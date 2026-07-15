@@ -1,0 +1,31 @@
+Build a Mobile-First, 100% Responsive Full-Stack Ledger Application named "হাজারী খাতাবুক" (Hazari Khatabook) matching the exact UI structure provided in the screenshots. The application must use React (Tailwind CSS), Node.js/Express, and SQLite.
+
+1. HOME SCREEN ARCHITECTURE (As per the latest screenshot):
+- The Home Screen must be a zero-scroll viewport wrapper (`h-screen overflow-hidden`) but containing an isolated scrollable center area for the customer directory.
+- FIXED TOP BLUE HEADER: 
+  * Background Color: Deep Blue. Contains Shop Name dropdown, "+ স্টাফ যোগ করুন" (Add Staff) button.
+  * Sub-header tab selector active on "কাস্টমার" (Customers).
+- FIXED OVERLAPPING SUMMARY CARD:
+  * White background grid showing: "দেবেন" (Red ৳0), "পাবেন" (Green ৳0), and a clickable arrow button for "রিপোর্ট দেখুন" (View Report).
+- FIXED UTILITY BAR:
+  * Contains a "Search Customer" search bar input, a "ফিল্টার" icon, and a "PDF" report generation icon.
+- SCROLLABLE CUSTOMER LIST AREA (The only scrollable section):
+  * Use `flex-1 overflow-y-auto` so that when multiple customers are added, ONLY this mid-section scrolls vertically. 
+  * Empty State: Show the central graphic placeholder text "কাস্টমার যোগ করুন এবং দ্রুত বকেয়া কালেকশন করুন".
+- FIXED BOTTOM NAVIGATION BAR:
+  * Permanently floating right-aligned active Fab button: "+ কাস্টমার যোগ করুন" (ADD CUSTOMER) in Crimson Red/Magenta color.
+  * Sticky bottom footer tabs: "পার্টিস (Parties)" with active icon layout.
+
+2. TRANSACTION ENTRY SCREEN WITH KEYPAD (From previous screenshots):
+- Tapping a customer opens their transaction history ledger screen.
+- Inside the ledger entry page, enforce a strict layout where the custom 4-column calculator keypad is locked at the absolute bottom (taking 40% height).
+- The dynamic fields update instantly without moving the keyboard position:
+  * STATE A (Empty): Shows only the large Taka (৳) amount card, "SAVE" button, and custom keypad.
+  * STATE B (Active Typing): As soon as numbers/operators are pressed, the remaining fields ("বিবরণ", "বিল নম্বর", "তারিখ", "ক্যামেরা আইকন") smoothly slide up inside the tight space between the amount box and the SAVE button, completely bypassing standard browser input scrolling.
+
+3. DATA & LOCALIZATION:
+- All system text, values, forms, and logs must be in 100% professional Bengali language.
+- All monetary math calculations must display the Bangladeshi Taka symbol (৳).
+- Implement the SQLite tables (`parties`, `ledger_entries`) and sync all real-time ledger addition math to update individual and aggregate balances perfectly.
+
+Generate the clean multi-file architecture with zero layout shifting.
