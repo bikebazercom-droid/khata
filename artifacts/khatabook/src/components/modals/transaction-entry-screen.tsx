@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useCreateLedgerEntry,
@@ -50,17 +50,32 @@ const ROW_0DOT: KeyDef[] = [
   { label: '+', value: '+', kind: 'accent', span: 2 },
 ];
 
-function Key({ def, onPress }: { def: KeyDef; onPress: (value: string) => void }) {
+// Memoized so a parent re-render (typing, memory updates, description edits,
+// etc.) never re-renders the 20+ key buttons — only `onPress` identity and
+// `def` (a stable module-level constant) are compared, and `onPress` is a
+// useCallback below, so in practice these never re-render after mount.
+const Key = memo(function Key({ def, onPress }: { def: KeyDef; onPress: (value: string) => void }) {
   return (
     <button
       type="button"
       onClick={() => onPress(def.value)}
-      style={def.span ? { gridColumn: `span ${def.span}` } : undefined}
+      style={{
+        ...(def.span ? { gridColumn: `span ${def.span}` } : undefined),
+        // Hardware-accelerated, GPU-composited layer: the browser can flip
+        // the `:active` background on its own compositor thread instead of
+        // repainting, so there's zero lag on low-end mobile devices even
+        // during fast repeated taps.
+        transform: 'translate3d(0,0,0)',
+        backfaceVisibility: 'hidden',
+        willChange: 'background-color',
+      }}
       className={cn(
         'h-14 rounded-xl font-bold text-lg flex items-center justify-center active:scale-[0.95] transition-[background-color,transform] duration-[50ms] ease-out select-none',
         // Tactile press feedback: every key — digit, operator, or memory
         // control — flashes to a warm charcoal-brown the instant it's
         // pressed, then snaps back on release, like a phone dialer keypad.
+        // This is pure CSS :active — no React state involved, so pressing
+        // a key never triggers a re-render just for the visual feedback.
         'active:bg-[#4A3C31] active:text-white active:shadow-none',
         def.kind === 'digit' && 'bg-white text-slate-800 shadow-sm',
         def.kind === 'muted' && 'bg-blue-50 text-blue-900 shadow-sm',
@@ -70,7 +85,7 @@ function Key({ def, onPress }: { def: KeyDef; onPress: (value: string) => void }
       {def.label}
     </button>
   );
-}
+});
 
 export function TransactionEntryScreen({
   partyId,
@@ -96,24 +111,37 @@ export function TransactionEntryScreen({
   // visibility flag to keep in sync.
   const [memoryHistory, setMemoryHistory] = useState<string[]>([]);
   const isMemoryActive = memoryHistory.length > 0;
-  const clearMemory = () => {
+  const clearMemory = useCallback(() => {
+    memoryValueRef.current = 0;
     setMemoryValue(0);
     setMemoryHistory([]);
-  };
+  }, []);
   // Tap the MRC bar once to recall the memory value into the expression;
   // tap it again right after (with no other key press in between) to clear
   // the memory instead — classic calculator MRC semantics, not time-based.
   const justRecalledRef = useRef(false);
-  const handleMrcTap = () => {
+  // Live memory total kept in a ref alongside state: pressKey/handleMrcTap
+  // read the ref for same-tick math (no stale-closure risk from batched
+  // setState) while `memoryValue` state still drives the on-screen render.
+  const memoryValueRef = useRef(0);
+  // Mirrors `expression` so pressKey (a stable, zero-dependency useCallback)
+  // can read the latest typed value without closing over stale state or
+  // embedding side effects inside a setState updater function — updaters
+  // must stay pure, so all M+/M- bookkeeping happens outside of one.
+  const expressionRef = useRef('');
+  useEffect(() => {
+    expressionRef.current = expression;
+  }, [expression]);
+  const handleMrcTap = useCallback(() => {
     if (justRecalledRef.current) {
       clearMemory();
       justRecalledRef.current = false;
       return;
     }
-    setExpression(trimNumberForExpression(memoryValue));
+    setExpression(trimNumberForExpression(memoryValueRef.current));
     setHasInteracted(true);
     justRecalledRef.current = true;
-  };
+  }, [clearMemory]);
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [showError, setShowError] = useState(false);
@@ -135,6 +163,16 @@ export function TransactionEntryScreen({
     return evaluateCalculatorExpression(expression);
   }, [expression]);
 
+  // Pre-computed once per expression/result change rather than re-formatted
+  // inline in JSX on every render (e.g. from unrelated state like
+  // `description` or `dueDate` edits) — keeps the render loop free of string
+  // work while typing.
+  const formulaPreviewText = useMemo(() => {
+    const base = expression ? formatExpressionForDisplay(expression) : '0';
+    const suffix = hasFormula && liveResult !== null ? ` = ${trimNumberForExpression(liveResult)}` : '';
+    return `${base}${suffix}`;
+  }, [expression, hasFormula, liveResult]);
+
   // Once memory logs exist, the big header amount tracks the running memory
   // total rather than whatever is currently being typed for the next entry —
   // the typed expression still gets its own live preview bar below.
@@ -146,7 +184,7 @@ export function TransactionEntryScreen({
   // unlike `isActive` which can flip back off as the formula is edited.
   const showMetadata = hasInteracted;
 
-  const processCapturedImage = async (dataUrl: string) => {
+  const processCapturedImage = useCallback(async (dataUrl: string) => {
     setIsScanning(true);
     try {
       const scanned = await scanDocument(dataUrl);
@@ -157,40 +195,51 @@ export function TransactionEntryScreen({
     } finally {
       setIsScanning(false);
     }
-  };
+  }, []);
 
-  const handleAttachClick = () => {
+  const handleAttachClick = useCallback(() => {
     if (typeof navigator !== 'undefined' && typeof navigator.mediaDevices?.getUserMedia === 'function') {
       setIsCameraOpen(true);
     } else {
       fileInputRef.current?.click();
     }
-  };
+  }, []);
 
-  const handleCameraCapture = (dataUrl: string) => {
-    setIsCameraOpen(false);
-    void processCapturedImage(dataUrl);
-  };
+  const handleCameraCapture = useCallback(
+    (dataUrl: string) => {
+      setIsCameraOpen(false);
+      void processCapturedImage(dataUrl);
+    },
+    [processCapturedImage]
+  );
 
-  const handleCameraError = () => {
+  const handleCameraError = useCallback(() => {
     setIsCameraOpen(false);
     fileInputRef.current?.click();
-  };
+  }, []);
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        void processCapturedImage(reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
+  const handleFileChange = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          void processCapturedImage(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    },
+    [processCapturedImage]
+  );
 
-  const pressKey = (value: string) => {
+  // Stable across renders (useCallback with a functional-setState style body
+  // that reads current expression/memory via refs) so the memoized <Key>
+  // grid never has to re-render just because this identity changed —
+  // keystrokes stay off the render path entirely except for the one state
+  // update they actually need.
+  const pressKey = useCallback((value: string) => {
     setShowError(false);
     // Any keypad press other than the MRC bar breaks the recall→clear combo.
     justRecalledRef.current = false;
@@ -203,7 +252,7 @@ export function TransactionEntryScreen({
       return;
     }
     if (value === '=') {
-      const result = evaluateCalculatorExpression(expression);
+      const result = evaluateCalculatorExpression(expressionRef.current);
       if (result === null) {
         setShowError(true);
         return;
@@ -217,13 +266,17 @@ export function TransactionEntryScreen({
       // operation. The log label keeps the raw typed expression (e.g.
       // "500×") rather than its evaluated value, so multi-step entries stay
       // legible in the history.
-      const safeValue = liveResult !== null && Number.isFinite(liveResult) ? liveResult : 0;
-      const label = expression ? formatExpressionForDisplay(expression) : '0';
-      const newMemoryValue = value === 'M+' ? memoryValue + safeValue : memoryValue - safeValue;
+      const currentExpression = expressionRef.current;
+      const result = currentExpression ? evaluateCalculatorExpression(currentExpression) : 0;
+      const safeValue = result !== null && Number.isFinite(result) ? result : 0;
+      const label = currentExpression ? formatExpressionForDisplay(currentExpression) : '0';
+      const newMemoryValue = value === 'M+' ? memoryValueRef.current + safeValue : memoryValueRef.current - safeValue;
+      memoryValueRef.current = newMemoryValue;
       setMemoryValue(newMemoryValue);
       setMemoryHistory((prev) => [...prev, `${value}(${label})=${newMemoryValue.toFixed(1)}`]);
       // Clear the typed expression so the next number starts fresh for the
       // following memory entry.
+      expressionRef.current = '';
       setExpression('');
       justRecalledRef.current = false;
       // Silent by design: no toast/alert here — the running total and
@@ -234,9 +287,9 @@ export function TransactionEntryScreen({
     // Any numeric/operator key press permanently unlocks the metadata panel.
     setHasInteracted(true);
     setExpression((prev) => prev + value);
-  };
+  }, []);
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     // If memory logs exist, the grand total accumulated in memory is the
     // authoritative amount to save — it already reflects every M+/M- entry.
     // Otherwise fall back to whatever is currently typed in the expression.
@@ -277,7 +330,20 @@ export function TransactionEntryScreen({
         },
       }
     );
-  };
+  }, [
+    memoryHistory.length,
+    memoryValue,
+    expression,
+    createEntry,
+    partyId,
+    type,
+    description,
+    billImage,
+    dueDate,
+    clearMemory,
+    queryClient,
+    onClose,
+  ]);
 
   return (
     <div className="absolute inset-0 z-50 bg-[#f8fafc] flex flex-col">
@@ -311,7 +377,10 @@ export function TransactionEntryScreen({
               newest at the bottom, scrollable once it grows past a few
               lines. Completely hidden until the first M+/M- press. */}
           {isMemoryActive && (
-            <div className="max-h-28 overflow-y-auto px-4 py-2 border-t border-slate-100 bg-slate-50/60 space-y-1">
+            <div
+              className="max-h-28 overflow-y-auto px-4 py-2 border-t border-slate-100 bg-slate-50/60 space-y-1"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
               {memoryHistory.map((log, i) => (
                 <p key={i} className="text-sm font-mono font-medium text-slate-700 truncate">
                   {log}
@@ -326,8 +395,7 @@ export function TransactionEntryScreen({
           {showMetadata && (
             <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50/60">
               <p className="text-sm font-mono font-medium text-slate-500 truncate">
-                {expression ? formatExpressionForDisplay(expression) : '0'}
-                {hasFormula && liveResult !== null ? ` = ${trimNumberForExpression(liveResult)}` : ''}
+                {formulaPreviewText}
               </p>
             </div>
           )}
@@ -436,8 +504,13 @@ export function TransactionEntryScreen({
         </button>
       </div>
 
-      {/* Custom on-screen calculator keypad */}
-      <div className="p-3 pb-4 space-y-2 shrink-0 bg-[#eef2f7]">
+      {/* Custom on-screen calculator keypad — promoted to its own GPU
+          compositor layer so key presses never trigger a main-thread paint
+          of the whole grid on low-end mobile devices. */}
+      <div
+        className="p-3 pb-4 space-y-2 shrink-0 bg-[#eef2f7]"
+        style={{ transform: 'translate3d(0,0,0)', backfaceVisibility: 'hidden' }}
+      >
         {/* MRC bar: shown whenever the memory history has at least one
             entry. Tap once to recall the running total into the expression;
             tap again right after (no other key in between) to clear the
