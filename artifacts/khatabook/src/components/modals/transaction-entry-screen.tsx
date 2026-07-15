@@ -18,12 +18,8 @@ import { scanDocument } from '@/lib/document-scan';
 type KeyKind = 'digit' | 'muted' | 'accent';
 type KeyDef = { label: string; value: string; kind: KeyKind; span?: number };
 
-const ROW_MEMORY_1: KeyDef[] = [
-  { label: 'MC', value: 'MC', kind: 'muted' },
-  { label: 'MR', value: 'MR', kind: 'muted' },
+const ROW_MEMORY: KeyDef[] = [
   { label: 'C', value: 'C', kind: 'muted' },
-];
-const ROW_MEMORY_2: KeyDef[] = [
   { label: 'M+', value: 'M+', kind: 'muted' },
   { label: 'M-', value: 'M-', kind: 'muted' },
   { label: '⌫', value: 'DEL', kind: 'digit' },
@@ -100,6 +96,20 @@ export function TransactionEntryScreen({
     setIsMemoryActive(false);
     setMemoryEquationText('');
   };
+  // Tap the MRC bar once to recall the memory value into the expression;
+  // tap it again right after (with no other key press in between) to clear
+  // the memory instead — classic calculator MRC semantics, not time-based.
+  const justRecalledRef = useRef(false);
+  const handleMrcTap = () => {
+    if (justRecalledRef.current) {
+      clearMemory();
+      justRecalledRef.current = false;
+      return;
+    }
+    setExpression(trimNumberForExpression(memoryValue));
+    setHasInteracted(true);
+    justRecalledRef.current = true;
+  };
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [showError, setShowError] = useState(false);
@@ -175,6 +185,8 @@ export function TransactionEntryScreen({
 
   const pressKey = (value: string) => {
     setShowError(false);
+    // Any keypad press other than the MRC bar breaks the recall→clear combo.
+    justRecalledRef.current = false;
     if (value === 'C') {
       setExpression('');
       setIsMemoryActive(false);
@@ -201,20 +213,10 @@ export function TransactionEntryScreen({
       const safeValue = Number.isFinite(parsed) ? parsed : 0;
       const newMemoryValue = value === 'M+' ? memoryValue + safeValue : memoryValue - safeValue;
       setMemoryValue(newMemoryValue);
-      setMemoryEquationText(`${value}(${trimNumberForExpression(safeValue)})=${trimNumberForExpression(newMemoryValue)}`);
+      setMemoryEquationText(`${value}(${trimNumberForExpression(safeValue)})=${newMemoryValue.toFixed(1)}`);
       setIsMemoryActive(true);
+      justRecalledRef.current = false;
       toast.success(value === 'M+' ? `মেমোরিতে যোগ হয়েছে: ${formatCurrency(safeValue)}` : `মেমোরি থেকে বিয়োগ হয়েছে: ${formatCurrency(safeValue)}`);
-      return;
-    }
-    if (value === 'MR') {
-      // Recall replaces the display with the stored memory value so it can
-      // be used directly in the next calculation.
-      setExpression(trimNumberForExpression(memoryValue));
-      setHasInteracted(true);
-      return;
-    }
-    if (value === 'MC') {
-      clearMemory();
       return;
     }
     // Any numeric/operator key press permanently unlocks the metadata panel.
@@ -288,32 +290,24 @@ export function TransactionEntryScreen({
             <span className={cn('text-3xl font-extrabold tracking-tight', isGet ? 'text-emerald-600' : 'text-red-500')}>
               {formatCurrency(displayAmount)}
             </span>
-            {isMemoryActive && (
-              <span
-                aria-label="মেমোরি সক্রিয়"
-                title="মেমোরিতে মান সংরক্ষিত আছে"
-                className="ml-2 inline-flex items-center justify-center align-middle text-[10px] font-extrabold text-blue-700 bg-blue-100 rounded px-1.5 py-0.5"
-              >
-                M
-              </span>
-            )}
             {!isActive && <p className="text-xs font-semibold text-slate-400 mt-1">পরিমাণ লিখুন</p>}
-            {/* Memory sub-display: completely hidden until an M+/M- press,
-                hidden again on C/MC. */}
-            {isMemoryActive && memoryEquationText && (
-              <p className="text-xs font-mono font-semibold text-blue-600 mt-1">{memoryEquationText}</p>
-            )}
           </div>
-          {/* Formula sub-bar: once unlocked by the first key press it stays
-              mounted and visible for the rest of the session — it never
-              re-hides on clears/edits, only its text content updates. */}
-          {showMetadata && (
+          {/* Memory equation sub-bar: completely hidden until an M+/M- press,
+              hidden again on C/MC. Takes priority over the calculator
+              formula bar since only one sub-bar is shown at a time. */}
+          {isMemoryActive && memoryEquationText ? (
             <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50/60">
-              <p className="text-sm font-mono font-medium text-slate-500 truncate">
-                {expression ? formatExpressionForDisplay(expression) : '0'}
-                {hasFormula && liveResult !== null ? ` = ${trimNumberForExpression(liveResult)}` : ''}
-              </p>
+              <p className="text-sm font-mono font-medium text-slate-700 truncate">{memoryEquationText}</p>
             </div>
+          ) : (
+            showMetadata && (
+              <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50/60">
+                <p className="text-sm font-mono font-medium text-slate-500 truncate">
+                  {expression ? formatExpressionForDisplay(expression) : '0'}
+                  {hasFormula && liveResult !== null ? ` = ${trimNumberForExpression(liveResult)}` : ''}
+                </p>
+              </div>
+            )
           )}
           {showError && (
             <div className="px-4 py-2 border-t border-red-100 bg-red-50">
@@ -332,20 +326,6 @@ export function TransactionEntryScreen({
           )}
         >
           <div className="flex flex-col gap-3 pt-0.5">
-            {/* MRC bar: completely hidden until an M+/M- press, hidden again
-                on C/MC. */}
-            {isMemoryActive && (
-              <button
-                type="button"
-                tabIndex={showMetadata ? 0 : -1}
-                onClick={() => setExpression((prev) => prev + (memoryValue >= 0 ? `+${trimNumberForExpression(memoryValue)}` : trimNumberForExpression(memoryValue)))}
-                className="w-full flex items-center justify-between bg-blue-50 border border-blue-100 rounded-xl px-4 py-2 text-xs font-bold text-blue-800 active:scale-[0.98] transition-transform"
-              >
-                <span>MRC</span>
-                <span>= {formatCurrency(memoryValue)} · যোগ করতে ট্যাপ করুন</span>
-              </button>
-            )}
-
             {/* Description */}
             <input
               value={description}
@@ -436,13 +416,20 @@ export function TransactionEntryScreen({
 
       {/* Custom on-screen calculator keypad */}
       <div className="p-3 pb-4 space-y-2 shrink-0 bg-[#eef2f7]">
-        <div className="grid grid-cols-3 gap-2">
-          {ROW_MEMORY_1.map((k) => (
-            <Key key={k.value} def={k} onPress={pressKey} />
-          ))}
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          {ROW_MEMORY_2.map((k) => (
+        {/* MRC bar: completely hidden until an M+/M- press, hidden again on
+            C/MC. Tap to recall the stored value into the expression; tap
+            again within half a second to clear the memory. */}
+        {isMemoryActive && (
+          <button
+            type="button"
+            onClick={handleMrcTap}
+            className="w-full h-12 rounded-xl bg-[#0b3d91] text-white font-extrabold text-base flex items-center justify-center active:scale-[0.98] transition-transform"
+          >
+            MRC = {formatCurrency(memoryValue)}
+          </button>
+        )}
+        <div className="grid grid-cols-4 gap-2">
+          {ROW_MEMORY.map((k) => (
             <Key key={k.value} def={k} onPress={pressKey} />
           ))}
         </div>
