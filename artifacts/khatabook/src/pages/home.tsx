@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { AddPartyModal } from '@/components/modals/add-party-modal';
 import { SettingsDrawer } from '@/components/modals/settings-drawer';
 import { AddStaffDialog } from '@/components/modals/add-staff-dialog';
+import { RenameStoreDialog } from '@/components/modals/rename-store-dialog';
 import { formatDistanceToNow } from 'date-fns';
 import { bn } from 'date-fns/locale';
 
@@ -25,6 +26,7 @@ export function HomeView() {
   const [isAddPartyOpen, setIsAddPartyOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
+  const [isRenameStoreOpen, setIsRenameStoreOpen] = useState(false);
 
   const { data: summary } = useGetDashboardSummary();
   const { data: settings } = useGetBusinessSettings();
@@ -43,7 +45,7 @@ export function HomeView() {
               {settings?.storeName || 'হাজারী খাতাবুক'}
             </h1>
             <button
-              onClick={() => setIsSettingsOpen(true)}
+              onClick={() => setIsRenameStoreOpen(true)}
               aria-label="দোকানের নাম সম্পাদনা করুন"
               className="w-6 h-6 shrink-0 rounded-md flex items-center justify-center text-white/60 active:bg-white/15 active:text-white transition-all"
             >
@@ -280,6 +282,7 @@ export function HomeView() {
       <AddPartyModal open={isAddPartyOpen} onOpenChange={setIsAddPartyOpen} defaultRole={role} />
       <SettingsDrawer open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
       <AddStaffDialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen} />
+      <RenameStoreDialog open={isRenameStoreOpen} onOpenChange={setIsRenameStoreOpen} />
     </div>
   );
 }
