@@ -1,0 +1,22 @@
+Upgrade the entire application to use a centralized Cloud Database Architecture (SQLite/PostgreSQL with server synchronization, or Firebase Firestore/Supabase) to support full cloud backup, recovery, and real-time multi-device sync based on the OTP login system.
+
+STRICTLY IMPLEMENT THE FOLLOWING MULTI-DEVICE CLOUD LOGIC:
+
+1. PERSISTENT ACCOUNT DATA RECOVERY (আগের সব হিস্টরি থাকবে):
+- Bind all application data—including Customer Profiles, Transaction Ledgers, Calculator Memory Log History, and Bill Attachment URLs—to the unique User Identity (verified Gmail or Bangladeshi Phone Number).
+- If the user uninstalls the app or clears cache, logging back in with the SAME verified Gmail or Phone Number must instantly fetch and restore 100% of their historical data from the cloud database within milliseconds.
+
+2. MULTI-DEVICE SIMULTANEOUS ACTIVE LOGINS (দুই ডিভাইসে যেন সেম দেখায়):
+- Allow the exact same authenticated account (Gmail or Phone) to be simultaneously logged in across multiple active devices (e.g., two mobile phones or phone and web view).
+- Ensure authorization tokens (JWT or Session tokens) support multiple concurrent sessions without forcefully logging out the alternate device.
+
+3. REAL-TIME INTER-DEVICE DATA SYNC (এক ডিভাইস থেকে এন্ট্রি করলে অন্য ডিভাইসে শো করবে):
+- Implement a real-time listener or automated background polling pipeline (via WebSockets, Server-Sent Events, or Supabase/Firebase Realtime sub-streams):
+  * When a transaction is successfully saved on "Device A" using the red "সংরক্ষণ করুন" button, silently broadcast this update to the cloud.
+  * "Device B", running the same account, must catch this update and instantly append the new transaction card, update the dynamic top total balance ("আপনি দেবেন / আপনি পাবেন"), and display the attached bill thumbnail in real-time.
+- Maintain our strict zero-loading performance policy: This sync must happen completely in the background without showing any spinners, freezing the screen, or causing flashing animations on either device.
+
+4. IMAGE CLOUD STORAGE Integration:
+- Upload scanned bill attachment images captured from the camera to a secure cloud bucket (S3, Cloudinary, or Supabase Storage) so that image URLs are globally accessible and render properly across all authorized logged-in devices.
+
+Refactor the database controller, API endpoints, and React global state hooks to implement this real-time sync mechanism now.
