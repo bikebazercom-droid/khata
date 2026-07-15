@@ -67,11 +67,12 @@ function groupByMonth(entries: ReportEntry[]): MonthGroup[] {
   return groups;
 }
 
-const COLOR_DEBIT_BG = '#fef2f2';
-const COLOR_CREDIT_BG = '#f0fdf4';
-const COLOR_DEBIT_TEXT = '#b91c1c';
-const COLOR_CREDIT_TEXT = '#15803d';
-const COLOR_BRAND = '#0b57d0';
+const COLOR_DEBIT_BG = '#FFF5F5';
+const COLOR_CREDIT_BG = '#F0FDF4';
+const COLOR_DEBIT_TEXT = '#DC2626';
+const COLOR_CREDIT_TEXT = '#16A34A';
+const COLOR_BRAND = '#0b3d91';
+const GRID_BORDER = '0.75px solid #000000';
 
 /** Balance-column text: signed amount plus the accounting-style Dr/Cr suffix. */
 function balanceCell(balanceAfter: number) {
@@ -103,14 +104,17 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
         <div
           style={{
             backgroundColor: COLOR_BRAND,
-            padding: '18px 32px',
+            padding: '16px 32px',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
           }}
         >
-          <h1 style={{ fontSize: '20px', fontWeight: 800, margin: 0, color: '#ffffff' }}>{storeName}</h1>
-          <span style={{ fontSize: '12px', fontWeight: 700, color: '#dbeafe', letterSpacing: '0.04em' }}>হাজারী খাতাবুক</span>
+          <h1 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: '#ffffff', letterSpacing: '0.02em' }}>{storeName}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '10px', height: '10px', backgroundColor: '#ffffff', borderRadius: '2px', display: 'inline-block' }} />
+            <span style={{ fontSize: '14px', fontWeight: 700, color: '#ffffff' }}>হাজারী খাতাবুক</span>
+          </div>
         </div>
 
         <div style={{ padding: '24px 32px 32px' }}>
@@ -141,34 +145,37 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
 
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
             <thead>
-              <tr style={{ backgroundColor: COLOR_BRAND }}>
-                <th style={{ textAlign: 'left', padding: '8px 10px', color: '#ffffff', fontWeight: 700 }}>তারিখ</th>
-                <th style={{ textAlign: 'left', padding: '8px 10px', color: '#ffffff', fontWeight: 700 }}>ডিটেলস</th>
-                <th style={{ textAlign: 'right', padding: '8px 10px', color: '#ffffff', fontWeight: 700 }}>ডেবিট (-)</th>
-                <th style={{ textAlign: 'right', padding: '8px 10px', color: '#ffffff', fontWeight: 700 }}>ক্রেডিট (+)</th>
-                <th style={{ textAlign: 'right', padding: '8px 10px', color: '#ffffff', fontWeight: 700 }}>ব্যালেন্স</th>
+              <tr style={{ backgroundColor: '#ffffff' }}>
+                <th style={{ textAlign: 'left', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>তারিখ</th>
+                <th style={{ textAlign: 'left', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ডিটেলস</th>
+                <th style={{ textAlign: 'right', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ডেবিট (-)</th>
+                <th style={{ textAlign: 'right', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ক্রেডিট (+)</th>
+                <th style={{ textAlign: 'right', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ব্যালেন্স</th>
               </tr>
             </thead>
             <tbody>
               {monthGroups.length === 0 && (
                 <tr>
-                  <td colSpan={5} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8' }}>
+                  <td colSpan={5} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', border: GRID_BORDER }}>
                     এখনো কোনো লেনদেন নেই
                   </td>
                 </tr>
               )}
-              {monthGroups.map((group) => (
+              {monthGroups.map((group, groupIndex) => (
                 <Fragment key={group.key}>
+                  {/* Month divider: a plain section title (no grid border) that visually
+                      separates each month's bordered block, matching the reference layout
+                      where every month renders as its own boxed mini-table. */}
                   <tr key={`${group.key}-header`}>
                     <td
                       colSpan={5}
                       style={{
-                        padding: '8px 10px',
-                        backgroundColor: '#1e293b',
-                        color: '#ffffff',
+                        padding: groupIndex === 0 ? '4px 2px 8px' : '18px 2px 8px',
+                        color: '#0f172a',
                         fontWeight: 800,
-                        fontSize: '12px',
-                        letterSpacing: '0.02em',
+                        fontSize: '13px',
+                        border: 'none',
+                        backgroundColor: '#ffffff',
                       }}
                     >
                       {group.label}
@@ -177,61 +184,92 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                   {group.entries.map((entry, i) => {
                     const isGave = entry.type === 'YOU_GAVE';
                     return (
-                      <tr key={entry.id} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                        <td style={{ padding: '7px 10px', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>
-                          {format(entryDate(entry), 'd MMM')}
+                      <tr key={entry.id} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#fafafa' }}>
+                        <td style={{ padding: '7px 10px', border: GRID_BORDER, whiteSpace: 'nowrap' }}>
+                          {format(entryDate(entry), 'dd/MM')}
                         </td>
-                        <td style={{ padding: '7px 10px', borderBottom: '1px solid #e2e8f0', color: '#334155' }}>{entryDetails(entry)}</td>
+                        <td style={{ padding: '7px 10px', border: GRID_BORDER, color: '#334155' }}>{entryDetails(entry)}</td>
                         <td
                           style={{
                             padding: '7px 10px',
-                            borderBottom: '1px solid #e2e8f0',
+                            border: GRID_BORDER,
                             textAlign: 'right',
                             fontWeight: 700,
                             backgroundColor: COLOR_DEBIT_BG,
                             color: isGave ? COLOR_DEBIT_TEXT : '#cbd5e1',
                           }}
                         >
-                          {isGave ? formatCurrency(entry.amount) : '—'}
+                          {isGave ? formatCurrency(entry.amount) : ''}
                         </td>
                         <td
                           style={{
                             padding: '7px 10px',
-                            borderBottom: '1px solid #e2e8f0',
+                            border: GRID_BORDER,
                             textAlign: 'right',
                             fontWeight: 700,
                             backgroundColor: COLOR_CREDIT_BG,
                             color: !isGave ? COLOR_CREDIT_TEXT : '#cbd5e1',
                           }}
                         >
-                          {!isGave ? formatCurrency(entry.amount) : '—'}
+                          {!isGave ? formatCurrency(entry.amount) : ''}
                         </td>
-                        <td style={{ padding: '7px 10px', borderBottom: '1px solid #e2e8f0', textAlign: 'right', fontWeight: 700, color: COLOR_DEBIT_TEXT }}>
+                        <td
+                          style={{
+                            padding: '7px 10px',
+                            border: GRID_BORDER,
+                            textAlign: 'right',
+                            fontWeight: 700,
+                            color: entry.balanceAfter >= 0 ? COLOR_DEBIT_TEXT : '#334155',
+                          }}
+                        >
                           {balanceCell(entry.balanceAfter)}
                         </td>
                       </tr>
                     );
                   })}
-                  <tr key={`${group.key}-total`} style={{ backgroundColor: '#eef2ff' }}>
-                    <td colSpan={2} style={{ padding: '8px 10px', fontWeight: 800, color: '#1e293b', borderBottom: '2px solid #c7d2fe' }}>
+                  <tr key={`${group.key}-total`} style={{ backgroundColor: '#f8fafc' }}>
+                    <td colSpan={2} style={{ padding: '8px 10px', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
                       {group.label.split(' ')[0]} মোট
                     </td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: COLOR_DEBIT_TEXT, backgroundColor: COLOR_DEBIT_BG, borderBottom: '2px solid #c7d2fe' }}>
+                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
                       {formatCurrency(group.totalDebit)}
                     </td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: COLOR_CREDIT_TEXT, backgroundColor: COLOR_CREDIT_BG, borderBottom: '2px solid #c7d2fe' }}>
+                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
                       {formatCurrency(group.totalCredit)}
                     </td>
-                    <td style={{ padding: '8px 10px', borderBottom: '2px solid #c7d2fe' }} />
+                    <td style={{ padding: '8px 10px', border: GRID_BORDER }} />
                   </tr>
                 </Fragment>
               ))}
             </tbody>
           </table>
 
-          <p style={{ fontSize: '10px', color: '#94a3b8', marginTop: '24px', textAlign: 'center' }}>
-            এই রিপোর্টটি {storeName} থেকে স্বয়ংক্রিয়ভাবে তৈরি করা হয়েছে। এটি কোনো আইনি নথি নয়। সাহায্যের জন্য {storeName}-এর সাথে সরাসরি যোগাযোগ করুন।
+        </div>
+
+        {/* Bottom footer bar: brand CTA (left) + help/legal copy (right). Renders
+            once at the true end of the statement content — html2pdf slices a
+            single tall canvas into pages, so a bar pinned here cannot repeat on
+            every physical page the way "Page X of Y" (stamped separately via
+            jsPDF, per page) does. */}
+        <div
+          style={{
+            backgroundColor: COLOR_BRAND,
+            padding: '14px 32px',
+            marginTop: '28px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <p style={{ fontSize: '11px', fontWeight: 700, color: '#ffffff', margin: 0 }}>
+            {storeName} থেকে স্বয়ংক্রিয়ভাবে তৈরি করা এই রিপোর্টটি হাজারী খাতাবুক ব্যবহার করে তৈরি।
           </p>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{ fontSize: '11px', fontWeight: 700, color: '#ffffff', margin: 0 }}>
+              সাহায্যের জন্য {storeName}-এর সাথে যোগাযোগ করুন
+            </p>
+            <p style={{ fontSize: '9px', color: '#c7d2fe', margin: '2px 0 0' }}>নিয়ম ও শর্তাবলী প্রযোজ্য</p>
+          </div>
         </div>
       </div>
     );

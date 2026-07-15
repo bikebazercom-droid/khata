@@ -1,0 +1,26 @@
+Re-architect the PDF generation styling for the "রিপোর্ট" (Report) and "রিমাইন্ডার" (Reminder) actions to strictly match the exact aesthetic, table layout, borders, and color codes shown in the provided screenshot.
+
+1. PIXEL-PERFECT GRID & BORDERS:
+- Build a strictly bordered table (প্রত্যেকটা আইটেমের জন্য আলাদা ঘর/বর্ডার থাকবে) using a solid black/gray inner grid style. Ensure every cell has clear left, right, top, and bottom borders (`lineWidth: 0.5`, `strokeStyle: '#000000'`).
+- The table must have exactly 5 columns with these Bengali headers:
+  * "তারিখ" (Date) | "ডিটেলস" (Details) | "ডেবিট (-)" (Debit) | "ক্রেডিট (+)" (Credit) | "ব্যালেন্স" (Balance)
+
+2. EXACT CELL COLOR CODING (RED & GREEN):
+- COLUMN 3 ("ডেবিট (-)"): Apply a very light pinkish-red background fill (e.g., hex `#FFF5F5` or `#FDE8E8`) for all rows in this column. Any numeric value inside this column must be colored in Bold Red text.
+- COLUMN 4 ("ক্রেডিট (+)"): Apply a very light greenish background fill (e.g., hex `#F0FDF4` or `#DEF7EC`) for all rows in this column. Any numeric value inside this column must be colored in Bold Green text.
+- COLUMN 5 ("ব্যালেন্স"): The balance must render with bold text formatted in red/dark gray.
+
+3. DYNAMIC MONTHLY GROUPS AND SUB-TOTALS:
+- Chronologically sort transactions from Oldest to Newest.
+- Before each month's transactions begin, insert a full-width section row displaying the Month & Year (e.g., "ফেব্রুয়ারি ২০২৬", "মার্চ ২০২৬").
+- At the end of each month's block, insert a distinct summary row:
+  * Column 2 text: "[মাসের নাম] মোট" (e.g., "ফেব্রুয়ারি মোট").
+  * Column 3: Display the sum of all debits for that month.
+  * Column 4: Display the sum of all credits for that month.
+  * Apply a clean light gray background style to this summary row.
+
+4. TOP & BOTTOM BRANDING BARS:
+- Top Header: Deep blue solid color block with white text "HAZARI GOLD LLC 2026" on the left and "Khatabook" logo/text on the right.
+- Bottom Footer: Display page numbers (Page X of Y), and localized customer support details.
+
+Implement this beautiful, fully-styled tabular PDF generator now using the active ledger dataset.
