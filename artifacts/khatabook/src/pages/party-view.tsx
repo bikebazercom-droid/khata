@@ -50,6 +50,7 @@ import {
   buildReportFilename,
   buildWhatsAppReminderText,
   toWhatsAppNumber,
+  stampPageNumbers,
 } from '@/lib/ledger-report';
 import { format, isToday } from 'date-fns';
 import { toast } from 'sonner';
@@ -168,13 +169,28 @@ export function PartyView() {
     }).from(reportRef.current);
   };
 
+  /**
+   * Advances a fresh html2pdf worker through PDF generation and stamps
+   * "Page X of Y" on every page. html2pdf's Worker.then() returns another
+   * chainable Worker at runtime (unlike the shipped .d.ts, which types it as
+   * a plain Promise), so `.save()`/`.outputPdf()` remain callable after
+   * this — hence the cast back to the worker type.
+   */
+  const finalizeReportPdf = (worker: NonNullable<ReturnType<typeof buildReportPdf>>) =>
+    worker
+      .toPdf()
+      .get('pdf')
+      .then((pdf) => {
+        stampPageNumbers(pdf);
+      }) as unknown as NonNullable<ReturnType<typeof buildReportPdf>>;
+
   const handleReport = async () => {
     if (!party) return;
     setIsGeneratingReport(true);
     try {
       const worker = buildReportPdf();
       if (!worker) throw new Error('report element not ready');
-      await worker.save();
+      await finalizeReportPdf(worker).save();
       toast.success('পিডিএফ রিপোর্ট ডাউনলোড হয়েছে');
     } catch (err) {
       console.error('Report generation failed', err);
@@ -190,7 +206,7 @@ export function PartyView() {
     try {
       const worker = buildReportPdf();
       if (!worker) throw new Error('report element not ready');
-      const blob = await worker.outputPdf('blob');
+      const blob = await finalizeReportPdf(worker).outputPdf('blob');
       const filename = buildReportFilename(party.name);
       const messageText = buildWhatsAppReminderText(storeName, party);
       const file = new File([blob], filename, { type: 'application/pdf' });

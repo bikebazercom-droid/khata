@@ -1,11 +1,14 @@
-import { forwardRef } from 'react';
+import { forwardRef, Fragment } from 'react';
 import { format } from 'date-fns';
+import { bn } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
 
 export interface ReportEntry {
   id: string;
   type: 'YOU_GAVE' | 'YOU_GOT';
   amount: number;
+  description: string;
+  billReference: string | null;
   dueDate: string | null;
   createdAt: string | Date;
   balanceAfter: number;
@@ -24,6 +27,58 @@ interface LedgerReportDocumentProps {
   entries: ReportEntry[];
 }
 
+/** The entry's real transaction date, normalized to a Date object. */
+function entryDate(entry: ReportEntry) {
+  return new Date(entry.dueDate || entry.createdAt);
+}
+
+/** Human-readable details cell: description, falling back to a generic label, plus bill reference if present. */
+function entryDetails(entry: ReportEntry) {
+  const base = entry.description?.trim() || (entry.type === 'YOU_GAVE' ? 'নগদ প্রদান' : 'নগদ গ্রহণ');
+  return entry.billReference ? `${base} (বিল: ${entry.billReference})` : base;
+}
+
+interface MonthGroup {
+  key: string;
+  label: string;
+  entries: ReportEntry[];
+  totalDebit: number;
+  totalCredit: number;
+}
+
+/** Groups already chronologically-sorted (oldest -> newest) entries into calendar-month sections. */
+function groupByMonth(entries: ReportEntry[]): MonthGroup[] {
+  const groups: MonthGroup[] = [];
+  for (const entry of entries) {
+    const date = entryDate(entry);
+    const key = format(date, 'yyyy-MM');
+    let group = groups[groups.length - 1];
+    if (!group || group.key !== key) {
+      group = { key, label: format(date, 'MMMM yyyy', { locale: bn }), entries: [], totalDebit: 0, totalCredit: 0 };
+      groups.push(group);
+    }
+    group.entries.push(entry);
+    if (entry.type === 'YOU_GAVE') {
+      group.totalDebit += entry.amount;
+    } else {
+      group.totalCredit += entry.amount;
+    }
+  }
+  return groups;
+}
+
+const COLOR_DEBIT_BG = '#fef2f2';
+const COLOR_CREDIT_BG = '#f0fdf4';
+const COLOR_DEBIT_TEXT = '#b91c1c';
+const COLOR_CREDIT_TEXT = '#15803d';
+const COLOR_BRAND = '#0b57d0';
+
+/** Balance-column text: signed amount plus the accounting-style Dr/Cr suffix. */
+function balanceCell(balanceAfter: number) {
+  const isDr = balanceAfter >= 0; // positive = customer owes you (receivable, "Dr"); negative = you owe them ("Cr")
+  return `${formatCurrency(Math.abs(balanceAfter))} ${isDr ? 'Dr' : 'Cr'}`;
+}
+
 /**
  * Off-screen printable ledger statement, rendered with plain inline styles
  * (no Tailwind utility classes) so html2canvas — which cannot parse the
@@ -32,102 +87,152 @@ interface LedgerReportDocumentProps {
 export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocumentProps>(
   ({ storeName, party, entries }, ref) => {
     const isGive = party.balanceType === 'YOU_WILL_GIVE';
-    // `entries` is already sorted oldest -> newest by the caller's
-    // dual-sorting pipeline (true transaction-date order), matching the
-    // standard chronologically valid statement layout.
-    const chronological = entries;
+    const monthGroups = groupByMonth(entries);
 
     return (
       <div
         ref={ref}
         style={{
           width: '760px',
-          padding: '32px',
           fontFamily: "'Noto Sans Bengali', 'Inter', sans-serif",
           color: '#0f172a',
           backgroundColor: '#ffffff',
         }}
       >
-        <div style={{ borderBottom: '3px solid #0b57d0', paddingBottom: '16px', marginBottom: '20px' }}>
-          <h1 style={{ fontSize: '22px', fontWeight: 800, margin: 0, color: '#0b57d0' }}>{storeName}</h1>
-          <p style={{ fontSize: '11px', color: '#64748b', margin: '4px 0 0' }}>
-            রিপোর্ট তৈরির তারিখ: {format(new Date(), 'd MMM yyyy, hh:mm a')}
+        {/* Top banner: business branding (left) + app identity (right) */}
+        <div
+          style={{
+            backgroundColor: COLOR_BRAND,
+            padding: '18px 32px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <h1 style={{ fontSize: '20px', fontWeight: 800, margin: 0, color: '#ffffff' }}>{storeName}</h1>
+          <span style={{ fontSize: '12px', fontWeight: 700, color: '#dbeafe', letterSpacing: '0.04em' }}>হাজারী খাতাবুক</span>
+        </div>
+
+        <div style={{ padding: '24px 32px 32px' }}>
+          <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 20px' }}>
+            রিপোর্ট তৈরির তারিখ: {format(new Date(), 'd MMMM yyyy, hh:mm a', { locale: bn })}
           </p>
-        </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-          <div>
-            <p style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              কাস্টমার
-            </p>
-            <p style={{ fontSize: '16px', fontWeight: 800, margin: '2px 0 0' }}>{party.name}</p>
-            <p style={{ fontSize: '12px', color: '#475569', margin: '2px 0 0' }}>{party.phone}</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+            <div>
+              <p style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                কাস্টমার
+              </p>
+              <p style={{ fontSize: '16px', fontWeight: 800, margin: '2px 0 0' }}>{party.name}</p>
+              <p style={{ fontSize: '12px', color: '#475569', margin: '2px 0 0' }}>{party.phone}</p>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                বর্তমান ব্যালেন্স
+              </p>
+              <p style={{ fontSize: '13px', fontWeight: 800, margin: '4px 0 0', color: isGive ? COLOR_DEBIT_TEXT : COLOR_CREDIT_TEXT }}>
+                {isGive ? 'আপনি দেবেন' : 'আপনি পাবেন'}
+              </p>
+              <p style={{ fontSize: '20px', fontWeight: 800, margin: '2px 0 0', color: isGive ? COLOR_DEBIT_TEXT : COLOR_CREDIT_TEXT }}>
+                {formatCurrency(party.currentBalance)}
+              </p>
+            </div>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              বর্তমান ব্যালেন্স
-            </p>
-            <p style={{ fontSize: '13px', fontWeight: 800, margin: '4px 0 0', color: isGive ? '#dc2626' : '#059669' }}>
-              {isGive ? 'আপনি দেবেন' : 'আপনি পাবেন'}
-            </p>
-            <p style={{ fontSize: '20px', fontWeight: 800, margin: '2px 0 0', color: isGive ? '#dc2626' : '#059669' }}>
-              {formatCurrency(party.currentBalance)}
-            </p>
-          </div>
-        </div>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-          <thead>
-            <tr style={{ backgroundColor: '#0b57d0' }}>
-              <th style={{ textAlign: 'left', padding: '8px 10px', color: '#ffffff', fontWeight: 700 }}>তারিখ ও সময়</th>
-              <th style={{ textAlign: 'left', padding: '8px 10px', color: '#ffffff', fontWeight: 700 }}>ধরন</th>
-              <th style={{ textAlign: 'right', padding: '8px 10px', color: '#ffffff', fontWeight: 700 }}>পরিমাণ</th>
-              <th style={{ textAlign: 'right', padding: '8px 10px', color: '#ffffff', fontWeight: 700 }}>ব্যালেন্স</th>
-            </tr>
-          </thead>
-          <tbody>
-            {chronological.map((entry, i) => {
-              const isGave = entry.type === 'YOU_GAVE';
-              return (
-                <tr key={entry.id} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                  <td style={{ padding: '7px 10px', borderBottom: '1px solid #e2e8f0' }}>
-                    {format(new Date(entry.dueDate || entry.createdAt), 'd MMM yyyy')}
-                    {' • '}
-                    {format(new Date(entry.createdAt), 'hh:mm a')}
-                  </td>
-                  <td style={{ padding: '7px 10px', borderBottom: '1px solid #e2e8f0', color: isGave ? '#dc2626' : '#059669', fontWeight: 700 }}>
-                    {isGave ? 'দিয়েছেন' : 'পেয়েছেন'}
-                  </td>
-                  <td
-                    style={{
-                      padding: '7px 10px',
-                      borderBottom: '1px solid #e2e8f0',
-                      textAlign: 'right',
-                      fontWeight: 700,
-                      color: isGave ? '#dc2626' : '#059669',
-                    }}
-                  >
-                    {formatCurrency(entry.amount)}
-                  </td>
-                  <td style={{ padding: '7px 10px', borderBottom: '1px solid #e2e8f0', textAlign: 'right', color: '#334155' }}>
-                    {formatCurrency(Math.abs(entry.balanceAfter))}
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
+            <thead>
+              <tr style={{ backgroundColor: COLOR_BRAND }}>
+                <th style={{ textAlign: 'left', padding: '8px 10px', color: '#ffffff', fontWeight: 700 }}>তারিখ</th>
+                <th style={{ textAlign: 'left', padding: '8px 10px', color: '#ffffff', fontWeight: 700 }}>ডিটেলস</th>
+                <th style={{ textAlign: 'right', padding: '8px 10px', color: '#ffffff', fontWeight: 700 }}>ডেবিট (-)</th>
+                <th style={{ textAlign: 'right', padding: '8px 10px', color: '#ffffff', fontWeight: 700 }}>ক্রেডিট (+)</th>
+                <th style={{ textAlign: 'right', padding: '8px 10px', color: '#ffffff', fontWeight: 700 }}>ব্যালেন্স</th>
+              </tr>
+            </thead>
+            <tbody>
+              {monthGroups.length === 0 && (
+                <tr>
+                  <td colSpan={5} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8' }}>
+                    এখনো কোনো লেনদেন নেই
                   </td>
                 </tr>
-              );
-            })}
-            {chronological.length === 0 && (
-              <tr>
-                <td colSpan={4} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8' }}>
-                  এখনো কোনো লেনদেন নেই
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              )}
+              {monthGroups.map((group) => (
+                <Fragment key={group.key}>
+                  <tr key={`${group.key}-header`}>
+                    <td
+                      colSpan={5}
+                      style={{
+                        padding: '8px 10px',
+                        backgroundColor: '#1e293b',
+                        color: '#ffffff',
+                        fontWeight: 800,
+                        fontSize: '12px',
+                        letterSpacing: '0.02em',
+                      }}
+                    >
+                      {group.label}
+                    </td>
+                  </tr>
+                  {group.entries.map((entry, i) => {
+                    const isGave = entry.type === 'YOU_GAVE';
+                    return (
+                      <tr key={entry.id} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                        <td style={{ padding: '7px 10px', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>
+                          {format(entryDate(entry), 'd MMM')}
+                        </td>
+                        <td style={{ padding: '7px 10px', borderBottom: '1px solid #e2e8f0', color: '#334155' }}>{entryDetails(entry)}</td>
+                        <td
+                          style={{
+                            padding: '7px 10px',
+                            borderBottom: '1px solid #e2e8f0',
+                            textAlign: 'right',
+                            fontWeight: 700,
+                            backgroundColor: COLOR_DEBIT_BG,
+                            color: isGave ? COLOR_DEBIT_TEXT : '#cbd5e1',
+                          }}
+                        >
+                          {isGave ? formatCurrency(entry.amount) : '—'}
+                        </td>
+                        <td
+                          style={{
+                            padding: '7px 10px',
+                            borderBottom: '1px solid #e2e8f0',
+                            textAlign: 'right',
+                            fontWeight: 700,
+                            backgroundColor: COLOR_CREDIT_BG,
+                            color: !isGave ? COLOR_CREDIT_TEXT : '#cbd5e1',
+                          }}
+                        >
+                          {!isGave ? formatCurrency(entry.amount) : '—'}
+                        </td>
+                        <td style={{ padding: '7px 10px', borderBottom: '1px solid #e2e8f0', textAlign: 'right', fontWeight: 700, color: COLOR_DEBIT_TEXT }}>
+                          {balanceCell(entry.balanceAfter)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  <tr key={`${group.key}-total`} style={{ backgroundColor: '#eef2ff' }}>
+                    <td colSpan={2} style={{ padding: '8px 10px', fontWeight: 800, color: '#1e293b', borderBottom: '2px solid #c7d2fe' }}>
+                      {group.label.split(' ')[0]} মোট
+                    </td>
+                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: COLOR_DEBIT_TEXT, backgroundColor: COLOR_DEBIT_BG, borderBottom: '2px solid #c7d2fe' }}>
+                      {formatCurrency(group.totalDebit)}
+                    </td>
+                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: COLOR_CREDIT_TEXT, backgroundColor: COLOR_CREDIT_BG, borderBottom: '2px solid #c7d2fe' }}>
+                      {formatCurrency(group.totalCredit)}
+                    </td>
+                    <td style={{ padding: '8px 10px', borderBottom: '2px solid #c7d2fe' }} />
+                  </tr>
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
 
-        <p style={{ fontSize: '10px', color: '#94a3b8', marginTop: '24px', textAlign: 'center' }}>
-          এই রিপোর্টটি {storeName} থেকে স্বয়ংক্রিয়ভাবে তৈরি করা হয়েছে।
-        </p>
+          <p style={{ fontSize: '10px', color: '#94a3b8', marginTop: '24px', textAlign: 'center' }}>
+            এই রিপোর্টটি {storeName} থেকে স্বয়ংক্রিয়ভাবে তৈরি করা হয়েছে। এটি কোনো আইনি নথি নয়। সাহায্যের জন্য {storeName}-এর সাথে সরাসরি যোগাযোগ করুন।
+          </p>
+        </div>
       </div>
     );
   }
@@ -138,6 +243,31 @@ LedgerReportDocument.displayName = 'LedgerReportDocument';
 export function buildReportFilename(partyName: string) {
   const safeName = partyName.trim().replace(/\s+/g, '_');
   return `${safeName}_হিসাব_খাতা.pdf`;
+}
+
+/**
+ * Adds an ASCII "Page X of Y" stamp to every page of a generated jsPDF
+ * document. jsPDF's built-in fonts can't render Bengali glyphs, so this
+ * overlay is intentionally kept to plain digits/Latin text; all Bengali
+ * copy (legal footer, branding) lives in the html2canvas-rendered content
+ * instead.
+ */
+export function stampPageNumbers(pdf: {
+  internal: { getNumberOfPages(): number; pageSize: { getWidth(): number; getHeight(): number } };
+  setPage(page: number): void;
+  setFontSize(size: number): void;
+  setTextColor(r: number, g: number, b: number): void;
+  text(text: string, x: number, y: number, options?: { align?: 'left' | 'center' | 'right' }): void;
+}) {
+  const totalPages = pdf.internal.getNumberOfPages();
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  for (let page = 1; page <= totalPages; page += 1) {
+    pdf.setPage(page);
+    pdf.setFontSize(8);
+    pdf.setTextColor(148, 163, 184);
+    pdf.text(`Page ${page} of ${totalPages}`, pageWidth - 24, pageHeight - 16, { align: 'right' });
+  }
 }
 
 /**
