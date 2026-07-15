@@ -1,0 +1,32 @@
+Enhance the Home Page UI/UX to match the premium, clean, and card-based layout shown in the three reference screenshots. Focus on mobile responsiveness, pixel-perfect spacing, and rounded corner cards.
+
+1. DEEP BLUE BRANDING HEADER:
+- Background: Solid Deep Blue color (#075E9F or #025091).
+- Header Content:
+  * Left: Book icon next to the business name text (e.g., "My Business" or dynamic title) with an edit pencil icon.
+  * Right: A button with text "+ স্টাফ যোগ করুন" (Add Staff) accompanied by a user-plus icon, and a calendar/profile action button.
+- Tabs (গ্রাহক / সরবরাহকারী):
+  * Create a clean tab bar below the header.
+  * Active Tab: "গ্রাহক" (Customer) with a bold white underline indicating it's active.
+  * Inactive Tab: "সরবরাহকারী" (Supplier) in soft, slightly opaque white text.
+
+2. THE "3-IN-1" FLOATING SUMMARY CARD (Crucial):
+- Place a beautiful floating white card with sharp, clean rounded corners (e.g., `borderRadius: 16px` or `12px`) and a subtle shadow wrapper (`box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1)`).
+- This card must have a slight offset, partially overlapping the bottom edge of the deep blue header block.
+- Inside this card, divide the layout into exactly 3 equal columns separated by very thin, light gray vertical dividers:
+  * LEFT BOX ("আপনি দেবেন"): Render the amount in bold green text (e.g., green code `#15803D`) and label "আপনি দেবেন" underneath in a soft gray color.
+  * MIDDLE BOX ("আপনি পাবেন"): Render the amount in bold red text (e.g., red code `#DC2626`) and label "আপনি পাবেন" underneath in soft gray.
+  * RIGHT BOX ("রিপোর্ট দেখুন"): Render the text "রিপোর্ট দেখুন" (View Report) in the primary blue brand color, aligned vertically with a right-chevron arrow icon (`>`) for clear action indication.
+
+3. SEARCH & ACTIONS ROW (Directly Below the Card):
+- Input Field: Implement a clean search bar with rounded corners and a gray placeholder: "গ্রাহক অনুসন্ধান করুন" (Search customer).
+- Left of Search: A search magnifying glass icon.
+- Right of Search:
+  * Filter Icon: A vertical funnel icon with small subtitle "ফিল্টার" (Filter).
+  * PDF Icon: A clean PDF sheet icon with small subtitle "PDF" for instant ledger downloads.
+
+4. MOBILE RESPONSIVENESS AND SPACING:
+- Ensure all margins and paddings are tightly budgeted for typical mobile viewport sizes (360px to 420px width) without causing any overflow or wrapping issues.
+- Apply smooth tap states (`active:scale-95` or similar touch feedbacks) on the "রিপোর্ট দেখুন" box and search icons.
+
+Refactor the React/CSS components to instantly implement this modern, rounded-box-driven home screen layout.

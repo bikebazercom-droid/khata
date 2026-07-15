@@ -7,18 +7,12 @@ import {
   PartyRole,
   DueFilter,
 } from '@workspace/api-client-react';
-import { Search, Plus, Settings, User, ChevronRight, ChevronDown, UserPlus2, SlidersHorizontal, FileText, Users } from 'lucide-react';
+import { Search, Plus, Settings, User, ChevronRight, UserPlus2, SlidersHorizontal, FileText, Users, BookOpen, Pencil, UserCircle2 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { AddPartyModal } from '@/components/modals/add-party-modal';
 import { SettingsDrawer } from '@/components/modals/settings-drawer';
 import { AddStaffDialog } from '@/components/modals/add-staff-dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { formatDistanceToNow } from 'date-fns';
 import { bn } from 'date-fns/locale';
 
@@ -39,52 +33,50 @@ export function HomeView() {
   return (
     <div className="flex flex-col h-full w-full bg-white relative">
       {/* Fixed deep-blue top header */}
-      <div className="shrink-0 bg-[#0b57d0] pb-9 z-10">
-        <div className="flex items-center justify-between px-4 pt-4 pb-3">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2.5 min-w-0 active:opacity-80 transition-opacity">
-                <div className="w-9 h-9 rounded-xl bg-white/15 text-white flex items-center justify-center font-bold text-sm shrink-0">
-                  হা
-                </div>
-                <div className="leading-tight min-w-0 text-left">
-                  <span className="flex items-center gap-1">
-                    <h1 className="font-extrabold tracking-tight text-[15px] text-white truncate max-w-[140px]">
-                      {settings?.storeName || 'হাজারী খাতাবুক'}
-                    </h1>
-                    <ChevronDown className="w-3.5 h-3.5 text-white/70 shrink-0" />
-                  </span>
-                  <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest">খাতাবুক</p>
-                </div>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuItem disabled className="font-bold text-slate-800">
-                {settings?.storeName || 'হাজারী খাতাবুক'} ✓
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setIsSettingsOpen(true)}>
-                <Settings className="w-4 h-4 mr-2" /> দোকানের সেটিংস
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+      <div className="shrink-0 bg-[#075E9F] pb-9 z-10">
+        <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-white/15 text-white flex items-center justify-center shrink-0">
+              <BookOpen className="w-[18px] h-[18px]" />
+            </div>
+            <h1 className="font-extrabold tracking-tight text-[15px] text-white truncate max-w-[120px]">
+              {settings?.storeName || 'হাজারী খাতাবুক'}
+            </h1>
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              aria-label="দোকানের নাম সম্পাদনা করুন"
+              className="w-6 h-6 shrink-0 rounded-md flex items-center justify-center text-white/60 active:bg-white/15 active:text-white transition-all"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
-          <button
-            onClick={() => setIsAddStaffOpen(true)}
-            className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-2 rounded-xl shrink-0 active:scale-95 transition-all"
-          >
-            <UserPlus2 className="w-3.5 h-3.5" />
-            স্টাফ যোগ করুন
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setIsAddStaffOpen(true)}
+              className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-2 rounded-xl active:scale-95 transition-all"
+            >
+              <UserPlus2 className="w-3.5 h-3.5" />
+              স্টাফ যোগ করুন
+            </button>
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              aria-label="প্রোফাইল"
+              className="w-9 h-9 rounded-xl bg-white/15 text-white flex items-center justify-center active:scale-95 active:bg-white/25 transition-all"
+            >
+              <UserCircle2 className="w-[18px] h-[18px]" />
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}
         <div className="px-4">
-          <div className="flex bg-white/15 p-1.5 rounded-xl">
+          <div className="flex items-stretch gap-6 border-b border-white/15">
             <button
               onClick={() => setRole(PartyRole.CUSTOMER)}
               className={cn(
-                'flex-1 text-sm font-bold py-2.5 rounded-lg transition-all active:scale-[0.98]',
-                role === PartyRole.CUSTOMER ? 'bg-white shadow-md text-[#0b57d0]' : 'text-white/80'
+                'text-sm font-bold pb-2.5 pt-1 transition-all border-b-2',
+                role === PartyRole.CUSTOMER ? 'text-white border-white' : 'text-white/60 border-transparent'
               )}
             >
               কাস্টমার (খরিদ্দার)
@@ -92,8 +84,8 @@ export function HomeView() {
             <button
               onClick={() => setRole(PartyRole.SUPPLIER)}
               className={cn(
-                'flex-1 text-sm font-bold py-2.5 rounded-lg transition-all active:scale-[0.98]',
-                role === PartyRole.SUPPLIER ? 'bg-white shadow-md text-[#0b57d0]' : 'text-white/80'
+                'text-sm font-bold pb-2.5 pt-1 transition-all border-b-2',
+                role === PartyRole.SUPPLIER ? 'text-white border-white' : 'text-white/60 border-transparent'
               )}
             >
               সাপ্লায়ার (মহাজন)
@@ -102,29 +94,29 @@ export function HomeView() {
         </div>
       </div>
 
-      {/* Overlapping white summary card */}
+      {/* Overlapping white "3-in-1" summary card */}
       <div className="shrink-0 px-4 -mt-6 z-10">
-        <div className="bg-white rounded-2xl shadow-[0_8px_30px_-10px_rgba(11,87,208,0.35)] border border-slate-100 p-3">
-          <div className="grid grid-cols-2 gap-2 mb-2">
-            <div className="bg-emerald-50 rounded-xl p-3">
-              <p className="text-[9px] font-bold text-emerald-600/80 uppercase tracking-widest mb-1">পাবেন</p>
-              <p className="text-emerald-700 font-extrabold text-[15px] tracking-tight truncate">
-                {formatCurrency(summary?.youWillGet || 0)}
-              </p>
-            </div>
-            <div className="bg-red-50 rounded-xl p-3">
-              <p className="text-[9px] font-bold text-red-500/80 uppercase tracking-widest mb-1">দেবেন</p>
-              <p className="text-red-600 font-extrabold text-[15px] tracking-tight truncate">
-                {formatCurrency(summary?.youWillGive || 0)}
-              </p>
-            </div>
+        <div className="bg-white rounded-2xl shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)] border border-slate-100 grid grid-cols-3 divide-x divide-slate-100">
+          <div className="px-1.5 py-3 text-center min-w-0">
+            <p className="text-emerald-700 font-extrabold text-[13px] tracking-tight truncate">
+              {formatCurrency(summary?.youWillGive || 0)}
+            </p>
+            <p className="text-[9.5px] font-semibold text-slate-400 mt-1 whitespace-nowrap">আপনি দেবেন</p>
+          </div>
+          <div className="px-1.5 py-3 text-center min-w-0">
+            <p className="text-red-600 font-extrabold text-[13px] tracking-tight truncate">
+              {formatCurrency(summary?.youWillGet || 0)}
+            </p>
+            <p className="text-[9.5px] font-semibold text-slate-400 mt-1 whitespace-nowrap">আপনি পাবেন</p>
           </div>
           <Link
             href="/reports"
-            className="w-full flex items-center justify-between px-3 py-2 rounded-xl hover:bg-slate-50 active:scale-[0.98] transition-all"
+            className="px-1.5 py-3 flex flex-col items-center justify-center gap-1 active:scale-[0.95] transition-all min-w-0"
           >
-            <span className="text-xs font-bold text-slate-500">রিপোর্ট দেখুন</span>
-            <ChevronRight className="w-4 h-4 text-slate-400" />
+            <span className="flex items-center gap-1 text-[#075E9F] font-bold text-[12px] whitespace-nowrap">
+              রিপোর্ট দেখুন
+              <ChevronRight className="w-3.5 h-3.5 shrink-0" />
+            </span>
           </Link>
         </div>
       </div>
@@ -134,7 +126,7 @@ export function HomeView() {
         <div className="relative flex-1">
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <Input
-            placeholder={role === PartyRole.CUSTOMER ? 'কাস্টমার খুঁজুন...' : 'সাপ্লায়ার খুঁজুন...'}
+            placeholder={role === PartyRole.CUSTOMER ? 'কাস্টমার অনুসন্ধান করুন' : 'সাপ্লায়ার অনুসন্ধান করুন'}
             className="pl-10 h-11 bg-slate-50 border-slate-200 rounded-xl font-medium focus-visible:ring-primary/20"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -144,18 +136,20 @@ export function HomeView() {
           onClick={() => setShowDueFilters((v) => !v)}
           aria-label="ফিল্টার"
           className={cn(
-            'w-11 h-11 shrink-0 rounded-xl flex items-center justify-center active:scale-95 transition-all',
+            'w-14 h-11 shrink-0 rounded-xl flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all',
             showDueFilters ? 'bg-primary text-primary-foreground' : 'bg-slate-50 text-slate-500 border border-slate-200'
           )}
         >
-          <SlidersHorizontal className="w-[18px] h-[18px]" />
+          <SlidersHorizontal className="w-4 h-4" />
+          <span className="text-[9px] font-bold leading-none">ফিল্টার</span>
         </button>
         <Link
           href="/reports"
           aria-label="PDF রিপোর্ট"
-          className="w-11 h-11 shrink-0 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 flex items-center justify-center active:scale-95 transition-all"
+          className="w-14 h-11 shrink-0 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all"
         >
-          <FileText className="w-[18px] h-[18px]" />
+          <FileText className="w-4 h-4" />
+          <span className="text-[9px] font-bold leading-none">PDF</span>
         </Link>
       </div>
 
