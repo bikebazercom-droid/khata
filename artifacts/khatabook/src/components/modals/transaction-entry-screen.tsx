@@ -90,7 +90,16 @@ export function TransactionEntryScreen({
   // Dedicated calculator memory register (M+/M-/MR/MC), independent of the
   // live expression/result state above.
   const [memoryValue, setMemoryValue] = useState(0);
-  const clearMemory = () => setMemoryValue(0);
+  // Controls visibility of the memory sub-display and the MRC bar: both stay
+  // completely hidden until an M+/M- operation is performed, and hide again
+  // on C/MC.
+  const [isMemoryActive, setIsMemoryActive] = useState(false);
+  const [memoryEquationText, setMemoryEquationText] = useState('');
+  const clearMemory = () => {
+    setMemoryValue(0);
+    setIsMemoryActive(false);
+    setMemoryEquationText('');
+  };
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [showError, setShowError] = useState(false);
@@ -168,6 +177,7 @@ export function TransactionEntryScreen({
     setShowError(false);
     if (value === 'C') {
       setExpression('');
+      setIsMemoryActive(false);
       return;
     }
     if (value === 'DEL') {
@@ -189,7 +199,10 @@ export function TransactionEntryScreen({
       // memory operation.
       const parsed = parseFloat(String(displayAmount));
       const safeValue = Number.isFinite(parsed) ? parsed : 0;
-      setMemoryValue((m) => (value === 'M+' ? m + safeValue : m - safeValue));
+      const newMemoryValue = value === 'M+' ? memoryValue + safeValue : memoryValue - safeValue;
+      setMemoryValue(newMemoryValue);
+      setMemoryEquationText(`${value}(${trimNumberForExpression(safeValue)})=${trimNumberForExpression(newMemoryValue)}`);
+      setIsMemoryActive(true);
       toast.success(value === 'M+' ? `মেমোরিতে যোগ হয়েছে: ${formatCurrency(safeValue)}` : `মেমোরি থেকে বিয়োগ হয়েছে: ${formatCurrency(safeValue)}`);
       return;
     }
@@ -275,7 +288,7 @@ export function TransactionEntryScreen({
             <span className={cn('text-3xl font-extrabold tracking-tight', isGet ? 'text-emerald-600' : 'text-red-500')}>
               {formatCurrency(displayAmount)}
             </span>
-            {memoryValue !== 0 && (
+            {isMemoryActive && (
               <span
                 aria-label="মেমোরি সক্রিয়"
                 title="মেমোরিতে মান সংরক্ষিত আছে"
@@ -285,6 +298,11 @@ export function TransactionEntryScreen({
               </span>
             )}
             {!isActive && <p className="text-xs font-semibold text-slate-400 mt-1">পরিমাণ লিখুন</p>}
+            {/* Memory sub-display: completely hidden until an M+/M- press,
+                hidden again on C/MC. */}
+            {isMemoryActive && memoryEquationText && (
+              <p className="text-xs font-mono font-semibold text-blue-600 mt-1">{memoryEquationText}</p>
+            )}
           </div>
           {/* Formula sub-bar: once unlocked by the first key press it stays
               mounted and visible for the rest of the session — it never
@@ -314,15 +332,17 @@ export function TransactionEntryScreen({
           )}
         >
           <div className="flex flex-col gap-3 pt-0.5">
-            {memoryValue !== 0 && (
+            {/* MRC bar: completely hidden until an M+/M- press, hidden again
+                on C/MC. */}
+            {isMemoryActive && (
               <button
                 type="button"
                 tabIndex={showMetadata ? 0 : -1}
                 onClick={() => setExpression((prev) => prev + (memoryValue >= 0 ? `+${trimNumberForExpression(memoryValue)}` : trimNumberForExpression(memoryValue)))}
                 className="w-full flex items-center justify-between bg-blue-50 border border-blue-100 rounded-xl px-4 py-2 text-xs font-bold text-blue-800 active:scale-[0.98] transition-transform"
               >
-                <span>মেমোরি (M)</span>
-                <span>{formatCurrency(memoryValue)} · যোগ করতে ট্যাপ করুন</span>
+                <span>MRC</span>
+                <span>= {formatCurrency(memoryValue)} · যোগ করতে ট্যাপ করুন</span>
               </button>
             )}
 
