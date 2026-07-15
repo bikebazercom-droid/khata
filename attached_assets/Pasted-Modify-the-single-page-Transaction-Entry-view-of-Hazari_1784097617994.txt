@@ -1,0 +1,25 @@
+Modify the single-page Transaction Entry view of "হাজারী খাতাবুক" (Hazari Khatabook) to handle dynamic UI state transitions seamlessly on one screen, matching the exact conditional behavior of native ledger apps.
+
+1. CONDITIONAL SINGLE-PAGE UI TRANSITION LOGIC:
+- STATE A (Empty Amount State - As shown in the user's uploaded image):
+  * When the "Enter amount / পরিমাণ লিখুন" field is empty or equals 0, hide the metadata fields (Details, Bill No, Date Picker, Attach Bills) to save vertical space.
+  * The screen should ONLY display the top customer header, the large amount display box, the "SAVE" button (disabled state), and the full custom on-screen 4-column calculator grid at the bottom.
+- STATE B (Active Typing State):
+  * As soon as the user taps a number or operator on the custom calculator grid, the system must IMMEDIATELY and smoothly expand/reveal the rest of the form components in the space between the amount box and the SAVE button.
+  * The revealed components must include:
+    - "Details (Items, bill no., quantity, etc.)" text field.
+    - "Add Bill No." utility link.
+    - Inline row containing the "Date Picker / তারিখ" drop-down and the "Attach bills" button with a camera icon.
+  * The entire layout must fit perfectly in a single viewport screen without requiring native browser scrolling, keeping the calculator locked to the bottom.
+
+2. CUSTOM ON-SCREEN KEYPAD & FORMULA EVALUATION:
+- The custom UI keypad must trigger character insertion smoothly:
+  [ C ]   [ M+ ]  [ M- ]  [ ⌫ ]
+  [ 7 ]   [ 8 ]   [ 9 ]   [ ÷ ]   [ % ]
+  [ 4 ]   [ 5 ]   [ 6 ]   [ × ]
+  [ 1 ]   [ 2 ]   [ 3 ]   [ - (Blue) ]
+  [ 0 ]   [ . ]   [ = ]   [ + (Blue) ]
+- Show the live preview equation right beneath the amount box (e.g., "100+500-300 = 300") the moment State B is active.
+- When the user hits the "SAVE" button, parse the arithmetic total, sanitize it, save it into the SQLite `ledger_entries` table, and automatically recalculate the `parties` balance using Bangladeshi Taka (৳).
+
+Generate the fully functioning React component state machine with Tailwind CSS transition effects for opening the metadata panels conditionally.

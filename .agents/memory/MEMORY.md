@@ -1,0 +1,2 @@
+- [Mobile single-page layout height](mobile-fixed-height-layout.md) — outer app shell must use fixed `h-[100dvh]`, not `min-h-[100dvh]`, or absolutely-positioned full-screen overlays inherit unbounded height and cause page scroll.
+- [Collapsible panel animation](collapsible-panel-css-trick.md) — prefer `max-height` transition over CSS Grid `0fr`/`1fr` trick for animating a section to/from zero height; the grid trick was unreliable here.

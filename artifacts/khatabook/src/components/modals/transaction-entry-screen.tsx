@@ -97,6 +97,8 @@ export function TransactionEntryScreen({
   }, [expression]);
 
   const displayAmount = liveResult ?? 0;
+  // STATE A (empty/zero) vs STATE B (active typing) — drives the conditional reveal of metadata fields.
+  const isActive = expression.length > 0 && displayAmount !== 0;
 
   const pressKey = (value: string) => {
     setShowError(false);
@@ -187,16 +189,17 @@ export function TransactionEntryScreen({
         </h2>
       </div>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+      {/* Content — no page scroll; metadata panel expands/collapses in place (STATE A <-> STATE B) */}
+      <div className="flex-1 min-h-0 flex flex-col justify-start px-3 py-3 gap-3 overflow-hidden">
         {/* Amount card + live formula sub-bar */}
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden shrink-0">
           <div className="px-4 py-5">
             <span className={cn('text-3xl font-extrabold tracking-tight', isGet ? 'text-emerald-600' : 'text-red-500')}>
               {formatCurrency(displayAmount)}
             </span>
+            {!isActive && <p className="text-xs font-semibold text-slate-400 mt-1">পরিমাণ লিখুন</p>}
           </div>
-          {expression && (
+          {isActive && (
             <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50/60">
               <p className="text-sm font-mono font-medium text-slate-500 truncate">
                 {expression}
@@ -211,70 +214,87 @@ export function TransactionEntryScreen({
           )}
         </div>
 
-        {memory !== 0 && (
-          <button
-            type="button"
-            onClick={() => setExpression((prev) => prev + (memory >= 0 ? `+${trimNumberForExpression(memory)}` : trimNumberForExpression(memory)))}
-            className="w-full flex items-center justify-between bg-blue-50 border border-blue-100 rounded-xl px-4 py-2 text-xs font-bold text-blue-800 active:scale-[0.98] transition-transform"
-          >
-            <span>মেমোরি (M)</span>
-            <span>{formatCurrency(memory)} · যোগ করতে ট্যাপ করুন</span>
-          </button>
-        )}
+        {/* Metadata panel: hidden entirely in STATE A, smoothly revealed the instant typing starts (STATE B) */}
+        <div
+          aria-hidden={!isActive}
+          className={cn(
+            'overflow-hidden transition-[max-height,opacity] duration-300 ease-in-out shrink-0',
+            isActive ? 'max-h-[320px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
+          )}
+        >
+          <div className="flex flex-col gap-3 pt-0.5">
+            {memory !== 0 && (
+              <button
+                type="button"
+                tabIndex={isActive ? 0 : -1}
+                onClick={() => setExpression((prev) => prev + (memory >= 0 ? `+${trimNumberForExpression(memory)}` : trimNumberForExpression(memory)))}
+                className="w-full flex items-center justify-between bg-blue-50 border border-blue-100 rounded-xl px-4 py-2 text-xs font-bold text-blue-800 active:scale-[0.98] transition-transform"
+              >
+                <span>মেমোরি (M)</span>
+                <span>{formatCurrency(memory)} · যোগ করতে ট্যাপ করুন</span>
+              </button>
+            )}
 
-        {/* Description */}
-        <input
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="বিস্তারিত লিখুন (পণ্য, বিল নং, পরিমাণ ইত্যাদি)"
-          className="w-full h-12 px-4 rounded-xl bg-white border border-slate-200 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20"
-        />
+            {/* Description */}
+            <input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              tabIndex={isActive ? 0 : -1}
+              placeholder="বিস্তারিত লিখুন (পণ্য, বিল নং, পরিমাণ ইত্যাদি)"
+              className="w-full h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
 
-        {/* Bill reference: collapsed trigger -> input */}
-        {showBillField ? (
-          <input
-            value={billReference}
-            onChange={(e) => setBillReference(e.target.value)}
-            placeholder="বিল/ইনভয়েস নম্বর"
-            autoFocus
-            className="w-full h-12 px-4 rounded-xl bg-white border border-slate-200 text-sm font-medium uppercase placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20"
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setShowBillField(true)}
-            className="flex items-center gap-1 text-sm font-bold text-primary px-1"
-          >
-            <Plus className="w-3.5 h-3.5" /> বিল নম্বর যুক্ত করুন
-          </button>
-        )}
+            {/* Bill reference: collapsed trigger -> input */}
+            {showBillField ? (
+              <input
+                value={billReference}
+                onChange={(e) => setBillReference(e.target.value)}
+                placeholder="বিল/ইনভয়েস নম্বর"
+                tabIndex={isActive ? 0 : -1}
+                autoFocus
+                className="w-full h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-medium uppercase placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+            ) : (
+              <button
+                type="button"
+                tabIndex={isActive ? 0 : -1}
+                onClick={() => setShowBillField(true)}
+                className="flex items-center gap-1 text-sm font-bold text-primary px-1"
+              >
+                <Plus className="w-3.5 h-3.5" /> বিল নম্বর যুক্ত করুন
+              </button>
+            )}
 
-        {/* Date + attach bills */}
-        <div className="grid grid-cols-2 gap-3">
-          <input
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            className="h-12 px-3 rounded-xl bg-white border border-slate-200 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20"
-          />
-          <button
-            type="button"
-            onClick={() => toast('বিল সংযুক্তি শীঘ্রই আসছে')}
-            className="h-12 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-600 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
-          >
-            <Camera className="w-4 h-4" /> বিল সংযুক্ত করুন
-          </button>
+            {/* Date + attach bills */}
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                tabIndex={isActive ? 0 : -1}
+                className="h-11 px-3 rounded-xl bg-white border border-slate-200 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+              <button
+                type="button"
+                tabIndex={isActive ? 0 : -1}
+                onClick={() => toast('বিল সংযুক্তি শীঘ্রই আসছে')}
+                className="h-11 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-600 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+              >
+                <Camera className="w-4 h-4" /> বিল সংযুক্ত করুন
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* SAVE button, fixed above keypad */}
-      <div className="px-3 pt-2 shrink-0">
+      {/* SAVE button, fixed above keypad — disabled in STATE A */}
+      <div className="px-3 pt-1 shrink-0">
         <button
           type="button"
           onClick={handleSave}
-          disabled={createEntry.isPending}
+          disabled={createEntry.isPending || !isActive}
           className={cn(
-            'w-full h-14 rounded-xl font-extrabold text-white text-base shadow-[0_4px_14px_0_rgba(0,0,0,0.15)] active:scale-[0.98] transition-transform disabled:opacity-60',
+            'w-full h-14 rounded-xl font-extrabold text-white text-base shadow-[0_4px_14px_0_rgba(0,0,0,0.15)] active:scale-[0.98] transition-all disabled:opacity-40 disabled:active:scale-100',
             isGet ? 'bg-emerald-600' : 'bg-red-500'
           )}
         >
