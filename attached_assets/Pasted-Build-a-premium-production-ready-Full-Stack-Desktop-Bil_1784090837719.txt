@@ -1,0 +1,40 @@
+Build a premium, production-ready Full-Stack Desktop Billing, Ledger, and Accounting application inspired by the core functionalities of the Khatabook mobile app but optimized for a high-performance desktop experience. 
+
+Tech Stack: React.js, Tailwind CSS, Lucide React Icons (Frontend), Node.js Express (Backend), and SQLite (Database).
+
+Implement the following database schema and UI components:
+
+1. DATABASE LAYOUT (SQLite)
+- `Parties`: id (UUID), name (text), phone (text), role (enum: 'CUSTOMER', 'SUPPLIER'), current_balance (decimal), balance_type (enum: 'YOU_WILL_GIVE', 'YOU_WILL_GET'), due_date (date, nullable), last_transaction (timestamp).
+- `Ledger_Entries`: id (UUID), party_id (FK), type (enum: 'YOU_GAVE', 'YOU_GOT'), amount (decimal), description (text), attachments/bills (text, nullable), created_at (timestamp).
+- `Business_Settings`: id (UUID), store_name (text, default 'Hazari Khatabook'), language (text, default 'English'), online_collection_balance (decimal).
+
+2. MAIN DESKTOP UI ARCHITECTURE (Split-Screen Design)
+Create a persistent left control panel/sidebar and a dynamic right action area.
+
+A. LEFT PANEL (The Control Center - Width: 35%):
+- Top Bar: Shop Selector dropdown (styled with "Hazari Khatabook") + "+ Add Staff" quick utility button.
+- Toggle Navigation: Two high-contrast tabs at the top switching between "Customers" and "Suppliers".
+- Aggregated Balance Dashboard Card: Divided into 3 horizontal numeric states:
+  * "You will get" -> Display balance in high-visibility Emerald Green.
+  * "You will give" -> Display balance in bold Crimson Red.
+  * "Online Collections" -> Display current wallet balance with a blue accent.
+  * Beneath the stats, add clickable text links: "View Reports >" and "Open Cashbook".
+- List Filters: A quick search bar followed by interactive horizontal tags: "All", "Due Today", "Upcoming", "No Due Date".
+- Parties Directory List: Render a vertical list of profiles fetching from the database. Each list item must display the customer's letter badge, Name, "X days ago" timestamp, and their running balance highlighted in Red or Green with a directional chevron.
+- Action Trigger: A prominent, sticky sticky "+ ADD CUSTOMER / SUPPLIER" accent action button at the bottom of the directory list.
+
+B. RIGHT PANEL (Granular Transaction & Ledger Engine - Width: 65%):
+- Default View: Show a summary dashboard with a multi-language selection widget block (English, Bengali, Hindi, etc.) and visual layout metrics.
+- Active Party View (When a Customer/Supplier is clicked):
+  * Profile Header: Displays Name, Phone, and unique identifier metrics with quick utility action triggers: "Report", "Request Money", "Payment Reminder", and "SMS".
+  * Core Ledger History: A clean, scrolling transaction stream with cards showing historical data. "You Gave" entries should format clear red styling, and "You Got" entries should format clear green styling, matching exact transaction details.
+  * Sticky Action Bar (Bottom Footer): Persistent dual buttons built for lightning-fast entry:
+    - Button 1: "YOU GAVE ৳" (Bold Red filling - triggers a popup modal to enter bill details, description, due date, and amount).
+    - Button 2: "YOU GOT ৳" (Bold Green filling - triggers a popup modal to record received cash/digital payments).
+
+3. EXTRA BUSINESS LOGIC
+- When a transaction is submitted via the "YOU GAVE" or "YOU GOT" modals, update the `Ledger_Entries` log, recalculate the party's `current_balance` and `balance_type`, and update the global dashboard analytics instantly.
+- Implement an automated "Send Reminder" mockup frame that formats a payment link with text context like: "Payment reminder for ৳X sent by Hazari Khatabook".
+
+Aesthetic Guidelines: Minimalist typography using the 'Inter' font feel, crisp white modules over a soft slate canvas (`bg-slate-50`), maintaining clear accounting data visibility. Build a fully functional local prototype.
