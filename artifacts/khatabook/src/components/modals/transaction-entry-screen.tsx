@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useCreateLedgerEntry,
@@ -8,10 +8,12 @@ import {
   getListPartiesQueryKey,
   getGetDashboardSummaryQueryKey,
 } from '@workspace/api-client-react';
-import { ChevronLeft, Camera } from 'lucide-react';
+import { ChevronLeft, Camera, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { cn, evaluateCalculatorExpression, formatCurrency, formatExpressionForDisplay, trimNumberForExpression } from '@/lib/utils';
+import { CameraCaptureModal } from '@/components/modals/camera-capture-modal';
+import { scanDocument } from '@/lib/document-scan';
 
 type KeyKind = 'digit' | 'muted' | 'accent';
 type KeyDef = { label: string; value: string; kind: KeyKind; span?: number };
@@ -85,6 +87,10 @@ export function TransactionEntryScreen({
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [showError, setShowError] = useState(false);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [billImage, setBillImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // Once the user presses any numeric/operator key, the metadata panel
   // (details/bill/date/camera) locks open and never collapses again for the
   // rest of this session — even if the formula is later cleared or edited
@@ -106,6 +112,50 @@ export function TransactionEntryScreen({
   // Whether the metadata panel should be shown — persistent once triggered,
   // unlike `isActive` which can flip back off as the formula is edited.
   const showMetadata = hasInteracted;
+
+  const processCapturedImage = async (dataUrl: string) => {
+    setIsScanning(true);
+    try {
+      const scanned = await scanDocument(dataUrl);
+      setBillImage(scanned);
+      toast.success('বিল স্ক্যান সম্পন্ন হয়েছে');
+    } catch {
+      toast.error('বিল স্ক্যান করা যায়নি, আবার চেষ্টা করুন');
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const handleAttachClick = () => {
+    if (typeof navigator !== 'undefined' && typeof navigator.mediaDevices?.getUserMedia === 'function') {
+      setIsCameraOpen(true);
+    } else {
+      fileInputRef.current?.click();
+    }
+  };
+
+  const handleCameraCapture = (dataUrl: string) => {
+    setIsCameraOpen(false);
+    void processCapturedImage(dataUrl);
+  };
+
+  const handleCameraError = () => {
+    setIsCameraOpen(false);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        void processCapturedImage(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const pressKey = (value: string) => {
     setShowError(false);
@@ -269,15 +319,45 @@ export function TransactionEntryScreen({
               <button
                 type="button"
                 tabIndex={showMetadata ? 0 : -1}
-                onClick={() => toast('বিল সংযুক্তি শীঘ্রই আসছে')}
+                onClick={handleAttachClick}
                 className="h-11 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-600 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
               >
                 <Camera className="w-4 h-4" /> বিল সংযুক্ত করুন
               </button>
             </div>
+
+            {/* Scanned attachment preview — purely additive, doesn't alter
+                the date/attach row above. */}
+            {billImage && (
+              <div className="flex items-center gap-2 px-1">
+                <img src={billImage} alt="সংযুক্ত বিল" className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0" />
+                <span className="text-xs font-semibold text-emerald-600 flex-1 truncate">বিল স্ক্যান হয়ে সংযুক্ত হয়েছে</span>
+                <button
+                  type="button"
+                  onClick={() => setBillImage(null)}
+                  aria-label="বিল সংযুক্তি সরান"
+                  className="w-6 h-6 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center shrink-0 active:scale-95 transition-transform"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
+
+      {isCameraOpen && (
+        <CameraCaptureModal onCapture={handleCameraCapture} onClose={() => setIsCameraOpen(false)} onError={handleCameraError} />
+      )}
+
+      {isScanning && (
+        <div className="fixed inset-0 z-[80] bg-black/70 flex flex-col items-center justify-center gap-3">
+          <div className="w-10 h-10 rounded-full border-4 border-white/30 border-t-white animate-spin" />
+          <p className="text-white text-sm font-semibold">স্ক্যানিং হচ্ছে...</p>
+        </div>
+      )}
 
       {/* SAVE button, fixed above keypad — disabled while the amount isn't a valid non-zero total */}
       <div className="px-3 pt-1 shrink-0">
