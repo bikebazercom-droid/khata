@@ -12,7 +12,6 @@ import { formatCurrency, cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { AddPartyModal } from '@/components/modals/add-party-modal';
 import { SettingsDrawer } from '@/components/modals/settings-drawer';
-import { ReportDrawer } from '@/components/modals/report-drawer';
 import { AddStaffDialog } from '@/components/modals/add-staff-dialog';
 import {
   DropdownMenu,
@@ -31,7 +30,6 @@ export function HomeView() {
   const [location] = useLocation();
   const [isAddPartyOpen, setIsAddPartyOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isReportOpen, setIsReportOpen] = useState(false);
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
 
   const { data: summary } = useGetDashboardSummary();
@@ -121,13 +119,13 @@ export function HomeView() {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => setIsReportOpen(true)}
+          <Link
+            href="/reports"
             className="w-full flex items-center justify-between px-3 py-2 rounded-xl hover:bg-slate-50 active:scale-[0.98] transition-all"
           >
             <span className="text-xs font-bold text-slate-500">রিপোর্ট দেখুন</span>
             <ChevronRight className="w-4 h-4 text-slate-400" />
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -152,13 +150,13 @@ export function HomeView() {
         >
           <SlidersHorizontal className="w-[18px] h-[18px]" />
         </button>
-        <button
-          onClick={() => setIsReportOpen(true)}
+        <Link
+          href="/reports"
           aria-label="PDF রিপোর্ট"
           className="w-11 h-11 shrink-0 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 flex items-center justify-center active:scale-95 transition-all"
         >
           <FileText className="w-[18px] h-[18px]" />
-        </button>
+        </Link>
       </div>
 
       {/* Due filters (toggleable) */}
@@ -269,13 +267,13 @@ export function HomeView() {
           <Users className="w-5 h-5" />
           <span className="text-[10px] font-bold">পার্টিস</span>
         </button>
-        <button
-          onClick={() => setIsReportOpen(true)}
+        <Link
+          href="/reports"
           className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-slate-400 active:text-slate-600 transition-colors"
         >
           <FileText className="w-5 h-5" />
           <span className="text-[10px] font-bold">রিপোর্ট</span>
-        </button>
+        </Link>
         <button
           onClick={() => setIsSettingsOpen(true)}
           className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-slate-400 active:text-slate-600 transition-colors"
@@ -287,7 +285,6 @@ export function HomeView() {
 
       <AddPartyModal open={isAddPartyOpen} onOpenChange={setIsAddPartyOpen} defaultRole={role} />
       <SettingsDrawer open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
-      <ReportDrawer open={isReportOpen} onOpenChange={setIsReportOpen} />
       <AddStaffDialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen} />
     </div>
   );

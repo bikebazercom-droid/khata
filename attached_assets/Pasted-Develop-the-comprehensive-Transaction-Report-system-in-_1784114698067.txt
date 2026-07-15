@@ -1,0 +1,36 @@
+Develop the comprehensive Transaction Report system in "হাজারী খাতাবুক" (Hazari Khatabook) matching the exact flow and layout of the three provided screenshots.
+
+1. SCREEN 1: MAIN ENTRY POINT (Header Card):
+- Create the top dashboard summary section:
+  * "আপনি দেবেন" (You will give) card: Left column, soft red text, displaying aggregate total.
+  * "আপনি পাবেন" (You will get) card: Middle column, soft green text, displaying aggregate total.
+  * "রিপোর্ট দেখুন >" (View Report) button: Right column. Clicking this navigates directly to the main "রিপোর্ট দেখুন" page.
+
+2. SCREEN 2 & 3: "রিপোর্ট দেখুন" (REPORT SCREEN) UI & DYNAMIC FILTERING:
+- Header: Deep blue top navigation header labeled "রিপোর্ট দেখুন" (with a back arrow).
+- Date Range Picks: High-fidelity layout containing "আরম্ভের তারিখ" (Start Date) and "শেষের তারিখ" (End Date) buttons with calendar selectors.
+- Search Bar & Dropdown: An input labeled "এন্ট্রি অনুসন্ধান করুন" (Search entries) alongside a selection dropdown currently showing "সব" (All).
+- Bottom-Sheet/Popup Filter Selector (Exactly as in Screenshot 2):
+  * When clicking the dropdown, open a modal titled "রিপোর্ট সময়কাল নির্বাচন করুন" (Select Report Period) with radio options in Bengali:
+    * "সব" (All)
+    * "এই মাসে" (This Month)
+    * "এক দিন" (Single Day)
+    * "গত সপ্তাহে" (Last Week)
+    * "গত মাসের" (Last Month)
+    * "তারিখের পরিসর" (Custom Date Range)
+  * Selecting any filter option must instantly filter the SQLite database query results and dynamically re-calculate the figures on the screen.
+
+3. SCREEN METRICS & DOUBLE-COLUMN LEDGER LIST:
+- Metrics Bar:
+  * "মোট ব্যালেন্স" (Total Balance) with dynamic calculations and Taka symbol (e.g., ৳ ১৭,৮৮৫).
+  * Ledger Breakdown Grid: "মোট X এন্ট্রিগুলো" (Total X entries), "আপনি দিয়েছেন" (Total Debited sum in Red, e.g., ৳ ৭,২৪৬), and "আপনি" [পেয়েছেন] (Total Credited sum in Green, e.g., ৳ ২৫,১৩১).
+- Entries List:
+  * Left: Customer Name / Phone Number with exact date-timestamp underneath (e.g., "15 Jul 26 • 05:13 PM").
+  * Middle Column (Red): Displays the amount in bold red text on a soft light-red background ONLY if the transaction was "আপনি দিয়েছেন" (You Gave).
+  * Right Column (Green): Displays the amount in bold green text on a transparent/white background ONLY if the transaction was "আপনি পেয়েছেন" (You Got).
+
+4. PERSISTENT PDF DOWNLOAD ENGINE:
+- Footer Button: Stick a large full-width deep blue button at the absolute bottom of the report view reading: "[PDF] ডাউনলোড" (PDF Download).
+- PDF Compilation Logic: Clicking this button must generate a formatted 5-column grid PDF (as defined previously with black borders, light pink/green cell backgrounds, and localized Bengali texts) that respects the active filter state (e.g., if "গত সপ্তাহে" is filtered, only those entries are computed in the PDF). Trigger a direct client-side device download immediately.
+
+Build this stateful filtering pipeline, local storage/database query triggers, and the PDF download handler now.

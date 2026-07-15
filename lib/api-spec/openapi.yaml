@@ -203,6 +203,36 @@ paths:
                 $ref: "#/components/schemas/LedgerEntry"
         "404":
           description: Not found
+  /ledger-entries:
+    get:
+      operationId: listGlobalLedgerEntries
+      tags: [ledger]
+      summary: List ledger entries across all parties
+      description: Supports filtering by transaction date range and a free-text search across party name, phone, and entry description. Used by the global transaction report screen.
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of ledger entries across all parties, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GlobalLedgerEntry"
   /parties/{partyId}/reminder:
     post:
       operationId: sendPaymentReminder
@@ -407,6 +437,42 @@ components:
           type: string
         amount:
           type: number
+    GlobalLedgerEntry:
+      type: object
+      required:
+        - id
+        - partyId
+        - partyName
+        - partyPhone
+        - type
+        - amount
+        - description
+        - billReference
+        - dueDate
+        - createdAt
+      properties:
+        id:
+          type: string
+        partyId:
+          type: string
+        partyName:
+          type: string
+        partyPhone:
+          type: string
+        type:
+          $ref: "#/components/schemas/LedgerEntryType"
+        amount:
+          type: number
+        description:
+          type: string
+        billReference:
+          type: ["string", "null"]
+        dueDate:
+          type: ["string", "null"]
+          format: date
+        createdAt:
+          type: string
+          format: date-time
     DeletePartyResult:
       type: object
       required:

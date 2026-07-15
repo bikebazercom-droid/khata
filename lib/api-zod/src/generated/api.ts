@@ -199,6 +199,31 @@ export const CreateLedgerEntryResponse = zod.object({
 
 
 /**
+ * Supports filtering by transaction date range and a free-text search across party name, phone, and entry description. Used by the global transaction report screen.
+ * @summary List ledger entries across all parties
+ */
+export const ListGlobalLedgerEntriesQueryParams = zod.object({
+  "startDate": zod.date().optional(),
+  "endDate": zod.date().optional(),
+  "search": zod.coerce.string().optional()
+})
+
+export const ListGlobalLedgerEntriesResponseItem = zod.object({
+  "id": zod.string(),
+  "partyId": zod.string(),
+  "partyName": zod.string(),
+  "partyPhone": zod.string(),
+  "type": zod.enum(['YOU_GAVE', 'YOU_GOT']),
+  "amount": zod.number(),
+  "description": zod.string(),
+  "billReference": zod.string().nullable(),
+  "dueDate": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})
+export const ListGlobalLedgerEntriesResponse = zod.array(ListGlobalLedgerEntriesResponseItem)
+
+
+/**
  * @summary Generate a mock payment reminder message
  */
 export const SendPaymentReminderParams = zod.object({

@@ -123,6 +123,21 @@ export interface ReminderMessage {
   amount: number;
 }
 
+export interface GlobalLedgerEntry {
+  id: string;
+  partyId: string;
+  partyName: string;
+  partyPhone: string;
+  type: LedgerEntryType;
+  amount: number;
+  description: string;
+  /** @nullable */
+  billReference: string | null;
+  /** @nullable */
+  dueDate: string | null;
+  createdAt: string;
+}
+
 export interface DeletePartyResult {
   success: boolean;
   id: string;
@@ -132,5 +147,11 @@ export type ListPartiesParams = {
 role?: PartyRole;
 search?: string;
 dueFilter?: DueFilter;
+};
+
+export type ListGlobalLedgerEntriesParams = {
+startDate?: string;
+endDate?: string;
+search?: string;
 };
 

@@ -24,9 +24,11 @@ import type {
   BusinessSettingsUpdate,
   DashboardSummary,
   DeletePartyResult,
+  GlobalLedgerEntry,
   HealthStatus,
   LedgerEntry,
   LedgerEntryInput,
+  ListGlobalLedgerEntriesParams,
   ListPartiesParams,
   Party,
   PartyInput,
@@ -816,6 +818,91 @@ export const useCreateLedgerEntry = <TError = ErrorType<void>,
       > => {
       return useMutation(getCreateLedgerEntryMutationOptions(options));
     }
+
+export const getListGlobalLedgerEntriesUrl = (params?: ListGlobalLedgerEntriesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/ledger-entries?${stringifiedParams}` : `/api/ledger-entries`
+}
+
+/**
+ * Supports filtering by transaction date range and a free-text search across party name, phone, and entry description. Used by the global transaction report screen.
+ * @summary List ledger entries across all parties
+ */
+export const listGlobalLedgerEntries = async (params?: ListGlobalLedgerEntriesParams, options?: RequestInit): Promise<GlobalLedgerEntry[]> => {
+
+  return customFetch<GlobalLedgerEntry[]>(getListGlobalLedgerEntriesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListGlobalLedgerEntriesQueryKey = (params?: ListGlobalLedgerEntriesParams,) => {
+    return [
+    `/api/ledger-entries`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListGlobalLedgerEntriesQueryOptions = <TData = Awaited<ReturnType<typeof listGlobalLedgerEntries>>, TError = ErrorType<unknown>>(params?: ListGlobalLedgerEntriesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listGlobalLedgerEntries>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListGlobalLedgerEntriesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listGlobalLedgerEntries>>> = ({ signal }) => listGlobalLedgerEntries(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listGlobalLedgerEntries>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListGlobalLedgerEntriesQueryResult = NonNullable<Awaited<ReturnType<typeof listGlobalLedgerEntries>>>
+export type ListGlobalLedgerEntriesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List ledger entries across all parties
+ */
+
+export function useListGlobalLedgerEntries<TData = Awaited<ReturnType<typeof listGlobalLedgerEntries>>, TError = ErrorType<unknown>>(
+ params?: ListGlobalLedgerEntriesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listGlobalLedgerEntries>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListGlobalLedgerEntriesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getSendPaymentReminderUrl = (partyId: string,) => {
 
