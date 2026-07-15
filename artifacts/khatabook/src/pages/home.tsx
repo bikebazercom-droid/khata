@@ -206,7 +206,7 @@ export function HomeView() {
                 key={party.id}
                 href={`/party/${party.id}`}
                 className={cn(
-                  'flex items-center p-4 active:bg-slate-50 transition-all block w-full text-left relative',
+                  'flex items-center justify-between p-4 active:bg-slate-50 transition-all w-full text-left relative',
                   location === `/party/${party.id}` && 'bg-blue-50/40',
                   'animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both'
                 )}
