@@ -3,7 +3,7 @@ import { Route, Switch, Router as WouterRouter } from 'wouter';
 import { Toaster } from 'sonner';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { MainLayout } from '@/components/layout/main-layout';
-import { DashboardView } from '@/pages/dashboard';
+import { HomeView } from '@/pages/home';
 import { PartyView } from '@/pages/party-view';
 import NotFound from '@/pages/not-found';
 
@@ -16,7 +16,7 @@ function App() {
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
           <MainLayout>
             <Switch>
-              <Route path="/" component={DashboardView} />
+              <Route path="/" component={HomeView} />
               <Route path="/party/:id" component={PartyView} />
               <Route component={NotFound} />
             </Switch>

@@ -1,0 +1,33 @@
+Build a Mobile-First, 100% Responsive Full-Stack Billing and Ledger Web Application named "হাজারী খাতাবুক" (Hazari Khatabook). It must feel and function exactly like the "Khatabook" mobile app when browsing on a smartphone. Use a Node.js/Express backend, SQLite database, and React with Tailwind CSS.
+
+1. MOBILE-FIRST UI & NAVIGATION ARCHITECTURE:
+- DO NOT use a desktop split-screen layout. The UI must be optimized entirely for mobile viewports (100% width, full-screen touch browsing).
+- Implement a Native App-like View Switcher in React:
+  * VIEW 1 (Home/Directory Screen): Displays the store header, customer/supplier toggle tabs, global metrics, search/filters, and the contact feed list.
+  * VIEW 2 (Customer Ledger Screen): When a user taps a customer from the feed, the UI must smoothly slide or switch to a dedicated full-screen transaction view for that specific person, complete with a "Back Button" (পিছনে যান) to return to the main feed.
+
+2. DATABASE & BUSINESS LOGIC (SQLite):
+- Create a `parties` table: id (TEXT PK), name (TEXT), phone (TEXT), role (TEXT: 'CUSTOMER' or 'SUPPLIER'), current_balance (DECIMAL), balance_type (TEXT: 'YOU_WILL_GET', 'YOU_WILL_GIVE', 'SETTLED'), due_date (TEXT), last_transaction (TEXT).
+- Create a `ledger_entries` table: id (TEXT PK), party_id (TEXT FK), type (TEXT: 'YOU_GAVE' or 'YOU_GOT'), amount (DECIMAL), description (TEXT), bill_reference (TEXT), created_at (TEXT).
+- Backend Ledger Logic ('POST /api/ledger'): Instantly updates the entry log and dynamically updates the targeted party's balance:
+  * For CUSTOMER: 'YOU_GAVE' (আপনি দিয়েছেন) increases what they owe us ('YOU_WILL_GET' / পাবেন). 'YOU_GOT' (আপনি পেয়েছেন) decreases it.
+  * For SUPPLIER: 'YOU_GAVE' decreases what we owe them. 'YOU_GOT' increases what we owe them ('YOU_WILL_GIVE' / দেবেন).
+
+3. LOCALIZATION (Bengali Language & ৳ Taka Currency):
+- Every label, placeholder, error, and button must be in clear Bengali business terminology. All numbers must display the Bangladeshi Taka symbol (৳).
+
+4. DETAILED MOBILE SCREEN INTERFACES:
+- VIEW 1 (Home Screen Layout):
+  * Top Sticky Header: "হাজারী খাতাবুক" title, search bar, and a quick "+ কাস্টমার যোগ করুন" action bar.
+  * Sub-Header Tabs: Clean touch-friendly tabs for switching between "কাস্টমার (খরিদ্দার)" and "সাপ্লায়ার (মহাজন)".
+  * Summary Cards: Touch-responsive aggregate cards showing "পাবেন" (Green), "দেবেন" (Red), and "অনলাইন কালেকশন".
+  * List Feed: Chronological list of people with large hit-targets for fingers. Displays clear color-coded balances.
+- VIEW 2 (Ledger Screen Layout):
+  * Sticky Top Action Bar: Back arrow button, Customer Name, Phone number, and a prominent "তাগাদা পাঠান (SMS)" button.
+  * Scrollable Ledger Area: Stream of entries (Red borders for "আপনি দিয়েছেন", Green borders for "আপনি পেয়েছেন") easily scrollable via mobile swipe gestures.
+  * Sticky Bottom Action Overlay: Two massive, thumb-accessible buttons fixed to the bottom of the phone screen: "আপনি দিয়েছেন (৳)" (Red) and "আপনি পেয়েছেন (৳)" (Green). Tapping them opens full-screen or half-sheet mobile input forms.
+
+5. MOCK NOTIFICATIONS:
+- Tapping "তাগাদা পাঠান (SMS)" opens a dialog box showing a copyable Bengali reminder message string: "বকেয়া তাগাদা: হাজারী খাতাবুক-এর পক্ষ থেকে [Name]-কে ৳[Amount] টাকা বকেয়া পরিশোধের জন্য অনুরোধ করা হচ্ছে।"
+
+Generate the multi-file application with optimized responsive touch utilities, production-ready Express controllers, and smooth state handling.

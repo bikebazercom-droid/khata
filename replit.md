@@ -1,6 +1,6 @@
-# Hazari Khatabook
+# Hazari Khatabook (হাজারী খাতাবুক)
 
-A desktop billing & ledger app for shop owners to track money owed by customers and owed to suppliers, inspired by the Khatabook mobile app but built for a split-screen desktop workflow.
+A mobile-first, fully Bengali-localized billing & ledger web app for shop owners to track money owed by customers and owed to suppliers, built to feel and function like the Khatabook mobile app. Single-column, phone-frame layout (no desktop split-screen) with a native-app-like view switcher: a home/directory feed and a full-screen party ledger view.
 
 ## Run & Operate
 
@@ -28,7 +28,8 @@ A desktop billing & ledger app for shop owners to track money owed by customers 
 - `lib/db/src/schema/` — Drizzle tables: `parties.ts`, `ledgerEntries.ts`, `businessSettings.ts`
 - `artifacts/api-server/src/routes/` — route handlers (`parties.ts`, `dashboard.ts`, `settings.ts`)
 - `artifacts/api-server/src/lib/khatabook.ts` — shared balance-calculation and dashboard-aggregation helpers
-- `artifacts/khatabook/src/pages/` — `dashboard.tsx` (default right-panel view), party detail view, left panel/party list
+- `artifacts/khatabook/src/pages/` — `home.tsx` (View 1: directory/feed, formerly the desktop left panel), `party-view.tsx` (View 2: full-screen ledger for one party)
+- `artifacts/khatabook/src/components/modals/` — `add-party-modal.tsx`/`add-transaction-modal.tsx` (bottom `Drawer` half-sheets, not centered dialogs — mobile-first input pattern), `settings-drawer.tsx` (language stub, opened from the home header gear icon)
 - Generated hooks: `lib/api-client-react/src/generated/api.ts` (do not hand-edit; regenerate via codegen)
 
 ## Architecture decisions
@@ -36,14 +37,16 @@ A desktop billing & ledger app for shop owners to track money owed by customers 
 - A party's balance is stored as an unsigned `currentBalance` + a `balanceType` enum (`YOU_WILL_GIVE` / `YOU_WILL_GET`) rather than a signed number, matching the OpenAPI contract. Server-side helpers (`toSignedBalance`/`fromSignedBalance` in `khatabook.ts`) convert to/from a signed value to make the add/subtract math simple.
 - Balance recalculation happens entirely server-side when a ledger entry is created — the client never computes or sends the new balance.
 - `BusinessSettings` is a lazily-created singleton row (`getOrCreateBusinessSettings`), not a fixed seeded row, so the schema doesn't need a hardcoded ID.
-- No auth, no real i18n, no real SMS/payment gateway — the "system language" dropdown on the dashboard and "Add Staff"/"Statement Report" buttons are intentionally non-functional stubs; only the Payment Reminder button calls a real (mocked-response) endpoint.
-- The entire UI is hardcoded Bengali (not translated at runtime); currency is always displayed with ৳ via `formatCurrency` in `lib/utils.ts`. The "system language" dropdown only writes to `BusinessSettings.language` for display — it doesn't change UI text.
-- The mock SMS reminder message is built server-side in the `/parties/:id/reminder` route with the exact Bengali template the product spec requires; the frontend shows it in a dialog, not a toast.
+- No auth, no real i18n, no real SMS/payment gateway — the settings-drawer language picker is an intentionally non-functional stub (writes to `BusinessSettings.language` for display only); only the Payment Reminder button calls a real (mocked-response) endpoint.
+- The entire UI is hardcoded Bengali (not translated at runtime); currency is always displayed with ৳ via `formatCurrency` in `lib/utils.ts`.
+- The mock SMS reminder message is built server-side in the `/parties/:id/reminder` route with the exact Bengali template the product spec requires; the frontend shows it in a copyable dialog, not a toast.
+- DB stays PostgreSQL + Drizzle (established monorepo stack) even though a later spec text-mentioned SQLite — treated as a UI/UX-layer spec, not a stack migration request, to stay consistent with the rest of the project.
+- Routing IS the view switcher: `/` renders `HomeView` (View 1) and `/party/:id` renders `PartyView` (View 2) full-screen; `MainLayout` no longer renders a persistent sidebar, just a centered single-column phone-frame shell at all viewport widths.
 
 ## Product
 
-- Split-screen desktop app (35%/65%), fully in Bengali: left panel lists customers ("কাস্টমার")/suppliers ("সাপ্লায়ার") with balances, search, and due-date filter chips; right panel shows either the business dashboard (no party selected) or a selected party's ledger history with "আপনি দিয়েছেন"/"আপনি পেয়েছেন" entry recording.
-- Dashboard totals ("পাবেন" / "দেবেন" / "অনলাইন কালেকশন") are aggregated live from party balances plus stored business settings.
+- Mobile-first single-column app (no split-screen, even on desktop — content is capped at phone width and centered): Home view lists customers ("কাস্টমার")/suppliers ("সাপ্লায়ার") with a sticky header (search + quick add), summary cards ("পাবেন"/"দেবেন"/"অনলাইন কালেকশন"), due-date filter chips, and a tap-through contact feed.
+- Tapping a contact navigates to a full-screen ledger view with a back button, sticky reminder button, a scrollable stream of color-bordered entries (red = "আপনি দিয়েছেন", green = "আপনি পেয়েছেন"), and two large sticky bottom action buttons that open half-sheet `Drawer` forms.
 
 ## User preferences
 

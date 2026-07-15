@@ -1,17 +1,16 @@
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCreateParty, PartyRole, BalanceType, getListPartiesQueryKey, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
 const formSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  phone: z.string().min(10, "Valid phone number required"),
+  name: z.string().min(1, "নাম আবশ্যক"),
+  phone: z.string().min(10, "সঠিক ফোন নম্বর দিন"),
   role: z.nativeEnum(PartyRole),
   openingBalance: z.coerce.number().optional(),
   openingBalanceType: z.nativeEnum(BalanceType).optional(),
@@ -55,20 +54,23 @@ export function AddPartyModal({ open, onOpenChange, defaultRole }: { open: boole
   const currentRole = watch("role");
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>নতুন {currentRole === PartyRole.CUSTOMER ? "কাস্টমার" : "সাপ্লায়ার"} যোগ করুন</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 mt-2">
+    <Drawer open={open} onOpenChange={(val) => {
+      if (!val) reset();
+      onOpenChange(val);
+    }}>
+      <DrawerContent className="max-h-[92dvh]">
+        <DrawerHeader className="text-left">
+          <DrawerTitle>নতুন {currentRole === PartyRole.CUSTOMER ? "কাস্টমার" : "সাপ্লায়ার"} যোগ করুন</DrawerTitle>
+        </DrawerHeader>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 px-4 pb-6 overflow-y-auto">
           <div>
             <label className="text-sm font-semibold mb-1.5 block text-slate-700">নাম</label>
-            <Input {...register("name")} placeholder="নাম লিখুন" className="bg-slate-50 border-slate-200 focus-visible:ring-primary/30" />
+            <Input {...register("name")} placeholder="নাম লিখুন" className="bg-slate-50 border-slate-200 focus-visible:ring-primary/30 h-12" />
             {errors.name && <p className="text-red-500 text-xs mt-1 font-medium">{errors.name.message}</p>}
           </div>
           <div>
             <label className="text-sm font-semibold mb-1.5 block text-slate-700">ফোন নম্বর</label>
-            <Input {...register("phone")} placeholder="১০ ডিজিটের মোবাইল নম্বর" className="bg-slate-50 border-slate-200 focus-visible:ring-primary/30" />
+            <Input {...register("phone")} inputMode="tel" placeholder="১০ ডিজিটের মোবাইল নম্বর" className="bg-slate-50 border-slate-200 focus-visible:ring-primary/30 h-12" />
             {errors.phone && <p className="text-red-500 text-xs mt-1 font-medium">{errors.phone.message}</p>}
           </div>
           <div>
@@ -77,14 +79,14 @@ export function AddPartyModal({ open, onOpenChange, defaultRole }: { open: boole
               <button 
                 type="button" 
                 onClick={() => setValue("role", PartyRole.CUSTOMER)} 
-                className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${currentRole === PartyRole.CUSTOMER ? "bg-white shadow-sm text-primary" : "text-slate-500 hover:text-slate-700"}`}
+                className={`flex-1 py-2.5 text-sm font-semibold rounded-md transition-all ${currentRole === PartyRole.CUSTOMER ? "bg-white shadow-sm text-primary" : "text-slate-500"}`}
               >
                 কাস্টমার
               </button>
               <button 
                 type="button" 
                 onClick={() => setValue("role", PartyRole.SUPPLIER)} 
-                className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${currentRole === PartyRole.SUPPLIER ? "bg-white shadow-sm text-primary" : "text-slate-500 hover:text-slate-700"}`}
+                className={`flex-1 py-2.5 text-sm font-semibold rounded-md transition-all ${currentRole === PartyRole.SUPPLIER ? "bg-white shadow-sm text-primary" : "text-slate-500"}`}
               >
                 সাপ্লায়ার
               </button>
@@ -97,9 +99,10 @@ export function AddPartyModal({ open, onOpenChange, defaultRole }: { open: boole
                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">৳</span>
                  <Input 
                    type="number" 
+                   inputMode="decimal"
                    {...register("openingBalance")} 
                    placeholder="0" 
-                   className="pl-8 bg-slate-50 border-slate-200 focus-visible:ring-primary/30 font-semibold" 
+                   className="pl-8 bg-slate-50 border-slate-200 focus-visible:ring-primary/30 font-semibold h-12" 
                  />
                </div>
                <select 
@@ -111,14 +114,14 @@ export function AddPartyModal({ open, onOpenChange, defaultRole }: { open: boole
                </select>
             </div>
           </div>
-          <div className="flex justify-end gap-3 pt-6 mt-2">
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="px-6 font-semibold">বাতিল</Button>
-            <Button type="submit" disabled={createParty.isPending} className="px-8 font-bold shadow-md">
-              {currentRole === PartyRole.CUSTOMER ? "কাস্টমার" : "সাপ্লায়ার"} সংরক্ষণ করুন
+          <div className="flex gap-3 pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1 h-12 font-semibold">বাতিল</Button>
+            <Button type="submit" disabled={createParty.isPending} className="flex-1 h-12 font-bold shadow-md">
+              সংরক্ষণ করুন
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </DrawerContent>
+    </Drawer>
   );
 }
