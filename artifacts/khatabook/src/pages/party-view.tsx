@@ -8,12 +8,13 @@ import {
   getListLedgerEntriesQueryKey,
   LedgerEntryType
 } from '@workspace/api-client-react';
-import { Phone, FileText, BellRing, MessageSquare, ArrowDownLeft, ArrowUpRight, MoreVertical } from 'lucide-react';
+import { Phone, FileText, BellRing, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AddTransactionModal } from '@/components/modals/add-transaction-modal';
-import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { bn } from 'date-fns/locale';
 
 export function PartyView() {
   const [, params] = useRoute('/party/:id');
@@ -24,14 +25,13 @@ export function PartyView() {
   const sendReminder = useSendPaymentReminder();
 
   const [transactionType, setTransactionType] = useState<LedgerEntryType | null>(null);
+  const [reminderMessage, setReminderMessage] = useState<string | null>(null);
 
   const handleReminder = () => {
     if (!id) return;
     sendReminder.mutate({ partyId: id }, {
       onSuccess: (res) => {
-        toast.success("Reminder Sent via SMS", {
-          description: `Mock Message: ${res.message}`
-        });
+        setReminderMessage(res.message);
       }
     });
   };
@@ -52,7 +52,7 @@ export function PartyView() {
   }
 
   if (!party) {
-    return <div className="flex-1 flex items-center justify-center text-slate-500 font-medium">Party not found</div>;
+    return <div className="flex-1 flex items-center justify-center text-slate-500 font-medium">পার্টি খুঁজে পাওয়া যায়নি</div>;
   }
 
   return (
@@ -73,14 +73,14 @@ export function PartyView() {
                 <span className="flex items-center gap-1.5"><Phone className="w-4 h-4" /> {party.phone}</span>
                 <span className="w-1 h-1 rounded-full bg-slate-300"></span>
                 <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-xs text-slate-600 uppercase tracking-widest border border-slate-200">
-                  {party.role}
+                  {party.role === "CUSTOMER" ? "কাস্টমার" : "সাপ্লায়ার"}
                 </span>
               </div>
             </div>
           </div>
           <div className="text-right">
              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-               {party.balanceType === "YOU_WILL_GET" ? "You'll Get" : "You'll Give"}
+               {party.balanceType === "YOU_WILL_GET" ? "পাবেন" : "দেবেন"}
              </p>
              <p className={cn(
                "text-4xl font-extrabold tracking-tight",
@@ -92,19 +92,11 @@ export function PartyView() {
         </div>
 
         <div className="flex gap-3">
-          <Button variant="outline" size="sm" className="bg-white hover:bg-slate-50 text-slate-700 shadow-sm h-10 font-bold px-4 rounded-xl border-slate-200">
-            <FileText className="w-4 h-4 mr-2" /> Report
+          <Button variant="outline" size="sm" className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200 shadow-sm h-10 font-bold px-4 rounded-xl transition-colors" onClick={handleReminder}>
+            <BellRing className="w-4 h-4 mr-2" /> তাগাদা পাঠান (SMS)
           </Button>
-          {party.balanceType === "YOU_WILL_GET" && party.currentBalance > 0 && (
-            <Button variant="outline" size="sm" className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200 shadow-sm h-10 font-bold px-4 rounded-xl transition-colors" onClick={handleReminder}>
-              <BellRing className="w-4 h-4 mr-2" /> Send Reminder
-            </Button>
-          )}
-          <Button variant="outline" size="sm" className="bg-white hover:bg-slate-50 text-slate-700 shadow-sm h-10 font-bold px-4 rounded-xl border-slate-200">
-            <MessageSquare className="w-4 h-4 mr-2" /> SMS
-          </Button>
-          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl text-slate-500 hover:text-slate-900 ml-auto">
-            <MoreVertical className="w-5 h-5" />
+          <Button variant="outline" size="sm" className="bg-white hover:bg-slate-50 text-slate-700 shadow-sm h-10 font-bold px-4 rounded-xl border-slate-200 ml-auto">
+            <FileText className="w-4 h-4 mr-2" /> স্টেটমেন্ট রিপোর্ট
           </Button>
         </div>
       </div>
@@ -118,16 +110,16 @@ export function PartyView() {
             <div className="w-24 h-24 bg-white border-4 border-slate-100 shadow-sm rounded-full flex items-center justify-center mb-6 text-slate-300">
               <FileText className="w-10 h-10" />
             </div>
-            <h3 className="text-2xl font-extrabold text-slate-900 mb-2 tracking-tight">No transactions yet</h3>
-            <p className="text-slate-500 font-medium text-base">Record a payment or an advance to start tracking the ledger with {party.name}.</p>
+            <h3 className="text-2xl font-extrabold text-slate-900 mb-2 tracking-tight">এখনো কোনো লেনদেন নেই</h3>
+            <p className="text-slate-500 font-medium text-base">{party.name}-এর সাথে হিসাব রাখা শুরু করতে একটি লেনদেন যুক্ত করুন।</p>
           </div>
         ) : (
           <div className="max-w-4xl mx-auto space-y-4">
             <div className="flex justify-between items-center text-[11px] font-bold text-slate-400 uppercase tracking-widest px-6 mb-4 sticky top-0 bg-[#f8fafc]/90 backdrop-blur-sm py-2 z-10">
-              <span>Entries & Details</span>
+              <span>বিস্তারিত হিসাব</span>
               <div className="flex gap-20 mr-6">
-                 <span className="w-28 text-right">You Gave</span>
-                 <span className="w-28 text-right">You Got</span>
+                 <span className="w-28 text-right">আপনি দিয়েছেন</span>
+                 <span className="w-28 text-right">আপনি পেয়েছেন</span>
               </div>
             </div>
             
@@ -140,11 +132,11 @@ export function PartyView() {
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-1.5">
                     <p className="text-[15px] font-bold text-slate-900">
-                      {format(new Date(entry.createdAt), "dd MMM yyyy, hh:mm a")}
+                      {format(new Date(entry.createdAt), "dd MMM yyyy, hh:mm a", { locale: bn })}
                     </p>
                     {entry.billReference && (
                       <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 uppercase tracking-wider">
-                        Bill: {entry.billReference}
+                        বিল: {entry.billReference}
                       </span>
                     )}
                   </div>
@@ -173,14 +165,14 @@ export function PartyView() {
           className="flex-1 h-16 text-lg font-extrabold shadow-[0_4px_14px_0_rgba(239,68,68,0.39)] hover:shadow-[0_6px_20px_rgba(239,68,68,0.23)] hover:bg-red-600 transition-all rounded-2xl"
           onClick={() => setTransactionType(LedgerEntryType.YOU_GAVE)}
         >
-          <ArrowUpRight className="w-6 h-6 mr-2" /> YOU GAVE (₹)
+          <ArrowUpRight className="w-6 h-6 mr-2" /> আপনি দিয়েছেন (৳ মাল/নগদ)
         </Button>
         <Button 
           variant="success" 
           className="flex-1 h-16 text-lg font-extrabold shadow-[0_4px_14px_0_rgba(16,185,129,0.39)] hover:shadow-[0_6px_20px_rgba(16,185,129,0.23)] hover:bg-emerald-600 transition-all rounded-2xl"
           onClick={() => setTransactionType(LedgerEntryType.YOU_GOT)}
         >
-          <ArrowDownLeft className="w-6 h-6 mr-2" /> YOU GOT (₹)
+          <ArrowDownLeft className="w-6 h-6 mr-2" /> আপনি পেয়েছেন (৳ ক্যাশ/অনলাইন)
         </Button>
       </div>
 
@@ -190,6 +182,20 @@ export function PartyView() {
         open={!!transactionType}
         onOpenChange={(open) => !open && setTransactionType(null)}
       />
+
+      <Dialog open={!!reminderMessage} onOpenChange={(open) => !open && setReminderMessage(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BellRing className="w-5 h-5 text-emerald-600" /> তাগাদা পাঠানো হয়েছে
+            </DialogTitle>
+          </DialogHeader>
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm font-medium text-slate-700 leading-relaxed">
+            {reminderMessage}
+          </div>
+          <p className="text-xs text-slate-400 font-medium">এটি একটি সিমুলেটেড SMS বার্তা — কোনো বাস্তব SMS পাঠানো হয়নি।</p>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

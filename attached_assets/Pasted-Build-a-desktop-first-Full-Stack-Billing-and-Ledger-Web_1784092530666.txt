@@ -1,0 +1,29 @@
+Build a desktop-first Full-Stack Billing and Ledger Web Application named "হাজারী খাতাবুক" (Hazari Khatabook) completely localized in the Bengali language, using a Node.js/Express backend, SQLite database, and React with Tailwind CSS for the frontend.
+
+1. DATABASE SCHEMA & BUSINESS LOGIC (SQLite):
+- Create a `parties` table: id (TEXT PK), name (TEXT), phone (TEXT), role (TEXT: 'CUSTOMER' or 'SUPPLIER'), current_balance (DECIMAL), balance_type (TEXT: 'YOU_WILL_GET', 'YOU_WILL_GIVE', 'SETTLED'), due_date (TEXT), last_transaction (TEXT).
+- Create a `ledger_entries` table: id (TEXT PK), party_id (TEXT FK), type (TEXT: 'YOU_GAVE' or 'YOU_GOT'), amount (DECIMAL), description (TEXT), bill_reference (TEXT), created_at (TEXT).
+- Implement backend transaction logic: When a ledger entry is posted via 'POST /api/ledger', it must update the ledger and instantly recalculate the party's current_balance and balance_type:
+  * For CUSTOMER: 'YOU_GAVE' (আপনি দিয়েছেন) increases what they owe us ('YOU_WILL_GET' / পাবেন). 'YOU_GOT' (আপনি পেয়েছেন) decreases it.
+  * For SUPPLIER: 'YOU_GAVE' decreases what we owe them. 'YOU_GOT' increases what we owe them ('YOU_WILL_GIVE' / দেবেন).
+
+2. UI & LAYOUT SPECIFICATIONS (100% Bengali Language & ৳ Currency):
+- The entire interface text, buttons, tags, and placeholders MUST be in professional Bengali business terms. All monetary values must use the Bangladeshi Taka symbol (৳).
+- Implement a rigid split-screen desktop viewport layout: 35% Left Panel for directory navigation, 65% Right Panel for ledger details.
+- LEFT PANEL COMPONENTS (35%):
+  * Header: Store title "হাজারী খাতাবুক" with a sub-tag "ডেক্সটপ". A functional button "+ স্টাফ যোগ করুন".
+  * Switcher Tabs: Toggle buttons between "কাস্টমার (খরিদ্দার)" and "সাপ্লায়ার (মহাজন)".
+  * Global Metrics Card: 3 columns displaying "পাবেন" (Green text), "দেবেন" (Red text), and "অনলাইন কালেকশন" (Blue text).
+  * Search & Filter Chips: Search input field and active filter chips: "সব", "আজকের বকেয়া", "আসন্ন", "তারিখ ছাড়া".
+  * Directory Feed: Scrollable list of parties showing their name, phone, balance with ৳ sign, and sub-labels ("পাবেন" / "দেবেন").
+  * Footer: Sticky fixed button "+ নতুন কাস্টমার/সাপ্লায়ার যোগ করুন" opening a form modal.
+- RIGHT PANEL COMPONENTS (65%):
+  * Empty State: Show a clean dashboard with system language dropdown layout when no party is selected.
+  * Active State Profile Header: Displays selected party's Name, Phone, and actionable buttons: "তাগাদা পাঠান (SMS)" and "স্টেটমেন্ট রিপোর্ট".
+  * Ledger Stream: Chronological vertical scroll of transaction logs. Cards for "আপনি দিয়েছেন" must have a red accent/border, and "আপনি পেয়েছেন" must have a green accent/border.
+  * Bottom Entry Actions: Two massive sticky action buttons: "আপনি দিয়েছেন (৳ মাল/নগদ)" in Crimson Red, and "আপনি পেয়েছেন (৳ ক্যাশ/অনলাইন)" in Emerald Green. Both must launch modals to enter Amount, Description, Bill Reference, and Due Date.
+
+3. MOCK VALIDATION:
+- Clicking "তাগাদা পাঠান (SMS)" must trigger a modal displaying a simulated Bengali SMS reminder string: "বকেয়া তাগাদা: হাজারী খাতাবুক-এর পক্ষ থেকে [Name]-কে ৳[Amount] টাকা বকেয়া পরিশোধের জন্য অনুরোধ করা হচ্ছে।"
+
+Generate the complete multi-file project with production-ready Express routes, working SQLite controllers, and a polished React UI.

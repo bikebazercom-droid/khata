@@ -7,12 +7,13 @@ import {
   PartyRole, 
   DueFilter 
 } from '@workspace/api-client-react';
-import { Search, UserPlus, FileText, Book, User, ChevronRight } from 'lucide-react';
+import { Search, UserPlus, User, ChevronRight } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AddPartyModal } from '@/components/modals/add-party-modal';
 import { formatDistanceToNow } from 'date-fns';
+import { bn } from 'date-fns/locale';
 
 export function LeftPanel() {
   const [role, setRole] = useState<PartyRole>(PartyRole.CUSTOMER);
@@ -30,14 +31,17 @@ export function LeftPanel() {
       <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-20 shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm shadow-sm">
-            HK
+            হা
           </div>
-          <h1 className="font-bold tracking-tight text-lg text-slate-900">
-            {settings?.storeName || "Hazari Khatabook"}
-          </h1>
+          <div className="leading-tight">
+            <h1 className="font-bold tracking-tight text-lg text-slate-900">
+              {settings?.storeName || "হাজারী খাতাবুক"}
+            </h1>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ডেক্সটপ</p>
+          </div>
         </div>
         <Button variant="outline" size="sm" className="h-8 text-xs rounded-full font-semibold px-3 bg-slate-50 border-slate-200">
-          <UserPlus className="w-3.5 h-3.5 mr-1.5" /> Add Staff
+          <UserPlus className="w-3.5 h-3.5 mr-1.5" /> স্টাফ যোগ করুন
         </Button>
       </div>
 
@@ -50,7 +54,7 @@ export function LeftPanel() {
               role === PartyRole.CUSTOMER ? "bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] text-primary" : "text-slate-500 hover:text-slate-800"
             )}
           >
-            Customers
+            কাস্টমার (খরিদ্দার)
           </button>
           <button 
             onClick={() => setRole(PartyRole.SUPPLIER)}
@@ -59,51 +63,37 @@ export function LeftPanel() {
               role === PartyRole.SUPPLIER ? "bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] text-primary" : "text-slate-500 hover:text-slate-800"
             )}
           >
-            Suppliers
+            সাপ্লায়ার (মহাজন)
           </button>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm mb-5 relative overflow-hidden group">
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex-1">
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> You will give
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> পাবেন
               </p>
-              <p className="text-red-500 font-bold text-lg tracking-tight">{formatCurrency(summary?.youWillGive || 0)}</p>
+              <p className="text-emerald-600 font-bold text-base tracking-tight">{formatCurrency(summary?.youWillGet || 0)}</p>
             </div>
-            <div className="w-[1px] h-10 bg-slate-100 mx-4"></div>
-            <div className="flex-1">
+            <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> You will get
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> দেবেন
               </p>
-              <p className="text-emerald-500 font-bold text-lg tracking-tight">{formatCurrency(summary?.youWillGet || 0)}</p>
+              <p className="text-red-500 font-bold text-base tracking-tight">{formatCurrency(summary?.youWillGive || 0)}</p>
             </div>
-          </div>
-          
-          <div className="bg-[#f0f7ff] p-3 rounded-xl flex justify-between items-center border border-[#e0f2fe] mb-4 hover:bg-[#e0f2fe] transition-colors cursor-pointer">
-             <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-md bg-blue-500 text-white flex items-center justify-center">
-                  <span className="text-xs font-bold">₹</span>
-                </div>
-                <p className="text-xs font-bold text-blue-900 uppercase tracking-wide">Online Collections</p>
-             </div>
-             <p className="text-blue-700 font-bold text-sm">{formatCurrency(summary?.onlineCollectionBalance || 0)}</p>
-          </div>
-          
-          <div className="flex gap-2.5">
-            <Button variant="outline" size="sm" className="flex-1 h-9 text-xs font-semibold bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700">
-              <FileText className="w-3.5 h-3.5 mr-2 text-slate-500" /> View Reports
-            </Button>
-            <Button variant="outline" size="sm" className="flex-1 h-9 text-xs font-semibold bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700">
-              <Book className="w-3.5 h-3.5 mr-2 text-slate-500" /> Cashbook
-            </Button>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> অনলাইন কালেকশন
+              </p>
+              <p className="text-blue-600 font-bold text-base tracking-tight">{formatCurrency(summary?.onlineCollectionBalance || 0)}</p>
+            </div>
           </div>
         </div>
 
         <div className="relative mb-4">
           <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
           <Input 
-            placeholder={`Search ${role.toLowerCase()}s...`}
+            placeholder={role === PartyRole.CUSTOMER ? "কাস্টমার খুঁজুন..." : "সাপ্লায়ার খুঁজুন..."}
             className="pl-10 h-10 bg-slate-50 border-slate-200 rounded-xl font-medium focus-visible:ring-primary/20"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -112,10 +102,10 @@ export function LeftPanel() {
 
         <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide no-scrollbar -mx-4 px-4 mask-edge">
           {[
-             { id: DueFilter.ALL, label: "All" },
-             { id: DueFilter.DUE_TODAY, label: "Due Today" },
-             { id: DueFilter.UPCOMING, label: "Upcoming" },
-             { id: DueFilter.NO_DUE_DATE, label: "No Due Date" }
+             { id: DueFilter.ALL, label: "সব" },
+             { id: DueFilter.DUE_TODAY, label: "আজকের বকেয়া" },
+             { id: DueFilter.UPCOMING, label: "আসন্ন" },
+             { id: DueFilter.NO_DUE_DATE, label: "তারিখ ছাড়া" }
           ].map(f => (
             <button
               key={f.id}
@@ -137,7 +127,9 @@ export function LeftPanel() {
             <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-3">
               <User className="w-8 h-8 opacity-40" />
             </div>
-            <p className="text-sm font-medium">No {role.toLowerCase()}s found.</p>
+            <p className="text-sm font-medium">
+              {role === PartyRole.CUSTOMER ? "কোনো কাস্টমার পাওয়া যায়নি।" : "কোনো সাপ্লায়ার পাওয়া যায়নি।"}
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
@@ -166,7 +158,7 @@ export function LeftPanel() {
                     <p className="font-bold text-slate-900 truncate text-[15px]">{party.name}</p>
                     {party.lastTransactionAt && (
                       <span className="text-[10px] font-medium text-slate-400 shrink-0 ml-2">
-                        {formatDistanceToNow(new Date(party.lastTransactionAt), { addSuffix: true })}
+                        {formatDistanceToNow(new Date(party.lastTransactionAt), { addSuffix: true, locale: bn })}
                       </span>
                     )}
                   </div>
@@ -181,7 +173,7 @@ export function LeftPanel() {
                       {formatCurrency(party.currentBalance)}
                     </p>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                      {party.balanceType === "YOU_WILL_GET" ? "You'll Get" : "You'll Give"}
+                      {party.balanceType === "YOU_WILL_GET" ? "পাবেন" : "দেবেন"}
                     </p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors" />
@@ -199,7 +191,7 @@ export function LeftPanel() {
             onClick={() => setIsAddPartyOpen(true)}
           >
             <UserPlus className="w-5 h-5 mr-2" />
-            Add {role === PartyRole.CUSTOMER ? "Customer" : "Supplier"}
+            + নতুন কাস্টমার/সাপ্লায়ার যোগ করুন
           </Button>
         </div>
       </div>

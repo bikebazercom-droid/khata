@@ -4,7 +4,7 @@ import { z } from "zod/v4";
 
 export const businessSettingsTable = pgTable("business_settings", {
   id: uuid("id").primaryKey().defaultRandom(),
-  storeName: text("store_name").notNull().default("Hazari Khatabook"),
+  storeName: text("store_name").notNull().default("হাজারী খাতাবুক"),
   language: text("language").notNull().default("English"),
   onlineCollectionBalance: numeric("online_collection_balance", {
     precision: 12,

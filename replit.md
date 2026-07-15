@@ -36,12 +36,14 @@ A desktop billing & ledger app for shop owners to track money owed by customers 
 - A party's balance is stored as an unsigned `currentBalance` + a `balanceType` enum (`YOU_WILL_GIVE` / `YOU_WILL_GET`) rather than a signed number, matching the OpenAPI contract. Server-side helpers (`toSignedBalance`/`fromSignedBalance` in `khatabook.ts`) convert to/from a signed value to make the add/subtract math simple.
 - Balance recalculation happens entirely server-side when a ledger entry is created — the client never computes or sends the new balance.
 - `BusinessSettings` is a lazily-created singleton row (`getOrCreateBusinessSettings`), not a fixed seeded row, so the schema doesn't need a hardcoded ID.
-- No auth, no real i18n, no real SMS/payment gateway — language selector and several action buttons (Report, Request Money, SMS, Add Staff, Cashbook, View Reports) are intentionally non-functional stubs; only the Payment Reminder button calls a real (mocked-response) endpoint.
+- No auth, no real i18n, no real SMS/payment gateway — the "system language" dropdown on the dashboard and "Add Staff"/"Statement Report" buttons are intentionally non-functional stubs; only the Payment Reminder button calls a real (mocked-response) endpoint.
+- The entire UI is hardcoded Bengali (not translated at runtime); currency is always displayed with ৳ via `formatCurrency` in `lib/utils.ts`. The "system language" dropdown only writes to `BusinessSettings.language` for display — it doesn't change UI text.
+- The mock SMS reminder message is built server-side in the `/parties/:id/reminder` route with the exact Bengali template the product spec requires; the frontend shows it in a dialog, not a toast.
 
 ## Product
 
-- Split-screen desktop app: left panel lists customers/suppliers with balances, search, and due-date filters; right panel shows either the business dashboard (no party selected) or a selected party's ledger history with "You Gave"/"You Got" entry recording.
-- Dashboard totals (You Will Get / You Will Give / Online Collections) are aggregated live from party balances plus stored business settings.
+- Split-screen desktop app (35%/65%), fully in Bengali: left panel lists customers ("কাস্টমার")/suppliers ("সাপ্লায়ার") with balances, search, and due-date filter chips; right panel shows either the business dashboard (no party selected) or a selected party's ledger history with "আপনি দিয়েছেন"/"আপনি পেয়েছেন" entry recording.
+- Dashboard totals ("পাবেন" / "দেবেন" / "অনলাইন কালেকশন") are aggregated live from party balances plus stored business settings.
 
 ## User preferences
 

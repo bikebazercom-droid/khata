@@ -257,10 +257,13 @@ router.post(
       return;
     }
 
-    const settings = await getOrCreateBusinessSettings();
+    await getOrCreateBusinessSettings();
     const amount = Number(party.currentBalance);
+    const formattedAmount = new Intl.NumberFormat("en-IN", {
+      maximumFractionDigits: 0,
+    }).format(amount);
 
-    const message = `Payment reminder for \u09F3${amount.toFixed(2)} sent by ${settings.storeName}`;
+    const message = `বকেয়া তাগাদা: হাজারী খাতাবুক-এর পক্ষ থেকে ${party.name}-কে ৳${formattedAmount} টাকা বকেয়া পরিশোধের জন্য অনুরোধ করা হচ্ছে।`;
 
     res.json(
       SendPaymentReminderResponse.parse({

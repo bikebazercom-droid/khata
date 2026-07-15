@@ -10,7 +10,7 @@ export function DashboardView() {
 
   const handleLanguageChange = (lang: string) => {
     updateSettings.mutate({ data: { language: lang } }, {
-      onSuccess: () => toast.success(`Language set to ${lang}`)
+      onSuccess: () => toast.success(`ভাষা সেট করা হয়েছে: ${lang}`)
     });
   };
 
@@ -23,11 +23,11 @@ export function DashboardView() {
           </div>
           <div>
             <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 mb-2">
-              {settings?.storeName || "Hazari Khatabook"}
+              {settings?.storeName || "হাজারী খাতাবুক"}
             </h1>
             <p className="text-slate-500 font-medium text-lg flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-emerald-500" />
-              Your business dashboard
+              আপনার ব্যবসার ড্যাশবোর্ড
             </p>
           </div>
         </div>
@@ -38,12 +38,12 @@ export function DashboardView() {
                <ArrowRightLeft className="w-48 h-48 text-emerald-500" />
              </div>
              <p className="text-sm font-bold text-emerald-600 uppercase tracking-widest mb-3 flex items-center gap-2">
-               <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> To Collect
+               <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> পাবেন
              </p>
              <h2 className="text-5xl font-extrabold text-slate-900 mb-6 tracking-tight">{formatCurrency(summary?.youWillGet || 0)}</h2>
              <div className="inline-flex items-center px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm font-bold">
                <Users className="w-4 h-4 mr-2" />
-               From {summary?.customerCount || 0} customers
+               {summary?.customerCount || 0} জন কাস্টমার থেকে
              </div>
            </div>
            
@@ -52,12 +52,12 @@ export function DashboardView() {
                <Wallet className="w-48 h-48 text-red-500" />
              </div>
              <p className="text-sm font-bold text-red-600 uppercase tracking-widest mb-3 flex items-center gap-2">
-               <span className="w-2 h-2 rounded-full bg-red-500 inline-block"></span> To Pay
+               <span className="w-2 h-2 rounded-full bg-red-500 inline-block"></span> দেবেন
              </p>
              <h2 className="text-5xl font-extrabold text-slate-900 mb-6 tracking-tight">{formatCurrency(summary?.youWillGive || 0)}</h2>
              <div className="inline-flex items-center px-4 py-2 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm font-bold">
                <Users className="w-4 h-4 mr-2" />
-               To {summary?.supplierCount || 0} suppliers
+               {summary?.supplierCount || 0} জন সাপ্লায়ারকে
              </div>
            </div>
         </div>
@@ -68,12 +68,12 @@ export function DashboardView() {
                <Languages className="w-5 h-5 text-slate-600" />
              </div>
              <div>
-               <h3 className="font-bold text-lg text-slate-900">App Language</h3>
-               <p className="text-sm text-slate-500 font-medium">Choose your preferred language for bills and UI</p>
+               <h3 className="font-bold text-lg text-slate-900">সিস্টেম ভাষা</h3>
+               <p className="text-sm text-slate-500 font-medium">বিল ও ইন্টারফেসের জন্য আপনার পছন্দের ভাষা বেছে নিন</p>
              </div>
            </div>
            <div className="grid grid-cols-3 gap-5">
-             {["English", "Hindi", "Bengali"].map(lang => (
+             {["বাংলা", "English", "हिंदी"].map(lang => (
                <button
                  key={lang}
                  onClick={() => handleLanguageChange(lang)}
