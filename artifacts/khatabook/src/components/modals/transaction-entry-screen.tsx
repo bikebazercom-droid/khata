@@ -11,7 +11,7 @@ import {
 import { ChevronLeft, Camera, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { cn, evaluateMathExpression, expandPercent, formatCurrency, trimNumberForExpression } from '@/lib/utils';
+import { cn, evaluateCalculatorExpression, formatCurrency, formatExpressionForDisplay, trimNumberForExpression } from '@/lib/utils';
 
 type KeyKind = 'digit' | 'muted' | 'accent';
 type KeyDef = { label: string; value: string; kind: KeyKind; span?: number };
@@ -93,7 +93,7 @@ export function TransactionEntryScreen({
 
   const liveResult = useMemo(() => {
     if (!expression) return 0;
-    return evaluateMathExpression(expandPercent(expression));
+    return evaluateCalculatorExpression(expression);
   }, [expression]);
 
   const displayAmount = liveResult ?? 0;
@@ -111,7 +111,7 @@ export function TransactionEntryScreen({
       return;
     }
     if (value === '=') {
-      const result = evaluateMathExpression(expandPercent(expression));
+      const result = evaluateCalculatorExpression(expression);
       if (result === null) {
         setShowError(true);
         return;
@@ -120,7 +120,7 @@ export function TransactionEntryScreen({
       return;
     }
     if (value === 'M+' || value === 'M-') {
-      const result = evaluateMathExpression(expandPercent(expression));
+      const result = evaluateCalculatorExpression(expression);
       if (result === null) {
         setShowError(true);
         return;
@@ -133,7 +133,7 @@ export function TransactionEntryScreen({
   };
 
   const handleSave = () => {
-    const finalAmount = evaluateMathExpression(expandPercent(expression));
+    const finalAmount = evaluateCalculatorExpression(expression);
     if (finalAmount === null || finalAmount <= 0) {
       setShowError(true);
       toast.error('সঠিক হিসাব বা সংখ্যা লিখুন');
@@ -202,7 +202,7 @@ export function TransactionEntryScreen({
           {isActive && (
             <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50/60">
               <p className="text-sm font-mono font-medium text-slate-500 truncate">
-                {expression}
+                {formatExpressionForDisplay(expression)}
                 {hasFormula && liveResult !== null ? ` = ${trimNumberForExpression(liveResult)}` : ''}
               </p>
             </div>

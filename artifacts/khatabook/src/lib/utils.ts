@@ -12,41 +12,98 @@ export function formatCurrency(amount: number) {
 }
 
 /**
- * Safely evaluates a simple arithmetic expression typed into the in-line
- * amount calculator (e.g. "500+250*2"). Only digits, whitespace, and the
- * operators + - * / ( ) . are ever allowed through to evaluation, so this
- * cannot execute arbitrary JS. Returns null if the expression is empty,
- * contains disallowed characters, or fails to evaluate to a finite number.
+ * Evaluates an expression typed into the custom on-screen calculator keypad
+ * (e.g. "10+5+40*5/10%"), using classic sequential four-function-calculator
+ * semantics rather than algebraic operator precedence — i.e. operations are
+ * applied strictly in the order they were pressed (like a physical adding
+ * machine), which is what real ledger/cash-register calculators do and is
+ * required for chained "%" tokens to resolve to the expected total.
+ *
+ * Percent handling ("standard ledger calculator" convention):
+ * - After + or -, "N%" means "N percent OF the running total so far"
+ *   (e.g. 100+10% = 100 + 10 = 110).
+ * - After * or /, "N%" means the literal fraction N/100
+ *   (e.g. 200*10% = 20, 275/10% = 275/0.1 = 2750).
+ *
+ * Only digits, ".", "%", and the operators + - * / are ever allowed through,
+ * so this cannot execute arbitrary JS. Returns null if the expression is
+ * empty, malformed (dangling/doubled operators, stray characters), or
+ * fails to evaluate to a finite number (including division by zero).
  */
-export function evaluateMathExpression(raw: string): number | null {
-  const trimmed = raw.trim();
+export function evaluateCalculatorExpression(raw: string): number | null {
+  const trimmed = raw.replace(/\s+/g, '');
   if (!trimmed) return null;
 
-  // Only allow digits, ., whitespace, and the four basic operators/parens.
-  if (!/^[0-9+\-*/().\s]+$/.test(trimmed)) return null;
-  // Reject a bare number-only string with no operator issues (still valid),
-  // but reject dangling operators like "500+" which are incomplete.
-  if (/[+\-*/.]$/.test(trimmed.replace(/\s+/g, ''))) return null;
-  // Reject empty parens or consecutive operators like "5**2" / "5+-2" edge cases
-  if (/[+\-*/]{2,}/.test(trimmed.replace(/\s+/g, '').replace(/\(-/g, '('))) return null;
+  // Only allow digits, ., %, and the four basic operators.
+  if (!/^[0-9+\-*/.%]+$/.test(trimmed)) return null;
+  // Reject dangling operators at the end, e.g. "500+".
+  if (/[+\-*/]$/.test(trimmed)) return null;
+  // Reject consecutive operators, e.g. "5**2" / "5+-2".
+  if (/[+\-*/]{2,}/.test(trimmed)) return null;
+  // "%" may only ever be preceded by a digit and followed by an operator or
+  // the end of the string — reject things like "%5" or "10%%".
+  if (/%[0-9%]/.test(trimmed) || /^%/.test(trimmed)) return null;
 
-  try {
-    // eslint-disable-next-line no-new-func
-    const result = Function(`"use strict"; return (${trimmed});`)();
-    if (typeof result !== 'number' || !Number.isFinite(result)) return null;
-    return result;
-  } catch {
-    return null;
+  // Tokenize into number tokens (optionally trailed by "%") and single-char
+  // operator tokens, verifying every character is consumed by a token in
+  // sequence (no gaps = no unrecognized fragments slip through).
+  const tokenPattern = /(\d+(?:\.\d+)?%?)|([+\-*/])/g;
+  const tokens: string[] = [];
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+  while ((match = tokenPattern.exec(trimmed)) !== null) {
+    if (match.index !== cursor) return null;
+    tokens.push(match[0]);
+    cursor = tokenPattern.lastIndex;
   }
+  if (cursor !== trimmed.length || tokens.length === 0) return null;
+
+  const isOperator = (t: string) => t === '+' || t === '-' || t === '*' || t === '/';
+  if (isOperator(tokens[0])) return null;
+
+  const firstToken = tokens[0];
+  let acc = firstToken.endsWith('%') ? parseFloat(firstToken) / 100 : parseFloat(firstToken);
+  if (!Number.isFinite(acc)) return null;
+
+  for (let i = 1; i < tokens.length; i += 2) {
+    const op = tokens[i];
+    const operandToken = tokens[i + 1];
+    if (!isOperator(op) || operandToken === undefined || isOperator(operandToken)) return null;
+
+    const isPercent = operandToken.endsWith('%');
+    const rawNum = parseFloat(isPercent ? operandToken.slice(0, -1) : operandToken);
+    if (!Number.isFinite(rawNum)) return null;
+
+    const value = isPercent
+      ? op === '+' || op === '-'
+        ? acc * (rawNum / 100) // percent of the running total for +/-
+        : rawNum / 100 // literal fraction for */÷
+      : rawNum;
+
+    switch (op) {
+      case '+':
+        acc += value;
+        break;
+      case '-':
+        acc -= value;
+        break;
+      case '*':
+        acc *= value;
+        break;
+      case '/':
+        if (value === 0) return null;
+        acc /= value;
+        break;
+    }
+  }
+
+  return Number.isFinite(acc) ? acc : null;
 }
 
-/**
- * Expands standalone percentage terms (e.g. "500%" -> "(500/100)") before
- * handing an expression to evaluateMathExpression, so the custom calculator
- * keypad's "%" key behaves like a basic calculator percent function.
- */
-export function expandPercent(raw: string): string {
-  return raw.replace(/(\d+(\.\d+)?)%/g, '($1/100)');
+/** Converts internal "*"/"/" operator characters to the "×"/"÷" symbols used
+ * on the keypad, for display in the live formula sub-bar. */
+export function formatExpressionForDisplay(expr: string): string {
+  return expr.replace(/\*/g, '×').replace(/\//g, '÷');
 }
 
 /** Formats a number for re-insertion into the calculator expression buffer

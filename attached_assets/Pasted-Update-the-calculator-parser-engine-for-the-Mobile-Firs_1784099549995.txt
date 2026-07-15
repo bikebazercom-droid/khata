@@ -1,0 +1,21 @@
+Update the calculator parser engine for the Mobile-First "হাজারী খাতাবুক" (Hazari Khatabook) application to correctly evaluate complex expressions involving percentages (%), addition (+), subtraction (-), multiplication (×), and division (÷) seamlessly on a single page layout, matching the exact behavior in the user's screenshot.
+
+1. ADVANCED MATHEMATICAL PARSING & PERCENTAGE ENGINE:
+- The custom UI keypad input string must be evaluated in real-time.
+- Replace the division symbol (÷) with (/) and multiplication symbol (×) with (*) before evaluation.
+- Implement a smart percentage (%) parser: When evaluating the mathematical string, convert any occurrence of percentage tokens correctly according to standard ledger calculator logic (e.g., parsing a number followed by '%' as `(number / 100)` or dynamically chaining it to the preceding term inside the expression).
+- As the user types `10+5+40×5÷10%`, the sub-bar must instantly show the full equation string `10+5+40×5÷10% = 2750` (or its exact arithmetic equivalent total), while the main large card reflects the active numeric/operator input token (e.g., showing `10%` contextually as typed).
+- Ensure the JavaScript evaluation engine does not throw syntax errors when a user chains multiple math symbols sequentially with a percentage sign.
+
+2. FIXED MOBILE STRUCTURE & CONDITIONAL TRANSITION:
+- Keep a strict zero-scroll viewport layer (`h-screen overflow-hidden`).
+- Custom on-screen grid keyboard must remain pinned at the bottom 40% height.
+- State A (Empty): Amount box is 0. Metadata fields are hidden. "SAVE" button is disabled.
+- State B (Typing): As soon as any calculation button is pressed, the compact layout instantly expands to show "বিবরণ (Details)", "বিল নম্বর", "তারিখ (Date Picker)", and "ক্যামেরা আইকন" in a tight space between the calculator and the total box, ensuring nothing goes off-screen.
+
+3. DATA & LOCALIZATION CONFIGURATION:
+- Interface text and layouts must remain 100% localized in the Bengali language.
+- Replace all currency indicators globally with the Bangladeshi Taka symbol (৳).
+- On tapping the Crimson Red/Emerald Green "SAVE" button, the final parsed float total must be successfully written into the SQLite database (`ledger_entries` and `parties`).
+
+Generate the complete multi-file system update with robust string validation and tokenizing logic for the custom percent-based calculator engine.
