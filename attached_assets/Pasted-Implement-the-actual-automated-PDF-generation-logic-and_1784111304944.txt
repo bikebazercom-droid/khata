@@ -1,0 +1,20 @@
+Implement the actual automated PDF generation logic and deep-linking share streams for the "রিপোর্ট" (Report) and "রিমাইন্ডার" (Reminder) utility action buttons.
+
+1. CLIENT-SIDE PDF GENERATION ENGINE:
+- Integrate a reliable client-side printing or PDF engine (like 'jspdf' along with 'jspdf-autotable' or 'html2pdf.js') into the Customer Ledger module.
+- The generated PDF must be professionally structured in Bengali, showcasing:
+  * Top Header: Shop/Business Name, Customer Name, and Customer Phone Number.
+  * Summary: Current Net Outstanding Status ("আপনি পাবেন" / "আপনি দেবেন") and Total Amount.
+  * Ledger Table: A clean tabular grid matching the chronological entries (Date/Time, Type: দিয়েছেন/পেয়েছেন, Amount, and Running Balance).
+
+2. "রিপোর্ট" (REPORT) BUTTON AUTOMATION:
+- When the user clicks the "রিপোর্ট" button, it must instantly trigger the PDF generator, compile the specific customer's entire transaction ledger from the SQLite database, and execute a direct browser/device download trigger (e.g., `doc.save('কাস্টমার_হিসাব_খাতা.pdf')`). 
+- The process must download the file directly to the user's local storage without opening print previews or empty windows.
+
+3. "রিমাইন্ডার" (REMINDER) BUTTON WHATSAPP STREAMING:
+- When the user clicks the "রিমাইন্ডার" button, first dynamically generate the same ledger report PDF.
+- Upload/Save the temporary PDF data or convert the text summary to a structured receipt layout.
+- Launch a seamless functional deep link to WhatsApp Web/App (`https://wa.me/<customer_phone_number>?text=<encoded_ledger_summary_and_download_link>`). 
+- If the ecosystem allows local file attachments via native sharing wrappers, invoke the device's native share sheet (e.g., `navigator.share`) pre-loaded with the actual generated PDF file blob so the user can send the document directly to the customer's WhatsApp chat window in one click.
+
+Ensure these functionalities are fully wired to the active customer ledger dataset and handle asynchronous states cleanly with native loading spinners during generation.

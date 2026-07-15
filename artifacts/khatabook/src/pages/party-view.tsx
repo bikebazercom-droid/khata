@@ -1,22 +1,22 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useRoute, Link, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useGetParty,
   useListLedgerEntries,
-  useSendPaymentReminder,
   useDeleteParty,
+  useGetBusinessSettings,
   getGetPartyQueryKey,
   getListLedgerEntriesQueryKey,
   getListPartiesQueryKey,
   getGetDashboardSummaryQueryKey,
   LedgerEntryType,
 } from '@workspace/api-client-react';
+import html2pdf from 'html2pdf.js';
 import {
   ChevronLeft,
   Phone,
   FileText,
-  MoreVertical,
   Copy,
   Check,
   Trash2,
@@ -24,6 +24,7 @@ import {
   MessageCircle,
   MessageSquareText,
   Plus,
+  Loader2,
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -44,6 +45,12 @@ import {
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
 import { TransactionEntryScreen } from '@/components/modals/transaction-entry-screen';
+import {
+  LedgerReportDocument,
+  buildReportFilename,
+  buildWhatsAppReminderText,
+  toWhatsAppNumber,
+} from '@/lib/ledger-report';
 import { format, isToday } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -71,16 +78,17 @@ export function PartyView() {
 
   const { data: party, isLoading: partyLoading } = useGetParty(id || '', { query: { enabled: !!id, queryKey: getGetPartyQueryKey(id || '') } });
   const { data: entries = [], isLoading: entriesLoading } = useListLedgerEntries(id || '', { query: { enabled: !!id, queryKey: getListLedgerEntriesQueryKey(id || '') } });
-  const sendReminder = useSendPaymentReminder();
+  const { data: settings } = useGetBusinessSettings();
   const deleteParty = useDeleteParty();
 
   const [transactionType, setTransactionType] = useState<LedgerEntryType | null>(null);
-  const [reminderMessage, setReminderMessage] = useState<string | null>(null);
   const [smsMessage, setSmsMessage] = useState<string | null>(null);
-  const [reportGenerated, setReportGenerated] = useState(false);
-  const [copiedReminder, setCopiedReminder] = useState(false);
   const [copiedSms, setCopiedSms] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [isGeneratingReminder, setIsGeneratingReminder] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
+  const storeName = settings?.storeName || 'হাজারী খাতাবুক';
 
   // Running balance per entry: entries arrive newest-first, and the party's
   // current signed balance equals the balance immediately after entries[0].
@@ -118,22 +126,84 @@ export function PartyView() {
     );
   };
 
-  const handleReminder = () => {
-    if (!id) return;
-    sendReminder.mutate(
-      { partyId: id },
-      {
-        onSuccess: (res) => {
-          setCopiedReminder(false);
-          setReminderMessage(res.message);
-        },
-      }
-    );
+  /** Renders the hidden report DOM node into a jsPDF worker instance. */
+  const buildReportPdf = () => {
+    if (!reportRef.current) return null;
+    return html2pdf().set({
+      margin: 10,
+      filename: party ? buildReportFilename(party.name) : 'হিসাব_খাতা.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' },
+    }).from(reportRef.current);
   };
 
-  const handleReport = () => {
-    setReportGenerated(true);
-    toast.success('পিডিএফ রিপোর্ট তৈরি হয়েছে (সিমুলেটেড)');
+  const handleReport = async () => {
+    if (!party) return;
+    setIsGeneratingReport(true);
+    try {
+      const worker = buildReportPdf();
+      if (!worker) throw new Error('report element not ready');
+      await worker.save();
+      toast.success('পিডিএফ রিপোর্ট ডাউনলোড হয়েছে');
+    } catch (err) {
+      console.error('Report generation failed', err);
+      toast.error('রিপোর্ট তৈরি করা যায়নি');
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  const handleReminderShare = async () => {
+    if (!party) return;
+    setIsGeneratingReminder(true);
+    try {
+      const worker = buildReportPdf();
+      if (!worker) throw new Error('report element not ready');
+      const blob = await worker.outputPdf('blob');
+      const filename = buildReportFilename(party.name);
+      const messageText = buildWhatsAppReminderText(storeName, party);
+      const file = new File([blob], filename, { type: 'application/pdf' });
+
+      const canShareFile =
+        typeof navigator.share === 'function' &&
+        typeof navigator.canShare === 'function' &&
+        navigator.canShare({ files: [file] });
+
+      if (canShareFile) {
+        await navigator.share({
+          files: [file],
+          title: 'হিসাবের রিপোর্ট',
+          text: messageText,
+        });
+        toast.success('শেয়ার শীট খোলা হয়েছে');
+        return;
+      }
+
+      // Fallback: download the PDF locally, then open a real WhatsApp deep
+      // link pre-filled with the ledger summary (wa.me can't attach files).
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      const waNumber = toWhatsAppNumber(party.phone);
+      window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(messageText)}`, '_blank');
+      toast.success('পিডিএফ ডাউনলোড হয়েছে এবং WhatsApp খোলা হয়েছে');
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        // User cancelled the native share sheet — not an error.
+        return;
+      }
+      console.error('Reminder share failed', err);
+      toast.error('রিমাইন্ডার পাঠানো যায়নি');
+    } finally {
+      setIsGeneratingReminder(false);
+    }
   };
 
   const handleSms = () => {
@@ -143,18 +213,6 @@ export function PartyView() {
       `প্রিয় ${party.name}, আপনার হিসাবে ${label} ${formatCurrency(party.currentBalance)}। ধন্যবাদান্তে, হাজারী খাতাবুক।`
     );
     setCopiedSms(false);
-  };
-
-  const handleCopyReminder = async () => {
-    if (!reminderMessage) return;
-    try {
-      await navigator.clipboard.writeText(reminderMessage);
-      setCopiedReminder(true);
-      toast.success('বার্তা কপি করা হয়েছে');
-      setTimeout(() => setCopiedReminder(false), 2000);
-    } catch {
-      toast.error('কপি করা যায়নি');
-    }
   };
 
   const handleCopySms = async () => {
@@ -267,18 +325,27 @@ export function PartyView() {
         <button
           type="button"
           onClick={handleReport}
-          className="flex flex-col items-center gap-1 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+          disabled={isGeneratingReport}
+          className="flex flex-col items-center gap-1 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors disabled:opacity-60"
         >
-          <FileDown className="w-5 h-5 text-slate-500" />
+          {isGeneratingReport ? (
+            <Loader2 className="w-5 h-5 text-slate-500 animate-spin" />
+          ) : (
+            <FileDown className="w-5 h-5 text-slate-500" />
+          )}
           <span className="text-[11px] font-bold text-slate-600">রিপোর্ট</span>
         </button>
         <button
           type="button"
-          onClick={handleReminder}
-          disabled={sendReminder.isPending}
-          className="flex flex-col items-center gap-1 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+          onClick={handleReminderShare}
+          disabled={isGeneratingReminder}
+          className="flex flex-col items-center gap-1 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors disabled:opacity-60"
         >
-          <MessageCircle className="w-5 h-5 text-emerald-500" />
+          {isGeneratingReminder ? (
+            <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
+          ) : (
+            <MessageCircle className="w-5 h-5 text-emerald-500" />
+          )}
           <span className="text-[11px] font-bold text-slate-600">রিমাইন্ডার</span>
         </button>
         <button
@@ -391,24 +458,10 @@ export function PartyView() {
         />
       )}
 
-      {/* Reminder (WhatsApp share) dialog */}
-      <Dialog open={!!reminderMessage} onOpenChange={(open) => !open && setReminderMessage(null)}>
-        <DialogContent className="max-w-sm rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <MessageCircle className="w-5 h-5 text-emerald-600" /> রিমাইন্ডার তৈরি হয়েছে
-            </DialogTitle>
-          </DialogHeader>
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm font-medium text-slate-700 leading-relaxed">
-            {reminderMessage}
-          </div>
-          <Button onClick={handleCopyReminder} variant="outline" className="w-full font-bold">
-            {copiedReminder ? <Check className="w-4 h-4 mr-2 text-emerald-600" /> : <Copy className="w-4 h-4 mr-2" />}
-            {copiedReminder ? 'কপি হয়েছে' : 'বার্তা কপি করুন'}
-          </Button>
-          <p className="text-xs text-slate-400 font-medium text-center">এটি একটি সিমুলেটেড WhatsApp শেয়ার — কোনো বাস্তব বার্তা পাঠানো হয়নি।</p>
-        </DialogContent>
-      </Dialog>
+      {/* Off-screen printable ledger report used to render the actual PDF via html2pdf */}
+      <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -1 }} aria-hidden="true">
+        <LedgerReportDocument ref={reportRef} storeName={storeName} party={party} entries={entriesWithBalance} />
+      </div>
 
       {/* SMS dialog (distinct simulated flow) */}
       <Dialog open={!!smsMessage} onOpenChange={(open) => !open && setSmsMessage(null)}>
@@ -426,21 +479,6 @@ export function PartyView() {
             {copiedSms ? 'কপি হয়েছে' : 'বার্তা কপি করুন'}
           </Button>
           <p className="text-xs text-slate-400 font-medium text-center">এটি একটি সিমুলেটেড এসএমএস — কোনো বাস্তব এসএমএস পাঠানো হয়নি।</p>
-        </DialogContent>
-      </Dialog>
-
-      {/* Report (PDF) confirmation dialog */}
-      <Dialog open={reportGenerated} onOpenChange={(open) => !open && setReportGenerated(false)}>
-        <DialogContent className="max-w-sm rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileDown className="w-5 h-5 text-slate-500" /> রিপোর্ট তৈরি হয়েছে
-            </DialogTitle>
-          </DialogHeader>
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm font-medium text-slate-700 leading-relaxed">
-            {party.name}-এর সম্পূর্ণ হিসাবের একটি পিডিএফ রিপোর্ট তৈরি হয়েছে। বর্তমান ব্যালেন্স: {formatCurrency(party.currentBalance)} ({isGive ? 'আপনি দেবেন' : 'আপনি পাবেন'})।
-          </div>
-          <p className="text-xs text-slate-400 font-medium text-center">এটি একটি সিমুলেটেড পিডিএফ রিপোর্ট — কোনো বাস্তব ফাইল তৈরি হয়নি।</p>
         </DialogContent>
       </Dialog>
 
