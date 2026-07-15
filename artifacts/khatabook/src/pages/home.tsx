@@ -79,7 +79,7 @@ export function HomeView() {
                 role === PartyRole.CUSTOMER ? 'text-white border-white' : 'text-white/60 border-transparent'
               )}
             >
-              কাস্টমার (খরিদ্দার)
+              গ্রাহক
             </button>
             <button
               onClick={() => setRole(PartyRole.SUPPLIER)}
@@ -88,7 +88,7 @@ export function HomeView() {
                 role === PartyRole.SUPPLIER ? 'text-white border-white' : 'text-white/60 border-transparent'
               )}
             >
-              সাপ্লায়ার (মহাজন)
+              সরবরাহকারী
             </button>
           </div>
         </div>
