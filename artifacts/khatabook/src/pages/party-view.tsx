@@ -478,17 +478,17 @@ export function PartyView() {
       </div>
 
       {/* Sticky bottom action overlay */}
-      <div className="bg-white border-t border-slate-200 p-3 flex gap-3 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.08)] shrink-0 z-20">
+      <div className="bg-white border-t border-slate-200 px-3 pt-3 pb-5 flex gap-3 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.08)] shrink-0 z-20">
         <Button
           variant="destructive"
-          className="flex-1 h-16 text-base font-extrabold shadow-[0_4px_14px_0_rgba(239,68,68,0.35)] active:scale-[0.98] transition-all rounded-2xl"
+          className="flex-1 h-12 text-base font-extrabold shadow-[0_4px_14px_0_rgba(239,68,68,0.35)] active:scale-[0.98] transition-all rounded-xl flex items-center justify-center leading-none"
           onClick={() => setTransactionType(LedgerEntryType.YOU_GAVE)}
         >
           আপনি দিয়েছেন ৳
         </Button>
         <Button
           variant="success"
-          className="flex-1 h-16 text-base font-extrabold shadow-[0_4px_14px_0_rgba(16,185,129,0.35)] active:scale-[0.98] transition-all rounded-2xl"
+          className="flex-1 h-12 text-base font-extrabold shadow-[0_4px_14px_0_rgba(16,185,129,0.35)] active:scale-[0.98] transition-all rounded-xl flex items-center justify-center leading-none"
           onClick={() => setTransactionType(LedgerEntryType.YOU_GOT)}
         >
           আপনি পেয়েছেন ৳
