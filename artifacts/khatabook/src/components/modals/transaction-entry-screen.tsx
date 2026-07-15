@@ -8,7 +8,7 @@ import {
   getListPartiesQueryKey,
   getGetDashboardSummaryQueryKey,
 } from '@workspace/api-client-react';
-import { ChevronLeft, Camera, Plus } from 'lucide-react';
+import { ChevronLeft, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { cn, evaluateCalculatorExpression, formatCurrency, formatExpressionForDisplay, trimNumberForExpression } from '@/lib/utils';
@@ -83,8 +83,6 @@ export function TransactionEntryScreen({
   const [expression, setExpression] = useState('');
   const [memory, setMemory] = useState(0);
   const [description, setDescription] = useState('');
-  const [billReference, setBillReference] = useState('');
-  const [showBillField, setShowBillField] = useState(false);
   const [dueDate, setDueDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [showError, setShowError] = useState(false);
   // Once the user presses any numeric/operator key, the metadata panel
@@ -158,7 +156,7 @@ export function TransactionEntryScreen({
           type,
           amount: finalAmount,
           description,
-          billReference: billReference || undefined,
+          billReference: undefined,
           dueDate: dueDate || undefined,
         },
       },
@@ -259,29 +257,8 @@ export function TransactionEntryScreen({
               className="w-full h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
 
-            {/* Bill reference: collapsed trigger -> input */}
-            {showBillField ? (
-              <input
-                value={billReference}
-                onChange={(e) => setBillReference(e.target.value)}
-                placeholder="বিল/ইনভয়েস নম্বর"
-                tabIndex={showMetadata ? 0 : -1}
-                autoFocus
-                className="w-full h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-medium uppercase placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20"
-              />
-            ) : (
-              <button
-                type="button"
-                tabIndex={showMetadata ? 0 : -1}
-                onClick={() => setShowBillField(true)}
-                className="flex items-center gap-1 text-sm font-bold text-primary px-1"
-              >
-                <Plus className="w-3.5 h-3.5" /> বিল নম্বর যুক্ত করুন
-              </button>
-            )}
-
             {/* Date + attach bills */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 -mt-1.5">
               <input
                 type="date"
                 value={dueDate}
