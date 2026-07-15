@@ -262,7 +262,6 @@ components:
       type: object
       required:
         - name
-        - phone
         - role
       properties:
         name:
@@ -270,7 +269,7 @@ components:
           minLength: 1
         phone:
           type: string
-          minLength: 1
+          description: Optional mobile number; may be omitted or blank.
         role:
           $ref: "#/components/schemas/PartyRole"
         openingBalance:

@@ -1,0 +1,25 @@
+Implement the new customer onboarding flow and flexible database parsing for "হাজারী খাতাবুক" (Hazari Khatabook) matching the exact user interface and constraints provided in the screenshots.
+
+1. CONTACT LIST DIRECTORY SCREEN (Screen 2 Layout):
+- When clicking "+ কাস্টমার যোগ করুন" from the home view, open a dedicated contact directory selector.
+- Top Sticky Area: Search box input with a clear ("X") utility icon placeholder "Customer name / কাস্টমার খুঁজুন". Below it, a row with a dotted circle "+" icon stating "+ Add Customer / নতুন কাস্টমার ম্যানুয়ালি যোগ করুন" pushing to the empty form.
+- Content Scroll Feed: Render list of phone contacts with circular avatar badges featuring initials (e.g., "AN", "AF", "AM") or a "+" sign for raw numbers, followed by Contact Name and the respective Phone Number below it.
+- Include a right-aligned vertical alphabetic shortcut rail (A to Z index).
+- Tapping any row passes data into the Form state and transitions instantly.
+
+2. ADD PARTY FORM ROUTE WITH BD PRESETS (Screen 1 Layout):
+- Title Header: White back arrow with text "Add Party / কাস্টমার যোগ করুন".
+- Main Text Input: "Party name / কাস্টমারের নাম" (Required).
+- Phone Grid Input:
+  * Country Code Prefix Block: Prefilled with the Bangladeshi Flag icon and "+880" text.
+  * Number Input Block: "Mobile Number / মোবাইল নাম্বার".
+- STRICT VALIDATION BYPASS RULE: The mobile number input must be COMPLETELY OPTIONAL. If the user only provides a "Party name" and leaves the number box blank, clicking the save button must successfully execute. Do not throw client-side validations or let the backend fail.
+- Database Schema Configuration (SQLite): Update the `parties` schema execution so the `phone` column comfortably accepts `NULL` or empty strings (`""`).
+- Radio Buttons: "Who are they?" section defaulting to "Customer / কাস্টমার".
+- Bottom Fixed Button: Sticky solid Blue action button stretching across the screen base reading "ADD CUSTOMER". Clicking this commits the data and shows a toast notice: "কাস্টমার সফলভাবে যোগ করা হয়েছে".
+
+3. CORE SINGLE-PAGE VIEWPOT HOOKS:
+- Ensure the home screen remains non-scrollable except for the center customer layout.
+- Maintain the custom 4-column percentage calculation utility engine (`10+5+40×5÷10% = 2750`) on the entry pad without layout shifts.
+
+Generate the exact clean state management and database changes right away.

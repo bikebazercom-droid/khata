@@ -90,10 +90,9 @@ export const ListPartiesResponse = zod.array(ListPartiesResponseItem)
 
 
 
-
 export const CreatePartyBody = zod.object({
   "name": zod.string().min(1),
-  "phone": zod.string().min(1),
+  "phone": zod.string().optional().describe('Optional mobile number; may be omitted or blank.'),
   "role": zod.enum(['CUSTOMER', 'SUPPLIER']),
   "openingBalance": zod.number().optional().describe('Optional opening balance amount (always positive)'),
   "openingBalanceType": zod.enum(['YOU_WILL_GIVE', 'YOU_WILL_GET']).optional(),

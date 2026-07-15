@@ -95,7 +95,7 @@ router.post("/parties", async (req, res): Promise<void> => {
     .insert(partiesTable)
     .values({
       name,
-      phone,
+      phone: phone || "",
       role,
       currentBalance,
       balanceType,

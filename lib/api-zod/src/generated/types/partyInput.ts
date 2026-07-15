@@ -11,8 +11,8 @@ import type { PartyRole } from './partyRole';
 export interface PartyInput {
   /** @minLength 1 */
   name: string;
-  /** @minLength 1 */
-  phone: string;
+  /** Optional mobile number; may be omitted or blank. */
+  phone?: string;
   role: PartyRole;
   /** Optional opening balance amount (always positive) */
   openingBalance?: number;

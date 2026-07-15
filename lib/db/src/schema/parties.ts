@@ -19,7 +19,10 @@ export const balanceTypeEnum = pgEnum("balance_type", [
 export const partiesTable = pgTable("parties", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
-  phone: text("phone").notNull(),
+  // Optional at the product level (a customer can be added with just a name);
+  // stored as an empty string rather than NULL so the column stays simple to
+  // query, but the ADD PARTY form and API never require a value here.
+  phone: text("phone").notNull().default(""),
   role: partyRoleEnum("role").notNull(),
   currentBalance: numeric("current_balance", { precision: 12, scale: 2 })
     .notNull()
