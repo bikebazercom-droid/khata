@@ -11,7 +11,10 @@ import {
   getListPartiesQueryKey,
   getGetDashboardSummaryQueryKey,
   LedgerEntryType,
+  type Party,
+  type DashboardSummary,
 } from '@workspace/api-client-react';
+import { shiftSummaryForPartyChange } from '@/lib/optimistic';
 import html2pdf from 'html2pdf.js';
 import {
   ChevronLeft,
@@ -54,7 +57,6 @@ import {
   stampPageNumbers,
 } from '@/lib/ledger-report';
 import { format, isToday } from 'date-fns';
-import { toast } from 'sonner';
 
 /**
  * The entry's real transaction date. Users can backdate/forward-date an
@@ -93,7 +95,46 @@ export function PartyView() {
   const { data: party, isLoading: partyLoading } = useGetParty(id || '', { query: { enabled: !!id, queryKey: getGetPartyQueryKey(id || '') } });
   const { data: entries = [], isLoading: entriesLoading } = useListLedgerEntries(id || '', { query: { enabled: !!id, queryKey: getListLedgerEntriesQueryKey(id || '') } });
   const { data: settings } = useGetBusinessSettings();
-  const deleteParty = useDeleteParty();
+  // Optimistic delete: onMutate removes the party from the list/summary
+  // caches synchronously (the UI navigates away instantly, see
+  // `handleDelete`); onError restores the snapshot silently if the
+  // background request fails; onSettled reconciles in the background.
+  const deleteParty = useDeleteParty({
+    mutation: {
+      onMutate: async ({ partyId }) => {
+        const partiesKey = getListPartiesQueryKey();
+        const summaryKey = getGetDashboardSummaryQueryKey();
+        const previousParties = queryClient.getQueryData<Party[]>(partiesKey);
+        const previousSummary = queryClient.getQueryData<DashboardSummary>(summaryKey);
+        const removedParty = previousParties?.find((p) => p.id === partyId);
+
+        if (previousParties) {
+          queryClient.setQueryData<Party[]>(partiesKey, previousParties.filter((p) => p.id !== partyId));
+        }
+        if (previousSummary) {
+          let nextSummary = shiftSummaryForPartyChange(previousSummary, removedParty, undefined);
+          nextSummary = {
+            ...nextSummary,
+            customerCount: nextSummary.customerCount - (removedParty?.role === 'CUSTOMER' ? 1 : 0),
+            supplierCount: nextSummary.supplierCount - (removedParty?.role === 'SUPPLIER' ? 1 : 0),
+          };
+          queryClient.setQueryData<DashboardSummary>(summaryKey, nextSummary);
+        }
+
+        return { partiesKey, summaryKey, previousParties, previousSummary };
+      },
+      onError: (err, _vars, context) => {
+        console.error('কাস্টমার ডিলিট ব্যর্থ হয়েছে, পরিবর্তন ফিরিয়ে নেওয়া হচ্ছে:', err);
+        if (!context) return;
+        queryClient.setQueryData(context.partiesKey, context.previousParties);
+        queryClient.setQueryData(context.summaryKey, context.previousSummary);
+      },
+      onSettled: () => {
+        queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+      },
+    },
+  });
 
   const [transactionType, setTransactionType] = useState<LedgerEntryType | null>(null);
   const [smsMessage, setSmsMessage] = useState<string | null>(null);
@@ -142,21 +183,12 @@ export function PartyView() {
 
   const handleDelete = () => {
     if (!id) return;
-    deleteParty.mutate(
-      { partyId: id },
-      {
-        onSuccess: () => {
-          setShowDeleteConfirm(false);
-          queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
-          toast.success('কাস্টমার সফলভাবে ডিলিট করা হয়েছে');
-          navigate('/');
-        },
-        onError: () => {
-          toast.error('কাস্টমার ডিলিট করা যায়নি');
-        },
-      }
-    );
+    // Optimistic UI: close the confirm dialog and navigate home instantly —
+    // the party is already gone from the list/summary caches via onMutate
+    // above. The actual delete request runs silently in the background.
+    setShowDeleteConfirm(false);
+    navigate('/');
+    deleteParty.mutate({ partyId: id });
   };
 
   /** Renders the hidden report DOM node into a jsPDF worker instance. */
@@ -193,10 +225,10 @@ export function PartyView() {
       const worker = buildReportPdf();
       if (!worker) throw new Error('report element not ready');
       await finalizeReportPdf(worker).save();
-      toast.success('পিডিএফ রিপোর্ট ডাউনলোড হয়েছে');
+      // Silent by design: the browser's own download indicator is the
+      // confirmation — no toast needed.
     } catch (err) {
       console.error('Report generation failed', err);
-      toast.error('রিপোর্ট তৈরি করা যায়নি');
     } finally {
       setIsGeneratingReport(false);
     }
@@ -224,7 +256,8 @@ export function PartyView() {
           title: 'হিসাবের রিপোর্ট',
           text: messageText,
         });
-        toast.success('শেয়ার শীট খোলা হয়েছে');
+        // Silent by design: the native share sheet opening is itself the
+        // confirmation — no toast needed.
         return;
       }
 
@@ -241,14 +274,14 @@ export function PartyView() {
 
       const waNumber = toWhatsAppNumber(party.phone);
       window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(messageText)}`, '_blank');
-      toast.success('পিডিএফ ডাউনলোড হয়েছে এবং WhatsApp খোলা হয়েছে');
+      // Silent by design: opening WhatsApp / triggering the download is
+      // itself the confirmation — no toast needed.
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         // User cancelled the native share sheet — not an error.
         return;
       }
       console.error('Reminder share failed', err);
-      toast.error('রিমাইন্ডার পাঠানো যায়নি');
     } finally {
       setIsGeneratingReminder(false);
     }
@@ -267,11 +300,12 @@ export function PartyView() {
     if (!smsMessage) return;
     try {
       await navigator.clipboard.writeText(smsMessage);
+      // `copiedSms` already drives the button's own "কপি হয়েছে" label/icon
+      // swap below — that's the (silent, instant) confirmation.
       setCopiedSms(true);
-      toast.success('বার্তা কপি করা হয়েছে');
       setTimeout(() => setCopiedSms(false), 2000);
-    } catch {
-      toast.error('কপি করা যায়নি');
+    } catch (err) {
+      console.error('Clipboard copy failed', err);
     }
   };
 
@@ -555,15 +589,8 @@ export function PartyView() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteParty.isPending} className="font-bold">
-              বাতিল করুন
-            </AlertDialogCancel>
-            <Button
-              variant="destructive"
-              className="font-bold"
-              disabled={deleteParty.isPending}
-              onClick={handleDelete}
-            >
+            <AlertDialogCancel className="font-bold">বাতিল করুন</AlertDialogCancel>
+            <Button variant="destructive" className="font-bold" onClick={handleDelete}>
               ডিলিট করুন
             </Button>
           </AlertDialogFooter>

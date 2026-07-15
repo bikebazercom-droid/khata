@@ -1,6 +1,11 @@
-import { useGetBusinessSettings, useUpdateBusinessSettings } from '@workspace/api-client-react';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  useGetBusinessSettings,
+  useUpdateBusinessSettings,
+  getGetBusinessSettingsQueryKey,
+  type BusinessSettings,
+} from '@workspace/api-client-react';
 import { Languages } from 'lucide-react';
-import { toast } from 'sonner';
 import {
   Drawer,
   DrawerContent,
@@ -11,13 +16,32 @@ import {
 
 export function SettingsDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { data: settings } = useGetBusinessSettings();
-  const updateSettings = useUpdateBusinessSettings();
+  const queryClient = useQueryClient();
+  // Optimistic update: the selected language pill highlights instantly via
+  // the cache write in onMutate; a silent background write persists it,
+  // rolling back quietly on failure.
+  const updateSettings = useUpdateBusinessSettings({
+    mutation: {
+      onMutate: async ({ data }) => {
+        const settingsKey = getGetBusinessSettingsQueryKey();
+        const previousSettings = queryClient.getQueryData<BusinessSettings>(settingsKey);
+        if (previousSettings) {
+          queryClient.setQueryData<BusinessSettings>(settingsKey, { ...previousSettings, ...data });
+        }
+        return { settingsKey, previousSettings };
+      },
+      onError: (err, _vars, context) => {
+        console.error('ভাষা পরিবর্তন ব্যর্থ হয়েছে, পরিবর্তন ফিরিয়ে নেওয়া হচ্ছে:', err);
+        if (context) queryClient.setQueryData(context.settingsKey, context.previousSettings);
+      },
+      onSettled: () => {
+        queryClient.invalidateQueries({ queryKey: getGetBusinessSettingsQueryKey() });
+      },
+    },
+  });
 
   const handleLanguageChange = (lang: string) => {
-    updateSettings.mutate(
-      { data: { language: lang } },
-      { onSuccess: () => toast.success(`ভাষা সেট করা হয়েছে: ${lang}`) }
-    );
+    updateSettings.mutate({ data: { language: lang } });
   };
 
   return (

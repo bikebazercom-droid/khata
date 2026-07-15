@@ -7,11 +7,14 @@ import {
   getGetPartyQueryKey,
   getListPartiesQueryKey,
   getGetDashboardSummaryQueryKey,
+  type LedgerEntry,
+  type Party,
+  type DashboardSummary,
 } from '@workspace/api-client-react';
 import { ChevronLeft, Camera, X } from 'lucide-react';
-import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { cn, evaluateCalculatorExpression, formatCurrency, formatExpressionForDisplay, trimNumberForExpression } from '@/lib/utils';
+import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic';
 import { CameraCaptureModal } from '@/components/modals/camera-capture-modal';
 import { scanDocument } from '@/lib/document-scan';
 
@@ -99,7 +102,76 @@ export function TransactionEntryScreen({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
-  const createEntry = useCreateLedgerEntry();
+  // Optimistic mutation: onMutate applies the expected ledger/balance/
+  // dashboard changes to the cache synchronously (instant UI, no spinner),
+  // onError silently rolls back if the background request fails, and
+  // onSettled reconciles with the server's authoritative response in the
+  // background. `handleSave` below fires this and returns to the ledger
+  // view in the same tick — it never awaits the network.
+  const createEntry = useCreateLedgerEntry({
+    mutation: {
+      onMutate: async ({ partyId, data }) => {
+        const entriesKey = getListLedgerEntriesQueryKey(partyId);
+        const partyKey = getGetPartyQueryKey(partyId);
+        const partiesKey = getListPartiesQueryKey();
+        const summaryKey = getGetDashboardSummaryQueryKey();
+
+        const previousEntries = queryClient.getQueryData<LedgerEntry[]>(entriesKey);
+        const previousParty = queryClient.getQueryData<Party>(partyKey);
+        const previousParties = queryClient.getQueryData<Party[]>(partiesKey);
+        const previousSummary = queryClient.getQueryData<DashboardSummary>(summaryKey);
+
+        const optimisticEntry: LedgerEntry = {
+          id: `optimistic-${Date.now()}`,
+          partyId,
+          type: data.type,
+          amount: data.amount,
+          description: data.description ?? '',
+          billReference: data.billReference ?? null,
+          billImage: data.billImage ?? null,
+          dueDate: data.dueDate ?? null,
+          createdAt: new Date().toISOString(),
+        };
+        queryClient.setQueryData<LedgerEntry[]>(entriesKey, (old) => [optimisticEntry, ...(old ?? [])]);
+
+        const delta = data.type === LedgerEntryType.YOU_GAVE ? data.amount : -data.amount;
+        const updatedParty = previousParty ? applyBalanceDelta(previousParty, delta) : undefined;
+        if (updatedParty) {
+          queryClient.setQueryData<Party>(partyKey, { ...updatedParty, lastTransactionAt: optimisticEntry.createdAt });
+        }
+        if (previousParties) {
+          queryClient.setQueryData<Party[]>(
+            partiesKey,
+            previousParties.map((p) =>
+              p.id === partyId ? { ...applyBalanceDelta(p, delta), lastTransactionAt: optimisticEntry.createdAt } : p
+            )
+          );
+        }
+        if (previousSummary) {
+          queryClient.setQueryData<DashboardSummary>(summaryKey, shiftSummaryForPartyChange(previousSummary, previousParty, updatedParty));
+        }
+
+        return { entriesKey, partyKey, partiesKey, summaryKey, previousEntries, previousParty, previousParties, previousSummary };
+      },
+      onError: (err, _vars, context) => {
+        console.error('লেনদেন সংরক্ষণ ব্যর্থ হয়েছে, পরিবর্তন ফিরিয়ে নেওয়া হচ্ছে:', err);
+        if (!context) return;
+        queryClient.setQueryData(context.entriesKey, context.previousEntries);
+        queryClient.setQueryData(context.partyKey, context.previousParty);
+        queryClient.setQueryData(context.partiesKey, context.previousParties);
+        queryClient.setQueryData(context.summaryKey, context.previousSummary);
+      },
+      onSettled: (_data, _err, { partyId }) => {
+        // Silent background reconciliation — replaces the optimistic
+        // temp-id entry / estimated balances with the server's real data
+        // without ever blocking or flashing a loading state.
+        queryClient.invalidateQueries({ queryKey: getListLedgerEntriesQueryKey(partyId) });
+        queryClient.invalidateQueries({ queryKey: getGetPartyQueryKey(partyId) });
+        queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+      },
+    },
+  });
 
   const [expression, setExpression] = useState('');
   // Dedicated calculator memory register (M+/M-/MR/MC), independent of the
@@ -188,10 +260,14 @@ export function TransactionEntryScreen({
     setIsScanning(true);
     try {
       const scanned = await scanDocument(dataUrl);
+      // Success is silently visible: the thumbnail appears in the metadata
+      // panel the instant `billImage` is set — no toast needed.
       setBillImage(scanned);
-      toast.success('বিল স্ক্যান সম্পন্ন হয়েছে');
-    } catch {
-      toast.error('বিল স্ক্যান করা যায়নি, আবার চেষ্টা করুন');
+    } catch (err) {
+      // Falls back to the raw captured photo rather than blocking the user
+      // with an error toast — they can still attach it or retake it.
+      console.error('বিল স্ক্যান করা যায়নি, মূল ছবি ব্যবহার করা হচ্ছে:', err);
+      setBillImage(dataUrl);
     } finally {
       setIsScanning(false);
     }
@@ -295,55 +371,32 @@ export function TransactionEntryScreen({
     // Otherwise fall back to whatever is currently typed in the expression.
     const finalAmount = memoryHistory.length > 0 ? memoryValue : evaluateCalculatorExpression(expression);
     if (finalAmount === null || finalAmount <= 0) {
+      // Inline error state only (a red highlight on the formula line) —
+      // no toast/blocking dialog for a validation issue the user can see
+      // and fix on this same screen.
       setShowError(true);
-      toast.error('সঠিক হিসাব বা সংখ্যা লিখুন');
       return;
     }
 
-    createEntry.mutate(
-      {
-        partyId,
-        data: {
-          type,
-          amount: finalAmount,
-          description,
-          billReference: undefined,
-          billImage: billImage ?? undefined,
-          dueDate: dueDate || undefined,
-        },
+    // Optimistic UI: commit to the final view instantly. The memory log is
+    // scoped to this transaction entry, so it's cleared the moment the
+    // amount is handed off — the actual network write happens silently in
+    // the background (see the mutation's onMutate/onError/onSettled above)
+    // and is never awaited here.
+    clearMemory();
+    onClose();
+    createEntry.mutate({
+      partyId,
+      data: {
+        type,
+        amount: finalAmount,
+        description,
+        billReference: undefined,
+        billImage: billImage ?? undefined,
+        dueDate: dueDate || undefined,
       },
-      {
-        onSuccess: () => {
-          // Silent by design: no success toast/dialog — commit and return
-          // to the ledger view immediately so saving feels instantaneous.
-          // The memory log is scoped to this transaction entry — clear it
-          // now that the running total has been persisted to the ledger.
-          clearMemory();
-          queryClient.invalidateQueries({ queryKey: getListLedgerEntriesQueryKey(partyId) });
-          queryClient.invalidateQueries({ queryKey: getGetPartyQueryKey(partyId) });
-          queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
-          onClose();
-        },
-        onError: () => {
-          toast.error('লেনদেন সংরক্ষণ করা যায়নি');
-        },
-      }
-    );
-  }, [
-    memoryHistory.length,
-    memoryValue,
-    expression,
-    createEntry,
-    partyId,
-    type,
-    description,
-    billImage,
-    dueDate,
-    clearMemory,
-    queryClient,
-    onClose,
-  ]);
+    });
+  }, [memoryHistory.length, memoryValue, expression, createEntry, partyId, type, description, billImage, dueDate, clearMemory, onClose]);
 
   return (
     <div className="absolute inset-0 z-50 bg-[#f8fafc] flex flex-col">
@@ -494,7 +547,7 @@ export function TransactionEntryScreen({
         <button
           type="button"
           onClick={handleSave}
-          disabled={createEntry.isPending || !isActive}
+          disabled={!isActive}
           className={cn(
             'w-full h-14 rounded-xl font-extrabold text-white text-base shadow-[0_4px_14px_0_rgba(0,0,0,0.15)] active:scale-[0.98] transition-all disabled:opacity-40 disabled:active:scale-100',
             isGet ? 'bg-emerald-600' : 'bg-red-500'

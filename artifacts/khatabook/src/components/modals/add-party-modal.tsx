@@ -3,12 +3,20 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCreateParty, PartyRole, BalanceType, getListPartiesQueryKey, getGetDashboardSummaryQueryKey } from '@workspace/api-client-react';
+import {
+  useCreateParty,
+  PartyRole,
+  BalanceType,
+  getListPartiesQueryKey,
+  getGetDashboardSummaryQueryKey,
+  type Party,
+  type DashboardSummary,
+} from '@workspace/api-client-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
 import { ChevronLeft, Search, X, UserPlus, Contact as ContactIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { summaryContribution } from '@/lib/optimistic';
 
 // The Contact Picker API (navigator.contacts.select) is not yet part of the
 // standard DOM typings; declare just enough of the shape we use.
@@ -129,9 +137,6 @@ function ContactDirectoryScreen({
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
       setContacts(mapped);
-      if (mapped.length === 0) {
-        toast('কোনো কন্টাক্ট নির্বাচন করা হয়নি');
-      }
     } catch {
       // User cancelled the native picker, or permission was denied — no-op.
     } finally {
@@ -284,7 +289,58 @@ function AddPartyForm({
   onDone: () => void;
 }) {
   const queryClient = useQueryClient();
-  const createParty = useCreateParty();
+  // Optimistic create: onMutate inserts a temp party into the list/summary
+  // caches synchronously so the UI (list, counts, totals) reflects the new
+  // party instantly; onError rolls the snapshot back silently if the
+  // background write fails; onSettled reconciles with the server's real
+  // id/data without ever blocking the UI.
+  const createParty = useCreateParty({
+    mutation: {
+      onMutate: async ({ data }) => {
+        const partiesKey = getListPartiesQueryKey();
+        const summaryKey = getGetDashboardSummaryQueryKey();
+        const previousParties = queryClient.getQueryData<Party[]>(partiesKey);
+        const previousSummary = queryClient.getQueryData<DashboardSummary>(summaryKey);
+
+        const openingBalance = data.openingBalance ?? 0;
+        const optimisticParty: Party = {
+          id: `optimistic-${Date.now()}`,
+          name: data.name,
+          phone: data.phone ?? '',
+          role: data.role,
+          currentBalance: openingBalance,
+          balanceType: data.openingBalanceType ?? BalanceType.YOU_WILL_GET,
+          dueDate: data.dueDate ?? null,
+          lastTransactionAt: openingBalance > 0 ? new Date().toISOString() : null,
+          createdAt: new Date().toISOString(),
+        };
+        queryClient.setQueryData<Party[]>(partiesKey, (old) => [optimisticParty, ...(old ?? [])]);
+
+        if (previousSummary) {
+          const contribution = summaryContribution(optimisticParty);
+          queryClient.setQueryData<DashboardSummary>(summaryKey, {
+            ...previousSummary,
+            youWillGet: previousSummary.youWillGet + contribution.get,
+            youWillGive: previousSummary.youWillGive + contribution.give,
+            customerCount: previousSummary.customerCount + (data.role === PartyRole.CUSTOMER ? 1 : 0),
+            supplierCount: previousSummary.supplierCount + (data.role === PartyRole.SUPPLIER ? 1 : 0),
+          });
+        }
+
+        return { partiesKey, summaryKey, previousParties, previousSummary };
+      },
+      onError: (err, _vars, context) => {
+        console.error('কাস্টমার/সাপ্লায়ার যুক্ত করা ব্যর্থ হয়েছে, পরিবর্তন ফিরিয়ে নেওয়া হচ্ছে:', err);
+        if (!context) return;
+        queryClient.setQueryData(context.partiesKey, context.previousParties);
+        queryClient.setQueryData(context.summaryKey, context.previousSummary);
+      },
+      onSettled: () => {
+        queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+      },
+    },
+  });
 
   const {
     register,
@@ -309,29 +365,20 @@ function AddPartyForm({
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
     const phone = data.phone?.trim();
-    createParty.mutate(
-      {
-        data: {
-          ...data,
-          // Mobile number is entirely optional — store "" rather than
-          // failing when the shop owner only has a name to go on.
-          phone: phone ? `+880${phone}` : '',
-          openingBalance: data.openingBalance || undefined,
-          openingBalanceType: data.openingBalance ? data.openingBalanceType : undefined,
-        },
+    // Optimistic UI: close the form and return to the list instantly — the
+    // new party is already visible via the cache update in onMutate above.
+    // The actual write happens silently in the background.
+    onDone();
+    createParty.mutate({
+      data: {
+        ...data,
+        // Mobile number is entirely optional — store "" rather than
+        // failing when the shop owner only has a name to go on.
+        phone: phone ? `+880${phone}` : '',
+        openingBalance: data.openingBalance || undefined,
+        openingBalanceType: data.openingBalance ? data.openingBalanceType : undefined,
       },
-      {
-        onSuccess: () => {
-          toast.success(isCustomer ? 'কাস্টমার সফলভাবে যোগ করা হয়েছে' : 'সাপ্লায়ার সফলভাবে যোগ করা হয়েছে');
-          queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
-          onDone();
-        },
-        onError: () => {
-          toast.error('যুক্ত করা যায়নি');
-        },
-      }
-    );
+    });
   };
 
   return (
@@ -444,7 +491,7 @@ function AddPartyForm({
         <div className="shrink-0 px-4 pt-3 pb-[calc(1rem+var(--safe-bottom))] border-t border-slate-100">
           <Button
             type="submit"
-            disabled={createParty.isPending}
+            disabled={!watch('name')?.trim()}
             className="w-full h-14 rounded-xl font-extrabold text-white text-base bg-[#0b57d0] hover:bg-[#0b57d0]/90 shadow-[0_4px_14px_0_rgba(11,87,208,0.35)] active:scale-[0.98] transition-all"
           >
             {isCustomer ? 'ADD CUSTOMER' : 'ADD SUPPLIER'}
