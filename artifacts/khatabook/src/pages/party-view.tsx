@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRoute, Link, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -12,7 +12,19 @@ import {
   getGetDashboardSummaryQueryKey,
   LedgerEntryType,
 } from '@workspace/api-client-react';
-import { ChevronLeft, Phone, FileText, BellRing, Copy, Check, Lock, Trash2 } from 'lucide-react';
+import {
+  ChevronLeft,
+  Phone,
+  FileText,
+  MoreVertical,
+  Copy,
+  Check,
+  Trash2,
+  FileDown,
+  MessageCircle,
+  MessageSquareText,
+  Plus,
+} from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -25,10 +37,31 @@ import {
   AlertDialogFooter,
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
 import { TransactionEntryScreen } from '@/components/modals/transaction-entry-screen';
-import { format } from 'date-fns';
-import { bn } from 'date-fns/locale';
+import { format, isToday } from 'date-fns';
 import { toast } from 'sonner';
+
+/** Groups entries by calendar day (entries already arrive newest-first from the API). */
+function groupByDay<T extends { createdAt: string | Date }>(entries: T[]) {
+  const groups: { dayKey: string; date: Date; items: T[] }[] = [];
+  for (const entry of entries) {
+    const date = new Date(entry.createdAt);
+    const dayKey = format(date, 'yyyy-MM-dd');
+    const last = groups[groups.length - 1];
+    if (last && last.dayKey === dayKey) {
+      last.items.push(entry);
+    } else {
+      groups.push({ dayKey, date, items: [entry] });
+    }
+  }
+  return groups;
+}
 
 export function PartyView() {
   const [, params] = useRoute('/party/:id');
@@ -43,8 +76,28 @@ export function PartyView() {
 
   const [transactionType, setTransactionType] = useState<LedgerEntryType | null>(null);
   const [reminderMessage, setReminderMessage] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [smsMessage, setSmsMessage] = useState<string | null>(null);
+  const [reportGenerated, setReportGenerated] = useState(false);
+  const [copiedReminder, setCopiedReminder] = useState(false);
+  const [copiedSms, setCopiedSms] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Running balance per entry: entries arrive newest-first, and the party's
+  // current signed balance equals the balance immediately after entries[0].
+  // Walk forward, unwinding each entry's delta to recover the balance after
+  // every earlier entry.
+  const entriesWithBalance = useMemo(() => {
+    if (!party) return [] as (typeof entries[number] & { balanceAfter: number })[];
+    let running = party.balanceType === 'YOU_WILL_GET' ? party.currentBalance : -party.currentBalance;
+    return entries.map((entry) => {
+      const balanceAfter = running;
+      const delta = entry.type === 'YOU_GAVE' ? entry.amount : -entry.amount;
+      running -= delta;
+      return { ...entry, balanceAfter };
+    });
+  }, [entries, party]);
+
+  const groupedEntries = useMemo(() => groupByDay(entriesWithBalance), [entriesWithBalance]);
 
   const handleDelete = () => {
     if (!id) return;
@@ -71,20 +124,46 @@ export function PartyView() {
       { partyId: id },
       {
         onSuccess: (res) => {
-          setCopied(false);
+          setCopiedReminder(false);
           setReminderMessage(res.message);
         },
       }
     );
   };
 
-  const handleCopy = async () => {
+  const handleReport = () => {
+    setReportGenerated(true);
+    toast.success('পিডিএফ রিপোর্ট তৈরি হয়েছে (সিমুলেটেড)');
+  };
+
+  const handleSms = () => {
+    if (!party) return;
+    const label = party.balanceType === 'YOU_WILL_GET' ? 'আপনি পাবেন' : 'আপনি দেবেন';
+    setSmsMessage(
+      `প্রিয় ${party.name}, আপনার হিসাবে ${label} ${formatCurrency(party.currentBalance)}। ধন্যবাদান্তে, হাজারী খাতাবুক।`
+    );
+    setCopiedSms(false);
+  };
+
+  const handleCopyReminder = async () => {
     if (!reminderMessage) return;
     try {
       await navigator.clipboard.writeText(reminderMessage);
-      setCopied(true);
+      setCopiedReminder(true);
       toast.success('বার্তা কপি করা হয়েছে');
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopiedReminder(false), 2000);
+    } catch {
+      toast.error('কপি করা যায়নি');
+    }
+  };
+
+  const handleCopySms = async () => {
+    if (!smsMessage) return;
+    try {
+      await navigator.clipboard.writeText(smsMessage);
+      setCopiedSms(true);
+      toast.success('বার্তা কপি করা হয়েছে');
+      setTimeout(() => setCopiedSms(false), 2000);
     } catch {
       toast.error('কপি করা যায়নি');
     }
@@ -118,11 +197,13 @@ export function PartyView() {
     );
   }
 
+  const isGive = party.balanceType === 'YOU_WILL_GIVE';
+
   return (
     <div className="flex flex-col h-full bg-[#f8fafc] w-full relative">
       {/* Sticky blue top header */}
       <div className="bg-[#0b57d0] shadow-sm z-10 shrink-0 sticky top-0">
-        <div className="flex items-center gap-3 px-3 py-3">
+        <div className="flex items-center gap-3 px-3 pt-3 pb-6">
           <Link
             href="/"
             aria-label="পিছনে যান"
@@ -130,8 +211,8 @@ export function PartyView() {
           >
             <ChevronLeft className="w-6 h-6" />
           </Link>
-          <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-base font-extrabold shrink-0 text-[#0b57d0]">
-            {party.name.charAt(0).toUpperCase()}
+          <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 text-[#0b57d0]">
+            <Plus className="w-5 h-5" strokeWidth={3} />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -140,51 +221,84 @@ export function PartyView() {
                 {party.role === 'CUSTOMER' ? 'কাস্টমার' : 'সাপ্লায়ার'}
               </span>
             </div>
-            <span className="flex items-center gap-1 text-xs font-semibold text-white/80">
-              <Phone className="w-3 h-3" /> {party.phone}
-            </span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-1 text-xs font-semibold text-white/80 hover:text-white transition-colors"
+                >
+                  সেটিংস দেখুন
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem
+                  className="text-red-600 focus:text-red-600"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" /> কাস্টমার ডিলিট করুন
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-          <button
-            type="button"
-            onClick={handleReminder}
-            aria-label="তাগাদা পাঠান"
+          <a
+            href={`tel:${party.phone}`}
+            aria-label="কল করুন"
             className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all"
           >
-            <BellRing className="w-5 h-5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowDeleteConfirm(true)}
-            aria-label="কাস্টমার ডিলিট করুন"
-            className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all"
-          >
-            <Trash2 className="w-5 h-5" />
-          </button>
-        </div>
-        <div className="px-3 pb-2 flex items-center justify-between">
-          <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">
-            {party.balanceType === 'YOU_WILL_GET' ? 'পাবেন' : 'দেবেন'}
-          </p>
-          <p className="text-sm font-extrabold text-white tracking-tight">{formatCurrency(party.currentBalance)}</p>
+            <Phone className="w-5 h-5" />
+          </a>
         </div>
       </div>
 
-      {/* Safety badge */}
-      <div className="flex justify-center py-3 bg-[#f8fafc] shrink-0">
-        <div className="flex items-center gap-1.5 bg-slate-100 text-slate-500 text-[11px] font-semibold px-3 py-1.5 rounded-full">
-          <Lock className="w-3 h-3" />
-          শুধুমাত্র আপনি এবং {party.name} এই এন্ট্রিগুলো দেখতে পারবেন
+      {/* Floating summary card overlapping the blue header */}
+      <div className="px-3 -mt-4 shrink-0 relative z-10">
+        <div className="bg-white rounded-2xl shadow-md px-4 py-3.5 flex items-center justify-between">
+          <p className={cn('text-sm font-extrabold', isGive ? 'text-red-600' : 'text-emerald-600')}>
+            {isGive ? 'আপনি দেবেন' : 'আপনি পাবেন'}
+          </p>
+          <p className={cn('text-xl font-extrabold tracking-tight', isGive ? 'text-red-600' : 'text-emerald-600')}>
+            {formatCurrency(party.currentBalance)}
+          </p>
         </div>
+      </div>
+
+      {/* Action buttons bar */}
+      <div className="bg-white mt-3 shrink-0 border-b border-slate-200 grid grid-cols-3 divide-x divide-slate-100">
+        <button
+          type="button"
+          onClick={handleReport}
+          className="flex flex-col items-center gap-1 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+        >
+          <FileDown className="w-5 h-5 text-slate-500" />
+          <span className="text-[11px] font-bold text-slate-600">রিপোর্ট</span>
+        </button>
+        <button
+          type="button"
+          onClick={handleReminder}
+          disabled={sendReminder.isPending}
+          className="flex flex-col items-center gap-1 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+        >
+          <MessageCircle className="w-5 h-5 text-emerald-500" />
+          <span className="text-[11px] font-bold text-slate-600">রিমাইন্ডার</span>
+        </button>
+        <button
+          type="button"
+          onClick={handleSms}
+          className="flex flex-col items-center gap-1 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+        >
+          <MessageSquareText className="w-5 h-5 text-slate-400" />
+          <span className="text-[11px] font-bold text-slate-600">এসএমএস</span>
+        </button>
       </div>
 
       {/* Scrollable ledger area */}
-      <div className="flex-1 overflow-y-auto p-3 pb-4">
+      <div className="flex-1 overflow-y-auto pb-4">
         {entriesLoading ? (
           <div className="flex justify-center p-12">
             <div className="animate-pulse w-8 h-8 rounded-full bg-slate-200"></div>
           </div>
         ) : entries.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center max-w-xs mx-auto py-16">
+          <div className="flex flex-col items-center justify-center h-full text-center max-w-xs mx-auto py-16 px-3">
             <div className="w-20 h-20 bg-white border-4 border-slate-100 shadow-sm rounded-full flex items-center justify-center mb-5 text-slate-300">
               <FileText className="w-9 h-9" />
             </div>
@@ -192,41 +306,61 @@ export function PartyView() {
             <p className="text-slate-500 font-medium text-sm">{party.name}-এর সাথে হিসাব রাখা শুরু করতে একটি লেনদেন যুক্ত করুন।</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {entries.map((entry, i) => {
-              const isGave = entry.type === 'YOU_GAVE';
-              return (
-                <div
-                  key={entry.id}
-                  className={cn(
-                    'bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between gap-3 border-l-4 animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both',
-                    isGave ? 'border-l-red-400' : 'border-l-emerald-400'
-                  )}
-                  style={{ animationDelay: `${i * 30}ms` }}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <p className="text-[11px] font-bold text-slate-400">
-                        {format(new Date(entry.createdAt), 'dd MMM yyyy, hh:mm a', { locale: bn })}
-                      </p>
-                      {entry.billReference && (
-                        <span className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200 uppercase tracking-wider">
-                          বিল: {entry.billReference}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm font-semibold text-slate-700 truncate">
-                      {isGave ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন'}
-                      {entry.description ? ` · ${entry.description}` : ''}
-                    </p>
-                  </div>
-                  <p className={cn('text-lg font-extrabold shrink-0', isGave ? 'text-red-600' : 'text-emerald-600')}>
-                    {formatCurrency(entry.amount)}
-                  </p>
+          <>
+            {/* Column headers */}
+            <div className="sticky top-0 z-[5] bg-[#f8fafc] grid grid-cols-[1fr_auto_auto] gap-3 px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              <span>এন্ট্রি</span>
+              <span className="w-20 text-center">আপনি দিয়েছেন</span>
+              <span className="w-20 text-right">আপনি পেয়েছেন</span>
+            </div>
+
+            {groupedEntries.map((group) => (
+              <div key={group.dayKey}>
+                <div className="sticky top-[26px] z-[4] flex justify-center py-2 bg-[#f8fafc]/95 backdrop-blur-sm">
+                  <span className="text-[11px] font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
+                    {format(group.date, 'd MMM yy')}
+                    {isToday(group.date) ? ' • আজ' : ''}
+                  </span>
                 </div>
-              );
-            })}
-          </div>
+                <div className="px-3 space-y-2">
+                  {group.items.map((entry, i) => {
+                    const isGave = entry.type === 'YOU_GAVE';
+                    return (
+                      <div
+                        key={entry.id}
+                        className="bg-white rounded-xl shadow-sm grid grid-cols-[1fr_auto_auto] gap-3 items-center overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both"
+                        style={{ animationDelay: `${i * 30}ms` }}
+                      >
+                        <div className="min-w-0 py-3 pl-4">
+                          <p className="text-[12px] font-bold text-slate-700">
+                            {format(new Date(entry.createdAt), 'd MMM yy')} • {format(new Date(entry.createdAt), 'hh:mm a')}
+                          </p>
+                          <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
+                            ব্যালেন্স: {formatCurrency(Math.abs(entry.balanceAfter))}
+                          </p>
+                          {entry.billReference && (
+                            <span className="inline-block mt-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200 uppercase tracking-wider">
+                              বিল: {entry.billReference}
+                            </span>
+                          )}
+                        </div>
+                        <div className={cn('w-20 h-full flex items-center justify-center py-3', isGave ? 'bg-[#FFF5F5]' : 'bg-white')}>
+                          {isGave && (
+                            <span className="text-sm font-extrabold text-red-700">{formatCurrency(entry.amount)}</span>
+                          )}
+                        </div>
+                        <div className="w-20 h-full flex items-center justify-end py-3 pr-4 bg-white">
+                          {!isGave && (
+                            <span className="text-sm font-extrabold text-emerald-600">{formatCurrency(entry.amount)}</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </>
         )}
       </div>
 
@@ -257,21 +391,56 @@ export function PartyView() {
         />
       )}
 
+      {/* Reminder (WhatsApp share) dialog */}
       <Dialog open={!!reminderMessage} onOpenChange={(open) => !open && setReminderMessage(null)}>
         <DialogContent className="max-w-sm rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <BellRing className="w-5 h-5 text-emerald-600" /> তাগাদা পাঠানো হয়েছে
+              <MessageCircle className="w-5 h-5 text-emerald-600" /> রিমাইন্ডার তৈরি হয়েছে
             </DialogTitle>
           </DialogHeader>
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm font-medium text-slate-700 leading-relaxed">
             {reminderMessage}
           </div>
-          <Button onClick={handleCopy} variant="outline" className="w-full font-bold">
-            {copied ? <Check className="w-4 h-4 mr-2 text-emerald-600" /> : <Copy className="w-4 h-4 mr-2" />}
-            {copied ? 'কপি হয়েছে' : 'বার্তা কপি করুন'}
+          <Button onClick={handleCopyReminder} variant="outline" className="w-full font-bold">
+            {copiedReminder ? <Check className="w-4 h-4 mr-2 text-emerald-600" /> : <Copy className="w-4 h-4 mr-2" />}
+            {copiedReminder ? 'কপি হয়েছে' : 'বার্তা কপি করুন'}
           </Button>
-          <p className="text-xs text-slate-400 font-medium text-center">এটি একটি সিমুলেটেড SMS বার্তা — কোনো বাস্তব SMS পাঠানো হয়নি।</p>
+          <p className="text-xs text-slate-400 font-medium text-center">এটি একটি সিমুলেটেড WhatsApp শেয়ার — কোনো বাস্তব বার্তা পাঠানো হয়নি।</p>
+        </DialogContent>
+      </Dialog>
+
+      {/* SMS dialog (distinct simulated flow) */}
+      <Dialog open={!!smsMessage} onOpenChange={(open) => !open && setSmsMessage(null)}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquareText className="w-5 h-5 text-slate-500" /> এসএমএস তৈরি হয়েছে
+            </DialogTitle>
+          </DialogHeader>
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm font-medium text-slate-700 leading-relaxed">
+            {smsMessage}
+          </div>
+          <Button onClick={handleCopySms} variant="outline" className="w-full font-bold">
+            {copiedSms ? <Check className="w-4 h-4 mr-2 text-emerald-600" /> : <Copy className="w-4 h-4 mr-2" />}
+            {copiedSms ? 'কপি হয়েছে' : 'বার্তা কপি করুন'}
+          </Button>
+          <p className="text-xs text-slate-400 font-medium text-center">এটি একটি সিমুলেটেড এসএমএস — কোনো বাস্তব এসএমএস পাঠানো হয়নি।</p>
+        </DialogContent>
+      </Dialog>
+
+      {/* Report (PDF) confirmation dialog */}
+      <Dialog open={reportGenerated} onOpenChange={(open) => !open && setReportGenerated(false)}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileDown className="w-5 h-5 text-slate-500" /> রিপোর্ট তৈরি হয়েছে
+            </DialogTitle>
+          </DialogHeader>
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm font-medium text-slate-700 leading-relaxed">
+            {party.name}-এর সম্পূর্ণ হিসাবের একটি পিডিএফ রিপোর্ট তৈরি হয়েছে। বর্তমান ব্যালেন্স: {formatCurrency(party.currentBalance)} ({isGive ? 'আপনি দেবেন' : 'আপনি পাবেন'})।
+          </div>
+          <p className="text-xs text-slate-400 font-medium text-center">এটি একটি সিমুলেটেড পিডিএফ রিপোর্ট — কোনো বাস্তব ফাইল তৈরি হয়নি।</p>
         </DialogContent>
       </Dialog>
 
