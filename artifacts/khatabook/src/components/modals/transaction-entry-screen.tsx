@@ -222,7 +222,9 @@ export function TransactionEntryScreen({
       // following memory entry.
       setExpression('');
       justRecalledRef.current = false;
-      toast.success(value === 'M+' ? `মেমোরিতে যোগ হয়েছে: ${formatCurrency(safeValue)}` : `মেমোরি থেকে বিয়োগ হয়েছে: ${formatCurrency(safeValue)}`);
+      // Silent by design: no toast/alert here — the running total and
+      // history list already update instantly, so a notification would
+      // just interrupt fast, repeated M+/M- entry.
       return;
     }
     // Any numeric/operator key press permanently unlocks the metadata panel.
@@ -255,11 +257,8 @@ export function TransactionEntryScreen({
       },
       {
         onSuccess: () => {
-          toast.success(`সফলভাবে যুক্ত হয়েছে: ${formatCurrency(finalAmount)}`, {
-            style: isGet
-              ? { background: '#ecfdf5', borderColor: '#a7f3d0', color: '#065f46' }
-              : { background: '#fef2f2', borderColor: '#fecaca', color: '#991b1b' },
-          });
+          // Silent by design: no success toast/dialog — commit and return
+          // to the ledger view immediately so saving feels instantaneous.
           // The memory log is scoped to this transaction entry — clear it
           // now that the running total has been persisted to the ledger.
           clearMemory();
