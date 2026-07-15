@@ -57,7 +57,11 @@ function Key({ def, onPress }: { def: KeyDef; onPress: (value: string) => void }
       onClick={() => onPress(def.value)}
       style={def.span ? { gridColumn: `span ${def.span}` } : undefined}
       className={cn(
-        'h-14 rounded-xl font-bold text-lg flex items-center justify-center active:scale-[0.95] transition-transform select-none',
+        'h-14 rounded-xl font-bold text-lg flex items-center justify-center active:scale-[0.95] transition-[background-color,transform] duration-[50ms] ease-out select-none',
+        // Tactile press feedback: every key — digit, operator, or memory
+        // control — flashes to a warm charcoal-brown the instant it's
+        // pressed, then snaps back on release, like a phone dialer keypad.
+        'active:bg-[#4A3C31] active:text-white active:shadow-none',
         def.kind === 'digit' && 'bg-white text-slate-800 shadow-sm',
         def.kind === 'muted' && 'bg-blue-50 text-blue-900 shadow-sm',
         def.kind === 'accent' && 'bg-[#0b3d91] text-white shadow-sm'
@@ -442,7 +446,7 @@ export function TransactionEntryScreen({
           <button
             type="button"
             onClick={handleMrcTap}
-            className="w-full h-12 rounded-xl bg-[#0b3d91] text-white font-extrabold text-base flex items-center justify-center active:scale-[0.98] transition-transform"
+            className="w-full h-12 rounded-xl bg-[#0b3d91] text-white font-extrabold text-base flex items-center justify-center active:scale-[0.98] active:bg-[#4A3C31] transition-[background-color,transform] duration-[50ms] ease-out"
           >
             MRC = {formatCurrency(memoryValue)}
           </button>
