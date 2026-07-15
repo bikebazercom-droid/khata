@@ -210,10 +210,13 @@ export function TransactionEntryScreen({
             </span>
             {!isActive && <p className="text-xs font-semibold text-slate-400 mt-1">পরিমাণ লিখুন</p>}
           </div>
-          {isActive && (
+          {/* Formula sub-bar: once unlocked by the first key press it stays
+              mounted and visible for the rest of the session — it never
+              re-hides on clears/edits, only its text content updates. */}
+          {showMetadata && (
             <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50/60">
               <p className="text-sm font-mono font-medium text-slate-500 truncate">
-                {formatExpressionForDisplay(expression)}
+                {expression ? formatExpressionForDisplay(expression) : '0'}
                 {hasFormula && liveResult !== null ? ` = ${trimNumberForExpression(liveResult)}` : ''}
               </p>
             </div>
