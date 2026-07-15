@@ -10,6 +10,7 @@ export * from './balanceType';
 export * from './businessSettings';
 export * from './businessSettingsUpdate';
 export * from './dashboardSummary';
+export * from './deletePartyResult';
 export * from './dueFilter';
 export * from './healthStatus';
 export * from './ledgerEntry';

@@ -15,6 +15,8 @@ import {
   CreateLedgerEntryResponse,
   SendPaymentReminderParams,
   SendPaymentReminderResponse,
+  DeletePartyParams,
+  DeletePartyResponse,
 } from "@workspace/api-zod";
 import {
   applyPartyFilters,
@@ -237,6 +239,34 @@ router.post(
     );
   },
 );
+
+router.delete("/parties/:partyId", async (req, res): Promise<void> => {
+  const parsed = DeletePartyParams.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const [party] = await db
+    .select({ id: partiesTable.id })
+    .from(partiesTable)
+    .where(eq(partiesTable.id, parsed.data.partyId));
+
+  if (!party) {
+    res.status(404).json({ error: "Party not found" });
+    return;
+  }
+
+  // Cascade delete: wipe all ledger entries for this party before removing
+  // the party itself, so no orphan rows / corrupted balance sheets remain.
+  await db
+    .delete(ledgerEntriesTable)
+    .where(eq(ledgerEntriesTable.partyId, party.id));
+
+  await db.delete(partiesTable).where(eq(partiesTable.id, party.id));
+
+  res.json(DeletePartyResponse.parse({ success: true, id: party.id }));
+});
 
 router.post(
   "/parties/:partyId/reminder",

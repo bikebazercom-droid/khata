@@ -1,17 +1,30 @@
 import { useState } from 'react';
-import { useRoute, Link } from 'wouter';
+import { useRoute, Link, useLocation } from 'wouter';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   useGetParty,
   useListLedgerEntries,
   useSendPaymentReminder,
+  useDeleteParty,
   getGetPartyQueryKey,
   getListLedgerEntriesQueryKey,
+  getListPartiesQueryKey,
+  getGetDashboardSummaryQueryKey,
   LedgerEntryType,
 } from '@workspace/api-client-react';
-import { ChevronLeft, Phone, FileText, BellRing, Copy, Check, Lock } from 'lucide-react';
+import { ChevronLeft, Phone, FileText, BellRing, Copy, Check, Lock, Trash2 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
 import { TransactionEntryScreen } from '@/components/modals/transaction-entry-screen';
 import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
@@ -20,14 +33,37 @@ import { toast } from 'sonner';
 export function PartyView() {
   const [, params] = useRoute('/party/:id');
   const id = params?.id;
+  const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
 
   const { data: party, isLoading: partyLoading } = useGetParty(id || '', { query: { enabled: !!id, queryKey: getGetPartyQueryKey(id || '') } });
   const { data: entries = [], isLoading: entriesLoading } = useListLedgerEntries(id || '', { query: { enabled: !!id, queryKey: getListLedgerEntriesQueryKey(id || '') } });
   const sendReminder = useSendPaymentReminder();
+  const deleteParty = useDeleteParty();
 
   const [transactionType, setTransactionType] = useState<LedgerEntryType | null>(null);
   const [reminderMessage, setReminderMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const handleDelete = () => {
+    if (!id) return;
+    deleteParty.mutate(
+      { partyId: id },
+      {
+        onSuccess: () => {
+          setShowDeleteConfirm(false);
+          queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+          toast.success('কাস্টমার সফলভাবে ডিলিট করা হয়েছে');
+          navigate('/');
+        },
+        onError: () => {
+          toast.error('কাস্টমার ডিলিট করা যায়নি');
+        },
+      }
+    );
+  };
 
   const handleReminder = () => {
     if (!id) return;
@@ -115,6 +151,14 @@ export function PartyView() {
             className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all"
           >
             <BellRing className="w-5 h-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowDeleteConfirm(true)}
+            aria-label="কাস্টমার ডিলিট করুন"
+            className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all"
+          >
+            <Trash2 className="w-5 h-5" />
           </button>
         </div>
         <div className="px-3 pb-2 flex items-center justify-between">
@@ -230,6 +274,30 @@ export function PartyView() {
           <p className="text-xs text-slate-400 font-medium text-center">এটি একটি সিমুলেটেড SMS বার্তা — কোনো বাস্তব SMS পাঠানো হয়নি।</p>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent className="max-w-sm rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>কাস্টমার ডিলিট করুন</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-600">
+              আপনি কি নিশ্চিত যে এই কাস্টমারকে ডিলিট করতে চান? এর ফলে এই কাস্টমারের সমস্ত হিসাব মুছে যাবে।
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteParty.isPending} className="font-bold">
+              বাতিল করুন
+            </AlertDialogCancel>
+            <Button
+              variant="destructive"
+              className="font-bold"
+              disabled={deleteParty.isPending}
+              onClick={handleDelete}
+            >
+              ডিলিট করুন
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

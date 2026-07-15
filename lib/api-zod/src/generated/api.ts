@@ -133,6 +133,20 @@ export const GetPartyResponse = zod.object({
 
 
 /**
+ * Permanently removes the party plus any related ledger entries (cascade).
+ * @summary Delete a party and all of its ledger entries
+ */
+export const DeletePartyParams = zod.object({
+  "partyId": zod.coerce.string()
+})
+
+export const DeletePartyResponse = zod.object({
+  "success": zod.boolean(),
+  "id": zod.string()
+})
+
+
+/**
  * @summary List ledger entries for a party
  */
 export const ListLedgerEntriesParams = zod.object({

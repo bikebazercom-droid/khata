@@ -137,6 +137,26 @@ paths:
                 $ref: "#/components/schemas/Party"
         "404":
           description: Not found
+    delete:
+      operationId: deleteParty
+      tags: [parties]
+      summary: Delete a party and all of its ledger entries
+      description: Permanently removes the party plus any related ledger entries (cascade).
+      parameters:
+        - name: partyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletePartyResult"
+        "404":
+          description: Not found
   /parties/{partyId}/ledger-entries:
     get:
       operationId: listLedgerEntries
@@ -387,3 +407,13 @@ components:
           type: string
         amount:
           type: number
+    DeletePartyResult:
+      type: object
+      required:
+        - success
+        - id
+      properties:
+        success:
+          type: boolean
+        id:
+          type: string

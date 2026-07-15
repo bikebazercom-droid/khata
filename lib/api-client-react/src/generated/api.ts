@@ -23,6 +23,7 @@ import type {
   BusinessSettings,
   BusinessSettingsUpdate,
   DashboardSummary,
+  DeletePartyResult,
   HealthStatus,
   LedgerEntry,
   LedgerEntryInput,
@@ -593,6 +594,78 @@ export function useGetParty<TData = Awaited<ReturnType<typeof getParty>>, TError
 
 
 
+
+export const getDeletePartyUrl = (partyId: string,) => {
+
+
+
+
+  return `/api/parties/${partyId}`
+}
+
+/**
+ * Permanently removes the party plus any related ledger entries (cascade).
+ * @summary Delete a party and all of its ledger entries
+ */
+export const deleteParty = async (partyId: string, options?: RequestInit): Promise<DeletePartyResult> => {
+
+  return customFetch<DeletePartyResult>(getDeletePartyUrl(partyId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeletePartyMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteParty>>, TError,{partyId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteParty>>, TError,{partyId: string}, TContext> => {
+
+const mutationKey = ['deleteParty'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteParty>>, {partyId: string}> = (props) => {
+          const {partyId} = props ?? {};
+
+          return  deleteParty(partyId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeletePartyMutationResult = NonNullable<Awaited<ReturnType<typeof deleteParty>>>
+
+    export type DeletePartyMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete a party and all of its ledger entries
+ */
+export const useDeleteParty = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteParty>>, TError,{partyId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteParty>>,
+        TError,
+        {partyId: string},
+        TContext
+      > => {
+      return useMutation(getDeletePartyMutationOptions(options));
+    }
 
 export const getListLedgerEntriesUrl = (partyId: string,) => {
 

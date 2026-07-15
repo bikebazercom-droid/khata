@@ -123,6 +123,11 @@ export interface ReminderMessage {
   amount: number;
 }
 
+export interface DeletePartyResult {
+  success: boolean;
+  id: string;
+}
+
 export type ListPartiesParams = {
 role?: PartyRole;
 search?: string;
