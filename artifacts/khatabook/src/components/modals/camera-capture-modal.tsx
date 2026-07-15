@@ -76,7 +76,7 @@ export function CameraCaptureModal({
 
   return (
     <div className="fixed inset-0 z-[70] bg-black flex flex-col">
-      <div className="flex items-center justify-between px-4 py-3 shrink-0">
+      <div className="flex items-center justify-between px-4 pb-3 pt-[calc(0.75rem+var(--safe-top))] shrink-0">
         <button
           type="button"
           onClick={onClose}
@@ -96,7 +96,7 @@ export function CameraCaptureModal({
         <div className="absolute inset-6 border-2 border-dashed border-white/40 rounded-2xl pointer-events-none" />
       </div>
 
-      <div className="py-6 flex items-center justify-center shrink-0">
+      <div className="pt-6 pb-[calc(1.5rem+var(--safe-bottom))] flex items-center justify-center shrink-0">
         <button
           type="button"
           onClick={handleCapture}

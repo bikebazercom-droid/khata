@@ -92,6 +92,51 @@
   }
 }
 
+/*
+ * Cross-platform mobile hardening (iOS Safari + Android Chrome/WebView).
+ *
+ * - Removing the default gray tap flash and native form chrome on iOS so
+ *   custom calculator/keypad buttons render identically on both platforms.
+ * - `-webkit-appearance: none` also strips the native look from
+ *   `<select>`/date inputs; anywhere that matters, restyle explicitly rather
+ *   than relying on the OS default.
+ */
+html {
+  -webkit-tap-highlight-color: transparent;
+  /* iOS zooms the page on input focus when the focused field's font-size is
+     under 16px; this is the fallback in case a future input ever ships
+     smaller than 16px text (the primary defense is the `user-scalable=no`
+     + `maximum-scale=1.0` viewport meta in index.html). */
+  -webkit-text-size-adjust: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/*
+ * Safe-area insets (iPhone notch / Dynamic Island / home indicator), exposed
+ * as plain custom properties rather than standalone `.pt-safe`/`.pb-safe`
+ * utility classes. A standalone class targeting `padding-top` would fight
+ * the Tailwind `pt-*`/`py-*` utility already on the same element for the
+ * same CSS property, and cascade order between two same-specificity rules
+ * is not something to gamble a header's padding on. Using variables inside
+ * a single `pt-[calc(...)]`/`pb-[calc(...)]` arbitrary-value utility at each
+ * call site keeps exactly one declaration per property.
+ * `env()` resolves to 0 on devices/browsers without a safe area (Android,
+ * desktop), so `var(--safe-top)`/`var(--safe-bottom)` are safe to add
+ * unconditionally everywhere.
+ */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* Scrollbar hide */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;

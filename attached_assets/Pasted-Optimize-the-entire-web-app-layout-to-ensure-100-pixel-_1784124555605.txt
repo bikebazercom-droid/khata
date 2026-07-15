@@ -1,0 +1,26 @@
+Optimize the entire web/app layout to ensure 100% pixel-perfect accuracy, zero-overflow, and identical visual rendering across both Android (Chrome/WebView) and iPhone (iOS Safari/WebKit) devices. 
+
+Please implement the following cross-platform mobile standards:
+
+1. iOS SAFE AREA LIMITS (আইফোনের নচ ও নিচের বারের জন্য স্পেসিং):
+- Integrate CSS Safe Area variables globally to prevent the top header and bottom transaction buttons from being cut off by the iPhone Notch, Dynamic Island, or the bottom Home Indicator bar.
+- Apply the following to your main container and bottom action bars:
+  * `padding-top: env(safe-area-inset-top, 16px);`
+  * `padding-bottom: env(safe-area-inset-bottom, 16px);`
+
+2. DISABLE DEFAULT iOS FORM STYLING (আইফোনের নিজস্ব বাটন স্টাইল বন্ধ করা):
+- iOS Safari applies default gray/rounded styles to input fields and buttons which ruins custom calculator/input designs. Override this globally:
+  * Set `-webkit-appearance: none; appearance: none;` on all input fields, select boxes, and buttons.
+  * Ensure `-webkit-tap-highlight-color: transparent;` is applied globally so that clicking calculator buttons doesn't show a generic gray flash on iPhones.
+
+3. PREVENT ZOOM ON INPUT FOCUS (ইনপুটে ক্লিক করলে স্ক্রিন বড় হওয়া বন্ধ করা):
+- On iOS, if the font size of an input is less than 16px, the screen automatically zooms in when focused, breaking the UI layout. 
+- Ensure all inputs, including the amount calculator display, have a minimum font size of `16px` on mobile viewports, or set `<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">` in the HTML head.
+
+4. HEIGHT BUG FIXES (Viewport Height on Mobile):
+- Use `100dvh` (Dynamic Viewport Height) or `100svh` instead of standard `100vh` for full-screen layouts. On mobile, `100vh` often gets cut off by the browser's dynamic address/navigation bars.
+
+5. FLEX & GRID COMPATIBILITY:
+- Check all CSS flexbox and grid layouts, ensuring `-webkit-flex` prefixes are used where necessary for older iOS WebKit engines, so that the 3-in-1 home page card, history list, and calculator grids look identical on every screen width.
+
+Refactor the CSS wrapper and layout files to guarantee a flawless, native-app-like experience on both iOS and Android.

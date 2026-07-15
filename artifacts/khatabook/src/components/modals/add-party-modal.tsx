@@ -142,7 +142,7 @@ function ContactDirectoryScreen({
   return (
     <>
       {/* Header */}
-      <div className="shrink-0 flex items-center gap-2 px-3 py-3 border-b border-slate-100">
+      <div className="shrink-0 flex items-center gap-2 px-3 pb-3 pt-[calc(0.75rem+var(--safe-top))] border-b border-slate-100">
         <button
           type="button"
           onClick={onClose}
@@ -337,7 +337,7 @@ function AddPartyForm({
   return (
     <>
       {/* Header */}
-      <div className="shrink-0 flex items-center gap-2 px-3 py-3 bg-[#0b57d0]">
+      <div className="shrink-0 flex items-center gap-2 px-3 pb-3 pt-[calc(0.75rem+var(--safe-top))] bg-[#0b57d0]">
         <button
           type="button"
           onClick={onBack}
@@ -441,7 +441,7 @@ function AddPartyForm({
         </div>
 
         {/* Sticky bottom action */}
-        <div className="shrink-0 px-4 pt-3 pb-4 border-t border-slate-100">
+        <div className="shrink-0 px-4 pt-3 pb-[calc(1rem+var(--safe-bottom))] border-t border-slate-100">
           <Button
             type="submit"
             disabled={createParty.isPending}

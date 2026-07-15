@@ -141,7 +141,7 @@ export function ReportView() {
   return (
     <div className="flex flex-col h-full w-full bg-white relative">
       {/* Deep blue header */}
-      <div className="shrink-0 bg-[#0b57d0] px-4 py-4 flex items-center gap-3 z-10">
+      <div className="shrink-0 bg-[#0b57d0] px-4 pb-4 pt-[calc(1rem+var(--safe-top))] flex items-center gap-3 z-10">
         <button onClick={() => navigate('/')} aria-label="ফিরে যান" className="text-white active:opacity-70 transition-opacity">
           <ChevronLeft className="w-6 h-6" />
         </button>
@@ -289,7 +289,7 @@ export function ReportView() {
       </div>
 
       {/* Sticky PDF download footer */}
-      <div className="absolute bottom-0 left-0 right-0 p-3 bg-white border-t border-slate-200 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.08)] shrink-0 z-20">
+      <div className="absolute bottom-0 left-0 right-0 px-3 pt-3 pb-[calc(0.75rem+var(--safe-bottom))] bg-white border-t border-slate-200 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.08)] shrink-0 z-20">
         <button
           type="button"
           onClick={handleDownload}

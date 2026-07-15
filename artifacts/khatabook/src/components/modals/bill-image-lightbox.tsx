@@ -13,7 +13,7 @@ export function BillImageLightbox({ src, onClose }: { src: string; onClose: () =
       aria-modal="true"
       onClick={onClose}
     >
-      <div className="flex items-center justify-between px-4 py-3 shrink-0">
+      <div className="flex items-center justify-between px-4 pb-3 pt-[calc(0.75rem+var(--safe-top))] shrink-0">
         <span className="text-white text-sm font-semibold">সংযুক্ত বিল</span>
         <button
           type="button"
@@ -32,7 +32,7 @@ export function BillImageLightbox({ src, onClose }: { src: string; onClose: () =
         <img src={src} alt="সংযুক্ত বিলের ছবি" className="max-w-full max-h-full w-auto h-auto object-contain rounded-lg" />
       </div>
 
-      <div className="pb-6 pt-2 flex items-center justify-center shrink-0">
+      <div className="pt-2 pb-[calc(1.5rem+var(--safe-bottom))] flex items-center justify-center shrink-0">
         <button
           type="button"
           onClick={onClose}

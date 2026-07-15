@@ -348,7 +348,7 @@ export function TransactionEntryScreen({
   return (
     <div className="absolute inset-0 z-50 bg-[#f8fafc] flex flex-col">
       {/* Contextual header */}
-      <div className="flex items-center gap-2 px-3 py-3 bg-white border-b border-slate-100 shrink-0">
+      <div className="flex items-center gap-2 px-3 pb-3 pt-[calc(0.75rem+var(--safe-top))] bg-white border-b border-slate-100 shrink-0">
         <button
           type="button"
           onClick={onClose}
@@ -508,7 +508,7 @@ export function TransactionEntryScreen({
           compositor layer so key presses never trigger a main-thread paint
           of the whole grid on low-end mobile devices. */}
       <div
-        className="p-3 pb-4 space-y-2 shrink-0 bg-[#eef2f7]"
+        className="pt-3 pr-3 pl-3 pb-[calc(1rem+var(--safe-bottom))] space-y-2 shrink-0 bg-[#eef2f7]"
         style={{ transform: 'translate3d(0,0,0)', backfaceVisibility: 'hidden' }}
       >
         {/* MRC bar: shown whenever the memory history has at least one

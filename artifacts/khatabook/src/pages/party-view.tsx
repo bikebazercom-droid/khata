@@ -309,7 +309,7 @@ export function PartyView() {
     <div className="flex flex-col h-full bg-[#f8fafc] w-full relative">
       {/* Sticky blue top header */}
       <div className="bg-[#0b57d0] shadow-sm z-10 shrink-0 sticky top-0">
-        <div className="flex items-center gap-3 px-3 pt-3 pb-6">
+        <div className="flex items-center gap-3 px-3 pb-6 pt-[calc(0.75rem+var(--safe-top))]">
           <Link
             href="/"
             aria-label="পিছনে যান"
@@ -494,7 +494,7 @@ export function PartyView() {
       </div>
 
       {/* Sticky bottom action overlay */}
-      <div className="bg-white border-t border-slate-200 px-3 pt-3 pb-5 flex gap-3 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.08)] shrink-0 z-20">
+      <div className="bg-white border-t border-slate-200 px-3 pt-3 pb-[calc(1.25rem+var(--safe-bottom))] flex gap-3 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.08)] shrink-0 z-20">
         <Button
           variant="destructive"
           className="flex-1 h-12 text-base font-extrabold shadow-[0_4px_14px_0_rgba(239,68,68,0.35)] active:scale-[0.98] transition-all rounded-xl flex items-center justify-center leading-none"

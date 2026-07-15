@@ -36,7 +36,7 @@ export function HomeView() {
     <div className="flex flex-col h-full w-full bg-white relative">
       {/* Fixed deep-blue top header */}
       <div className="shrink-0 bg-[#075E9F] pb-9 z-10">
-        <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-3">
+        <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-[calc(1rem+var(--safe-top))]">
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-white/15 text-white flex items-center justify-center shrink-0">
               <BookOpen className="w-[18px] h-[18px]" />
@@ -258,7 +258,7 @@ export function HomeView() {
       </button>
 
       {/* Sticky bottom nav */}
-      <div className="shrink-0 flex items-stretch border-t border-slate-100 bg-white z-10">
+      <div className="shrink-0 flex items-stretch border-t border-slate-100 bg-white z-10 pb-[var(--safe-bottom)]">
         <button className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[#0b57d0]">
           <Users className="w-5 h-5" />
           <span className="text-[10px] font-bold">পার্টিস</span>
