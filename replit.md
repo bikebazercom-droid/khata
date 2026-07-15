@@ -46,7 +46,9 @@ A mobile-first, fully Bengali-localized billing & ledger web app for shop owners
 ## Product
 
 - Mobile-first single-column app (no split-screen, even on desktop — content is capped at phone width and centered): Home view lists customers ("কাস্টমার")/suppliers ("সাপ্লায়ার") with a sticky header (search + quick add), summary cards ("পাবেন"/"দেবেন"/"অনলাইন কালেকশন"), due-date filter chips, and a tap-through contact feed.
-- Tapping a contact navigates to a full-screen ledger view with a back button, sticky reminder button, a scrollable stream of color-bordered entries (red = "আপনি দিয়েছেন", green = "আপনি পেয়েছেন"), and two large sticky bottom action buttons that open half-sheet `Drawer` forms.
+- Tapping a contact navigates to a full-screen ledger view: sticky blue header (back arrow, avatar, name/role badge, phone, bell icon for reminders), a centered "🔒 only you and X can see these entries" privacy badge, a scrollable stream of color-bordered entries (red = "আপনি দিয়েছেন", green = "আপনি পেয়েছেন"), and two sticky bottom action buttons.
+- Tapping a bottom action button opens `TransactionEntryScreen` (`components/modals/transaction-entry-screen.tsx`) — a full-screen overlay (not a drawer/dialog) replicating the native Khatabook calculator screen: contextual colored header showing the live total, an amount card with a live raw-formula sub-bar, description/bill-no/date/attach-bill fields, and a custom on-screen 4/5-column calculator keypad (digits, ÷×−+, %, C, ⌫, =, M+/M-) that replaces the device keyboard entirely — no real `<input type=number>` for amount. `evaluateMathExpression`/`expandPercent` in `lib/utils.ts` sanitize and evaluate the tapped expression client-side before the numeric result is sent to the API.
+- `add-party-modal.tsx` still uses the bottom half-sheet `Drawer` pattern (only the ledger-entry amount flow needed the full custom-keypad screen).
 
 ## User preferences
 

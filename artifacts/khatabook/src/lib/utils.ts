@@ -39,3 +39,18 @@ export function evaluateMathExpression(raw: string): number | null {
     return null;
   }
 }
+
+/**
+ * Expands standalone percentage terms (e.g. "500%" -> "(500/100)") before
+ * handing an expression to evaluateMathExpression, so the custom calculator
+ * keypad's "%" key behaves like a basic calculator percent function.
+ */
+export function expandPercent(raw: string): string {
+  return raw.replace(/(\d+(\.\d+)?)%/g, '($1/100)');
+}
+
+/** Formats a number for re-insertion into the calculator expression buffer
+ * (e.g. after pressing "="), stripping floating-point noise. */
+export function trimNumberForExpression(value: number): string {
+  return Number(value.toFixed(2)).toString();
+}

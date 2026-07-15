@@ -8,11 +8,11 @@ import {
   getListLedgerEntriesQueryKey,
   LedgerEntryType,
 } from '@workspace/api-client-react';
-import { ChevronLeft, Phone, FileText, BellRing, Copy, Check } from 'lucide-react';
+import { ChevronLeft, Phone, FileText, BellRing, Copy, Check, Lock } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { AddTransactionModal } from '@/components/modals/add-transaction-modal';
+import { TransactionEntryScreen } from '@/components/modals/transaction-entry-screen';
 import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -83,54 +83,53 @@ export function PartyView() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#f8fafc] w-full">
-      {/* Sticky top action bar */}
-      <div className="bg-white border-b border-slate-200 shadow-sm z-10 shrink-0 sticky top-0">
+    <div className="flex flex-col h-full bg-[#f8fafc] w-full relative">
+      {/* Sticky blue top header */}
+      <div className="bg-[#0b57d0] shadow-sm z-10 shrink-0 sticky top-0">
         <div className="flex items-center gap-3 px-3 py-3">
           <Link
             href="/"
             aria-label="পিছনে যান"
-            className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-100 active:scale-95 transition-all"
+            className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all"
           >
             <ChevronLeft className="w-6 h-6" />
           </Link>
-          <div
-            className={cn(
-              'w-11 h-11 rounded-full flex items-center justify-center text-lg font-extrabold shrink-0 border-2',
-              party.balanceType === 'YOU_WILL_GET'
-                ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                : 'bg-red-50 text-red-600 border-red-100'
-            )}
-          >
+          <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-base font-extrabold shrink-0 text-[#0b57d0]">
             {party.name.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="text-[15px] font-extrabold text-slate-900 leading-tight truncate">{party.name}</h2>
-            <span className="flex items-center gap-1 text-xs font-semibold text-slate-500">
+            <div className="flex items-center gap-2">
+              <h2 className="text-[15px] font-extrabold text-white leading-tight truncate">{party.name}</h2>
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/20 text-white uppercase tracking-wider shrink-0">
+                {party.role === 'CUSTOMER' ? 'কাস্টমার' : 'সাপ্লায়ার'}
+              </span>
+            </div>
+            <span className="flex items-center gap-1 text-xs font-semibold text-white/80">
               <Phone className="w-3 h-3" /> {party.phone}
             </span>
           </div>
-          <div className="text-right shrink-0">
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-              {party.balanceType === 'YOU_WILL_GET' ? 'পাবেন' : 'দেবেন'}
-            </p>
-            <p
-              className={cn(
-                'text-lg font-extrabold tracking-tight',
-                party.balanceType === 'YOU_WILL_GET' ? 'text-emerald-600' : 'text-red-500'
-              )}
-            >
-              {formatCurrency(party.currentBalance)}
-            </p>
-          </div>
-        </div>
-        <div className="px-3 pb-3">
-          <Button
-            className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-sm active:scale-[0.98] transition-transform"
+          <button
+            type="button"
             onClick={handleReminder}
+            aria-label="তাগাদা পাঠান"
+            className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all"
           >
-            <BellRing className="w-4 h-4 mr-2" /> তাগাদা পাঠান (SMS)
-          </Button>
+            <BellRing className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="px-3 pb-2 flex items-center justify-between">
+          <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">
+            {party.balanceType === 'YOU_WILL_GET' ? 'পাবেন' : 'দেবেন'}
+          </p>
+          <p className="text-sm font-extrabold text-white tracking-tight">{formatCurrency(party.currentBalance)}</p>
+        </div>
+      </div>
+
+      {/* Safety badge */}
+      <div className="flex justify-center py-3 bg-[#f8fafc] shrink-0">
+        <div className="flex items-center gap-1.5 bg-slate-100 text-slate-500 text-[11px] font-semibold px-3 py-1.5 rounded-full">
+          <Lock className="w-3 h-3" />
+          শুধুমাত্র আপনি এবং {party.name} এই এন্ট্রিগুলো দেখতে পারবেন
         </div>
       </div>
 
@@ -194,23 +193,25 @@ export function PartyView() {
           className="flex-1 h-16 text-base font-extrabold shadow-[0_4px_14px_0_rgba(239,68,68,0.35)] active:scale-[0.98] transition-all rounded-2xl"
           onClick={() => setTransactionType(LedgerEntryType.YOU_GAVE)}
         >
-          আপনি দিয়েছেন (৳)
+          আপনি দিয়েছেন ৳
         </Button>
         <Button
           variant="success"
           className="flex-1 h-16 text-base font-extrabold shadow-[0_4px_14px_0_rgba(16,185,129,0.35)] active:scale-[0.98] transition-all rounded-2xl"
           onClick={() => setTransactionType(LedgerEntryType.YOU_GOT)}
         >
-          আপনি পেয়েছেন (৳)
+          আপনি পেয়েছেন ৳
         </Button>
       </div>
 
-      <AddTransactionModal
-        partyId={id}
-        type={transactionType}
-        open={!!transactionType}
-        onOpenChange={(open) => !open && setTransactionType(null)}
-      />
+      {transactionType && (
+        <TransactionEntryScreen
+          partyId={id}
+          partyName={party.name}
+          type={transactionType}
+          onClose={() => setTransactionType(null)}
+        />
+      )}
 
       <Dialog open={!!reminderMessage} onOpenChange={(open) => !open && setReminderMessage(null)}>
         <DialogContent className="max-w-sm rounded-2xl">

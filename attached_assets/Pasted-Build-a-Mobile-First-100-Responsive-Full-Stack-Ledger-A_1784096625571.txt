@@ -1,0 +1,34 @@
+Build a Mobile-First, 100% Responsive Full-Stack Ledger Application named "হাজারী খাতাবুক" (Hazari Khatabook) using a Node.js/Express backend, SQLite database, and React with Tailwind CSS. It must replicate the exact UI layout flow and custom calculator behavior shown in native mobile ledger apps like Khatabook.
+
+1. EXACT SCREEN FLOW & LAYOUT REPLICATION (Mobile-First):
+- SCREEN 1 (Customer Ledger Stream):
+  * Sticky blue top header showing Customer Name, Phone, and a back arrow.
+  * A centered safety badge: "🔒 Only you and [Name] can see these entries".
+  * Bottom Sticky Action Bar: Two distinct wide buttons placed side-by-side:
+    - Left Button: "আপনি দিয়েছেন ৳" (Crimson Red background, white text).
+    - Right Button: "আপনি পেয়েছেন ৳" (Emerald Green background, white text).
+- SCREEN 2 & 3 (Transaction Input & Custom Calculator Screen):
+  * Tapping either bottom button overlays a full-screen entry sheet.
+  * Header displays contextually: "You gave ৳ [Amount] to [Name]" or "You got ৳ [Amount] from [Name]".
+  * Main Amount Field: A large white card container displaying the current evaluated total next to the "৳" sign.
+  * Live Formula Sub-bar: Directly beneath the total, display the raw mathematical expression being typed in real-time (e.g., "100+500-300 = 300").
+  * Metadata Fields: Below the amount card, render:
+    - An input for "Details (Items, bill no., quantity, etc.)" or "একটি নোট বা বিবরণ যুক্ত করুন".
+    - An optional "Add Bill No." text trigger.
+    - Grid row containing a Date Picker and an "Attach bills" button with a camera icon.
+  * Permanent "SAVE" Button: A full-width green/red action button fixed right above the keyboard.
+  * CUSTOM ON-SCREEN KEYPAD/CALCULATOR (Crucial Component):
+    - Replace the standard mobile native keyboard with a custom-built 4-column React grid layout keypad at the bottom.
+    - Grid structure row by row:
+      [ C ]   [ M+ ]  [ M- ]  [ ⌫ (Backspace) ]
+      [ 7 ]   [ 8 ]   [ 9 ]   [ ÷ ]   [ % ]
+      [ 4 ]   [ 5 ]   [ 6 ]   [ × ]
+      [ 1 ]   [ 2 ]   [ 3 ]   [ - (Blue color) ]
+      [ 0 ]   [ . ]   [ = ]   [ + (Blue color) ]
+    - Tapping these buttons must append characters directly into the formula logic, evaluate dynamically, and update the main amount display instantly.
+
+2. DATABASE & BACKEND LOGIC (SQLite + Express):
+- Tables: `parties` (id, name, phone, role, current_balance, balance_type) and `ledger_entries` (id, party_id, type, amount, description, bill_reference, created_at).
+- Maintain rigorous float calculation logic inside 'POST /api/ledger' to auto-update balances correctly based on whether it's a Customer or Supplier transaction.
+
+Generate all components cleanly with full localized interface text in Bengali and Bangladeshi Taka (৳) currency representation.
