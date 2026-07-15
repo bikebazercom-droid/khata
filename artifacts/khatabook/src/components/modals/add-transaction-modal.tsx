@@ -7,10 +7,16 @@ import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { FileText, Tag, CalendarClock } from "lucide-react";
+import { FileText, Tag, CalendarClock, Equal } from "lucide-react";
+import { evaluateMathExpression, formatCurrency } from "@/lib/utils";
 
 const formSchema = z.object({
-  amount: z.coerce.number().min(1, "পরিমাণ ০-এর বেশি হতে হবে"),
+  amount: z
+    .string()
+    .min(1, "পরিমাণ আবশ্যক")
+    .refine((val) => evaluateMathExpression(val) !== null && evaluateMathExpression(val)! > 0, {
+      message: "সঠিক হিসাব বা সংখ্যা লিখুন",
+    }),
   description: z.string().optional(),
   billReference: z.string().optional(),
   dueDate: z.string().optional(),
@@ -20,16 +26,25 @@ export function AddTransactionModal({ partyId, type, open, onOpenChange }: { par
   const queryClient = useQueryClient();
   const createEntry = useCreateLedgerEntry();
   
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<z.infer<typeof formSchema>>({
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { amount: 0, description: "", billReference: "", dueDate: "" }
+    defaultValues: { amount: "", description: "", billReference: "", dueDate: "" }
   });
+
+  const amountInput = watch("amount");
+  const hasOperator = /[+\-*/]/.test(amountInput?.replace(/^-/, "") ?? "");
+  const liveResult = hasOperator ? evaluateMathExpression(amountInput ?? "") : null;
 
   const onSubmit = (data: z.infer<typeof formSchema>) => {
     if (!type) return;
-    createEntry.mutate({ partyId, data: { ...data, dueDate: data.dueDate || undefined, type } }, {
+    const finalAmount = evaluateMathExpression(data.amount);
+    if (finalAmount === null || finalAmount <= 0) {
+      toast.error("সঠিক হিসাব বা সংখ্যা লিখুন");
+      return;
+    }
+    createEntry.mutate({ partyId, data: { ...data, amount: finalAmount, dueDate: data.dueDate || undefined, type } }, {
       onSuccess: () => {
-        toast.success(`সফলভাবে যুক্ত হয়েছে: ৳${data.amount}`, {
+        toast.success(`সফলভাবে যুক্ত হয়েছে: ${formatCurrency(finalAmount)}`, {
           style: type === LedgerEntryType.YOU_GOT ? { background: '#ecfdf5', borderColor: '#a7f3d0', color: '#065f46' } : { background: '#fef2f2', borderColor: '#fecaca', color: '#991b1b' }
         });
         queryClient.invalidateQueries({ queryKey: getListLedgerEntriesQueryKey(partyId) });
@@ -65,16 +80,26 @@ export function AddTransactionModal({ partyId, type, open, onOpenChange }: { par
             <label className="text-[11px] font-bold uppercase tracking-widest mb-2 block text-slate-500">পরিমাণ</label>
             <div className="relative group">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-3xl text-slate-400 font-medium group-focus-within:text-slate-600 transition-colors">৳</span>
-              <Input 
-                type="number" 
+              <Input
+                type="text"
                 inputMode="decimal"
-                {...register("amount")} 
-                className="h-16 pl-12 text-3xl font-bold bg-white border-slate-200 shadow-sm rounded-xl focus-visible:ring-4 focus-visible:ring-primary/10 transition-all placeholder:text-slate-200" 
-                placeholder="0"
+                {...register("amount")}
+                className="h-16 pl-12 text-3xl font-bold bg-white border-slate-200 shadow-sm rounded-xl focus-visible:ring-4 focus-visible:ring-primary/10 transition-all placeholder:text-slate-200"
+                placeholder="0 বা 500+250*2"
                 autoFocus
-                step="any"
+                autoComplete="off"
               />
             </div>
+            {hasOperator && (
+              <div className="flex items-center gap-1.5 mt-2 px-1 text-sm font-bold text-slate-500 animate-in fade-in slide-in-from-top-1 duration-150">
+                <Equal className="w-3.5 h-3.5 shrink-0" />
+                {liveResult !== null ? (
+                  <span className="text-primary">{formatCurrency(liveResult)}</span>
+                ) : (
+                  <span className="text-red-500">সঠিক হিসাব বা সংখ্যা লিখুন</span>
+                )}
+              </div>
+            )}
             {errors.amount && <p className="text-red-500 text-xs mt-2 font-medium">{errors.amount.message}</p>}
           </div>
           
@@ -110,7 +135,7 @@ export function AddTransactionModal({ partyId, type, open, onOpenChange }: { par
               disabled={createEntry.isPending} 
               className={`flex-1 h-14 font-bold text-lg text-white shadow-[0_4px_14px_0_rgba(0,0,0,0.15)] transition-all rounded-xl border-none active:scale-[0.98] ${isGet ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-500 hover:bg-red-600'}`}
             >
-              সংরক্ষণ করুন
+              এন্ট্রি নিশ্চিত করুন
             </Button>
           </div>
         </form>

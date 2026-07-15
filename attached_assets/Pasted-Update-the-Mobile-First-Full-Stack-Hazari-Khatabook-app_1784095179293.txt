@@ -1,0 +1,30 @@
+Update the Mobile-First Full-Stack "হাজারী খাতাবুক" (Hazari Khatabook) application to include an In-Line Calculator inside the "পরিমাণ" (Amount) input field, exactly like the real Khatabook app. 
+
+1. IN-LINE CALCULATOR & EXPRESSION EVALUATION LOGIC:
+- Modify the "পরিমাণ" (Amount) input text box to accept both numbers and mathematical operators: addition (+), subtraction (-), multiplication (*), and division (/).
+- As the user types an expression (e.g., "500+250*2" or "1200-300"), the UI must dynamically show the live calculated result instantly.
+- When the user clicks the final submit button to save the entry ("এন্ট্রি নিশ্চিত করুন"), the system must automatically evaluate the final mathematical string, convert it to a sanitized float number, and save that final calculated value into the SQLite database ledger.
+- If the text entry contains an invalid mathematical syntax, display a gentle Bengali validation warning ("সঠিক হিসাব বা সংখ্যা লিখুন") to prevent crashing.
+
+2. MOBILE-FIRST UI & NAVIGATION ARCHITECTURE:
+- Completely optimized for mobile viewports (100% full-screen mobile touch browsing).
+- Implement a Native App-like View Switcher in React:
+  * VIEW 1 (Home/Directory Screen): Displays store header, customer/supplier tabs ("কাস্টমার (খরিদ্দার)" / "সাপ্লায়ার (মহাজন)"), global metrics ("পাবেন" in Green, "দেবেন" in Red, "অনলাইন কালেকশন" in Blue), search bar, filter chips, and interactive contact feed.
+  * VIEW 2 (Customer Ledger Screen): Tapping any party switches to a dedicated full-screen ledger panel with a "Back Button" (পিছনে যান) to return to the main feed.
+
+3. FULL-STACK PERSISTENCE & TRANSACTION ENGINE (SQLite + Express):
+- Tables: `parties` (id, name, phone, role, current_balance, balance_type, due_date, last_transaction) and `ledger_entries` (id, party_id, type, amount, description, bill_reference, created_at).
+- Database Controller Logic: Processing 'POST /api/ledger' must automatically recalculate target balances:
+  * For CUSTOMER: 'YOU_GAVE' (আপনি দিয়েছেন) increases what they owe us ('YOU_WILL_GET'). 'YOU_GOT' (আপনি পেয়েছেন) decreases it.
+  * For SUPPLIER: 'YOU_GAVE' decreases what we owe them. 'YOU_GOT' increases what we owe them ('YOU_WILL_GIVE').
+
+4. FULLY LOCALIZED MOBILE UI COMPONENT DETAILS:
+- VIEW 2 (Ledger Screen Layout):
+  * Sticky Top Action Bar: Back arrow button, Customer Name, Phone number, and "তাগাদা পাঠান (SMS)".
+  * Scrollable Ledger Area: Chronological list of transaction logs (Red border accents for "আপনি দিয়েছেন", Green border accents for "আপনি পেয়েছেন").
+  * Sticky Bottom Action Overlay: Two permanent mobile thumb-accessible buttons: "আপনি দিয়েছেন (৳)" (Red) and "আপনি পেয়েছেন (৳)" (Green). Tapping them slides up the transaction modal matching the user's provided screenshot layout: "পরিমাণ" (supporting in-line math arithmetic equations), "বিবরণ (ঐচ্ছিক)", "বিল নম্বর (ঐচ্ছিক)", and "পরিশোধের তারিখ".
+
+5. MOCK NOTIFICATIONS:
+- Tapping "তাগাদা পাঠান (SMS)" launches a modal showing the generated Bengali reminder text: "বকেয়া তাগাদা: হাজারী খাতাবুক-এর পক্ষ থেকে [Name]-কে ৳[Amount] টাকা বকেয়া পরিশোধের জন্য অনুরোধ করা হচ্ছে।"
+
+Generate the clean multi-file architecture with strict error handling for the mathematical input evaluation.
