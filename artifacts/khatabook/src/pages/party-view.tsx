@@ -45,6 +45,7 @@ import {
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
 import { TransactionEntryScreen } from '@/components/modals/transaction-entry-screen';
+import { BillImageLightbox } from '@/components/modals/bill-image-lightbox';
 import {
   LedgerReportDocument,
   buildReportFilename,
@@ -100,6 +101,7 @@ export function PartyView() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [isGeneratingReminder, setIsGeneratingReminder] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
   const storeName = settings?.storeName || 'হাজারী খাতাবুক';
 
@@ -456,6 +458,20 @@ export function PartyView() {
                               বিল: {entry.billReference}
                             </span>
                           )}
+                          {entry.billImage && (
+                            <button
+                              type="button"
+                              onClick={() => setLightboxImage(entry.billImage)}
+                              aria-label="বিলের ছবি দেখুন"
+                              className="block mt-1.5 active:scale-95 transition-transform"
+                            >
+                              <img
+                                src={entry.billImage}
+                                alt="সংযুক্ত বিল"
+                                className="w-10 h-10 rounded-md object-cover border border-slate-200"
+                              />
+                            </button>
+                          )}
                         </div>
                         <div className={cn('w-20 h-full flex items-center justify-center py-3', isGave ? 'bg-[#FFF5F5]' : 'bg-white')}>
                           {isGave && (
@@ -503,6 +519,8 @@ export function PartyView() {
           onClose={() => setTransactionType(null)}
         />
       )}
+
+      {lightboxImage && <BillImageLightbox src={lightboxImage} onClose={() => setLightboxImage(null)} />}
 
       {/* Off-screen printable ledger report used to render the actual PDF via html2pdf */}
       <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -1 }} aria-hidden="true">

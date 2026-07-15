@@ -160,6 +160,7 @@ export const ListLedgerEntriesResponseItem = zod.object({
   "amount": zod.number(),
   "description": zod.string(),
   "billReference": zod.string().nullable(),
+  "billImage": zod.string().nullable().describe('Scanned bill\/receipt image, stored as a base64 data URL.'),
   "dueDate": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date()
 })
@@ -183,6 +184,7 @@ export const CreateLedgerEntryBody = zod.object({
   "amount": zod.number().gt(createLedgerEntryBodyAmountExclusiveMin),
   "description": zod.string().optional(),
   "billReference": zod.string().nullish(),
+  "billImage": zod.string().nullish().describe('Scanned bill\/receipt image, stored as a base64 data URL.'),
   "dueDate": zod.coerce.date().nullish()
 })
 
@@ -193,6 +195,7 @@ export const CreateLedgerEntryResponse = zod.object({
   "amount": zod.number(),
   "description": zod.string(),
   "billReference": zod.string().nullable(),
+  "billImage": zod.string().nullable().describe('Scanned bill\/receipt image, stored as a base64 data URL.'),
   "dueDate": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date()
 })
@@ -217,6 +220,7 @@ export const ListGlobalLedgerEntriesResponseItem = zod.object({
   "amount": zod.number(),
   "description": zod.string(),
   "billReference": zod.string().nullable(),
+  "billImage": zod.string().nullable().describe('Scanned bill\/receipt image, stored as a base64 data URL.'),
   "dueDate": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date()
 })

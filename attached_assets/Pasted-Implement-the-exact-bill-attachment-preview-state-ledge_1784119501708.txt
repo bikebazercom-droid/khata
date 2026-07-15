@@ -1,0 +1,27 @@
+Implement the exact bill attachment preview state, ledger list thumbnail display, and full-screen image viewer modal as shown in the three reference screenshots.
+
+1. POST-CAPTURE ATTACHMENT STATE (Screenshot 2 Style):
+- When a bill is captured/scanned, transition the capture component on the right to match Screenshot 2:
+  * Inside a white rounded border box, render:
+    - The scanned image thumbnail with a tiny green circular cross/delete (X) badge overlapping its top-right corner.
+    - A solid green square camera icon right next to the thumbnail to allow re-capturing or adding more.
+  * Keep this entire block beautifully aligned on the right, keeping the Date picker component neatly on the left.
+
+2. LEDGER TRANSACTION LIST DISPLAY (Screenshot 3 Style):
+- On the Customer Details / Transaction Ledger screen, locate the left column ("এন্ট্রিগুলো") for each transaction row.
+- Inside each row card, align the items vertically as follows:
+  * Line 1: Date & Time (e.g., "15 Jul 26 • 06:39 PM" in soft gray text).
+  * Line 2: Balance pill (e.g., "ব্যালেন্স ৳ ১,৮৪৪" inside a light gray rounded badge).
+  * Line 3: If a bill image is attached to this transaction, render a small, clean, rounded-corner image preview thumbnail (e.g., 40px x 40px with `border-radius: 6px`) DIRECTLY below the Balance pill.
+
+3. FULL-SCREEN IMAGE VIEWER (LIGHTBOX MODAL):
+- Add a click event to the bill thumbnail in the ledger list.
+- When clicked, open a beautiful, full-screen interactive modal (Lightbox) with:
+  * A dark semi-transparent background overlay.
+  * The selected scanned bill image rendered in high resolution at the center of the screen (with zoom support if mobile).
+  * A clear "বন্ধ করুন" (Close) or "X" button at the top corner to easily close the modal and return to the ledger.
+
+4. DATABASE STATE & STORAGE:
+- Ensure the transaction schema supports storing the bill image (as a Base64 string or file URL/path in SQLite) so it loads correctly when visiting the customer page.
+
+Please implement this entire attachment-to-ledger preview lifecycle and lightbox view now.

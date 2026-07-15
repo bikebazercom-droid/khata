@@ -25,6 +25,7 @@ export const ledgerEntriesTable = pgTable("ledger_entries", {
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   description: text("description").notNull().default(""),
   billReference: text("bill_reference"),
+  billImage: text("bill_image"),
   dueDate: date("due_date", { mode: "string" }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

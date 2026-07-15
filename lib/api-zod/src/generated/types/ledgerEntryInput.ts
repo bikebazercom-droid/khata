@@ -14,6 +14,11 @@ export interface LedgerEntryInput {
   description?: string;
   /** @nullable */
   billReference?: string | null;
+  /**
+     * Scanned bill/receipt image, stored as a base64 data URL.
+     * @nullable
+     */
+  billImage?: string | null;
   /** @nullable */
   dueDate?: Date | null;
 }

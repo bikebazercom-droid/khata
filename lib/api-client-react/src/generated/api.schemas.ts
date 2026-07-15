@@ -78,6 +78,11 @@ export interface LedgerEntry {
   description: string;
   /** @nullable */
   billReference: string | null;
+  /**
+     * Scanned bill/receipt image, stored as a base64 data URL.
+     * @nullable
+     */
+  billImage: string | null;
   /** @nullable */
   dueDate: string | null;
   createdAt: string;
@@ -90,6 +95,11 @@ export interface LedgerEntryInput {
   description?: string;
   /** @nullable */
   billReference?: string | null;
+  /**
+     * Scanned bill/receipt image, stored as a base64 data URL.
+     * @nullable
+     */
+  billImage?: string | null;
   /** @nullable */
   dueDate?: string | null;
 }
@@ -133,6 +143,11 @@ export interface GlobalLedgerEntry {
   description: string;
   /** @nullable */
   billReference: string | null;
+  /**
+     * Scanned bill/receipt image, stored as a base64 data URL.
+     * @nullable
+     */
+  billImage: string | null;
   /** @nullable */
   dueDate: string | null;
   createdAt: string;

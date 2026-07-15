@@ -339,6 +339,7 @@ components:
         - amount
         - description
         - billReference
+        - billImage
         - dueDate
         - createdAt
       properties:
@@ -354,6 +355,9 @@ components:
           type: string
         billReference:
           type: ["string", "null"]
+        billImage:
+          type: ["string", "null"]
+          description: Scanned bill/receipt image, stored as a base64 data URL.
         dueDate:
           type: ["string", "null"]
           format: date
@@ -375,6 +379,9 @@ components:
           type: string
         billReference:
           type: ["string", "null"]
+        billImage:
+          type: ["string", "null"]
+          description: Scanned bill/receipt image, stored as a base64 data URL.
         dueDate:
           type: ["string", "null"]
           format: date
@@ -448,6 +455,7 @@ components:
         - amount
         - description
         - billReference
+        - billImage
         - dueDate
         - createdAt
       properties:
@@ -467,6 +475,9 @@ components:
           type: string
         billReference:
           type: ["string", "null"]
+        billImage:
+          type: ["string", "null"]
+          description: Scanned bill/receipt image, stored as a base64 data URL.
         dueDate:
           type: ["string", "null"]
           format: date

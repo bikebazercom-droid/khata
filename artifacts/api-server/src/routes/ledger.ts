@@ -67,6 +67,7 @@ router.get("/ledger-entries", async (req, res): Promise<void> => {
       amount: ledgerEntriesTable.amount,
       description: ledgerEntriesTable.description,
       billReference: ledgerEntriesTable.billReference,
+      billImage: ledgerEntriesTable.billImage,
       dueDate: ledgerEntriesTable.dueDate,
       createdAt: ledgerEntriesTable.createdAt,
     })

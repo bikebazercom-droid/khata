@@ -200,7 +200,7 @@ router.post(
       return;
     }
 
-    const { type, amount, description, billReference, dueDate } = body.data;
+    const { type, amount, description, billReference, billImage, dueDate } = body.data;
 
     const currentSigned = toSignedBalance(party);
     const delta = type === "YOU_GAVE" ? amount : -amount;
@@ -217,6 +217,7 @@ router.post(
         amount: amount.toFixed(2),
         description: description ?? "",
         billReference: billReference ?? null,
+        billImage: billImage ?? null,
         dueDate: toDateOnlyString(dueDate ?? null),
       })
       .returning();
