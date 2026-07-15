@@ -86,15 +86,15 @@ export function TransactionEntryScreen({
   // Dedicated calculator memory register (M+/M-/MR/MC), independent of the
   // live expression/result state above.
   const [memoryValue, setMemoryValue] = useState(0);
-  // Controls visibility of the memory sub-display and the MRC bar: both stay
-  // completely hidden until an M+/M- operation is performed, and hide again
-  // on C/MC.
-  const [isMemoryActive, setIsMemoryActive] = useState(false);
-  const [memoryEquationText, setMemoryEquationText] = useState('');
+  // Full log of every M+/M- operation this session, newest last — rendered
+  // as a scrollable history list. The memory UI (history list + MRC bar) is
+  // visible exactly when this array is non-empty; there is no separate
+  // visibility flag to keep in sync.
+  const [memoryHistory, setMemoryHistory] = useState<string[]>([]);
+  const isMemoryActive = memoryHistory.length > 0;
   const clearMemory = () => {
     setMemoryValue(0);
-    setIsMemoryActive(false);
-    setMemoryEquationText('');
+    setMemoryHistory([]);
   };
   // Tap the MRC bar once to recall the memory value into the expression;
   // tap it again right after (with no other key press in between) to clear
@@ -131,10 +131,13 @@ export function TransactionEntryScreen({
     return evaluateCalculatorExpression(expression);
   }, [expression]);
 
-  const displayAmount = liveResult ?? 0;
+  // Once memory logs exist, the big header amount tracks the running memory
+  // total rather than whatever is currently being typed for the next entry —
+  // the typed expression still gets its own live preview bar below.
+  const displayAmount = memoryHistory.length > 0 ? memoryValue : (liveResult ?? 0);
   // Whether the amount currently parses to something worth saving — drives
   // the "পরিমাণ লিখুন" placeholder, the formula sub-bar, and the SAVE button.
-  const isActive = expression.length > 0 && displayAmount !== 0;
+  const isActive = memoryHistory.length > 0 ? memoryValue !== 0 : expression.length > 0 && displayAmount !== 0;
   // Whether the metadata panel should be shown — persistent once triggered,
   // unlike `isActive` which can flip back off as the formula is edited.
   const showMetadata = hasInteracted;
@@ -189,7 +192,6 @@ export function TransactionEntryScreen({
     justRecalledRef.current = false;
     if (value === 'C') {
       setExpression('');
-      setIsMemoryActive(false);
       return;
     }
     if (value === 'DEL') {
@@ -206,15 +208,19 @@ export function TransactionEntryScreen({
       return;
     }
     if (value === 'M+' || value === 'M-') {
-      // Parse whatever is currently on the display into a number; an empty
-      // or invalid expression is treated as 0 rather than blocking the
-      // memory operation.
-      const parsed = parseFloat(String(displayAmount));
-      const safeValue = Number.isFinite(parsed) ? parsed : 0;
+      // Evaluate whatever expression is currently typed; an empty or
+      // invalid expression is treated as 0 rather than blocking the memory
+      // operation. The log label keeps the raw typed expression (e.g.
+      // "500×") rather than its evaluated value, so multi-step entries stay
+      // legible in the history.
+      const safeValue = liveResult !== null && Number.isFinite(liveResult) ? liveResult : 0;
+      const label = expression ? formatExpressionForDisplay(expression) : '0';
       const newMemoryValue = value === 'M+' ? memoryValue + safeValue : memoryValue - safeValue;
       setMemoryValue(newMemoryValue);
-      setMemoryEquationText(`${value}(${trimNumberForExpression(safeValue)})=${newMemoryValue.toFixed(1)}`);
-      setIsMemoryActive(true);
+      setMemoryHistory((prev) => [...prev, `${value}(${label})=${newMemoryValue.toFixed(1)}`]);
+      // Clear the typed expression so the next number starts fresh for the
+      // following memory entry.
+      setExpression('');
       justRecalledRef.current = false;
       toast.success(value === 'M+' ? `মেমোরিতে যোগ হয়েছে: ${formatCurrency(safeValue)}` : `মেমোরি থেকে বিয়োগ হয়েছে: ${formatCurrency(safeValue)}`);
       return;
@@ -225,7 +231,10 @@ export function TransactionEntryScreen({
   };
 
   const handleSave = () => {
-    const finalAmount = evaluateCalculatorExpression(expression);
+    // If memory logs exist, the grand total accumulated in memory is the
+    // authoritative amount to save — it already reflects every M+/M- entry.
+    // Otherwise fall back to whatever is currently typed in the expression.
+    const finalAmount = memoryHistory.length > 0 ? memoryValue : evaluateCalculatorExpression(expression);
     if (finalAmount === null || finalAmount <= 0) {
       setShowError(true);
       toast.error('সঠিক হিসাব বা সংখ্যা লিখুন');
@@ -251,6 +260,9 @@ export function TransactionEntryScreen({
               ? { background: '#ecfdf5', borderColor: '#a7f3d0', color: '#065f46' }
               : { background: '#fef2f2', borderColor: '#fecaca', color: '#991b1b' },
           });
+          // The memory log is scoped to this transaction entry — clear it
+          // now that the running total has been persisted to the ledger.
+          clearMemory();
           queryClient.invalidateQueries({ queryKey: getListLedgerEntriesQueryKey(partyId) });
           queryClient.invalidateQueries({ queryKey: getGetPartyQueryKey(partyId) });
           queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
@@ -292,22 +304,29 @@ export function TransactionEntryScreen({
             </span>
             {!isActive && <p className="text-xs font-semibold text-slate-400 mt-1">পরিমাণ লিখুন</p>}
           </div>
-          {/* Memory equation sub-bar: completely hidden until an M+/M- press,
-              hidden again on C/MC. Takes priority over the calculator
-              formula bar since only one sub-bar is shown at a time. */}
-          {isMemoryActive && memoryEquationText ? (
-            <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50/60">
-              <p className="text-sm font-mono font-medium text-slate-700 truncate">{memoryEquationText}</p>
-            </div>
-          ) : (
-            showMetadata && (
-              <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50/60">
-                <p className="text-sm font-mono font-medium text-slate-500 truncate">
-                  {expression ? formatExpressionForDisplay(expression) : '0'}
-                  {hasFormula && liveResult !== null ? ` = ${trimNumberForExpression(liveResult)}` : ''}
+          {/* Live memory history list: every M+/M- entry logged this session,
+              newest at the bottom, scrollable once it grows past a few
+              lines. Completely hidden until the first M+/M- press. */}
+          {isMemoryActive && (
+            <div className="max-h-28 overflow-y-auto px-4 py-2 border-t border-slate-100 bg-slate-50/60 space-y-1">
+              {memoryHistory.map((log, i) => (
+                <p key={i} className="text-sm font-mono font-medium text-slate-700 truncate">
+                  {log}
                 </p>
-              </div>
-            )
+              ))}
+            </div>
+          )}
+          {/* Calculator formula sub-bar: live preview of whatever is
+              currently being typed for the next entry (or the plain amount
+              when memory isn't in use). Shown alongside the history list
+              above, not instead of it. */}
+          {showMetadata && (
+            <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50/60">
+              <p className="text-sm font-mono font-medium text-slate-500 truncate">
+                {expression ? formatExpressionForDisplay(expression) : '0'}
+                {hasFormula && liveResult !== null ? ` = ${trimNumberForExpression(liveResult)}` : ''}
+              </p>
+            </div>
           )}
           {showError && (
             <div className="px-4 py-2 border-t border-red-100 bg-red-50">
@@ -416,9 +435,10 @@ export function TransactionEntryScreen({
 
       {/* Custom on-screen calculator keypad */}
       <div className="p-3 pb-4 space-y-2 shrink-0 bg-[#eef2f7]">
-        {/* MRC bar: completely hidden until an M+/M- press, hidden again on
-            C/MC. Tap to recall the stored value into the expression; tap
-            again within half a second to clear the memory. */}
+        {/* MRC bar: shown whenever the memory history has at least one
+            entry. Tap once to recall the running total into the expression;
+            tap again right after (no other key in between) to clear the
+            entire memory log. */}
         {isMemoryActive && (
           <button
             type="button"
