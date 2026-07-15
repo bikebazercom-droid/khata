@@ -6,6 +6,7 @@ export interface ReportEntry {
   id: string;
   type: 'YOU_GAVE' | 'YOU_GOT';
   amount: number;
+  dueDate: string | null;
   createdAt: string | Date;
   balanceAfter: number;
 }
@@ -31,8 +32,10 @@ interface LedgerReportDocumentProps {
 export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocumentProps>(
   ({ storeName, party, entries }, ref) => {
     const isGive = party.balanceType === 'YOU_WILL_GIVE';
-    // Chronological (oldest -> newest) for a natural statement read order.
-    const chronological = [...entries].reverse();
+    // `entries` is already sorted oldest -> newest by the caller's
+    // dual-sorting pipeline (true transaction-date order), matching the
+    // standard chronologically valid statement layout.
+    const chronological = entries;
 
     return (
       <div
@@ -88,7 +91,9 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
               return (
                 <tr key={entry.id} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
                   <td style={{ padding: '7px 10px', borderBottom: '1px solid #e2e8f0' }}>
-                    {format(new Date(entry.createdAt), 'd MMM yyyy, hh:mm a')}
+                    {format(new Date(entry.dueDate || entry.createdAt), 'd MMM yyyy')}
+                    {' • '}
+                    {format(new Date(entry.createdAt), 'hh:mm a')}
                   </td>
                   <td style={{ padding: '7px 10px', borderBottom: '1px solid #e2e8f0', color: isGave ? '#dc2626' : '#059669', fontWeight: 700 }}>
                     {isGave ? 'দিয়েছেন' : 'পেয়েছেন'}

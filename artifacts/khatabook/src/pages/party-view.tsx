@@ -54,12 +54,24 @@ import {
 import { format, isToday } from 'date-fns';
 import { toast } from 'sonner';
 
-/** Groups entries by calendar day (entries already arrive newest-first from the API). */
-function groupByDay<T extends { createdAt: string | Date }>(entries: T[]) {
+/**
+ * The entry's real transaction date. Users can backdate/forward-date an
+ * entry via the date field in the transaction entry screen (stored as
+ * `dueDate`); fall back to the entry's insertion date only when unset.
+ */
+function entryDateKey(entry: { dueDate: string | null; createdAt: string | Date }) {
+  // `dueDate` may arrive as a plain "yyyy-MM-dd" or as a full ISO timestamp
+  // (e.g. "2026-07-01T00:00:00.000Z") depending on the serializer; normalize
+  // either shape (or the createdAt fallback) to a bare calendar-day key.
+  return format(new Date(entry.dueDate || entry.createdAt), 'yyyy-MM-dd');
+}
+
+/** Groups already-sorted entries by calendar day, preserving the given order. */
+function groupByDay<T extends { dueDate: string | null; createdAt: string | Date }>(entries: T[]) {
   const groups: { dayKey: string; date: Date; items: T[] }[] = [];
   for (const entry of entries) {
-    const date = new Date(entry.createdAt);
-    const dayKey = format(date, 'yyyy-MM-dd');
+    const dayKey = entryDateKey(entry);
+    const date = new Date(`${dayKey}T00:00:00`);
     const last = groups[groups.length - 1];
     if (last && last.dayKey === dayKey) {
       last.items.push(entry);
@@ -90,22 +102,40 @@ export function PartyView() {
   const reportRef = useRef<HTMLDivElement>(null);
   const storeName = settings?.storeName || 'হাজারী খাতাবুক';
 
-  // Running balance per entry: entries arrive newest-first, and the party's
-  // current signed balance equals the balance immediately after entries[0].
-  // Walk forward, unwinding each entry's delta to recover the balance after
-  // every earlier entry.
-  const entriesWithBalance = useMemo(() => {
+  // Dual-sorting pipeline: one true chronological reconstruction feeds both
+  // the newest-first screen view and the oldest-first PDF/reminder timeline.
+  //
+  // The backend applies each entry's delta to the party's running total in
+  // insertion order, not transaction-date order, so `currentBalance` cannot
+  // simply be unwound entry-by-entry once backdating is involved. Addition
+  // is commutative, though: the true opening balance (before any entry)
+  // equals currentBalance minus the sum of every entry's delta, regardless
+  // of order. Walking forward from that opening balance through entries
+  // sorted by their real transaction date (`dueDate`, falling back to the
+  // insertion date) yields the correct running balance at every point in
+  // the actual timeline.
+  const ascendingEntries = useMemo(() => {
     if (!party) return [] as (typeof entries[number] & { balanceAfter: number })[];
-    let running = party.balanceType === 'YOU_WILL_GET' ? party.currentBalance : -party.currentBalance;
-    return entries.map((entry) => {
-      const balanceAfter = running;
-      const delta = entry.type === 'YOU_GAVE' ? entry.amount : -entry.amount;
-      running -= delta;
-      return { ...entry, balanceAfter };
+    const signedDelta = (entry: (typeof entries)[number]) => (entry.type === 'YOU_GAVE' ? entry.amount : -entry.amount);
+    const signedCurrent = party.balanceType === 'YOU_WILL_GET' ? party.currentBalance : -party.currentBalance;
+    const totalDelta = entries.reduce((sum, entry) => sum + signedDelta(entry), 0);
+    let running = signedCurrent - totalDelta; // balance before the earliest entry
+
+    const sorted = [...entries].sort((a, b) => {
+      const dayCompare = entryDateKey(a).localeCompare(entryDateKey(b));
+      if (dayCompare !== 0) return dayCompare;
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
+
+    return sorted.map((entry) => {
+      running += signedDelta(entry);
+      return { ...entry, balanceAfter: running };
     });
   }, [entries, party]);
 
-  const groupedEntries = useMemo(() => groupByDay(entriesWithBalance), [entriesWithBalance]);
+  const descendingEntries = useMemo(() => [...ascendingEntries].reverse(), [ascendingEntries]);
+
+  const groupedEntries = useMemo(() => groupByDay(descendingEntries), [descendingEntries]);
 
   const handleDelete = () => {
     if (!id) return;
@@ -400,7 +430,7 @@ export function PartyView() {
                       >
                         <div className="min-w-0 py-3 pl-4">
                           <p className="text-[12px] font-bold text-slate-700">
-                            {format(new Date(entry.createdAt), 'd MMM yy')} • {format(new Date(entry.createdAt), 'hh:mm a')}
+                            {format(new Date(`${entryDateKey(entry)}T00:00:00`), 'd MMM yy')} • {format(new Date(entry.createdAt), 'hh:mm a')}
                           </p>
                           <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
                             ব্যালেন্স: {formatCurrency(Math.abs(entry.balanceAfter))}
@@ -460,7 +490,7 @@ export function PartyView() {
 
       {/* Off-screen printable ledger report used to render the actual PDF via html2pdf */}
       <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -1 }} aria-hidden="true">
-        <LedgerReportDocument ref={reportRef} storeName={storeName} party={party} entries={entriesWithBalance} />
+        <LedgerReportDocument ref={reportRef} storeName={storeName} party={party} entries={ascendingEntries} />
       </div>
 
       {/* SMS dialog (distinct simulated flow) */}
