@@ -1,0 +1,21 @@
+Modify the Customer Ledger / Profile screen in "হাজারী খাতাবুক" (Hazari Khatabook) to replicate the provided reference screenshot EXACTLY, pixel for pixel, with 100% Bengali language localization.
+
+1. LAYOUT STRUCTURE & BENGALI TRANSLATION:
+- Main Header: Solid deep blue background. Displays a white back arrow, a circular profile icon with a '+' sign, the customer name or number, a dynamic "কাস্টমার" (Customer) badge, and a functional Call icon.
+- Summary Banner Card: A floating white box on the blue header background. Text reads "আপনি পাবেন" (Green text) or "আপনি দেবেন" (Red text) with large bold numbers formatted with the Bangladeshi Taka symbol (e.g., "৳ ১৩,১৮৫").
+- Action Buttons Bar (Exactly 3 Buttons): Delete the "Payment" button entirely. Keep exactly three options vertically stacked with their respective icons: "রিপোর্ট" (PDF download icon), "রিমাইন্ডার" (WhatsApp icon for sharing the generated PDF statement), and "এসএমএস" (Text message notification system).
+
+2. EXACT TRANSACTION GRID & DOUBLE-COLUMN COLOR SLOTS:
+- Entries must be grouped chronologically under sticky date headers (e.g., "15 Jul 26 • আজ", "14 Jul 26").
+- Inside each Transaction White Box/Row, use a strict three-column horizontal flex layout:
+  * LEFT COLUMN (Width: ~50%, Left-aligned): Contains two stacked rows of text. Row 1 shows the exact Date and Time stamp together (e.g., "15 Jul 26 • 03:51 PM"). Row 2 (directly underneath it) shows the running dynamic ledger balance labeled as "ব্যালেন্স: ৳ ১৩,১৮৫" or "ব্যালেন্স: ৳ ৪,৩৮৫" which automatically computes increments/decrements based on historical SQLite values.
+  * MIDDLE COLUMN ("আপনি দিয়েছেন" / Red Slot): If the entry type is 'You Gave', fill this middle container grid slot with a soft, very light premium red tinted background (`bg-red-50/20` or hex `#FFF5F5`). Display the numerical text inside as bold dark red. The rightmost column must be left completely blank and pure white.
+  * RIGHT COLUMN ("আপনি পেয়েছেন" / Green Slot): If the entry type is 'You Got', keep the middle container blank and white. The numerical amount must align strictly to the rightmost edge of the row container as bold clean green text.
+
+3. STICKY BOTTOM ACTIONS:
+- Fix two large, identical full-width split-screen shortcut trigger panels at the screen bottom:
+  * Left side: Bright Crimson Red background button titled "আপনি দিয়েছেন ৳"
+  * Right side: Bright Emerald Green background button titled "আপনি পেয়েছেন ৳"
+- Clicking either button routes seamlessly to the live input layout, feeding transactions instantly into the relational database.
+
+Strictly adhere to this exact grid alignment, spacing, and coloring rules without altering the previously locked dynamic percentage calculator engine.
