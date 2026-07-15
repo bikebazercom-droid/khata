@@ -18,8 +18,12 @@ import { scanDocument } from '@/lib/document-scan';
 type KeyKind = 'digit' | 'muted' | 'accent';
 type KeyDef = { label: string; value: string; kind: KeyKind; span?: number };
 
-const ROW_MEMORY: KeyDef[] = [
+const ROW_MEMORY_1: KeyDef[] = [
+  { label: 'MC', value: 'MC', kind: 'muted' },
+  { label: 'MR', value: 'MR', kind: 'muted' },
   { label: 'C', value: 'C', kind: 'muted' },
+];
+const ROW_MEMORY_2: KeyDef[] = [
   { label: 'M+', value: 'M+', kind: 'muted' },
   { label: 'M-', value: 'M-', kind: 'muted' },
   { label: '⌫', value: 'DEL', kind: 'digit' },
@@ -83,7 +87,10 @@ export function TransactionEntryScreen({
   const createEntry = useCreateLedgerEntry();
 
   const [expression, setExpression] = useState('');
-  const [memory, setMemory] = useState(0);
+  // Dedicated calculator memory register (M+/M-/MR/MC), independent of the
+  // live expression/result state above.
+  const [memoryValue, setMemoryValue] = useState(0);
+  const clearMemory = () => setMemoryValue(0);
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [showError, setShowError] = useState(false);
@@ -177,13 +184,24 @@ export function TransactionEntryScreen({
       return;
     }
     if (value === 'M+' || value === 'M-') {
-      const result = evaluateCalculatorExpression(expression);
-      if (result === null) {
-        setShowError(true);
-        return;
-      }
-      setMemory((m) => (value === 'M+' ? m + result : m - result));
-      toast.success(value === 'M+' ? `মেমোরিতে যোগ হয়েছে: ${formatCurrency(result)}` : `মেমোরি থেকে বিয়োগ হয়েছে: ${formatCurrency(result)}`);
+      // Parse whatever is currently on the display into a number; an empty
+      // or invalid expression is treated as 0 rather than blocking the
+      // memory operation.
+      const parsed = parseFloat(String(displayAmount));
+      const safeValue = Number.isFinite(parsed) ? parsed : 0;
+      setMemoryValue((m) => (value === 'M+' ? m + safeValue : m - safeValue));
+      toast.success(value === 'M+' ? `মেমোরিতে যোগ হয়েছে: ${formatCurrency(safeValue)}` : `মেমোরি থেকে বিয়োগ হয়েছে: ${formatCurrency(safeValue)}`);
+      return;
+    }
+    if (value === 'MR') {
+      // Recall replaces the display with the stored memory value so it can
+      // be used directly in the next calculation.
+      setExpression(trimNumberForExpression(memoryValue));
+      setHasInteracted(true);
+      return;
+    }
+    if (value === 'MC') {
+      clearMemory();
       return;
     }
     // Any numeric/operator key press permanently unlocks the metadata panel.
@@ -257,6 +275,15 @@ export function TransactionEntryScreen({
             <span className={cn('text-3xl font-extrabold tracking-tight', isGet ? 'text-emerald-600' : 'text-red-500')}>
               {formatCurrency(displayAmount)}
             </span>
+            {memoryValue !== 0 && (
+              <span
+                aria-label="মেমোরি সক্রিয়"
+                title="মেমোরিতে মান সংরক্ষিত আছে"
+                className="ml-2 inline-flex items-center justify-center align-middle text-[10px] font-extrabold text-blue-700 bg-blue-100 rounded px-1.5 py-0.5"
+              >
+                M
+              </span>
+            )}
             {!isActive && <p className="text-xs font-semibold text-slate-400 mt-1">পরিমাণ লিখুন</p>}
           </div>
           {/* Formula sub-bar: once unlocked by the first key press it stays
@@ -287,15 +314,15 @@ export function TransactionEntryScreen({
           )}
         >
           <div className="flex flex-col gap-3 pt-0.5">
-            {memory !== 0 && (
+            {memoryValue !== 0 && (
               <button
                 type="button"
                 tabIndex={showMetadata ? 0 : -1}
-                onClick={() => setExpression((prev) => prev + (memory >= 0 ? `+${trimNumberForExpression(memory)}` : trimNumberForExpression(memory)))}
+                onClick={() => setExpression((prev) => prev + (memoryValue >= 0 ? `+${trimNumberForExpression(memoryValue)}` : trimNumberForExpression(memoryValue)))}
                 className="w-full flex items-center justify-between bg-blue-50 border border-blue-100 rounded-xl px-4 py-2 text-xs font-bold text-blue-800 active:scale-[0.98] transition-transform"
               >
                 <span>মেমোরি (M)</span>
-                <span>{formatCurrency(memory)} · যোগ করতে ট্যাপ করুন</span>
+                <span>{formatCurrency(memoryValue)} · যোগ করতে ট্যাপ করুন</span>
               </button>
             )}
 
@@ -389,8 +416,13 @@ export function TransactionEntryScreen({
 
       {/* Custom on-screen calculator keypad */}
       <div className="p-3 pb-4 space-y-2 shrink-0 bg-[#eef2f7]">
-        <div className="grid grid-cols-4 gap-2">
-          {ROW_MEMORY.map((k) => (
+        <div className="grid grid-cols-3 gap-2">
+          {ROW_MEMORY_1.map((k) => (
+            <Key key={k.value} def={k} onPress={pressKey} />
+          ))}
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {ROW_MEMORY_2.map((k) => (
             <Key key={k.value} def={k} onPress={pressKey} />
           ))}
         </div>
