@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Hazari Khatabook"
+version = "1.0.0"
+id = "artifacts/khatabook"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20104
+
+[services.development]
+run = "pnpm --filter @workspace/khatabook run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/khatabook", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/khatabook/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20104"
+BASE_PATH = "/"

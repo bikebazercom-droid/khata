@@ -10,6 +10,14 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: parties
+    description: Customer and supplier directory
+  - name: ledger
+    description: Ledger entries (You Gave / You Got transactions)
+  - name: dashboard
+    description: Aggregated balance dashboard
+  - name: settings
+    description: Business settings
 paths:
   /healthz:
     get:
@@ -24,6 +32,177 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get aggregated dashboard totals
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+  /settings:
+    get:
+      operationId: getBusinessSettings
+      tags: [settings]
+      summary: Get business settings
+      responses:
+        "200":
+          description: Business settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BusinessSettings"
+    patch:
+      operationId: updateBusinessSettings
+      tags: [settings]
+      summary: Update business settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BusinessSettingsUpdate"
+      responses:
+        "200":
+          description: Updated business settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BusinessSettings"
+  /parties:
+    get:
+      operationId: listParties
+      tags: [parties]
+      summary: List parties (customers or suppliers)
+      parameters:
+        - name: role
+          in: query
+          schema:
+            $ref: "#/components/schemas/PartyRole"
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: dueFilter
+          in: query
+          schema:
+            $ref: "#/components/schemas/DueFilter"
+      responses:
+        "200":
+          description: List of parties
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Party"
+    post:
+      operationId: createParty
+      tags: [parties]
+      summary: Create a new customer or supplier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PartyInput"
+      responses:
+        "201":
+          description: Created party
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Party"
+  /parties/{partyId}:
+    get:
+      operationId: getParty
+      tags: [parties]
+      summary: Get a single party
+      parameters:
+        - name: partyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Party
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Party"
+        "404":
+          description: Not found
+  /parties/{partyId}/ledger-entries:
+    get:
+      operationId: listLedgerEntries
+      tags: [ledger]
+      summary: List ledger entries for a party
+      parameters:
+        - name: partyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of ledger entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LedgerEntry"
+    post:
+      operationId: createLedgerEntry
+      tags: [ledger]
+      summary: Record a "You Gave" or "You Got" transaction for a party
+      description: Creates the ledger entry and recalculates the party's balance and balance type.
+      parameters:
+        - name: partyId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LedgerEntryInput"
+      responses:
+        "201":
+          description: Created ledger entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LedgerEntry"
+        "404":
+          description: Not found
+  /parties/{partyId}/reminder:
+    post:
+      operationId: sendPaymentReminder
+      tags: [parties]
+      summary: Generate a mock payment reminder message
+      parameters:
+        - name: partyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Mock reminder message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReminderMessage"
+        "404":
+          description: Not found
 components:
   schemas:
     HealthStatus:
@@ -33,4 +212,179 @@ components:
           type: string
       required:
         - status
-
+    PartyRole:
+      type: string
+      enum: [CUSTOMER, SUPPLIER]
+    BalanceType:
+      type: string
+      enum: [YOU_WILL_GIVE, YOU_WILL_GET]
+    DueFilter:
+      type: string
+      enum: [ALL, DUE_TODAY, UPCOMING, NO_DUE_DATE]
+    LedgerEntryType:
+      type: string
+      enum: [YOU_GAVE, YOU_GOT]
+    Party:
+      type: object
+      required:
+        - id
+        - name
+        - phone
+        - role
+        - currentBalance
+        - balanceType
+        - dueDate
+        - lastTransactionAt
+        - createdAt
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+        role:
+          $ref: "#/components/schemas/PartyRole"
+        currentBalance:
+          type: number
+        balanceType:
+          $ref: "#/components/schemas/BalanceType"
+        dueDate:
+          type: ["string", "null"]
+          format: date
+        lastTransactionAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    PartyInput:
+      type: object
+      required:
+        - name
+        - phone
+        - role
+      properties:
+        name:
+          type: string
+          minLength: 1
+        phone:
+          type: string
+          minLength: 1
+        role:
+          $ref: "#/components/schemas/PartyRole"
+        openingBalance:
+          type: number
+          description: Optional opening balance amount (always positive)
+        openingBalanceType:
+          $ref: "#/components/schemas/BalanceType"
+        dueDate:
+          type: ["string", "null"]
+          format: date
+    LedgerEntry:
+      type: object
+      required:
+        - id
+        - partyId
+        - type
+        - amount
+        - description
+        - billReference
+        - dueDate
+        - createdAt
+      properties:
+        id:
+          type: string
+        partyId:
+          type: string
+        type:
+          $ref: "#/components/schemas/LedgerEntryType"
+        amount:
+          type: number
+        description:
+          type: string
+        billReference:
+          type: ["string", "null"]
+        dueDate:
+          type: ["string", "null"]
+          format: date
+        createdAt:
+          type: string
+          format: date-time
+    LedgerEntryInput:
+      type: object
+      required:
+        - type
+        - amount
+      properties:
+        type:
+          $ref: "#/components/schemas/LedgerEntryType"
+        amount:
+          type: number
+          exclusiveMinimum: 0
+        description:
+          type: string
+        billReference:
+          type: ["string", "null"]
+        dueDate:
+          type: ["string", "null"]
+          format: date
+    DashboardSummary:
+      type: object
+      required:
+        - youWillGet
+        - youWillGive
+        - onlineCollectionBalance
+        - customerCount
+        - supplierCount
+      properties:
+        youWillGet:
+          type: number
+        youWillGive:
+          type: number
+        onlineCollectionBalance:
+          type: number
+        customerCount:
+          type: integer
+        supplierCount:
+          type: integer
+    BusinessSettings:
+      type: object
+      required:
+        - id
+        - storeName
+        - language
+        - onlineCollectionBalance
+      properties:
+        id:
+          type: string
+        storeName:
+          type: string
+        language:
+          type: string
+        onlineCollectionBalance:
+          type: number
+    BusinessSettingsUpdate:
+      type: object
+      properties:
+        storeName:
+          type: string
+          minLength: 1
+        language:
+          type: string
+          minLength: 1
+        onlineCollectionBalance:
+          type: number
+    ReminderMessage:
+      type: object
+      required:
+        - message
+        - partyName
+        - amount
+      properties:
+        message:
+          type: string
+        partyName:
+          type: string
+        amount:
+          type: number
