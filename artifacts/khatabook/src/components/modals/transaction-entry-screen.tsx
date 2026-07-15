@@ -87,6 +87,11 @@ export function TransactionEntryScreen({
   const [showBillField, setShowBillField] = useState(false);
   const [dueDate, setDueDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [showError, setShowError] = useState(false);
+  // Once the user presses any numeric/operator key, the metadata panel
+  // (details/bill/date/camera) locks open and never collapses again for the
+  // rest of this session — even if the formula is later cleared or edited
+  // back down to zero. Only a fresh mount (new entry sheet) or save resets it.
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   const isGet = type === LedgerEntryType.YOU_GOT;
   const hasFormula = /[+\-*/%]/.test(expression.replace(/^-/, ''));
@@ -97,8 +102,12 @@ export function TransactionEntryScreen({
   }, [expression]);
 
   const displayAmount = liveResult ?? 0;
-  // STATE A (empty/zero) vs STATE B (active typing) — drives the conditional reveal of metadata fields.
+  // Whether the amount currently parses to something worth saving — drives
+  // the "পরিমাণ লিখুন" placeholder, the formula sub-bar, and the SAVE button.
   const isActive = expression.length > 0 && displayAmount !== 0;
+  // Whether the metadata panel should be shown — persistent once triggered,
+  // unlike `isActive` which can flip back off as the formula is edited.
+  const showMetadata = hasInteracted;
 
   const pressKey = (value: string) => {
     setShowError(false);
@@ -129,6 +138,8 @@ export function TransactionEntryScreen({
       toast.success(value === 'M+' ? `মেমোরিতে যোগ হয়েছে: ${formatCurrency(result)}` : `মেমোরি থেকে বিয়োগ হয়েছে: ${formatCurrency(result)}`);
       return;
     }
+    // Any numeric/operator key press permanently unlocks the metadata panel.
+    setHasInteracted(true);
     setExpression((prev) => prev + value);
   };
 
@@ -214,19 +225,20 @@ export function TransactionEntryScreen({
           )}
         </div>
 
-        {/* Metadata panel: hidden entirely in STATE A, smoothly revealed the instant typing starts (STATE B) */}
+        {/* Metadata panel: hidden until the first key press, then locked open
+            for the rest of the session regardless of later edits/clears. */}
         <div
-          aria-hidden={!isActive}
+          aria-hidden={!showMetadata}
           className={cn(
             'overflow-hidden transition-[max-height,opacity] duration-300 ease-in-out shrink-0',
-            isActive ? 'max-h-[320px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
+            showMetadata ? 'max-h-[320px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
           )}
         >
           <div className="flex flex-col gap-3 pt-0.5">
             {memory !== 0 && (
               <button
                 type="button"
-                tabIndex={isActive ? 0 : -1}
+                tabIndex={showMetadata ? 0 : -1}
                 onClick={() => setExpression((prev) => prev + (memory >= 0 ? `+${trimNumberForExpression(memory)}` : trimNumberForExpression(memory)))}
                 className="w-full flex items-center justify-between bg-blue-50 border border-blue-100 rounded-xl px-4 py-2 text-xs font-bold text-blue-800 active:scale-[0.98] transition-transform"
               >
@@ -239,7 +251,7 @@ export function TransactionEntryScreen({
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              tabIndex={isActive ? 0 : -1}
+              tabIndex={showMetadata ? 0 : -1}
               placeholder="বিস্তারিত লিখুন (পণ্য, বিল নং, পরিমাণ ইত্যাদি)"
               className="w-full h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
@@ -250,14 +262,14 @@ export function TransactionEntryScreen({
                 value={billReference}
                 onChange={(e) => setBillReference(e.target.value)}
                 placeholder="বিল/ইনভয়েস নম্বর"
-                tabIndex={isActive ? 0 : -1}
+                tabIndex={showMetadata ? 0 : -1}
                 autoFocus
                 className="w-full h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-medium uppercase placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
             ) : (
               <button
                 type="button"
-                tabIndex={isActive ? 0 : -1}
+                tabIndex={showMetadata ? 0 : -1}
                 onClick={() => setShowBillField(true)}
                 className="flex items-center gap-1 text-sm font-bold text-primary px-1"
               >
@@ -271,12 +283,12 @@ export function TransactionEntryScreen({
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                tabIndex={isActive ? 0 : -1}
+                tabIndex={showMetadata ? 0 : -1}
                 className="h-11 px-3 rounded-xl bg-white border border-slate-200 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
               <button
                 type="button"
-                tabIndex={isActive ? 0 : -1}
+                tabIndex={showMetadata ? 0 : -1}
                 onClick={() => toast('বিল সংযুক্তি শীঘ্রই আসছে')}
                 className="h-11 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-600 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
               >
@@ -287,7 +299,7 @@ export function TransactionEntryScreen({
         </div>
       </div>
 
-      {/* SAVE button, fixed above keypad — disabled in STATE A */}
+      {/* SAVE button, fixed above keypad — disabled while the amount isn't a valid non-zero total */}
       <div className="px-3 pt-1 shrink-0">
         <button
           type="button"
