@@ -458,8 +458,11 @@ router.post(
 
     await getOrCreateBusinessSettings(businessId);
     const amount = Number(party.currentBalance);
+    // minimumFractionDigits:0  → whole numbers stay clean (no trailing ".00")
+    // maximumFractionDigits:2  → decimal balances are shown exactly (2332.82, not 2333)
     const formattedAmount = new Intl.NumberFormat("en-IN", {
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
     }).format(amount);
 
     const message = `বকেয়া তাগাদা: ডিজিটাল খাতা-এর পক্ষ থেকে ${party.name}-কে ৳${formattedAmount} টাকা বকেয়া পরিশোধের জন্য অনুরোধ করা হচ্ছে।`;
