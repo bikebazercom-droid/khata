@@ -14,6 +14,7 @@ import {
   ScrollView,
   RefreshControl,
   Image,
+  Linking,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -25,6 +26,7 @@ import {
   useGetParty,
   useListLedgerEntries,
   useCreateLedgerEntry,
+  useSendPaymentReminder,
 } from '@workspace/api-client-react';
 import type { LedgerEntry } from '@workspace/api-client-react';
 import { useColors } from '@/hooks/useColors';
@@ -454,6 +456,159 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
   );
 }
 
+// ---------------------------------------------------------------------------
+// ReminderSheet
+// ---------------------------------------------------------------------------
+
+interface ReminderSheetProps {
+  visible: boolean;
+  partyId: string;
+  partyName: string;
+  partyPhone: string;
+  onClose: () => void;
+}
+
+function ReminderSheet({ visible, partyId, partyName, partyPhone, onClose }: ReminderSheetProps) {
+  const colors = useColors();
+  const sendReminder = useSendPaymentReminder();
+  const [message, setMessage] = useState('');
+  const [fetching, setFetching] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  // Fetch the pre-filled message whenever the sheet opens
+  useEffect(() => {
+    if (!visible) return;
+    setMessage('');
+    setFetching(true);
+    sendReminder.mutateAsync({ partyId })
+      .then((res) => setMessage(res.message))
+      .catch(() => setMessage(''))
+      .finally(() => setFetching(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, partyId]);
+
+  async function handleSend() {
+    if (!message.trim()) return;
+    setSending(true);
+    try {
+      if (partyPhone) {
+        // Open native SMS app pre-filled with the message
+        const encoded = encodeURIComponent(message.trim());
+        const smsUrl =
+          Platform.OS === 'ios'
+            ? `sms:${partyPhone}&body=${encoded}`
+            : `sms:${partyPhone}?body=${encoded}`;
+        const supported = await Linking.canOpenURL(smsUrl);
+        if (supported) {
+          await Linking.openURL(smsUrl);
+          onClose();
+          return;
+        }
+      }
+      // Fallback: show the message in an alert so the owner can copy it
+      Alert.alert(
+        'Reminder message',
+        message.trim(),
+        [
+          { text: 'Close', style: 'cancel', onPress: onClose },
+        ],
+      );
+    } catch {
+      Alert.alert('Error', 'Could not open SMS. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  const s = StyleSheet.create({
+    overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+    sheet: {
+      backgroundColor: colors.background,
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      paddingHorizontal: 24,
+      paddingTop: 12,
+      paddingBottom: Platform.OS === 'ios' ? 44 : 24,
+    },
+    handle: {
+      width: 36,
+      height: 4,
+      backgroundColor: colors.border,
+      borderRadius: 2,
+      alignSelf: 'center',
+      marginBottom: 20,
+    },
+    title: { fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.foreground, marginBottom: 4 },
+    subtitle: { fontSize: 13, color: colors.mutedForeground, fontFamily: 'Inter_400Regular', marginBottom: 20 },
+    messageBox: {
+      backgroundColor: colors.card,
+      borderRadius: colors.radius,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      padding: 14,
+      fontSize: 14,
+      fontFamily: 'Inter_400Regular',
+      color: colors.foreground,
+      minHeight: 120,
+      textAlignVertical: 'top',
+      marginBottom: 20,
+    },
+    sendBtn: {
+      borderRadius: colors.radius,
+      padding: 16,
+      alignItems: 'center',
+      backgroundColor: colors.primary,
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    sendBtnText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#fff' },
+    cancelBtn: { padding: 12, alignItems: 'center', marginTop: 6 },
+    cancelText: { color: colors.mutedForeground, fontSize: 15, fontFamily: 'Inter_500Medium' },
+  });
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={s.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={s.sheet}>
+          <View style={s.handle} />
+          <Text style={s.title}>Send Reminder</Text>
+          <Text style={s.subtitle}>{partyName}</Text>
+
+          {fetching ? (
+            <View style={{ height: 120, alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : (
+            <TextInput
+              style={s.messageBox}
+              value={message}
+              onChangeText={setMessage}
+              multiline
+              placeholder="Reminder message…"
+              placeholderTextColor={colors.mutedForeground}
+            />
+          )}
+
+          <TouchableOpacity
+            style={[s.sendBtn, { opacity: fetching || sending || !message.trim() ? 0.5 : 1 }]}
+            onPress={handleSend}
+            disabled={fetching || sending || !message.trim()}
+            activeOpacity={0.85}
+          >
+            <Feather name="send" size={16} color="#fff" />
+            <Text style={s.sendBtnText}>{sending ? 'Opening…' : 'Send'}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={s.cancelBtn} onPress={onClose}>
+            <Text style={s.cancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 interface LedgerRowProps {
   entry: LedgerEntry;
   colors: ReturnType<typeof useColors>;
@@ -571,6 +726,7 @@ export default function PartyDetailScreen() {
   const router = useRouter();
   const [showSheet, setShowSheet] = useState(false);
   const [pendingType, setPendingType] = useState<'YOU_GAVE' | 'YOU_GOT'>('YOU_GAVE');
+  const [showReminderSheet, setShowReminderSheet] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const { data: party, isLoading: partyLoading, refetch: refetchParty } = useGetParty(id!);
@@ -754,6 +910,30 @@ export default function PartyDetailScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Send Reminder button */}
+        <View style={{ paddingHorizontal: 16, marginBottom: 4 }}>
+          <TouchableOpacity
+            style={[
+              s.actionBtn,
+              {
+                backgroundColor: colors.card,
+                borderWidth: 1.5,
+                borderColor: colors.border,
+              },
+            ]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setShowReminderSheet(true);
+            }}
+            activeOpacity={0.8}
+          >
+            <Feather name="bell" size={16} color={colors.mutedForeground} />
+            <Text style={[s.actionBtnText, { color: colors.mutedForeground, fontSize: 14 }]}>
+              Send Reminder
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Ledger entries */}
         <View style={s.entriesHeader}>
           <Text style={s.entriesTitle}>
@@ -789,6 +969,14 @@ export default function PartyDetailScreen() {
           refetchParty();
           refetchEntries();
         }}
+      />
+
+      <ReminderSheet
+        visible={showReminderSheet}
+        partyId={id!}
+        partyName={party.name}
+        partyPhone={party.phone ?? ''}
+        onClose={() => setShowReminderSheet(false)}
       />
     </View>
   );
