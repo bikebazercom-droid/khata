@@ -13,11 +13,12 @@ import {
 } from '@workspace/api-client-react';
 import { ChevronLeft, Camera, X } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 import { cn, evaluateCalculatorExpression, formatCurrency, formatExpressionForDisplay, trimNumberForExpression } from '@/lib/utils';
 import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic';
 import { CameraCaptureModal } from '@/components/modals/camera-capture-modal';
 import { scanDocument } from '@/lib/document-scan';
-import { uploadBillImage, billImageSrc } from '@/lib/billImageStorage';
+import { uploadBillImage, billImageSrc, type BillImageUploadResult } from '@/lib/billImageStorage';
 
 type KeyKind = 'digit' | 'muted' | 'accent';
 type KeyDef = { label: string; value: string; kind: KeyKind; span?: number };
@@ -226,7 +227,7 @@ export function TransactionEntryScreen({
   // By the time the user fills in the amount and presses save, the upload is
   // almost always already complete — so awaiting it in handleSave adds no
   // perceptible delay.
-  const uploadPromiseRef = useRef<Promise<string | null> | null>(null);
+  const uploadPromiseRef = useRef<Promise<BillImageUploadResult> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Once the user presses any numeric/operator key, the metadata panel
   // (details/bill/date/camera) locks open and never collapses again for the
@@ -403,7 +404,29 @@ export function TransactionEntryScreen({
     // firing the mutation. For entries with no image the promise is null so
     // the mutation fires synchronously in the same microtask.
     void (async () => {
-      const objectPath = pendingUpload ? await pendingUpload : null;
+      let objectPath: string | undefined;
+
+      if (pendingUpload) {
+        const result = await pendingUpload;
+        if (result.ok) {
+          objectPath = result.objectPath;
+        } else {
+          // Inform the user — the entry will still be saved, just without
+          // the photo attached.
+          if (result.reason === 'url-request-failed') {
+            toast.warning('বিল ছবি সংযুক্ত হয়নি', {
+              description: 'সার্ভার সংযোগ করা যায়নি। এন্ট্রি সংরক্ষিত হয়েছে, তবে ছবিটি যোগ হয়নি।',
+              duration: 6000,
+            });
+          } else {
+            toast.warning('বিল ছবি আপলোড ব্যর্থ হয়েছে', {
+              description: 'নেটওয়ার্ক সমস্যার কারণে ছবিটি সংরক্ষণ করা যায়নি। এন্ট্রি সংরক্ষিত হয়েছে।',
+              duration: 6000,
+            });
+          }
+        }
+      }
+
       createEntry.mutate({
         partyId,
         data: {
@@ -413,7 +436,7 @@ export function TransactionEntryScreen({
           billReference: undefined,
           // Store the objectPath (e.g. "/objects/uploads/uuid") returned by
           // cloud storage, NOT the local base64 data URL.
-          billImage: objectPath ?? undefined,
+          billImage: objectPath,
           dueDate: dueDate || undefined,
         },
       });

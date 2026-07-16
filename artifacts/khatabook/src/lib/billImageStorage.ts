@@ -154,31 +154,50 @@ function dataUrlToBlob(dataUrl: string): Blob {
 }
 
 /**
+ * Discriminated result for `uploadBillImage`:
+ *   - `{ ok: true; objectPath: string }` — upload succeeded
+ *   - `{ ok: false; reason: 'url-request-failed' }` — could not obtain a presigned URL
+ *   - `{ ok: false; reason: 'upload-failed' }` — PUT to GCS failed after retries
+ */
+export type BillImageUploadResult =
+  | { ok: true; objectPath: string }
+  | { ok: false; reason: 'url-request-failed' | 'upload-failed' };
+
+/**
  * Upload a scanned bill image (given as a base64 data URL) to cloud storage.
  *
- * Returns the `objectPath` (e.g. `/objects/uploads/some-uuid`) to be stored
- * in the database, or `null` if the upload fails (in which case the entry is
- * saved without an image rather than blocking the user).
+ * Returns a `BillImageUploadResult` discriminated union so the caller can
+ * distinguish between a presigned-URL failure (step 1) and an actual upload
+ * failure (step 2).
+ *
+ * The PUT step (step 2) is retried once after a short delay before giving up,
+ * so a momentary network hiccup does not permanently lose the image.
  */
-export async function uploadBillImage(base64DataUrl: string): Promise<string | null> {
+export async function uploadBillImage(base64DataUrl: string): Promise<BillImageUploadResult> {
   try {
     const blob = dataUrlToBlob(base64DataUrl);
 
     // Step 1: request a presigned upload URL from our API.
-    const metaRes = await fetch(`${BASE}/api/storage/uploads/request-url`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: 'bill.jpg',
-        size: blob.size,
-        contentType: blob.type,
-      }),
-    });
+    let metaRes: Response;
+    try {
+      metaRes = await fetch(`${BASE}/api/storage/uploads/request-url`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'bill.jpg',
+          size: blob.size,
+          contentType: blob.type,
+        }),
+      });
+    } catch (err) {
+      console.error('বিল আপলোডের URL পাওয়া যায়নি (network error):', err);
+      return { ok: false, reason: 'url-request-failed' };
+    }
 
     if (!metaRes.ok) {
       console.error('বিল আপলোডের URL পাওয়া যায়নি:', metaRes.status);
-      return null;
+      return { ok: false, reason: 'url-request-failed' };
     }
 
     const { uploadURL, objectPath } = (await metaRes.json()) as {
@@ -187,20 +206,53 @@ export async function uploadBillImage(base64DataUrl: string): Promise<string | n
     };
 
     // Step 2: upload the image bytes directly to GCS via the presigned URL.
-    const uploadRes = await fetch(uploadURL, {
-      method: 'PUT',
-      body: blob,
-      headers: { 'Content-Type': blob.type },
-    });
+    // Retry once after a short delay — a momentary network interruption between
+    // step 1 and step 2 should not permanently lose the photo.
+    const attemptPut = (): Promise<Response> =>
+      fetch(uploadURL, {
+        method: 'PUT',
+        body: blob,
+        headers: { 'Content-Type': blob.type },
+      });
 
-    if (!uploadRes.ok) {
-      console.error('বিল ছবি আপলোড ব্যর্থ:', uploadRes.status);
-      return null;
+    let uploadRes: Response;
+    try {
+      uploadRes = await attemptPut();
+    } catch {
+      // First attempt threw (network drop) — wait 1 s then retry once.
+      await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+      try {
+        uploadRes = await attemptPut();
+      } catch (retryErr) {
+        console.error('বিল ছবি আপলোড ব্যর্থ (retry exhausted):', retryErr);
+        return { ok: false, reason: 'upload-failed' };
+      }
     }
 
-    return objectPath; // e.g. "/objects/uploads/some-uuid"
+    if (!uploadRes.ok) {
+      // Non-2xx on first attempt — retry once for transient 5xx errors.
+      if (uploadRes.status >= 500) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+        let retryRes: Response;
+        try {
+          retryRes = await attemptPut();
+        } catch (retryErr) {
+          console.error('বিল ছবি আপলোড ব্যর্থ (retry exhausted):', retryErr);
+          return { ok: false, reason: 'upload-failed' };
+        }
+        if (!retryRes.ok) {
+          console.error('বিল ছবি আপলোড ব্যর্থ (after retry):', retryRes.status);
+          return { ok: false, reason: 'upload-failed' };
+        }
+        return { ok: true, objectPath };
+      }
+      console.error('বিল ছবি আপলোড ব্যর্থ:', uploadRes.status);
+      return { ok: false, reason: 'upload-failed' };
+    }
+
+    return { ok: true, objectPath }; // e.g. "/objects/uploads/some-uuid"
   } catch (err) {
     console.error('বিল ছবি আপলোড ব্যর্থ হয়েছে:', err);
-    return null;
+    return { ok: false, reason: 'upload-failed' };
   }
 }
