@@ -10,6 +10,7 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { ConnectionStateProvider, useConnectionState } from '@/context/connection-state';
 import { HomeView } from '@/pages/home';
 import { PartyView } from '@/pages/party-view';
+import { TransactionDetailPage } from '@/pages/transaction-detail';
 import { ReportView } from '@/pages/report-view';
 import { LandingPage } from '@/pages/landing';
 import { SignInPage } from '@/pages/sign-in';
@@ -244,6 +245,13 @@ function AppRouter() {
             <Route path="/sign-in/*?" component={SignInPage} />
             <Route path="/sign-up/*?" component={SignUpPage} />
             {/* Protected */}
+            <Route path="/party/:partyId/entry/:entryId">
+              {() => (
+                <ProtectedLayout>
+                  <TransactionDetailPage />
+                </ProtectedLayout>
+              )}
+            </Route>
             <Route path="/party/:id">
               {(params) => (
                 <ProtectedLayout>

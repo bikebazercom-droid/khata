@@ -268,6 +268,65 @@ router.post(
   },
 );
 
+router.delete(
+  "/parties/:partyId/entries/:entryId",
+  async (req, res): Promise<void> => {
+    const { businessId } = req as unknown as AuthenticatedRequest;
+    const partyId = req.params.partyId as string;
+    const entryId = req.params.entryId as string;
+
+    const [party] = await db
+      .select()
+      .from(partiesTable)
+      .where(
+        and(
+          eq(partiesTable.id, partyId),
+          eq(partiesTable.businessId, businessId),
+        ),
+      );
+
+    if (!party) {
+      res.status(404).json({ error: "Party not found" });
+      return;
+    }
+
+    const [entry] = await db
+      .select()
+      .from(ledgerEntriesTable)
+      .where(
+        and(
+          eq(ledgerEntriesTable.id, entryId),
+          eq(ledgerEntriesTable.partyId, partyId),
+        ),
+      );
+
+    if (!entry) {
+      res.status(404).json({ error: "Entry not found" });
+      return;
+    }
+
+    // Reverse this entry's effect on the running balance.
+    // YOU_GAVE originally added +amount; YOU_GOT added -amount.
+    const currentSigned = toSignedBalance(party);
+    const delta = entry.type === "YOU_GAVE" ? Number(entry.amount) : -Number(entry.amount);
+    const nextSigned = currentSigned - delta;
+    const { currentBalance, balanceType } = fromSignedBalance(nextSigned);
+
+    await db
+      .delete(ledgerEntriesTable)
+      .where(eq(ledgerEntriesTable.id, entryId));
+
+    await db
+      .update(partiesTable)
+      .set({ currentBalance, balanceType })
+      .where(eq(partiesTable.id, partyId));
+
+    broadcast(businessId, { type: "ledger.deleted", payload: { partyId, entryId } });
+
+    res.json({ success: true });
+  },
+);
+
 router.delete("/parties/:partyId", async (req, res): Promise<void> => {
   const { businessId } = req as unknown as AuthenticatedRequest;
   const parsed = DeletePartyParams.safeParse(req.params);

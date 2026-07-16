@@ -504,33 +504,43 @@ export function PartyView() {
                 <div className="px-3 space-y-2">
                   {group.items.map((entry, i) => {
                     const isGave = entry.type === 'YOU_GAVE';
+                    const imgSrc = billImageSrc(entry.billImage);
                     return (
                       <div
                         key={entry.id}
-                        className="bg-white rounded-xl shadow-sm grid grid-cols-[1fr_auto_auto] gap-3 items-center overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => navigate(`/party/${id}/entry/${entry.id}`)}
+                        onKeyDown={(e) => e.key === 'Enter' && navigate(`/party/${id}/entry/${entry.id}`)}
+                        className="bg-white rounded-xl shadow-sm grid grid-cols-[1fr_auto_auto] gap-3 items-center overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both cursor-pointer hover:shadow-md active:scale-[0.99] transition-all"
                         style={{ animationDelay: `${i * 30}ms` }}
                       >
                         <div className="min-w-0 py-3 pl-4">
                           <p className="text-[12px] font-bold text-slate-700">
-                            {format(new Date(`${entryDateKey(entry)}T00:00:00`), 'd MMM yy')} • {format(new Date(entry.createdAt), 'hh:mm a')}
+                            {format(new Date(`${entryDateKey(entry)}T00:00:00`), 'd MMM yy')} • {format(new Date(entry.createdAt as string), 'hh:mm a')}
                           </p>
-                          <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
-                            ব্যালেন্স: {formatCurrency(Math.abs(entry.balanceAfter))}
-                          </p>
+                          {entry.description ? (
+                            <p className="text-[11px] font-semibold text-slate-400 mt-0.5 truncate max-w-[180px]">
+                              {entry.description}
+                            </p>
+                          ) : null}
                           {entry.billReference && (
                             <span className="inline-block mt-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200 uppercase tracking-wider">
                               বিল: {entry.billReference}
                             </span>
                           )}
-                          {billImageSrc(entry.billImage) && (
+                          {imgSrc && (
                             <button
                               type="button"
-                              onClick={() => setLightboxImage(billImageSrc(entry.billImage))}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setLightboxImage(imgSrc);
+                              }}
                               aria-label="বিলের ছবি দেখুন"
                               className="block mt-1.5 active:scale-95 transition-transform"
                             >
                               <img
-                                src={billImageSrc(entry.billImage)!}
+                                src={imgSrc}
                                 alt="সংযুক্ত বিল"
                                 className="w-10 h-10 rounded-md object-cover border border-slate-200"
                               />

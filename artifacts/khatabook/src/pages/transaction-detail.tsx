@@ -1,0 +1,362 @@
+import { useState } from 'react';
+import { useRoute, useLocation } from 'wouter';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  useGetParty,
+  useListLedgerEntries,
+  useGetBusinessSettings,
+  getGetPartyQueryKey,
+  getListLedgerEntriesQueryKey,
+  getListPartiesQueryKey,
+  getGetDashboardSummaryQueryKey,
+} from '@workspace/api-client-react';
+import {
+  ChevronLeft,
+  Trash2,
+  Share2,
+  Cloud,
+  CheckCircle2,
+  Receipt,
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { formatCurrency, cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
+import { billImageSrc } from '@/lib/billImageStorage';
+import { toWhatsAppNumber } from '@/lib/ledger-report';
+import { BillImageLightbox } from '@/components/modals/bill-image-lightbox';
+import { toast } from 'sonner';
+
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+function entryDateKey(entry: { dueDate: Date | string | null; createdAt: Date | string }) {
+  return format(new Date((entry.dueDate as string) || (entry.createdAt as string)), 'yyyy-MM-dd');
+}
+
+export function TransactionDetailPage() {
+  const [, params] = useRoute('/party/:partyId/entry/:entryId');
+  const partyId = params?.partyId ?? '';
+  const entryId = params?.entryId ?? '';
+  const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
+
+  const { data: party, isLoading: partyLoading } = useGetParty(partyId, {
+    query: { enabled: !!partyId, queryKey: getGetPartyQueryKey(partyId) },
+  });
+  const { data: entries = [], isLoading: entriesLoading } = useListLedgerEntries(partyId, {
+    query: { enabled: !!partyId, queryKey: getListLedgerEntriesQueryKey(partyId) },
+  });
+  const { data: settings } = useGetBusinessSettings();
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+
+  const entry = entries.find((e) => e.id === entryId);
+  const storeName = settings?.storeName || 'হাজারী খাতাবুক';
+  const isGave = entry?.type === 'YOU_GAVE';
+  const imageSrc = billImageSrc(entry?.billImage ?? null);
+  const partyInitials = (party?.name ?? '??').slice(0, 2).toUpperCase();
+
+  const txDateKey = entry ? entryDateKey(entry) : '';
+  const transactionDate = txDateKey ? format(new Date(`${txDateKey}T00:00:00`), 'd MMM yyyy') : '';
+  const transactionTime = entry ? format(new Date(entry.createdAt as string), 'hh:mm a') : '';
+
+  function buildReceiptText(): string {
+    if (!party || !entry) return '';
+    const actionLabel = isGave ? 'দিয়েছেন' : 'পেয়েছেন';
+    const balanceLabel = party.balanceType === 'YOU_WILL_GET' ? 'পাবেন' : 'দেবেন';
+    const lines = [
+      '━━━━━━━━━━━━━━━━━━',
+      `${storeName} — লেনদেন স্লিপ`,
+      '━━━━━━━━━━━━━━━━━━',
+      `গ্রাহক: ${party.name}`,
+      `তারিখ: ${transactionDate} ${transactionTime}`,
+      `লেনদেন: আপনি ${actionLabel} ${formatCurrency(entry.amount)}`,
+      entry.description ? `নোট: ${entry.description}` : null,
+      `বর্তমান ব্যালেন্স: ${formatCurrency(party.currentBalance)} (আপনি ${balanceLabel})`,
+      '━━━━━━━━━━━━━━━━━━',
+      'হাজারী খাতাবুক দ্বারা তৈরি',
+    ];
+    return lines.filter(Boolean).join('\n');
+  }
+
+  async function handleDelete() {
+    if (!partyId || !entryId) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`${BASE}/api/parties/${partyId}/entries/${entryId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      await queryClient.invalidateQueries({ queryKey: getListLedgerEntriesQueryKey(partyId) });
+      await queryClient.invalidateQueries({ queryKey: getGetPartyQueryKey(partyId) });
+      await queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
+      await queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+
+      toast.success('লেনদেন মুছে ফেলা হয়েছে');
+      navigate(`/party/${partyId}`, { replace: true });
+    } catch (err) {
+      console.error('Delete entry failed:', err);
+      toast.error('মুছতে সমস্যা হয়েছে, আবার চেষ্টা করুন');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  }
+
+  async function handleShare() {
+    if (!party || !entry) return;
+    setIsSharing(true);
+    try {
+      const text = buildReceiptText();
+
+      if (typeof navigator.share === 'function') {
+        try {
+          await navigator.share({ title: `লেনদেন — ${party.name}`, text });
+          return;
+        } catch (shareErr: unknown) {
+          const err = shareErr as { name?: string };
+          if (err?.name === 'AbortError') return; // user dismissed share sheet
+          // fall through to WhatsApp
+        }
+      }
+
+      // WhatsApp fallback
+      const waNumber = party.phone ? toWhatsAppNumber(party.phone) : '';
+      const encoded = encodeURIComponent(text);
+      const url = waNumber
+        ? `https://wa.me/${waNumber}?text=${encoded}`
+        : `https://wa.me/?text=${encoded}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } finally {
+      setIsSharing(false);
+    }
+  }
+
+  // Loading skeleton
+  if (partyLoading || entriesLoading) {
+    return (
+      <div className="flex flex-col h-[100dvh] bg-[#f8fafc]">
+        <div className="h-14 bg-white border-b border-slate-200 animate-pulse" />
+        <div className="flex-1 p-4 space-y-3">
+          <div className="h-44 bg-white rounded-2xl animate-pulse" />
+          <div className="h-8 bg-white rounded-full animate-pulse w-36" />
+          <div className="h-36 bg-white rounded-2xl animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
+  // Not found
+  if (!entry || !party) {
+    return (
+      <div className="flex flex-col h-[100dvh] bg-[#f8fafc] items-center justify-center gap-4 px-6">
+        <p className="text-slate-500 font-semibold text-center">এন্ট্রিটি পাওয়া যায়নি</p>
+        <Button variant="outline" onClick={() => navigate(partyId ? `/party/${partyId}` : '/')}>
+          ফিরে যান
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-[100dvh] bg-[#f8fafc] overflow-hidden">
+      {/* ── Header ──────────────────────────────────────────── */}
+      <header className="flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-200 shrink-0">
+        <button
+          type="button"
+          onClick={() => navigate(`/party/${partyId}`)}
+          className="p-1 -ml-1 rounded-lg hover:bg-slate-100 transition-colors"
+          aria-label="ফিরে যান"
+        >
+          <ChevronLeft className="w-5 h-5 text-slate-600" />
+        </button>
+        <h1 className="text-[15px] font-bold text-slate-800 tracking-tight flex-1">
+          বিস্তারিত প্রবেশিকা
+        </h1>
+      </header>
+
+      {/* ── Scrollable body ─────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 pb-28 space-y-3">
+
+        {/* Main transaction card */}
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+          {/* Coloured banner */}
+          <div className={cn('px-5 py-4', isGave ? 'bg-red-50' : 'bg-emerald-50')}>
+            <div className="flex items-center gap-4">
+              <div className={cn(
+                'w-12 h-12 rounded-full flex items-center justify-center font-extrabold text-[17px] shrink-0',
+                isGave ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700',
+              )}>
+                {partyInitials}
+              </div>
+              <div className="min-w-0">
+                <p className="font-extrabold text-slate-800 text-base leading-tight truncate">
+                  {party.name}
+                </p>
+                <p className="text-[12px] text-slate-500 font-medium mt-0.5">
+                  {transactionDate} • {transactionTime}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Amounts row */}
+          <div className="px-5 py-4 grid grid-cols-2 gap-4 border-t border-slate-100">
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                {isGave ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন'}
+              </p>
+              <p className={cn('text-2xl font-extrabold', isGave ? 'text-red-600' : 'text-emerald-600')}>
+                {formatCurrency(entry.amount)}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                বর্তমান ব্যালেন্স
+              </p>
+              <p className={cn(
+                'text-2xl font-extrabold',
+                party.balanceType === 'YOU_WILL_GET' ? 'text-emerald-600' : 'text-red-600',
+              )}>
+                {formatCurrency(party.currentBalance)}
+              </p>
+              <p className={cn(
+                'text-[11px] font-semibold mt-0.5',
+                party.balanceType === 'YOU_WILL_GET' ? 'text-emerald-500' : 'text-red-500',
+              )}>
+                {party.balanceType === 'YOU_WILL_GET' ? 'আপনি পাবেন' : 'আপনি দেবেন'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Status pills */}
+        {(entry.billReference || entry.billImage) && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {entry.billReference && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200 uppercase tracking-wider">
+                বিল: {entry.billReference}
+              </span>
+            )}
+            {entry.billImage && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <Cloud className="w-3 h-3" />
+                ক্লাউডে সংরক্ষিত
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Description */}
+        {entry.description && (
+          <div className="bg-white rounded-2xl shadow-sm px-5 py-4">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">নোট</p>
+            <p className="text-[14px] text-slate-700 font-medium leading-relaxed">{entry.description}</p>
+          </div>
+        )}
+
+        {/* Bill image */}
+        {imageSrc && (
+          <div className="bg-white rounded-2xl shadow-sm px-5 py-4">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">
+              সংযুক্ত বিলের ছবি
+            </p>
+            <button
+              type="button"
+              onClick={() => setLightboxImage(imageSrc)}
+              className="block w-full active:scale-[0.98] transition-transform"
+            >
+              <img
+                src={imageSrc}
+                alt="সংযুক্ত বিল"
+                className="w-full max-h-64 object-contain rounded-xl border border-slate-200 bg-slate-50"
+              />
+              <p className="text-[11px] text-slate-400 font-medium mt-2 text-center">
+                ছবি বড় করতে ট্যাপ করুন
+              </p>
+            </button>
+          </div>
+        )}
+
+        {/* Receipt preview */}
+        <div className="bg-white rounded-2xl shadow-sm px-5 py-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Receipt className="w-4 h-4 text-slate-400" />
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              রসিদের বার্তা
+            </p>
+          </div>
+          <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-mono text-[12px] text-slate-700 leading-relaxed whitespace-pre-wrap">
+            {buildReceiptText()}
+          </div>
+          <div className="flex items-center gap-1.5 mt-3 text-emerald-600">
+            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+            <p className="text-[11px] font-semibold">ক্লাউডে ব্যাকআপ সফল</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Fixed footer ─────────────────────────────────────── */}
+      <div className="fixed bottom-0 inset-x-0 flex gap-3 px-4 py-4 bg-white border-t border-slate-200 z-20">
+        <Button
+          variant="outline"
+          className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 hover:text-red-700 font-bold"
+          onClick={() => setShowDeleteConfirm(true)}
+        >
+          <Trash2 className="w-4 h-4 mr-2" />
+          মুছে ফেলুন
+        </Button>
+        <Button
+          className="flex-1 bg-slate-800 hover:bg-slate-900 font-bold"
+          onClick={handleShare}
+          disabled={isSharing}
+        >
+          <Share2 className="w-4 h-4 mr-2" />
+          শেয়ার করুন
+        </Button>
+      </div>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent className="max-w-sm rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>লেনদেন মুছে ফেলুন?</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-600">
+              এই লেনদেন মুছে গেলে <span className="font-semibold text-slate-800">{party.name}</span>-এর
+              ব্যালেন্স আপডেট হয়ে যাবে। এটি পূর্বাবস্থায় ফেরানো যাবে না।
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="font-bold">বাতিল</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              className="font-bold"
+              onClick={handleDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'মুছছে…' : 'মুছে ফেলুন'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Lightbox */}
+      {lightboxImage && (
+        <BillImageLightbox src={lightboxImage} onClose={() => setLightboxImage(null)} />
+      )}
+    </div>
+  );
+}

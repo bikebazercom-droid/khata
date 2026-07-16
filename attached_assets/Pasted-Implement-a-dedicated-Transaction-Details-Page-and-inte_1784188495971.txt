@@ -1,0 +1,21 @@
+Implement a dedicated Transaction Details Page ("বিস্তারিত প্রবেশিকা") and interactive navigation workflow as requested by the user.
+
+Follow these exact architectural requirements based on the reference UI workflow:
+
+1. CLICK TO NAVIGATE (এন্ট্রির টাচ রেসপন্স):
+- Update the transaction cards/rows in the main Customer Ledger view. When a user clicks or taps on any specific transaction entry, dynamically navigate them to a clean, full-screen Transaction Details Page (`/transaction/:id` or a dedicated full-overlay component).
+- Transition to this details view instantly in 0 milliseconds without showing any generic global loading indicators.
+
+2. DETAILS PAGE UI STRUCTURE ("বিস্তারিত প্রবেশিকা" স্ক্রিন ডিজাইন):
+- Match the provided visual UI layout perfectly:
+  * Top Navigation Bar: Back arrow button titled "বিস্তারিত প্রবেশিকা".
+  * Main Card: Displays Customer Initials, Name, Transaction Date/Time, Transaction Amount (with dynamic color indicators), and the updated Running Balance ("বর্তমান ব্যালেন্স").
+  * Central Content Body: Show the SMS/Notification status layout text block, along with a clean preview template of the receipt message, and the cloud backup success confirmation pill.
+  * If a bill image is uploaded for this transaction, render a beautiful image thumbnail box above the action footer so the user can see the attached voucher.
+
+3. DUAL ACTION FIXED FOOTER (শেয়ার ও ডিলিটের ফিক্সড বাটন):
+- Place two high-visibility action buttons strictly fixed at the bottom of this detail page:
+  * Left Button ("মুছে ফেলুন"): An outlined style button with a trash can icon. Clicking it triggers our background deletion pipeline and instantly redirects the user back to the ledger with updated balances.
+  * Right Button ("শেয়ার করুন"): A solid primary blue button with a share icon. Clicking this triggers the Web Share API (`navigator.share`) or opens a pre-composed WhatsApp template containing the transaction slip details, total due, and the cloud storage URL of the attached bill image.
+
+Refactor the routing layer, ledger row item components, and build out this Transaction Details container now.
