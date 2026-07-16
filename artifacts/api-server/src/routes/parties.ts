@@ -25,10 +25,12 @@ import {
   toDateOnlyString,
   toSignedBalance,
 } from "../lib/khatabook";
+import { type AuthenticatedRequest } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();
 
 router.get("/parties", async (req, res): Promise<void> => {
+  const { businessId } = req as unknown as AuthenticatedRequest;
   const parsed = ListPartiesQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -36,7 +38,7 @@ router.get("/parties", async (req, res): Promise<void> => {
   }
 
   const { role, search, dueFilter } = parsed.data;
-  const condition = applyPartyFilters(role, search);
+  const condition = applyPartyFilters(businessId, role, search);
 
   const rows = await db
     .select()
@@ -76,6 +78,7 @@ router.get("/parties", async (req, res): Promise<void> => {
 });
 
 router.post("/parties", async (req, res): Promise<void> => {
+  const { businessId } = req as unknown as AuthenticatedRequest;
   const parsed = CreatePartyBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -96,6 +99,7 @@ router.post("/parties", async (req, res): Promise<void> => {
   const [party] = await db
     .insert(partiesTable)
     .values({
+      businessId,
       name,
       phone: phone || "",
       role,
@@ -115,6 +119,7 @@ router.post("/parties", async (req, res): Promise<void> => {
 });
 
 router.get("/parties/:partyId", async (req, res): Promise<void> => {
+  const { businessId } = req as unknown as AuthenticatedRequest;
   const parsed = GetPartyParams.safeParse(req.params);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -124,7 +129,12 @@ router.get("/parties/:partyId", async (req, res): Promise<void> => {
   const [party] = await db
     .select()
     .from(partiesTable)
-    .where(eq(partiesTable.id, parsed.data.partyId));
+    .where(
+      and(
+        eq(partiesTable.id, parsed.data.partyId),
+        eq(partiesTable.businessId, businessId),
+      ),
+    );
 
   if (!party) {
     res.status(404).json({ error: "Party not found" });
@@ -142,6 +152,7 @@ router.get("/parties/:partyId", async (req, res): Promise<void> => {
 router.get(
   "/parties/:partyId/ledger-entries",
   async (req, res): Promise<void> => {
+    const { businessId } = req as unknown as AuthenticatedRequest;
     const parsed = ListLedgerEntriesParams.safeParse(req.params);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.message });
@@ -151,7 +162,12 @@ router.get(
     const [party] = await db
       .select({ id: partiesTable.id })
       .from(partiesTable)
-      .where(eq(partiesTable.id, parsed.data.partyId));
+      .where(
+        and(
+          eq(partiesTable.id, parsed.data.partyId),
+          eq(partiesTable.businessId, businessId),
+        ),
+      );
 
     if (!party) {
       res.status(404).json({ error: "Party not found" });
@@ -178,6 +194,7 @@ router.get(
 router.post(
   "/parties/:partyId/ledger-entries",
   async (req, res): Promise<void> => {
+    const { businessId } = req as unknown as AuthenticatedRequest;
     const params = CreateLedgerEntryParams.safeParse(req.params);
     if (!params.success) {
       res.status(400).json({ error: params.error.message });
@@ -193,7 +210,12 @@ router.post(
     const [party] = await db
       .select()
       .from(partiesTable)
-      .where(eq(partiesTable.id, params.data.partyId));
+      .where(
+        and(
+          eq(partiesTable.id, params.data.partyId),
+          eq(partiesTable.businessId, businessId),
+        ),
+      );
 
     if (!party) {
       res.status(404).json({ error: "Party not found" });
@@ -242,6 +264,7 @@ router.post(
 );
 
 router.delete("/parties/:partyId", async (req, res): Promise<void> => {
+  const { businessId } = req as unknown as AuthenticatedRequest;
   const parsed = DeletePartyParams.safeParse(req.params);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -251,15 +274,18 @@ router.delete("/parties/:partyId", async (req, res): Promise<void> => {
   const [party] = await db
     .select({ id: partiesTable.id })
     .from(partiesTable)
-    .where(eq(partiesTable.id, parsed.data.partyId));
+    .where(
+      and(
+        eq(partiesTable.id, parsed.data.partyId),
+        eq(partiesTable.businessId, businessId),
+      ),
+    );
 
   if (!party) {
     res.status(404).json({ error: "Party not found" });
     return;
   }
 
-  // Cascade delete: wipe all ledger entries for this party before removing
-  // the party itself, so no orphan rows / corrupted balance sheets remain.
   await db
     .delete(ledgerEntriesTable)
     .where(eq(ledgerEntriesTable.partyId, party.id));
@@ -272,6 +298,7 @@ router.delete("/parties/:partyId", async (req, res): Promise<void> => {
 router.post(
   "/parties/:partyId/reminder",
   async (req, res): Promise<void> => {
+    const { businessId } = req as unknown as AuthenticatedRequest;
     const parsed = SendPaymentReminderParams.safeParse(req.params);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.message });
@@ -281,14 +308,19 @@ router.post(
     const [party] = await db
       .select()
       .from(partiesTable)
-      .where(eq(partiesTable.id, parsed.data.partyId));
+      .where(
+        and(
+          eq(partiesTable.id, parsed.data.partyId),
+          eq(partiesTable.businessId, businessId),
+        ),
+      );
 
     if (!party) {
       res.status(404).json({ error: "Party not found" });
       return;
     }
 
-    await getOrCreateBusinessSettings();
+    await getOrCreateBusinessSettings(businessId);
     const amount = Number(party.currentBalance);
     const formattedAmount = new Intl.NumberFormat("en-IN", {
       maximumFractionDigits: 0,

@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, or, sql } from "drizzle-orm";
 import {
   db,
   businessSettingsTable,
@@ -7,20 +7,23 @@ import {
 } from "@workspace/db";
 
 /**
- * Ensures a single BusinessSettings row exists and returns it.
+ * Ensures a BusinessSettings row exists for the given business and returns it.
  */
-export async function getOrCreateBusinessSettings() {
-  const [existing] = await db.select().from(businessSettingsTable).limit(1);
+export async function getOrCreateBusinessSettings(businessId: string) {
+  const [existing] = await db
+    .select()
+    .from(businessSettingsTable)
+    .where(eq(businessSettingsTable.businessId, businessId));
   if (existing) {
     return existing;
   }
 
   const [created] = await db
     .insert(businessSettingsTable)
-    .values({})
+    .values({ businessId })
     .returning();
 
-  return created;
+  return created!;
 }
 
 /**
@@ -56,7 +59,7 @@ export function toDateOnlyString(value: Date | string | null | undefined): strin
   return value.toISOString().slice(0, 10);
 }
 
-export async function getDashboardTotals() {
+export async function getDashboardTotals(businessId: string) {
   const [row] = await db
     .select({
       youWillGet: sql<string>`coalesce(sum(case when ${partiesTable.balanceType} = 'YOU_WILL_GET' then ${partiesTable.currentBalance} else 0 end), 0)`,
@@ -64,7 +67,8 @@ export async function getDashboardTotals() {
       customerCount: sql<string>`coalesce(sum(case when ${partiesTable.role} = 'CUSTOMER' then 1 else 0 end), 0)`,
       supplierCount: sql<string>`coalesce(sum(case when ${partiesTable.role} = 'SUPPLIER' then 1 else 0 end), 0)`,
     })
-    .from(partiesTable);
+    .from(partiesTable)
+    .where(eq(partiesTable.businessId, businessId));
 
   return {
     youWillGet: Number(row?.youWillGet ?? 0),
@@ -75,15 +79,16 @@ export async function getDashboardTotals() {
 }
 
 export function applyPartyFilters(
+  businessId: string,
   role?: "CUSTOMER" | "SUPPLIER",
   search?: string,
 ) {
-  const conditions = [];
+  const conditions: ReturnType<typeof eq>[] = [eq(partiesTable.businessId, businessId)];
   if (role) {
     conditions.push(eq(partiesTable.role, role));
   }
   if (search) {
-    conditions.push(sql`${partiesTable.name} ilike ${"%" + search + "%"}`);
+    conditions.push(sql`${partiesTable.name} ilike ${"%" + search + "%"}` as any);
   }
-  return conditions.length > 0 ? and(...conditions) : undefined;
+  return and(...conditions);
 }

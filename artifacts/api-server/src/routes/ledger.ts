@@ -1,17 +1,13 @@
 import { Router, type IRouter } from "express";
-import { and, desc, gte, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lte, or, sql } from "drizzle-orm";
 import { db, ledgerEntriesTable, partiesTable } from "@workspace/db";
 import { ListGlobalLedgerEntriesResponse } from "@workspace/api-zod";
+import { type AuthenticatedRequest } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-// The orval-generated ListGlobalLedgerEntriesQueryParams schema types
-// startDate/endDate as `zod.date()` (no `.coerce`) even though the OpenAPI
-// `format: date` param arrives over the wire as a plain "yyyy-MM-dd" query
-// string, so it always fails validation. Validate the raw query manually
-// instead of using the generated schema.
 function parseQuery(query: Record<string, unknown>) {
   const startDate = typeof query["startDate"] === "string" ? query["startDate"] : undefined;
   const endDate = typeof query["endDate"] === "string" ? query["endDate"] : undefined;
@@ -27,10 +23,8 @@ function parseQuery(query: Record<string, unknown>) {
   return { data: { startDate, endDate, search } } as const;
 }
 
-// Global ledger feed across every party — powers the standalone Transaction
-// Report screen (as opposed to /parties/:partyId/ledger-entries, which is
-// scoped to a single customer/supplier).
 router.get("/ledger-entries", async (req, res): Promise<void> => {
+  const { businessId } = req as AuthenticatedRequest;
   const parsed = parseQuery(req.query as Record<string, unknown>);
   if ("error" in parsed) {
     res.status(400).json({ error: parsed.error });
@@ -38,13 +32,13 @@ router.get("/ledger-entries", async (req, res): Promise<void> => {
   }
 
   const { startDate, endDate, search } = parsed.data;
-  const conditions = [];
+  const conditions = [eq(partiesTable.businessId, businessId)];
 
   if (startDate) {
-    conditions.push(gte(ledgerEntriesTable.createdAt, new Date(`${startDate}T00:00:00.000Z`)));
+    conditions.push(gte(ledgerEntriesTable.createdAt, new Date(`${startDate}T00:00:00.000Z`)) as any);
   }
   if (endDate) {
-    conditions.push(lte(ledgerEntriesTable.createdAt, new Date(`${endDate}T23:59:59.999Z`)));
+    conditions.push(lte(ledgerEntriesTable.createdAt, new Date(`${endDate}T23:59:59.999Z`)) as any);
   }
   if (search) {
     const term = `%${search}%`;
@@ -53,7 +47,7 @@ router.get("/ledger-entries", async (req, res): Promise<void> => {
         sql`${partiesTable.name} ilike ${term}`,
         sql`${partiesTable.phone} ilike ${term}`,
         sql`${ledgerEntriesTable.description} ilike ${term}`,
-      ),
+      ) as any,
     );
   }
 
@@ -72,8 +66,8 @@ router.get("/ledger-entries", async (req, res): Promise<void> => {
       createdAt: ledgerEntriesTable.createdAt,
     })
     .from(ledgerEntriesTable)
-    .innerJoin(partiesTable, sql`${ledgerEntriesTable.partyId} = ${partiesTable.id}`)
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .innerJoin(partiesTable, eq(ledgerEntriesTable.partyId, partiesTable.id))
+    .where(and(...conditions))
     .orderBy(desc(ledgerEntriesTable.createdAt));
 
   res.json(

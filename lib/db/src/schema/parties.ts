@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { businessesTable } from "./businesses";
 
 export const partyRoleEnum = pgEnum("party_role", ["CUSTOMER", "SUPPLIER"]);
 export const balanceTypeEnum = pgEnum("balance_type", [
@@ -18,6 +19,8 @@ export const balanceTypeEnum = pgEnum("balance_type", [
 
 export const partiesTable = pgTable("parties", {
   id: uuid("id").primaryKey().defaultRandom(),
+  /** Which business this party belongs to. Null for legacy rows that pre-date multi-tenancy. */
+  businessId: uuid("business_id").references(() => businessesTable.id),
   name: text("name").notNull(),
   // Optional at the product level (a customer can be added with just a name);
   // stored as an empty string rather than NULL so the column stays simple to

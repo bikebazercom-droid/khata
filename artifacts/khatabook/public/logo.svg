@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" fill="none">
+  <!-- Background circle -->
+  <circle cx="80" cy="80" r="80" fill="#0f172a"/>
+  <!-- Book body -->
+  <rect x="38" y="34" width="64" height="82" rx="6" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <!-- Spine highlight -->
+  <rect x="38" y="34" width="14" height="82" rx="4" fill="#0ea5e9"/>
+  <!-- Page lines -->
+  <line x1="62" y1="54" x2="94" y2="54" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="62" y1="65" x2="94" y2="65" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="62" y1="76" x2="82" y2="76" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Taka symbol ৳ -->
+  <text x="62" y="107" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#38bdf8">৳</text>
+</svg>

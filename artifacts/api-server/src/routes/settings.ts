@@ -7,11 +7,13 @@ import {
   UpdateBusinessSettingsResponse,
 } from "@workspace/api-zod";
 import { getOrCreateBusinessSettings } from "../lib/khatabook";
+import { type AuthenticatedRequest } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();
 
-router.get("/settings", async (_req, res): Promise<void> => {
-  const settings = await getOrCreateBusinessSettings();
+router.get("/settings", async (req, res): Promise<void> => {
+  const { businessId } = req as AuthenticatedRequest;
+  const settings = await getOrCreateBusinessSettings(businessId);
   res.json(
     GetBusinessSettingsResponse.parse({
       ...settings,
@@ -21,13 +23,14 @@ router.get("/settings", async (_req, res): Promise<void> => {
 });
 
 router.patch("/settings", async (req, res): Promise<void> => {
+  const { businessId } = req as AuthenticatedRequest;
   const parsed = UpdateBusinessSettingsBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
 
-  const existing = await getOrCreateBusinessSettings();
+  const existing = await getOrCreateBusinessSettings(businessId);
 
   const updates: Partial<typeof businessSettingsTable.$inferInsert> = {};
   if (parsed.data.storeName !== undefined) {
