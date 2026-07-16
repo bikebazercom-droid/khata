@@ -354,22 +354,46 @@ export function StaffDeploymentPage() {
       const [year, mon] = pdfMonth.split('-').map(Number);
       const monthLabel  = format(new Date(year, mon - 1, 1), 'MMMM yyyy', { locale: bn });
 
-      // Fetch logs filtered by the selected month
+      // 1. Fetch all logs for the selected month from the server.
       const r = await fetch(`${BASE}/api/staff/logs?month=${pdfMonth}`, { credentials: 'include' });
-      const monthLogs: DeploymentLog[] = r.ok ? await r.json() : [];
+      if (!r.ok) throw new Error(`Server error ${r.status}`);
+      const monthLogs: DeploymentLog[] = await r.json();
 
       const tally  = destinationTally(monthLogs);
       const groups = groupLogsByDate(monthLogs);
 
+      // 2. Write the generated HTML into the off-screen container (not display:none).
+      //    The container is position:fixed; left:-9999px so it is fully laid out
+      //    by the browser but invisible to the user.
       const html = buildPdfHtml({ monthLabel, monthLogs, tally, groups, queueRemaining });
       pdfRef.current.innerHTML = html;
 
+      // 3. Wait for all fonts referenced by this document to finish loading.
+      //    Without this, html2canvas may capture before Noto Sans Bengali glyphs
+      //    are available, producing boxes or falling back to a system font.
+      await document.fonts.ready;
+
+      // 4. Yield one animation frame so the browser completes its layout pass
+      //    on the newly inserted HTML before html2canvas starts rasterising.
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+
+      // 5. Generate and download the PDF.
+      //    windowWidth: 794 tells html2canvas to treat the capture as if the
+      //    viewport is 794 px wide (A4 at 96 dpi) regardless of the real screen
+      //    width. Without this, a 390 px mobile viewport causes html2canvas to
+      //    capture only ~half the A4 column, which then gets stretched and blurry.
       await html2pdf()
         .set({
-          margin:      [12, 10, 12, 10],
+          margin:      [10, 8, 10, 8],
           filename:    `ডিউটি-স্টেটমেন্ট-${pdfMonth}.pdf`,
           image:       { type: 'jpeg', quality: 0.97 },
-          html2canvas: { scale: 2, useCORS: true, logging: false },
+          html2canvas: {
+            scale:       2,          // 2× resolution for crisp text
+            useCORS:     true,       // cross-origin font/image resources
+            allowTaint:  true,       // don't abort on tainted canvas resources
+            windowWidth: 794,        // A4 width — prevents mobile viewport clipping
+            logging:     false,
+          },
           jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
         })
         .from(pdfRef.current)
@@ -377,7 +401,8 @@ export function StaffDeploymentPage() {
 
       pdfRef.current.innerHTML = '';
       toast.success('PDF ডাউনলোড হয়েছে');
-    } catch {
+    } catch (err) {
+      console.error('[PDF export]', err);
       toast.error('PDF তৈরি করতে ব্যর্থ হয়েছে');
     } finally {
       setIsExporting(false);
@@ -1122,8 +1147,27 @@ export function StaffDeploymentPage() {
       {/* Settings drawer (accessible from header) */}
       <SettingsDrawer open={showSettings} onOpenChange={setShowSettings} />
 
-      {/* Hidden PDF rendering container */}
-      <div ref={pdfRef} className="hidden" aria-hidden />
+      {/*
+        PDF rendering container — intentionally off-screen, NOT display:none.
+        html2canvas cannot capture display:none elements; it returns a blank
+        canvas. Positioning far off-screen keeps it invisible to the user while
+        remaining fully renderable. The explicit 794 px width matches A4 at
+        96 dpi so html2canvas captures a full page rather than a mobile-width
+        sliver that gets stretched into the PDF.
+      */}
+      <div
+        ref={pdfRef}
+        aria-hidden
+        style={{
+          position:        'fixed',
+          left:            '-9999px',
+          top:             '0',
+          width:           '794px',
+          backgroundColor: '#fff',
+          pointerEvents:   'none',
+          zIndex:          -1,
+        }}
+      />
     </div>
   );
 }
