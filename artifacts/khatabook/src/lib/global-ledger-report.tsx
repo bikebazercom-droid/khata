@@ -2,6 +2,7 @@ import { forwardRef, Fragment } from 'react';
 import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
+import { billImageSrc } from '@/lib/billImageStorage';
 
 export interface GlobalReportEntry {
   id: string;
@@ -12,6 +13,7 @@ export interface GlobalReportEntry {
   amount: number;
   description: string;
   billReference: string | null;
+  billImage: string | null;
   dueDate: string | null;
   createdAt: string | Date;
 }
@@ -152,6 +154,7 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
                 <th style={{ textAlign: 'left', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>তারিখ</th>
                 <th style={{ textAlign: 'left', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>কাস্টমার/সাপ্লায়ার</th>
                 <th style={{ textAlign: 'left', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ডিটেলস</th>
+                <th style={{ textAlign: 'center', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER, width: '52px' }}>বিল</th>
                 <th style={{ textAlign: 'right', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ডেবিট (-)</th>
                 <th style={{ textAlign: 'right', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ক্রেডিট (+)</th>
               </tr>
@@ -159,7 +162,7 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
             <tbody>
               {monthGroups.length === 0 && (
                 <tr>
-                  <td colSpan={5} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', border: GRID_BORDER }}>
+                  <td colSpan={6} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', border: GRID_BORDER }}>
                     এই সময়কালে কোনো লেনদেন নেই
                   </td>
                 </tr>
@@ -168,7 +171,7 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
                 <Fragment key={group.key}>
                   <tr key={`${group.key}-header`}>
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       style={{
                         padding: groupIndex === 0 ? '4px 2px 8px' : '18px 2px 8px',
                         color: '#0f172a',
@@ -183,6 +186,7 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
                   </tr>
                   {group.entries.map((entry, i) => {
                     const isGave = entry.type === 'YOU_GAVE';
+                    const imgSrc = billImageSrc(entry.billImage);
                     return (
                       <tr key={entry.id} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#fafafa' }}>
                         <td style={{ padding: '7px 10px', border: GRID_BORDER, whiteSpace: 'nowrap' }}>
@@ -195,6 +199,16 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
                           ) : null}
                         </td>
                         <td style={{ padding: '7px 10px', border: GRID_BORDER, color: '#334155' }}>{entryDetails(entry)}</td>
+                        <td style={{ padding: '4px 6px', border: GRID_BORDER, textAlign: 'center', width: '52px' }}>
+                          {imgSrc ? (
+                            <img
+                              src={imgSrc}
+                              alt="বিল"
+                              crossOrigin="anonymous"
+                              style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '3px', display: 'inline-block' }}
+                            />
+                          ) : null}
+                        </td>
                         <td
                           style={{
                             padding: '7px 10px',
@@ -223,7 +237,7 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
                     );
                   })}
                   <tr key={`${group.key}-total`} style={{ backgroundColor: '#f8fafc' }}>
-                    <td colSpan={3} style={{ padding: '8px 10px', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
+                    <td colSpan={4} style={{ padding: '8px 10px', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
                       {group.label.split(' ')[0]} মোট
                     </td>
                     <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
