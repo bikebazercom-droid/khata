@@ -379,6 +379,33 @@ export function TransactionEntryScreen({
       // just interrupt fast, repeated M+/M- entry.
       return;
     }
+    // Guard: prevent a second decimal point in the current operand.
+    //
+    // The expression is a sequence of operands separated by operators
+    // (+, -, *, /). We slice off everything after the last operator to get
+    // the "current operand" being typed, and block "." if that segment
+    // already contains one — matching the behaviour of every physical
+    // calculator and preventing unparseable strings like "23.4.5".
+    //
+    // Example: expression = "100+23.4", user presses "."
+    //   lastOpIdx = 3  (the "+")
+    //   currentOperand = "23.4"  → already has "." → block, return "100+23.4"
+    if (value === '.') {
+      setHasInteracted(true);
+      setExpression((prev) => {
+        const lastOpIdx = Math.max(
+          prev.lastIndexOf('+'),
+          prev.lastIndexOf('-'),
+          prev.lastIndexOf('*'),
+          prev.lastIndexOf('/'),
+        );
+        const currentOperand = prev.slice(lastOpIdx + 1);
+        if (currentOperand.includes('.')) return prev; // already has decimal
+        return prev + '.';
+      });
+      return;
+    }
+
     // Any numeric/operator key press permanently unlocks the metadata panel.
     setHasInteracted(true);
     setExpression((prev) => prev + value);

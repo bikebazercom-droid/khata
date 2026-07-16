@@ -6,8 +6,12 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatCurrency(amount: number) {
+  // minimumFractionDigits:0 → whole numbers show without ".00"
+  // maximumFractionDigits:2 → decimals are preserved up to 2 places
+  // (the previous maximumFractionDigits:0 was silently rounding 2332.82 → 2333)
   return `৳${new Intl.NumberFormat('en-IN', {
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
   }).format(amount)}`
 }
 
@@ -31,7 +35,11 @@ export function formatCurrency(amount: number) {
  * fails to evaluate to a finite number (including division by zero).
  */
 export function evaluateCalculatorExpression(raw: string): number | null {
-  const trimmed = raw.replace(/\s+/g, '');
+  // Strip whitespace, then normalize any trailing decimal point so that
+  // "2332." evaluates as "2332" rather than returning null mid-keystroke.
+  // Without this the live display snaps to ৳0 the moment the user presses
+  // "." and before they type the first decimal digit.
+  const trimmed = raw.replace(/\s+/g, '').replace(/\.(?=[+\-*/]|$)/g, '');
   if (!trimmed) return null;
 
   // Only allow digits, ., %, and the four basic operators.
