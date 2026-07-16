@@ -7,34 +7,34 @@ export function LandingPage() {
 
   return (
     <div className="h-[100dvh] w-full bg-slate-200/60 flex justify-center overflow-hidden">
-      <div className="w-full max-w-lg h-[100dvh] bg-[#f8fafc] flex flex-col relative sm:shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
+      <div className="w-full max-w-lg h-[100dvh] bg-white flex flex-col relative sm:shadow-2xl overflow-hidden">
+        {/* Hero — dark navy brand gradient */}
+        <div className="flex-1 flex flex-col items-center justify-center px-8 text-center bg-gradient-to-b from-[#1B3A6B] to-[#2a5298]">
           <img
-            src={`${basePath}/logo.svg`}
+            src={`${basePath}/logo-icon.svg`}
             alt="ডিজিটাল খাতা"
-            className="w-24 h-24 mb-6"
+            className="w-28 h-28 mb-6 drop-shadow-xl"
           />
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">
-            ডিজিটাল খাতা
+          <h1 className="text-4xl font-extrabold text-white mb-1 tracking-tight">
+            Digital Khata
           </h1>
-          <p className="text-slate-500 text-base mb-1">Digital Khata</p>
-          <p className="text-slate-400 text-sm mt-3 max-w-xs leading-relaxed">
+          <p className="text-white/80 font-semibold text-xl mb-4">ডিজিটাল খাতা</p>
+          <p className="text-white/60 text-sm max-w-xs leading-relaxed">
             আপনার ব্যবসার হিসাব রাখুন সহজেই — কাস্টমার, সাপ্লায়ার, বকেয়া, এবং লেনদেন এক জায়গায়।
           </p>
         </div>
 
         {/* Actions */}
-        <div className="px-6 pb-10 space-y-3">
+        <div className="px-6 py-8 space-y-3 bg-white border-t border-slate-100">
           <button
             onClick={() => setLocation('/sign-in')}
-            className="w-full bg-slate-900 text-white rounded-xl py-3.5 text-base font-semibold hover:bg-slate-800 transition-colors"
+            className="w-full bg-[#1B3A6B] text-white rounded-xl py-3.5 text-base font-bold hover:bg-[#24488A] transition-colors"
           >
             Sign in
           </button>
           <button
             onClick={() => setLocation('/sign-up')}
-            className="w-full bg-white border border-slate-200 text-slate-700 rounded-xl py-3.5 text-base font-semibold hover:bg-slate-50 transition-colors"
+            className="w-full bg-white border-2 border-[#1B3A6B] text-[#1B3A6B] rounded-xl py-3.5 text-base font-bold hover:bg-blue-50 transition-colors"
           >
             Create account
           </button>

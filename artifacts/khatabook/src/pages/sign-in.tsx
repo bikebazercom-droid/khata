@@ -7,7 +7,19 @@ const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 export function SignInPage() {
   return (
-    <div className="min-h-[100dvh] bg-[#f8fafc] flex flex-col items-center justify-center px-4 py-12">
+    <div className="min-h-[100dvh] bg-gradient-to-b from-[#1B3A6B] to-[#2a5298] flex flex-col items-center justify-center px-4 py-12">
+      {/* Brand logo */}
+      <div className="mb-8 flex flex-col items-center gap-4">
+        <img
+          src={`${basePath}/logo-icon.svg`}
+          alt="ডিজিটাল খাতা আইকন"
+          className="w-24 h-24 drop-shadow-xl"
+        />
+        <div className="text-center">
+          <p className="text-white font-extrabold text-3xl tracking-tight leading-tight">Digital Khata</p>
+          <p className="text-white/80 font-semibold text-lg">ডিজিটাল খাতা</p>
+        </div>
+      </div>
       <div className="w-full max-w-[440px] space-y-6">
         <SignInTabs />
       </div>
@@ -21,13 +33,13 @@ function SignInTabs() {
   return (
     <div>
       {/* Tab bar */}
-      <div className="flex rounded-xl bg-slate-100 p-1 mb-6">
+      <div className="flex rounded-xl bg-white/20 p-1 mb-6">
         <button
           onClick={() => setTab('clerk')}
           className={`flex-1 text-sm font-medium py-2 rounded-lg transition-colors ${
             tab === 'clerk'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700'
+              ? 'bg-white text-[#1B3A6B] shadow-sm font-bold'
+              : 'text-white/80 hover:text-white'
           }`}
         >
           Email / Google
@@ -36,8 +48,8 @@ function SignInTabs() {
           onClick={() => setTab('phone')}
           className={`flex-1 text-sm font-medium py-2 rounded-lg transition-colors ${
             tab === 'phone'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-500 hover:text-slate-700'
+              ? 'bg-white text-[#1B3A6B] shadow-sm font-bold'
+              : 'text-white/80 hover:text-white'
           }`}
         >
           Phone Number
@@ -72,12 +84,12 @@ function ClerkSignIn() {
           footerActionLink: 'text-sky-600',
           footerActionText: 'text-slate-500',
           dividerText: 'text-slate-400',
-          formButtonPrimary: 'bg-slate-900 hover:bg-slate-800',
-          formFieldInput: 'border-slate-200 focus:border-sky-500',
+          formButtonPrimary: 'bg-[#1B3A6B] hover:bg-[#24488A]',
+          formFieldInput: 'border-slate-200 focus:border-[#1B3A6B]',
         },
         variables: {
-          colorPrimary: '#0f172a',
-          colorForeground: '#0f172a',
+          colorPrimary: '#1B3A6B',
+          colorForeground: '#1B3A6B',
           colorMutedForeground: '#64748b',
           colorDanger: '#ef4444',
           colorBackground: '#ffffff',
@@ -131,13 +143,6 @@ function PhoneSignIn() {
 
   return (
     <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8">
-      <div className="flex justify-center mb-6">
-        <img
-          src={`${basePath}/logo.svg`}
-          alt="ডিজিটাল খাতা"
-          className="w-14 h-14"
-        />
-      </div>
 
       {step === 'phone' ? (
         <>

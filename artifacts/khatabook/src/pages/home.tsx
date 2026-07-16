@@ -7,7 +7,7 @@ import {
   PartyRole,
   DueFilter,
 } from '@workspace/api-client-react';
-import { Search, Plus, Settings, User, ChevronRight, UserPlus2, SlidersHorizontal, FileText, Users, BookOpen, Pencil, UserCircle2 } from 'lucide-react';
+import { Search, Plus, Settings, User, ChevronRight, UserPlus2, SlidersHorizontal, FileText, Users, Pencil, UserCircle2 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { AddPartyModal } from '@/components/modals/add-party-modal';
@@ -35,12 +35,14 @@ export function HomeView() {
   return (
     <div className="flex flex-col h-full w-full bg-white relative">
       {/* Fixed deep-blue top header */}
-      <div className="shrink-0 bg-[#075E9F] pb-9 z-10">
+      <div className="shrink-0 bg-[#1B3A6B] pb-9 z-10">
         <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-[calc(1rem+var(--safe-top))]">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-white/15 text-white flex items-center justify-center shrink-0">
-              <BookOpen className="w-[18px] h-[18px]" />
-            </div>
+            <img
+              src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/logo-icon.svg`}
+              alt="ডিজিটাল খাতা"
+              className="w-9 h-9 shrink-0"
+            />
             <h1 className="font-extrabold tracking-tight text-[15px] text-white truncate max-w-[120px]">
               {settings?.storeName || 'ডিজিটাল খাতা'}
             </h1>
@@ -251,7 +253,7 @@ export function HomeView() {
       {/* Floating FAB */}
       <button
         onClick={() => setIsAddPartyOpen(true)}
-        className="absolute right-4 bottom-[76px] z-20 flex items-center gap-2 bg-[#e0195b] text-white font-bold text-sm pl-4 pr-5 py-3.5 rounded-full shadow-[0_8px_24px_-6px_rgba(224,25,91,0.6)] active:scale-95 transition-all"
+        className="absolute right-4 bottom-[76px] z-20 flex items-center gap-2 bg-[#F5A623] text-white font-bold text-sm pl-4 pr-5 py-3.5 rounded-full shadow-[0_8px_24px_-6px_rgba(245,166,35,0.55)] active:scale-95 transition-all"
       >
         <Plus className="w-4 h-4" />
         {role === PartyRole.CUSTOMER ? 'কাস্টমার যোগ করুন' : 'সাপ্লায়ার যোগ করুন'}
@@ -259,7 +261,7 @@ export function HomeView() {
 
       {/* Sticky bottom nav */}
       <div className="shrink-0 flex items-stretch border-t border-slate-100 bg-white z-10 pb-[var(--safe-bottom)]">
-        <button className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[#0b57d0]">
+        <button className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[#1B3A6B]">
           <Users className="w-5 h-5" />
           <span className="text-[10px] font-bold">পার্টিস</span>
         </button>
