@@ -201,6 +201,27 @@ export const CreateLedgerEntryResponse = zod.object({
 })
 
 
+export const PatchLedgerEntryParams = zod.object({
+  "partyId": zod.coerce.string(),
+  "entryId": zod.coerce.string()
+})
+
+export const PatchLedgerEntryBody = zod.object({
+  "billImage": zod.string().describe('Cloud storage object path to attach to the entry (e.g. /objects/uploads/uuid).')
+})
+
+export const PatchLedgerEntryResponse = zod.object({
+  "id": zod.string(),
+  "partyId": zod.string(),
+  "type": zod.enum(['YOU_GAVE', 'YOU_GOT']),
+  "amount": zod.number(),
+  "description": zod.string(),
+  "billReference": zod.string().nullable(),
+  "billImage": zod.string().nullable(),
+  "dueDate": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})
+
 /**
  * Supports filtering by transaction date range and a free-text search across party name, phone, and entry description. Used by the global transaction report screen.
  * @summary List ledger entries across all parties

@@ -20,6 +20,7 @@ export type EventType =
   | "party.deleted"
   | "ledger.created"
   | "ledger.deleted"
+  | "ledger.updated"
   | "settings.updated";
 
 export interface BusinessEvent {

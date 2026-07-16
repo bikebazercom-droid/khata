@@ -19,6 +19,7 @@ import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic'
 import { CameraCaptureModal } from '@/components/modals/camera-capture-modal';
 import { scanDocument } from '@/lib/document-scan';
 import { uploadBillImage, billImageSrc, type BillImageUploadResult } from '@/lib/billImageStorage';
+import { savePendingUpload } from '@/lib/pendingUploads';
 
 type KeyKind = 'digit' | 'muted' | 'accent';
 type KeyDef = { label: string; value: string; kind: KeyKind; span?: number };
@@ -223,6 +224,10 @@ export function TransactionEntryScreen({
   const [isScanning, setIsScanning] = useState(false);
   // Local display copy of the bill image (base64 while uploading, then objectPath after save).
   const [billImage, setBillImage] = useState<string | null>(null);
+  // Mirrors the raw base64 data URL set at image capture time so handleSave
+  // can access it synchronously even after onClose() clears component state.
+  // Needed to persist a retry record when the upload fails.
+  const pendingBase64Ref = useRef<string | null>(null);
   // Background upload promise started as soon as the image is scanned/selected.
   // By the time the user fills in the amount and presses save, the upload is
   // almost always already complete — so awaiting it in handleSave adds no
@@ -270,6 +275,8 @@ export function TransactionEntryScreen({
       const scanned = await scanDocument(dataUrl);
       // Show the scanned image as a local thumbnail immediately.
       setBillImage(scanned);
+      // Keep the raw base64 available for a retry record if the upload fails.
+      pendingBase64Ref.current = scanned;
       // Start the background upload right away so that by the time the user
       // fills in the amount and presses save, the upload is likely complete.
       uploadPromiseRef.current = uploadBillImage(scanned);
@@ -278,6 +285,7 @@ export function TransactionEntryScreen({
       // with an error toast — they can still attach it or retake it.
       console.error('বিল স্ক্যান করা যায়নি, মূল ছবি ব্যবহার করা হচ্ছে:', err);
       setBillImage(dataUrl);
+      pendingBase64Ref.current = dataUrl;
       uploadPromiseRef.current = uploadBillImage(dataUrl);
     } finally {
       setIsScanning(false);
@@ -395,9 +403,12 @@ export function TransactionEntryScreen({
     clearMemory();
     onClose();
 
-    // Capture the pending upload promise before clearing any state.
+    // Capture refs before clearing any state so the async block below can
+    // access them even after onClose() unmounts or resets the component.
     const pendingUpload = uploadPromiseRef.current;
+    const capturedBase64 = pendingBase64Ref.current;
     uploadPromiseRef.current = null;
+    pendingBase64Ref.current = null;
 
     // If an image was attached, await the background upload (started the
     // moment the image was scanned — well before this save press) before
@@ -405,41 +416,56 @@ export function TransactionEntryScreen({
     // the mutation fires synchronously in the same microtask.
     void (async () => {
       let objectPath: string | undefined;
+      let uploadFailed = false;
 
       if (pendingUpload) {
         const result = await pendingUpload;
         if (result.ok) {
           objectPath = result.objectPath;
         } else {
+          uploadFailed = true;
           // Inform the user — the entry will still be saved, just without
-          // the photo attached.
+          // the photo attached. The image will be retried automatically when
+          // connectivity is restored.
           if (result.reason === 'url-request-failed') {
             toast.warning('বিল ছবি সংযুক্ত হয়নি', {
-              description: 'সার্ভার সংযোগ করা যায়নি। এন্ট্রি সংরক্ষিত হয়েছে, তবে ছবিটি যোগ হয়নি।',
+              description: 'সংযোগ না থাকায় ছবিটি এখন আপলোড হয়নি। ইন্টারনেট ফিরলে স্বয়ংক্রিয়ভাবে যোগ হবে।',
               duration: 6000,
             });
           } else {
             toast.warning('বিল ছবি আপলোড ব্যর্থ হয়েছে', {
-              description: 'নেটওয়ার্ক সমস্যার কারণে ছবিটি সংরক্ষণ করা যায়নি। এন্ট্রি সংরক্ষিত হয়েছে।',
+              description: 'নেটওয়ার্ক সমস্যার কারণে ছবিটি সংরক্ষণ করা যায়নি। ইন্টারনেট ফিরলে স্বয়ংক্রিয়ভাবে চেষ্টা হবে।',
               duration: 6000,
             });
           }
         }
       }
 
-      createEntry.mutate({
-        partyId,
-        data: {
-          type,
-          amount: finalAmount,
-          description,
-          billReference: undefined,
-          // Store the objectPath (e.g. "/objects/uploads/uuid") returned by
-          // cloud storage, NOT the local base64 data URL.
-          billImage: objectPath,
-          dueDate: dueDate || undefined,
-        },
-      });
+      try {
+        const entry = await createEntry.mutateAsync({
+          partyId,
+          data: {
+            type,
+            amount: finalAmount,
+            description,
+            billReference: undefined,
+            // Store the objectPath (e.g. "/objects/uploads/uuid") returned by
+            // cloud storage, NOT the local base64 data URL.
+            billImage: objectPath,
+            dueDate: dueDate || undefined,
+          },
+        });
+
+        // If the upload failed but we have the base64 data and a real entry ID,
+        // persist a retry record so the background service can re-attempt the
+        // upload the next time connectivity is restored.
+        if (uploadFailed && capturedBase64 && entry?.id) {
+          savePendingUpload({ entryId: entry.id, partyId, base64: capturedBase64 });
+        }
+      } catch {
+        // The mutation failed — optimistic rollback is handled by onError above.
+        // Do not save a pending upload record since the entry itself wasn't created.
+      }
     })();
   }, [memoryHistory.length, memoryValue, expression, createEntry, partyId, type, description, dueDate, clearMemory, onClose]);
 

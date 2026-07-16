@@ -14,6 +14,9 @@ import {
   CreateLedgerEntryParams,
   CreateLedgerEntryBody,
   CreateLedgerEntryResponse,
+  PatchLedgerEntryParams,
+  PatchLedgerEntryBody,
+  PatchLedgerEntryResponse,
   SendPaymentReminderParams,
   SendPaymentReminderResponse,
   DeletePartyParams,
@@ -263,6 +266,73 @@ router.post(
       CreateLedgerEntryResponse.parse({
         ...entry,
         amount: Number(entry!.amount),
+      }),
+    );
+  },
+);
+
+router.patch(
+  "/parties/:partyId/ledger-entries/:entryId",
+  async (req, res): Promise<void> => {
+    const { businessId } = req as unknown as AuthenticatedRequest;
+    const params = PatchLedgerEntryParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+
+    const body = PatchLedgerEntryBody.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({ error: body.error.message });
+      return;
+    }
+
+    // Verify the party belongs to this business.
+    const [party] = await db
+      .select({ id: partiesTable.id })
+      .from(partiesTable)
+      .where(
+        and(
+          eq(partiesTable.id, params.data.partyId),
+          eq(partiesTable.businessId, businessId),
+        ),
+      );
+
+    if (!party) {
+      res.status(404).json({ error: "Party not found" });
+      return;
+    }
+
+    const [entry] = await db
+      .select()
+      .from(ledgerEntriesTable)
+      .where(
+        and(
+          eq(ledgerEntriesTable.id, params.data.entryId),
+          eq(ledgerEntriesTable.partyId, params.data.partyId),
+        ),
+      );
+
+    if (!entry) {
+      res.status(404).json({ error: "Entry not found" });
+      return;
+    }
+
+    const [updated] = await db
+      .update(ledgerEntriesTable)
+      .set({ billImage: body.data.billImage })
+      .where(eq(ledgerEntriesTable.id, params.data.entryId))
+      .returning();
+
+    broadcast(businessId, {
+      type: "ledger.updated",
+      payload: { partyId: params.data.partyId, entryId: params.data.entryId },
+    });
+
+    res.json(
+      PatchLedgerEntryResponse.parse({
+        ...updated,
+        amount: Number(updated!.amount),
       }),
     );
   },

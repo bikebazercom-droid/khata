@@ -18,6 +18,7 @@ import { SignUpPage } from '@/pages/sign-up';
 import NotFound from '@/pages/not-found';
 import { fetchMe } from '@/lib/phoneAuth';
 import { useRealtimeSync } from '@/lib/useRealtimeSync';
+import { useRetryPendingUploads } from '@/lib/useRetryPendingUploads';
 
 // ─── Clerk setup ──────────────────────────────────────────────────────────────
 
@@ -112,6 +113,9 @@ function RealtimeSyncManager() {
   const { isAuthenticated } = useAppAuth();
   const { setIsOnline } = useConnectionState();
   useRealtimeSync(isAuthenticated, setIsOnline);
+  // Retry any bill image uploads that failed while offline, once connectivity
+  // is restored. Only active when the user is authenticated (API calls need auth).
+  useRetryPendingUploads(isAuthenticated);
   return null;
 }
 
