@@ -22,6 +22,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { ReportPeriodDrawer, type ReportPeriod } from '@/components/modals/report-period-drawer';
 import { GlobalReportDocument, buildGlobalReportFilename } from '@/lib/global-ledger-report';
 import { stampPageNumbers } from '@/lib/ledger-report';
+import { BillImageLightbox } from '@/components/modals/bill-image-lightbox';
+import { billImageSrc } from '@/lib/billImageStorage';
 
 const PERIOD_LABELS: Record<ReportPeriod, string> = {
   ALL: 'সব',
@@ -75,6 +77,7 @@ export function ReportView() {
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
 
   const { startDate: rangeStart, endDate: rangeEnd } = resolveDateRange(period, startDate, endDate);
@@ -264,6 +267,7 @@ export function ReportView() {
           <div className="px-4 space-y-2">
             {entries.map((entry) => {
               const isGave = entry.type === 'YOU_GAVE';
+              const imgSrc = billImageSrc(entry.billImage);
               return (
                 <div
                   key={entry.id}
@@ -274,6 +278,20 @@ export function ReportView() {
                     <p className="text-[11px] font-medium text-slate-400 mt-0.5">
                       {format(new Date(entry.createdAt), 'd MMM yy')} • {format(new Date(entry.createdAt), 'hh:mm a')}
                     </p>
+                    {imgSrc && (
+                      <button
+                        type="button"
+                        onClick={() => setLightboxSrc(imgSrc)}
+                        className="mt-1.5 block active:opacity-70 transition-opacity"
+                        aria-label="বিলের ছবি দেখুন"
+                      >
+                        <img
+                          src={imgSrc}
+                          alt="বিল"
+                          className="w-10 h-10 rounded-md object-cover border border-slate-200"
+                        />
+                      </button>
+                    )}
                   </div>
                   <div className={cn('w-20 h-full flex items-center justify-center py-3', isGave ? 'bg-[#FFF5F5]' : 'bg-white')}>
                     {isGave && <span className="text-sm font-extrabold text-red-700">{formatCurrency(entry.amount)}</span>}
@@ -307,6 +325,8 @@ export function ReportView() {
       </div>
 
       <ReportPeriodDrawer open={isPeriodOpen} onOpenChange={setIsPeriodOpen} value={period} onSelect={setPeriod} />
+
+      {lightboxSrc && <BillImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
     </div>
   );
 }
