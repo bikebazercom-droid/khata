@@ -193,9 +193,21 @@ export async function requireAuth(
   }
 
   // ── 2. Try phone session cookie ──
-  const token = (req as any).cookies?.[COOKIE_NAME];
-  if (token) {
-    const payload = verifyPhoneSession(token);
+  const cookieToken = (req as any).cookies?.[COOKIE_NAME];
+  if (cookieToken) {
+    const payload = verifyPhoneSession(cookieToken);
+    if (payload) {
+      (req as AuthenticatedRequest).userId = payload.userId;
+      (req as AuthenticatedRequest).businessId = payload.businessId;
+      return next();
+    }
+  }
+
+  // ── 3. Try phone session Bearer token (mobile clients) ──
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
+    const bearerToken = authHeader.slice(7);
+    const payload = verifyPhoneSession(bearerToken);
     if (payload) {
       (req as AuthenticatedRequest).userId = payload.userId;
       (req as AuthenticatedRequest).businessId = payload.businessId;

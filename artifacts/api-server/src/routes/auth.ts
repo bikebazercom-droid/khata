@@ -112,17 +112,26 @@ router.post("/auth/phone/verify-otp", async (req: Request, res: Response): Promi
   // JIT provision the user + business.
   const user = await getOrCreatePhoneUser(normalized);
 
-  issuePhoneSession(res, {
+  const sessionPayload = {
     userId: user.id,
     businessId: user.businessId,
     phone: normalized,
-  });
+  };
+
+  issuePhoneSession(res, sessionPayload);
+
+  // Also return the JWT token in the response body so mobile clients
+  // (which have no cookie jar) can store it in SecureStore and attach
+  // it as a Bearer token on subsequent API requests.
+  const jwt = await import("jsonwebtoken");
+  const token = jwt.sign(sessionPayload, process.env.SESSION_SECRET!, { expiresIn: "30d" });
 
   res.json({
     success: true,
     userId: user.id,
     businessId: user.businessId,
     phone: normalized,
+    token,
   });
 });
 

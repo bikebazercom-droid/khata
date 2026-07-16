@@ -13,14 +13,21 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import * as SecureStore from 'expo-secure-store';
 import { useGetBusinessSettings, useUpdateBusinessSettings } from '@workspace/api-client-react';
 import { useColors } from '@/hooks/useColors';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAuth, useClerk } from '@clerk/expo';
+import { useRouter } from 'expo-router';
 
 export default function SettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
+  const router = useRouter();
+
+  const { isSignedIn } = useAuth();
+  const { signOut } = useClerk();
 
   const { data: settings, isLoading } = useGetBusinessSettings();
   const updateSettings = useUpdateBusinessSettings();
@@ -45,6 +52,36 @@ export default function SettingsScreen() {
     } catch {
       Alert.alert('Error', 'Could not save settings. Please try again.');
     }
+  }
+
+  async function handleLogout() {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              qc.clear();
+              if (isSignedIn) {
+                await signOut();
+              }
+              // Also clear phone session token if present
+              await SecureStore.deleteItemAsync('phone_session_token').catch(() => {});
+              // Clear auth token getter
+              const { setAuthTokenGetter } = await import('@workspace/api-client-react');
+              setAuthTokenGetter(null);
+              router.replace('/(auth)/sign-in' as any);
+            } catch (err: any) {
+              Alert.alert('Error', err?.message ?? 'Could not sign out');
+            }
+          },
+        },
+      ],
+    );
   }
 
   const s = StyleSheet.create({
@@ -100,6 +137,15 @@ export default function SettingsScreen() {
     saveBtnText: { color: colors.primaryForeground, fontSize: 16, fontFamily: 'Inter_600SemiBold' },
     cancelBtn: { padding: 14, alignItems: 'center', marginTop: 4 },
     cancelText: { color: colors.mutedForeground, fontSize: 15, fontFamily: 'Inter_500Medium' },
+    logoutBtn: {
+      borderRadius: colors.radius,
+      borderWidth: 1,
+      borderColor: '#ef4444',
+      padding: 16,
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    logoutText: { color: '#ef4444', fontSize: 16, fontFamily: 'Inter_600SemiBold' },
     aboutCard: {
       backgroundColor: colors.card,
       borderRadius: colors.radius,
@@ -168,6 +214,14 @@ export default function SettingsScreen() {
             </TouchableOpacity>
           </>
         )}
+
+        <Text style={s.sectionLabel}>ACCOUNT</Text>
+        <View style={s.card}>
+          <TouchableOpacity style={s.row} onPress={handleLogout} activeOpacity={0.7}>
+            <Text style={[s.rowLabel, { color: '#ef4444' }]}>Sign Out</Text>
+            <Feather name="log-out" size={18} color="#ef4444" />
+          </TouchableOpacity>
+        </View>
 
         <Text style={s.sectionLabel}>ABOUT</Text>
         <View style={s.aboutCard}>
