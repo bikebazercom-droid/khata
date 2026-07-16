@@ -82,9 +82,9 @@ router.delete("/staff/personnel/:id", async (req, res): Promise<void> => {
 
 router.post("/staff/personnel/:id/deploy", async (req, res): Promise<void> => {
   const { businessId } = req as unknown as AuthenticatedRequest;
-  const destination = req.body?.destination;
-  if (typeof destination !== "string" || !VALID_DESTINATIONS.has(destination)) {
-    res.status(400).json({ error: "Invalid destination" });
+  const destination = typeof req.body?.destination === "string" ? req.body.destination.trim() : "";
+  if (!destination || destination.length > 200) {
+    res.status(400).json({ error: "destination must be 1-200 characters" });
     return;
   }
 
@@ -133,9 +133,9 @@ router.post("/staff/personnel/:id/deploy", async (req, res): Promise<void> => {
 
 router.patch("/staff/logs/:id", async (req, res): Promise<void> => {
   const { businessId } = req as unknown as AuthenticatedRequest;
-  const destination = req.body?.destination;
-  if (typeof destination !== "string" || !VALID_DESTINATIONS.has(destination)) {
-    res.status(400).json({ error: "Invalid destination" });
+  const destination = typeof req.body?.destination === "string" ? req.body.destination.trim() : "";
+  if (!destination || destination.length > 200) {
+    res.status(400).json({ error: "destination must be 1-200 characters" });
     return;
   }
 

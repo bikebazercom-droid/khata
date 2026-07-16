@@ -21,6 +21,7 @@ import {
   ArrowDown,
   Pencil,
   Clock,
+  SendHorizontal,
   Settings,
 } from 'lucide-react';
 import { format, isToday, parseISO, startOfMonth, endOfMonth, subMonths } from 'date-fns';
@@ -114,6 +115,8 @@ export function StaffDeploymentPage() {
 
   // ── deploy modal ───────────────────────────────────────────────────────────
   const [deployTarget, setDeployTarget] = useState<StaffMember | null>(null);
+  const [customDest, setCustomDest] = useState('');
+  const [customEditDest, setCustomEditDest] = useState('');
 
   // ── add staff ──────────────────────────────────────────────────────────────
   const [showAdd, setShowAdd] = useState(false);
@@ -190,6 +193,7 @@ export function StaffDeploymentPage() {
       qc.invalidateQueries({ queryKey: ['staff-personnel'] });
       qc.invalidateQueries({ queryKey: ['staff-logs'] });
       setDeployTarget(null);
+      setCustomDest('');
       toast.success('ডিউটি লগ করা হয়েছে');
     },
     onError: () => toast.error('ডিউটি লগ করতে ব্যর্থ হয়েছে'),
@@ -225,6 +229,7 @@ export function StaffDeploymentPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['staff-logs'] });
       setEditLog(null);
+      setCustomEditDest('');
       toast.success('ডিউটি লোকেশন আপডেট হয়েছে');
     },
     onError: () => toast.error('আপডেট করতে ব্যর্থ হয়েছে'),
@@ -399,8 +404,11 @@ export function StaffDeploymentPage() {
                     </div>
                   </button>
                 ) : (
-                  /* Queue member card */
-                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  /* Queue member card — tappable for manual override deploy */
+                  <div
+                    onClick={() => setDeployTarget(member)}
+                    className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden cursor-pointer active:scale-[0.98] transition-all select-none"
+                  >
                     <div className="flex items-center gap-3 px-4 py-3">
                       <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
                         <span className="text-slate-600 font-bold text-[13px]">
@@ -409,14 +417,20 @@ export function StaffDeploymentPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-slate-800 text-[14px] truncate">{member.name}</p>
-                        <p className="text-[11px] text-slate-400 font-medium">#{idx + 1} — অপেক্ষারত</p>
+                        <p className="text-[11px] text-slate-400 font-medium">
+                          #{idx + 1} —{' '}
+                          <span className="text-[#1B3A6B]/60 font-semibold">ট্যাপ করে ম্যানুয়াল ডিউটি দিন</span>
+                        </p>
                       </div>
-                      <button
-                        onClick={() => setDeleteTarget(member)}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-400 hover:bg-red-50 active:scale-95 transition-all"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={e => { e.stopPropagation(); setDeleteTarget(member); }}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-400 hover:bg-red-50 active:scale-95 transition-all"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                        <MapPin className="w-3.5 h-3.5 text-slate-300 mr-0.5" />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -571,7 +585,7 @@ export function StaffDeploymentPage() {
       {deployTarget && (
         <div
           className="fixed inset-0 bg-black/50 z-50 flex items-end"
-          onClick={() => !deployMutation.isPending && setDeployTarget(null)}
+          onClick={() => { if (!deployMutation.isPending) { setDeployTarget(null); setCustomDest(''); } }}
         >
           <div
             className="w-full bg-white rounded-t-3xl overflow-hidden shadow-2xl"
@@ -598,11 +612,11 @@ export function StaffDeploymentPage() {
             </div>
 
             {/* Destination grid */}
-            <div className="px-5 py-4">
+            <div className="px-5 pt-4 pb-3">
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
                 গন্তব্য নির্বাচন করুন
               </p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {DESTINATIONS.map(dest => {
                   const colors = DEST_COLORS[dest];
                   return (
@@ -611,12 +625,12 @@ export function StaffDeploymentPage() {
                       disabled={deployMutation.isPending}
                       onClick={() => deployMutation.mutate({ id: deployTarget.id, destination: dest })}
                       className={cn(
-                        'flex items-center gap-2.5 px-4 py-3.5 rounded-2xl border-2 font-bold text-[14px] transition-all active:scale-[0.96]',
+                        'flex items-center justify-center gap-1.5 px-2 py-3 rounded-2xl border-2 font-bold text-[13px] transition-all active:scale-[0.96]',
                         colors.bg, colors.text, colors.border,
                         deployMutation.isPending && 'opacity-50 cursor-not-allowed',
                       )}
                     >
-                      <MapPin className="w-4 h-4 shrink-0" />
+                      <MapPin className="w-3.5 h-3.5 shrink-0" />
                       {dest}
                     </button>
                   );
@@ -624,8 +638,38 @@ export function StaffDeploymentPage() {
               </div>
             </div>
 
+            {/* Custom destination input */}
+            <div className="px-5 pb-4 pt-2 border-t border-slate-100">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                নতুন গন্তব্য লিখুন / এডিট করুন
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="যেমন: রংপুর, কুমিল্লা শাখা, হেড অফিস…"
+                  value={customDest}
+                  onChange={e => setCustomDest(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && customDest.trim() && !deployMutation.isPending) {
+                      deployMutation.mutate({ id: deployTarget.id, destination: customDest.trim() });
+                    }
+                  }}
+                  className="flex-1 rounded-xl border-slate-200 text-[14px] font-medium"
+                />
+                <Button
+                  disabled={!customDest.trim() || deployMutation.isPending}
+                  onClick={() => deployMutation.mutate({ id: deployTarget.id, destination: customDest.trim() })}
+                  className="bg-[#1B3A6B] hover:bg-[#243E72] font-bold px-4 shrink-0"
+                >
+                  {deployMutation.isPending
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <SendHorizontal className="w-4 h-4" />
+                  }
+                </Button>
+              </div>
+            </div>
+
             {/* Safety padding */}
-            <div className="pb-[calc(1rem+var(--safe-bottom,0px))]" />
+            <div className="pb-[calc(0.5rem+var(--safe-bottom,0px))]" />
           </div>
         </div>
       )}
@@ -708,7 +752,7 @@ export function StaffDeploymentPage() {
       {editLog && (
         <div
           className="fixed inset-0 bg-black/50 z-50 flex items-end"
-          onClick={() => !editLogMutation.isPending && setEditLog(null)}
+          onClick={() => { if (!editLogMutation.isPending) { setEditLog(null); setCustomEditDest(''); } }}
         >
           <div
             className="w-full bg-white rounded-t-3xl overflow-hidden shadow-2xl"
@@ -750,11 +794,11 @@ export function StaffDeploymentPage() {
             </div>
 
             {/* New destination picker */}
-            <div className="px-5 py-4">
+            <div className="px-5 pt-4 pb-3">
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
                 নতুন লোকেশন বেছে নিন
               </p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {DESTINATIONS.map(dest => {
                   const colors = DEST_COLORS[dest];
                   const isCurrent = dest === editLog.destination;
@@ -764,16 +808,16 @@ export function StaffDeploymentPage() {
                       disabled={editLogMutation.isPending || isCurrent}
                       onClick={() => editLogMutation.mutate({ id: editLog.id, destination: dest })}
                       className={cn(
-                        'flex items-center gap-2.5 px-4 py-3.5 rounded-2xl border-2 font-bold text-[14px] transition-all active:scale-[0.96] relative',
+                        'flex items-center justify-center gap-1.5 px-2 py-3 rounded-2xl border-2 font-bold text-[13px] transition-all active:scale-[0.96] relative',
                         colors.bg, colors.text, colors.border,
                         isCurrent && 'opacity-40 cursor-not-allowed',
                         editLogMutation.isPending && !isCurrent && 'opacity-60 cursor-not-allowed',
                       )}
                     >
-                      <MapPin className="w-4 h-4 shrink-0" />
+                      <MapPin className="w-3.5 h-3.5 shrink-0" />
                       {dest}
                       {isCurrent && (
-                        <span className="absolute top-1 right-1.5 text-[9px] font-bold opacity-60">বর্তমান</span>
+                        <span className="absolute top-0.5 right-1 text-[9px] font-bold opacity-60">বর্তমান</span>
                       )}
                     </button>
                   );
@@ -781,8 +825,38 @@ export function StaffDeploymentPage() {
               </div>
             </div>
 
+            {/* Custom destination input */}
+            <div className="px-5 pb-4 pt-2 border-t border-slate-100">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                নতুন গন্তব্য লিখুন / এডিট করুন
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="যেকোনো শহর, শাখা বা ঠিকানা…"
+                  value={customEditDest}
+                  onChange={e => setCustomEditDest(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && customEditDest.trim() && !editLogMutation.isPending) {
+                      editLogMutation.mutate({ id: editLog.id, destination: customEditDest.trim() });
+                    }
+                  }}
+                  className="flex-1 rounded-xl border-slate-200 text-[14px] font-medium"
+                />
+                <Button
+                  disabled={!customEditDest.trim() || editLogMutation.isPending}
+                  onClick={() => editLogMutation.mutate({ id: editLog.id, destination: customEditDest.trim() })}
+                  className="bg-[#1B3A6B] hover:bg-[#243E72] font-bold px-4 shrink-0"
+                >
+                  {editLogMutation.isPending
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <SendHorizontal className="w-4 h-4" />
+                  }
+                </Button>
+              </div>
+            </div>
+
             {/* Safety padding */}
-            <div className="pb-[calc(1rem+var(--safe-bottom,0px))]" />
+            <div className="pb-[calc(0.5rem+var(--safe-bottom,0px))]" />
           </div>
         </div>
       )}
