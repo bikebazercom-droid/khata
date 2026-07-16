@@ -1,0 +1,201 @@
+Hey Agent, please upgrade the "handleDownloadTodayJPG" function to not only download the image, but ALSO trigger the device's native sharing sheet (using the Web Share API) so the user can directly send/share the generated JPG image to WhatsApp in one click.
+
+Please replace the entire "handleDownloadTodayJPG" function with this 100% working implementation:
+
+```javascript
+const handleDownloadTodayJPG = () => {
+  // 1. Target today's active duty list
+  const todayLogs = dutyLogs || []; 
+  if (todayLogs.length === 0) {
+    alert("আজকে ডিউটিতে যাওয়ার কোনো তথ্য পাওয়া যায়নি!");
+    return;
+  }
+
+  // 2. Create a clean, isolated off-screen card container
+  const imgContainer = document.createElement('div');
+  imgContainer.id = 'temp-jpg-export-container';
+  imgContainer.style.position = 'absolute';
+  imgContainer.style.left = '-9999px';
+  imgContainer.style.top = '-9999px';
+  imgContainer.style.width = '450px'; // Optimized width for mobile sharing
+  imgContainer.style.padding = '30px';
+  imgContainer.style.backgroundColor = '#ffffff';
+  imgContainer.style.borderRadius = '16px';
+  imgContainer.style.boxSizing = 'border-box';
+
+  const style = document.createElement('style');
+  style.innerHTML = `
+    @import url('[https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700&display=swap](https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700&display=swap)');
+    #temp-jpg-export-container {
+      font-family: 'Noto Sans Bengali', Arial, sans-serif !important;
+    }
+    .img-header {
+      text-align: center;
+      border-bottom: 2px dashed #d1d5db;
+      padding-bottom: 15px;
+      margin-bottom: 20px;
+    }
+    .img-title {
+      font-size: 22px;
+      font-weight: bold;
+      color: #1e3a8a;
+      margin: 0;
+    }
+    .img-subtitle {
+      font-size: 13px;
+      color: #4b5563;
+      margin-top: 6px;
+    }
+    .staff-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .staff-row:last-child {
+      border-bottom: none;
+    }
+    .staff-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .avatar-index {
+      background-color: #eff6ff;
+      color: #1e40af;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+    }
+    .staff-name {
+      font-size: 16px;
+      font-weight: bold;
+      color: #1f2937;
+    }
+    .dest-badge {
+      font-size: 14px;
+      font-weight: bold;
+      color: #047857;
+      background-color: #ecfdf5;
+      padding: 4px 12px;
+      border-radius: 9999px;
+    }
+    .time-badge {
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 3px;
+      text-align: right;
+    }
+    .footer-note {
+      text-align: center;
+      margin-top: 25px;
+      font-size: 11px;
+      color: #9ca3af;
+      border-top: 1px solid #f3f4f6;
+      padding-top: 10px;
+    }
+  `;
+  imgContainer.appendChild(style);
+
+  const todayDate = new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
+  let rowsHtml = '';
+  
+  todayLogs.forEach((log, index) => {
+    const name = log.name || log.staffName || "অজানা স্টাফ";
+    const time = log.time || "07:17 PM";
+    const destination = log.destination || log.location || "কোনো গন্তব্য নেই";
+    
+    rowsHtml += `
+      <div class="staff-row">
+        <div class="staff-info">
+          <div class="avatar-index">${index + 1}</div>
+          <div class="staff-name">${name}</div>
+        </div>
+        <div>
+          <div class="dest-badge">📍 ${destination}</div>
+          <div class="time-badge">🕒 ${time}</div>
+        </div>
+      </div>
+    `;
+  });
+
+  imgContainer.innerHTML += `
+    <div class="img-header">
+      <div class="img-title">আজকের ডিউটি তালিকা</div>
+      <div class="img-subtitle">তারিখ: ${todayDate} | মোট ডিউটি: ${todayLogs.length} জন</div>
+    </div>
+    <div>
+      ${rowsHtml}
+    </div>
+    <div class="footer-note">
+      ডিজিটাল খাতা • সরাসরি হোয়াটসঅ্যাপে শেয়ার করুন
+    </div>
+  `;
+
+  document.body.appendChild(imgContainer);
+
+  // 3. Render Canvas and trigger Native Share API
+  setTimeout(() => {
+    import('html2canvas').then((module) => {
+      const html2canvas = module.default;
+      html2canvas(imgContainer, {
+        scale: 2.5, // Ultra-sharp resolution
+        useCORS: true,
+        backgroundColor: '#ffffff'
+      }).then((canvas) => {
+        // Convert canvas to blob (file format)
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            alert("ছবি তৈরি করতে সমস্যা হয়েছে!");
+            document.body.removeChild(imgContainer);
+            return;
+          }
+
+          const fileName = `আজকের_ডিউটি_তালিকা_${new Date().toISOString().slice(0, 10)}.jpg`;
+          const file = new File([blob], fileName, { type: 'image/jpeg' });
+
+          // Check if Web Share API supports file sharing (mostly true on modern mobile browsers)
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            navigator.share({
+              files: [file],
+              title: 'আজকের ডিউটি তালিকা',
+              text: 'আজকের ডিউটি তালিকা সরাসরি ডিজিটাল খাতা থেকে শেয়ার করা হলো।'
+            })
+            .then(() => console.log('Successfully shared!'))
+            .catch((err) => {
+              console.log('User cancelled share or error occurred, falling back to download.', err);
+              // Fallback to local download if share is cancelled or fails
+              triggerDownload(canvas, fileName);
+            });
+          } else {
+            // Fallback for desktop browsers where Web Share is not supported
+            triggerDownload(canvas, fileName);
+          }
+          
+          document.body.removeChild(imgContainer);
+        }, 'image/jpeg', 0.95);
+
+      }).catch((err) => {
+        console.error("JPG creation failed:", err);
+        document.body.removeChild(imgContainer);
+      });
+    }).catch((err) => {
+      console.error("Failed to load html2canvas:", err);
+      document.body.removeChild(imgContainer);
+    });
+  }, 300);
+};
+
+// Helper function to trigger standard browser download
+const triggerDownload = (canvas, fileName) => {
+  const link = document.createElement('a');
+  link.download = fileName;
+  link.href = canvas.toDataURL('image/jpeg', 0.95);
+  link.click();
+};

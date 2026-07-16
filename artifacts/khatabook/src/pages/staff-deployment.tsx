@@ -695,12 +695,58 @@ export function StaffDeploymentPage() {
         windowWidth: CARD_WIDTH,
       });
 
-      const link      = document.createElement('a');
-      link.download   = `আজকের_ডিউটি_${new Date().toISOString().slice(0, 10)}.jpg`;
-      link.href       = canvas.toDataURL('image/jpeg', 0.95);
-      link.click();
+      const fileName = `আজকের_ডিউটি_${new Date().toISOString().slice(0, 10)}.jpg`;
 
-      toast.success('JPG ডাউনলোড হয়েছে — WhatsApp-এ শেয়ার করুন');
+      // ── Fallback: standard <a> download ─────────────────────────────────
+      //
+      // Used on desktop browsers and any mobile browser that does not support
+      // the Web Share API with files (e.g. Firefox Android < 93).
+      const triggerDownload = () => {
+        const link    = document.createElement('a');
+        link.download = fileName;
+        link.href     = canvas.toDataURL('image/jpeg', 0.95);
+        link.click();
+        toast.success('JPG ডাউনলোড হয়েছে — WhatsApp-এ শেয়ার করুন');
+      };
+
+      // ── Primary: Web Share API with file ────────────────────────────────
+      //
+      // navigator.share({ files }) opens the OS native share sheet on
+      // Android and iOS, letting the user pick WhatsApp (or any other app)
+      // directly without leaving the browser.
+      //
+      // We must use toBlob (not toDataURL) because the Share API requires a
+      // File object, which must be constructed from a Blob.
+      //
+      // AbortError means the user dismissed the share sheet — that is not an
+      // error worth logging; we silently fall back to download instead.
+      const blob = await new Promise<Blob | null>(resolve =>
+        canvas.toBlob(resolve, 'image/jpeg', 0.95),
+      );
+
+      if (!blob) throw new Error('canvas.toBlob() returned null');
+
+      const file = new File([blob], fileName, { type: 'image/jpeg' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: 'আজকের ডিউটি তালিকা',
+            text:  'আজকের ডিউটি তালিকা সরাসরি ডিজিটাল খাতা থেকে শেয়ার করা হলো।',
+          });
+          toast.success('শেয়ার সম্পন্ন হয়েছে!');
+        } catch (shareErr: unknown) {
+          // User dismissed the sheet — not a real error, just fall back.
+          const cancelled =
+            shareErr instanceof DOMException && shareErr.name === 'AbortError';
+          if (!cancelled) console.warn('[JPG share]', shareErr);
+          triggerDownload();
+        }
+      } else {
+        // Desktop or browser without file-share support.
+        triggerDownload();
+      }
 
     } catch (err) {
       console.error('[JPG export]', err);
