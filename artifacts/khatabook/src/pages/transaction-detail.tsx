@@ -20,6 +20,8 @@ import {
   Cloud,
   CheckCircle2,
   Receipt,
+  ImageIcon,
+  Loader2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -38,6 +40,7 @@ import { toWhatsAppNumber } from '@/lib/ledger-report';
 import { BillImageLightbox } from '@/components/modals/bill-image-lightbox';
 import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic';
 import { toast } from 'sonner';
+import { generateReceiptBlob } from '@/lib/receiptCanvas';
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -174,26 +177,88 @@ export function TransactionDetailPage() {
     })();
   }
 
+  /**
+   * Share pipeline:
+   *  1. Render receipt to PNG via Canvas.
+   *  2. Try Web Share API with files (WhatsApp, Imo, Messenger, SMS, etc.)
+   *  3. Fallback: Web Share API text-only (opens share sheet without image).
+   *  4. Fallback: trigger browser download of the PNG.
+   */
   async function handleShare() {
     if (!party || !entry) return;
     setIsSharing(true);
     try {
-      const text = buildReceiptText();
+      const blob = await generateReceiptBlob({
+        storeName:      storeName,
+        partyName:      party.name,
+        date:           transactionDate,
+        time:           transactionTime,
+        amount:         entry.amount,
+        isGave:         isGave,
+        balance:        party.currentBalance,
+        balanceIsGet:   party.balanceType === 'YOU_WILL_GET',
+        description:    entry.description ?? undefined,
+        billReference:  entry.billReference ?? undefined,
+        base:           BASE,
+      });
 
-      if (typeof navigator.share === 'function') {
+      const file = new File([blob], 'digital-khata-receipt.png', { type: 'image/png' });
+
+      // ── tier 1: native share WITH image file ─────────────────────────────
+      if (
+        typeof navigator.share === 'function' &&
+        typeof navigator.canShare === 'function' &&
+        navigator.canShare({ files: [file] })
+      ) {
         try {
-          await navigator.share({ title: `লেনদেন — ${party.name}`, text });
+          await navigator.share({
+            files: [file],
+            title: `${storeName} — লেনদেন স্লিপ`,
+            text:  `${party.name} — ${formatCurrency(entry.amount)}`,
+          });
           return;
         } catch (shareErr: unknown) {
-          const err = shareErr as { name?: string };
-          if (err?.name === 'AbortError') return; // user dismissed share sheet
-          // fall through to WhatsApp
+          const e = shareErr as { name?: string };
+          if (e?.name === 'AbortError') return; // user dismissed — don't fall through
+          // other error → try next tier
         }
       }
 
-      // WhatsApp fallback
+      // ── tier 2: native share WITHOUT files (text + object URL) ───────────
+      if (typeof navigator.share === 'function') {
+        const objUrl = URL.createObjectURL(blob);
+        try {
+          await navigator.share({
+            title: `${storeName} — লেনদেন স্লিপ`,
+            text:  buildReceiptText(),
+            url:   objUrl,
+          });
+          return;
+        } catch (shareErr: unknown) {
+          const e = shareErr as { name?: string };
+          if (e?.name === 'AbortError') return;
+          // fall through to download
+        } finally {
+          URL.revokeObjectURL(objUrl);
+        }
+      }
+
+      // ── tier 3: download the PNG (desktop / unsupported browsers) ────────
+      const objUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objUrl;
+      a.download = 'digital-khata-receipt.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(objUrl);
+      toast.success('রসিদ ডাউনলোড হয়েছে');
+    } catch (err: unknown) {
+      console.error('Receipt generation failed:', err);
+      // ── final fallback: WhatsApp text link ────────────────────────────────
+      const text     = buildReceiptText();
       const waNumber = party.phone ? toWhatsAppNumber(party.phone) : '';
-      const encoded = encodeURIComponent(text);
+      const encoded  = encodeURIComponent(text);
       const url = waNumber
         ? `https://wa.me/${waNumber}?text=${encoded}`
         : `https://wa.me/?text=${encoded}`;
@@ -349,20 +414,91 @@ export function TransactionDetailPage() {
           </div>
         )}
 
-        {/* Receipt preview */}
-        <div className="bg-white rounded-2xl shadow-sm px-5 py-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Receipt className="w-4 h-4 text-slate-400" />
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              রসিদের বার্তা
+        {/* Digital receipt preview card */}
+        <div className="rounded-2xl overflow-hidden shadow-sm border border-slate-100">
+          {/* Header */}
+          <div className="bg-[#1B3A6B] px-5 py-4 flex flex-col items-center gap-1">
+            <img
+              src={`${BASE}/logo-icon.svg`}
+              alt="ডিজিটাল খাতা"
+              className="w-10 h-10 mb-1"
+            />
+            <p className="text-white font-extrabold text-[13px] tracking-tight">Digital Khata</p>
+            <p className="text-white/65 text-[11px]">ডিজিটাল খাতা</p>
+          </div>
+
+          {/* Store name strip */}
+          <div className="bg-[#243E72] px-5 py-2 text-center">
+            <p className="text-white/88 text-[11px] font-semibold truncate">{storeName}</p>
+          </div>
+
+          {/* Amount banner */}
+          <div className={cn('px-5 py-4 text-center', isGave ? 'bg-red-50' : 'bg-emerald-50')}>
+            <p className={cn('text-[11px] font-semibold mb-0.5', isGave ? 'text-red-400' : 'text-emerald-400')}>
+              {isGave ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন'}
+            </p>
+            <p className={cn('text-3xl font-extrabold', isGave ? 'text-red-600' : 'text-emerald-600')}>
+              {formatCurrency(entry.amount)}
             </p>
           </div>
-          <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-mono text-[12px] text-slate-700 leading-relaxed whitespace-pre-wrap">
-            {buildReceiptText()}
+
+          {/* Detail rows */}
+          <div className="bg-slate-50 px-5 py-4 space-y-3 border-t border-slate-100">
+            <div>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">গ্রাহক</p>
+              <p className="text-[14px] font-bold text-slate-800">{party.name}</p>
+            </div>
+            <div>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">তারিখ ও সময়</p>
+              <p className="text-[13px] font-semibold text-slate-600">{transactionDate} • {transactionTime}</p>
+            </div>
+            {entry.description && (
+              <div>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">নোট</p>
+                <p className="text-[13px] text-slate-600">{entry.description}</p>
+              </div>
+            )}
+
+            {/* Balance row */}
+            <div className="pt-2 border-t border-slate-200 grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">এই লেনদেন</p>
+                <p className={cn('text-[15px] font-extrabold', isGave ? 'text-red-600' : 'text-emerald-600')}>
+                  {formatCurrency(entry.amount)}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">বর্তমান ব্যালেন্স</p>
+                <p className={cn('text-[15px] font-extrabold',
+                  party.balanceType === 'YOU_WILL_GET' ? 'text-emerald-600' : 'text-red-600',
+                )}>
+                  {formatCurrency(party.currentBalance)}
+                </p>
+                <p className={cn('text-[10px] font-semibold',
+                  party.balanceType === 'YOU_WILL_GET' ? 'text-emerald-500' : 'text-red-500',
+                )}>
+                  {party.balanceType === 'YOU_WILL_GET' ? 'আপনি পাবেন' : 'আপনি দেবেন'}
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 mt-3 text-emerald-600">
-            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-            <p className="text-[11px] font-semibold">ক্লাউডে ব্যাকআপ সফল</p>
+
+          {/* Footer safety badge */}
+          <div className="bg-[#0f1d35] px-5 py-3 flex items-center gap-2">
+            <div className="w-5 h-5 rounded-full bg-[#F5A623] shrink-0 flex items-center justify-center">
+              <CheckCircle2 className="w-3 h-3 text-[#0f1d35]" />
+            </div>
+            <p className="text-white/85 text-[11px] font-semibold">
+              ১০০% নিরাপদ ও সুরক্ষিত ডিজিটাল খাতা
+            </p>
+          </div>
+
+          {/* Share hint */}
+          <div className="bg-white px-5 py-3 flex items-center gap-2 border-t border-slate-100">
+            <ImageIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <p className="text-[11px] text-slate-400 font-medium">
+              "শেয়ার করুন" বাটনে ট্যাপ করলে এই রসিদটি ছবি হিসেবে তৈরি হবে
+            </p>
           </div>
         </div>
       </div>
@@ -378,12 +514,21 @@ export function TransactionDetailPage() {
           মুছে ফেলুন
         </Button>
         <Button
-          className="flex-1 bg-slate-800 hover:bg-slate-900 font-bold"
+          className="flex-1 bg-[#1B3A6B] hover:bg-[#243E72] font-bold"
           onClick={handleShare}
           disabled={isSharing}
         >
-          <Share2 className="w-4 h-4 mr-2" />
-          শেয়ার করুন
+          {isSharing ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              রসিদ তৈরি হচ্ছে…
+            </>
+          ) : (
+            <>
+              <Share2 className="w-4 h-4 mr-2" />
+              শেয়ার করুন
+            </>
+          )}
         </Button>
       </div>
 
