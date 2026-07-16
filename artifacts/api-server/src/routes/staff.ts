@@ -18,7 +18,7 @@ const router: IRouter = Router();
 
 // ─── validation helpers ───────────────────────────────────────────────────────
 
-const VALID_DESTINATIONS = new Set(["ঢাকা", "চিটাগং", "বরিশাল", "খুলনা", "সিলেট"]);
+const VALID_DESTINATIONS = new Set(["ঢাকা", "চিটাগং", "বরিশাল", "খুলনা", "সিলেট", "রাজশাহী"]);
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
 // ─── GET /staff/personnel ─────────────────────────────────────────────────────
@@ -126,6 +126,36 @@ router.post("/staff/personnel/:id/deploy", async (req, res): Promise<void> => {
     .where(eq(staffPersonnelTable.id, staffMember.id));
 
   res.json({ ok: true });
+});
+
+// ─── PATCH /staff/logs/:id ────────────────────────────────────────────────────
+// Allows correcting the destination of any existing log entry.
+
+router.patch("/staff/logs/:id", async (req, res): Promise<void> => {
+  const { businessId } = req as unknown as AuthenticatedRequest;
+  const destination = req.body?.destination;
+  if (typeof destination !== "string" || !VALID_DESTINATIONS.has(destination)) {
+    res.status(400).json({ error: "Invalid destination" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(staffDeploymentLogsTable)
+    .set({ destination })
+    .where(
+      and(
+        eq(staffDeploymentLogsTable.id, req.params.id),
+        eq(staffDeploymentLogsTable.businessId, businessId),
+      ),
+    )
+    .returning();
+
+  if (!updated) {
+    res.status(404).json({ error: "Log entry not found" });
+    return;
+  }
+
+  res.json(updated);
 });
 
 // ─── GET /staff/logs ─────────────────────────────────────────────────────────

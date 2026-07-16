@@ -19,7 +19,8 @@ import {
   Users,
   CalendarDays,
   ArrowDown,
-  CheckCircle2,
+  Pencil,
+  Clock,
   Settings,
 } from 'lucide-react';
 import { format, isToday, parseISO, startOfMonth, endOfMonth, subMonths } from 'date-fns';
@@ -44,7 +45,7 @@ import { SettingsDrawer } from '@/components/modals/settings-drawer';
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
-const DESTINATIONS = ['ঢাকা', 'চিটাগং', 'বরিশাল', 'খুলনা', 'সিলেট'] as const;
+const DESTINATIONS = ['ঢাকা', 'চিটাগং', 'বরিশাল', 'খুলনা', 'সিলেট', 'রাজশাহী'] as const;
 type Destination = (typeof DESTINATIONS)[number];
 
 const DEST_COLORS: Record<Destination, { bg: string; text: string; border: string }> = {
@@ -53,7 +54,10 @@ const DEST_COLORS: Record<Destination, { bg: string; text: string; border: strin
   বরিশাল:  { bg: 'bg-emerald-50',text: 'text-emerald-700',border: 'border-emerald-200' },
   খুলনা:   { bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200' },
   সিলেট:   { bg: 'bg-rose-50',   text: 'text-rose-700',   border: 'border-rose-200' },
+  রাজশাহী: { bg: 'bg-teal-50',   text: 'text-teal-700',   border: 'border-teal-200' },
 };
+
+const FALLBACK_COLOR = { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200' };
 
 // ── types ─────────────────────────────────────────────────────────────────────
 
@@ -117,6 +121,9 @@ export function StaffDeploymentPage() {
 
   // ── delete confirm ─────────────────────────────────────────────────────────
   const [deleteTarget, setDeleteTarget] = useState<StaffMember | null>(null);
+
+  // ── log editing ────────────────────────────────────────────────────────────
+  const [editLog, setEditLog] = useState<DeploymentLog | null>(null);
 
   // ── settings drawer ────────────────────────────────────────────────────────
   const [showSettings, setShowSettings] = useState(false);
@@ -202,6 +209,25 @@ export function StaffDeploymentPage() {
       toast.success('স্টাফ সরানো হয়েছে');
     },
     onError: () => toast.error('স্টাফ সরাতে ব্যর্থ হয়েছে'),
+  });
+
+  const editLogMutation = useMutation({
+    mutationFn: async ({ id, destination }: { id: string; destination: string }) => {
+      const r = await fetch(`${BASE}/api/staff/logs/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ destination }),
+      });
+      if (!r.ok) throw new Error('Failed to update log');
+      return r.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['staff-logs'] });
+      setEditLog(null);
+      toast.success('ডিউটি লোকেশন আপডেট হয়েছে');
+    },
+    onError: () => toast.error('আপডেট করতে ব্যর্থ হয়েছে'),
   });
 
   // ── computed ───────────────────────────────────────────────────────────────
@@ -352,7 +378,10 @@ export function StaffDeploymentPage() {
                       <span className="text-white text-[11px] font-bold uppercase tracking-wider">
                         ✦ পরবর্তী ডিউটি লক্ষ্য
                       </span>
-                      <span className="text-white/70 text-[10px] font-semibold">ট্যাপ করুন →</span>
+                      <span className="flex items-center gap-1 text-amber-300 text-[10px] font-bold">
+                        <Clock className="w-3 h-3" />
+                        অপেক্ষায় আছেন
+                      </span>
                     </div>
                     <div className="flex items-center justify-between px-4 py-4">
                       <div className="flex items-center gap-3">
@@ -363,7 +392,7 @@ export function StaffDeploymentPage() {
                         </div>
                         <div>
                           <p className="font-bold text-slate-900 text-[16px]">{member.name}</p>
-                          <p className="text-[11px] text-slate-400 font-medium">#১ — সর্বোচ্চ অগ্রাধিকার</p>
+                          <p className="text-[11px] text-slate-400 font-medium">#১ — ডিউটি না দেওয়া পর্যন্ত এখানেই থাকবেন</p>
                         </div>
                       </div>
                       <MapPin className="w-5 h-5 text-[#1B3A6B]" />
@@ -481,7 +510,7 @@ export function StaffDeploymentPage() {
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                   {dayLogs.map((log, i) => {
                     const dest = log.destination as Destination;
-                    const colors = DEST_COLORS[dest] ?? { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200' };
+                    const colors = DEST_COLORS[dest] ?? FALLBACK_COLOR;
                     return (
                       <div
                         key={log.id}
@@ -505,6 +534,14 @@ export function StaffDeploymentPage() {
                         )}>
                           {log.destination}
                         </span>
+                        {/* Edit button */}
+                        <button
+                          onClick={() => setEditLog(log)}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-[#1B3A6B] hover:bg-[#1B3A6B]/10 active:scale-95 transition-all shrink-0"
+                          title="লোকেশন পরিবর্তন করুন"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
                       </div>
                     );
                   })}
@@ -664,6 +701,91 @@ export function StaffDeploymentPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ════════════════════════════════════════════
+          EDIT LOG MODAL — change a past deployment's location
+      ════════════════════════════════════════════ */}
+      {editLog && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-end"
+          onClick={() => !editLogMutation.isPending && setEditLog(null)}
+        >
+          <div
+            className="w-full bg-white rounded-t-3xl overflow-hidden shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-2">
+              <div className="w-10 h-1 bg-slate-200 rounded-full" />
+            </div>
+
+            {/* Log info */}
+            <div className="px-5 py-3 border-b border-slate-100">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                লোকেশন পরিবর্তন করছেন
+              </p>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#1B3A6B]/10 flex items-center justify-center shrink-0">
+                    <span className="text-[#1B3A6B] font-extrabold text-[15px]">
+                      {editLog.staffName.charAt(0)}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="font-extrabold text-slate-900 text-[16px]">{editLog.staffName}</p>
+                    <p className="text-[11px] text-slate-400">{formatBanglaDate(editLog.deployedAt)} — {formatBanglaTime(editLog.deployedAt)}</p>
+                  </div>
+                </div>
+                {/* Current destination badge */}
+                {(() => {
+                  const d = editLog.destination as Destination;
+                  const c = DEST_COLORS[d] ?? FALLBACK_COLOR;
+                  return (
+                    <span className={cn('text-[12px] font-bold px-3 py-1.5 rounded-full border shrink-0', c.bg, c.text, c.border)}>
+                      {editLog.destination}
+                    </span>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* New destination picker */}
+            <div className="px-5 py-4">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
+                নতুন লোকেশন বেছে নিন
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {DESTINATIONS.map(dest => {
+                  const colors = DEST_COLORS[dest];
+                  const isCurrent = dest === editLog.destination;
+                  return (
+                    <button
+                      key={dest}
+                      disabled={editLogMutation.isPending || isCurrent}
+                      onClick={() => editLogMutation.mutate({ id: editLog.id, destination: dest })}
+                      className={cn(
+                        'flex items-center gap-2.5 px-4 py-3.5 rounded-2xl border-2 font-bold text-[14px] transition-all active:scale-[0.96] relative',
+                        colors.bg, colors.text, colors.border,
+                        isCurrent && 'opacity-40 cursor-not-allowed',
+                        editLogMutation.isPending && !isCurrent && 'opacity-60 cursor-not-allowed',
+                      )}
+                    >
+                      <MapPin className="w-4 h-4 shrink-0" />
+                      {dest}
+                      {isCurrent && (
+                        <span className="absolute top-1 right-1.5 text-[9px] font-bold opacity-60">বর্তমান</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Safety padding */}
+            <div className="pb-[calc(1rem+var(--safe-bottom,0px))]" />
+          </div>
+        </div>
+      )}
 
       {/* Settings drawer (accessible from header) */}
       <SettingsDrawer open={showSettings} onOpenChange={setShowSettings} />
