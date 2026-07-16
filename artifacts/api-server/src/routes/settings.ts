@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, businessSettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { broadcast } from "../lib/eventBus";
 import {
   GetBusinessSettingsResponse,
   UpdateBusinessSettingsBody,
@@ -48,6 +49,8 @@ router.patch("/settings", async (req, res): Promise<void> => {
     .set(updates)
     .where(eq(businessSettingsTable.id, existing.id))
     .returning();
+
+  broadcast(businessId, { type: 'settings.updated', payload: {} });
 
   res.json(
     UpdateBusinessSettingsResponse.parse({

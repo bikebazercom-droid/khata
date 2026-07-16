@@ -15,6 +15,7 @@ import { SignInPage } from '@/pages/sign-in';
 import { SignUpPage } from '@/pages/sign-up';
 import NotFound from '@/pages/not-found';
 import { fetchMe } from '@/lib/phoneAuth';
+import { useRealtimeSync } from '@/lib/useRealtimeSync';
 
 // ─── Clerk setup ──────────────────────────────────────────────────────────────
 
@@ -97,6 +98,19 @@ const queryClient = new QueryClient({
     queries: { retry: false, staleTime: 30_000 },
   },
 });
+
+// ─── Real-time sync ───────────────────────────────────────────────────────────
+
+/**
+ * Mounts the SSE subscription only when the user is authenticated so we don't
+ * attempt an un-authed connection on the landing page.
+ * Must be rendered inside both ClerkProvider and QueryClientProvider.
+ */
+function RealtimeSyncManager() {
+  const { isAuthenticated } = useAppAuth();
+  useRealtimeSync(isAuthenticated);
+  return null;
+}
 
 // ─── Invalidate cache on user change ──────────────────────────────────────────
 
@@ -218,6 +232,7 @@ function AppRouter() {
     >
       <QueryClientProvider client={queryClient}>
         <ClerkCacheInvalidator />
+        <RealtimeSyncManager />
         <TooltipProvider>
           <Switch>
             {/* Public */}

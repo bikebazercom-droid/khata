@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { and, desc, eq } from "drizzle-orm";
 import { db, ledgerEntriesTable, partiesTable } from "@workspace/db";
+import { broadcast } from "../lib/eventBus";
 import {
   ListPartiesQueryParams,
   ListPartiesResponse,
@@ -109,6 +110,8 @@ router.post("/parties", async (req, res): Promise<void> => {
       lastTransactionAt: signedOpening !== 0 ? new Date() : null,
     })
     .returning();
+
+  broadcast(businessId, { type: 'party.created', payload: { partyId: party!.id } });
 
   res.status(201).json(
     CreatePartyResponse.parse({
@@ -254,6 +257,8 @@ router.post(
       })
       .where(eq(partiesTable.id, party.id));
 
+    broadcast(businessId, { type: 'ledger.created', payload: { partyId: party.id, entryId: entry!.id } });
+
     res.status(201).json(
       CreateLedgerEntryResponse.parse({
         ...entry,
@@ -291,6 +296,8 @@ router.delete("/parties/:partyId", async (req, res): Promise<void> => {
     .where(eq(ledgerEntriesTable.partyId, party.id));
 
   await db.delete(partiesTable).where(eq(partiesTable.id, party.id));
+
+  broadcast(businessId, { type: 'party.deleted', payload: { partyId: party.id } });
 
   res.json(DeletePartyResponse.parse({ success: true, id: party.id }));
 });
