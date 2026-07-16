@@ -9,6 +9,9 @@ import {
   getListLedgerEntriesQueryKey,
   getListPartiesQueryKey,
   getGetDashboardSummaryQueryKey,
+  type LedgerEntry,
+  type Party,
+  type DashboardSummary,
 } from '@workspace/api-client-react';
 import {
   ChevronLeft,
@@ -33,6 +36,7 @@ import {
 import { billImageSrc } from '@/lib/billImageStorage';
 import { toWhatsAppNumber } from '@/lib/ledger-report';
 import { BillImageLightbox } from '@/components/modals/bill-image-lightbox';
+import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic';
 import { toast } from 'sonner';
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -57,7 +61,6 @@ export function TransactionDetailPage() {
   const { data: settings } = useGetBusinessSettings();
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
@@ -90,30 +93,85 @@ export function TransactionDetailPage() {
     return lines.filter(Boolean).join('\n');
   }
 
-  async function handleDelete() {
-    if (!partyId || !entryId) return;
-    setIsDeleting(true);
-    try {
-      const res = await fetch(`${BASE}/api/parties/${partyId}/entries/${entryId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  /**
+   * Optimistic delete — 0ms navigation, background network request.
+   *
+   * Pattern:
+   *   1. Snapshot all affected caches for rollback.
+   *   2. Apply the expected post-delete state to the caches synchronously
+   *      (removes the entry, reverses its balance delta).
+   *   3. Close the dialog and navigate back to the party ledger instantly.
+   *   4. Fire the DELETE request silently in the background.
+   *   5. On success: background invalidation reconciles with server truth.
+   *   6. On failure: restore the snapshots and show a non-blocking toast.
+   */
+  function handleDelete() {
+    if (!partyId || !entryId || !party || !entry) return;
 
-      await queryClient.invalidateQueries({ queryKey: getListLedgerEntriesQueryKey(partyId) });
-      await queryClient.invalidateQueries({ queryKey: getGetPartyQueryKey(partyId) });
-      await queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
-      await queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+    const entriesKey = getListLedgerEntriesQueryKey(partyId);
+    const partyKey = getGetPartyQueryKey(partyId);
+    const partiesKey = getListPartiesQueryKey();
+    const summaryKey = getGetDashboardSummaryQueryKey();
 
-      toast.success('লেনদেন মুছে ফেলা হয়েছে');
-      navigate(`/party/${partyId}`, { replace: true });
-    } catch (err) {
-      console.error('Delete entry failed:', err);
-      toast.error('মুছতে সমস্যা হয়েছে, আবার চেষ্টা করুন');
-    } finally {
-      setIsDeleting(false);
-      setShowDeleteConfirm(false);
+    // ── 1. Snapshot ───────────────────────────────────────────────────────
+    const previousEntries = queryClient.getQueryData<LedgerEntry[]>(entriesKey);
+    const previousParty = queryClient.getQueryData<Party>(partyKey);
+    const previousParties = queryClient.getQueryData<Party[]>(partiesKey);
+    const previousSummary = queryClient.getQueryData<DashboardSummary>(summaryKey);
+
+    // ── 2. Optimistic cache updates ───────────────────────────────────────
+    // Remove this entry from the list.
+    queryClient.setQueryData<LedgerEntry[]>(entriesKey, (old) =>
+      (old ?? []).filter((e) => e.id !== entryId),
+    );
+
+    // Reverse the entry's balance delta on the party.
+    // YOU_GAVE originally applied +amount; reversal applies -amount.
+    // YOU_GOT  originally applied -amount; reversal applies +amount.
+    const reverseDelta = entry.type === 'YOU_GAVE' ? -entry.amount : entry.amount;
+    const updatedParty = applyBalanceDelta(party, reverseDelta);
+
+    queryClient.setQueryData<Party>(partyKey, updatedParty);
+    queryClient.setQueryData<Party[]>(partiesKey, (old) =>
+      (old ?? []).map((p) => (p.id === partyId ? applyBalanceDelta(p, reverseDelta) : p)),
+    );
+    if (previousSummary) {
+      queryClient.setQueryData<DashboardSummary>(
+        summaryKey,
+        shiftSummaryForPartyChange(previousSummary, party, updatedParty),
+      );
     }
+
+    // ── 3. Close dialog + instant navigation ─────────────────────────────
+    setShowDeleteConfirm(false);
+    navigate(`/party/${partyId}`, { replace: true });
+
+    // ── 4. Background DELETE request ─────────────────────────────────────
+    void (async () => {
+      try {
+        const res = await fetch(`${BASE}/api/parties/${partyId}/entries/${entryId}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        // ── 5. Background reconciliation ──────────────────────────────────
+        // Replace the optimistic state with the server's authoritative truth.
+        queryClient.invalidateQueries({ queryKey: entriesKey });
+        queryClient.invalidateQueries({ queryKey: partyKey });
+        queryClient.invalidateQueries({ queryKey: partiesKey });
+        queryClient.invalidateQueries({ queryKey: summaryKey });
+      } catch (err) {
+        console.error('Delete entry failed, rolling back:', err);
+
+        // ── 6. Rollback on failure ────────────────────────────────────────
+        queryClient.setQueryData(entriesKey, previousEntries);
+        queryClient.setQueryData(partyKey, previousParty);
+        queryClient.setQueryData(partiesKey, previousParties);
+        queryClient.setQueryData(summaryKey, previousSummary);
+        toast.error('মুছতে সমস্যা হয়েছে — লেনদেন ফিরে এসেছে');
+      }
+    })();
   }
 
   async function handleShare() {
@@ -345,9 +403,8 @@ export function TransactionDetailPage() {
               variant="destructive"
               className="font-bold"
               onClick={handleDelete}
-              disabled={isDeleting}
             >
-              {isDeleting ? 'মুছছে…' : 'মুছে ফেলুন'}
+              মুছে ফেলুন
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
