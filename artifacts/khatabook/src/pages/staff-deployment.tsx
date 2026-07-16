@@ -348,13 +348,12 @@ export function StaffDeploymentPage() {
   // ── PDF export ─────────────────────────────────────────────────────────────
 
   async function handleExportPdf() {
-    if (!pdfRef.current) return;
     setIsExporting(true);
     try {
       const [year, mon] = pdfMonth.split('-').map(Number);
       const monthLabel  = format(new Date(year, mon - 1, 1), 'MMMM yyyy', { locale: bn });
 
-      // 1. Fetch all logs for the selected month from the server.
+      // ── Step 1: fetch month logs ─────────────────────────────────────────
       const r = await fetch(`${BASE}/api/staff/logs?month=${pdfMonth}`, { credentials: 'include' });
       if (!r.ok) throw new Error(`Server error ${r.status}`);
       const monthLogs: DeploymentLog[] = await r.json();
@@ -362,44 +361,91 @@ export function StaffDeploymentPage() {
       const tally  = destinationTally(monthLogs);
       const groups = groupLogsByDate(monthLogs);
 
-      // 2. Write the generated HTML into the off-screen container (not display:none).
-      //    The container is position:fixed; left:-9999px so it is fully laid out
-      //    by the browser but invisible to the user.
-      const html = buildPdfHtml({ monthLabel, monthLogs, tally, groups, queueRemaining });
-      pdfRef.current.innerHTML = html;
+      // ── Step 2: locate the print container ──────────────────────────────
+      //
+      // We prefer the React ref (available as soon as the component mounts)
+      // but fall back to getElementById as a belt-and-suspenders guard for
+      // the rare case where the ref hasn't been assigned yet (e.g. during
+      // a very fast re-render cycle on low-end Android devices).
+      const element: HTMLElement | null =
+        pdfRef.current ?? document.getElementById('pdf-print-template');
 
-      // 3. Wait for all fonts referenced by this document to finish loading.
-      //    Without this, html2canvas may capture before Noto Sans Bengali glyphs
-      //    are available, producing boxes or falling back to a system font.
+      if (!element) throw new Error('PDF container not found in DOM');
+
+      // ── Step 3: populate the container ──────────────────────────────────
+      //
+      // The container is position:fixed; left:-9999px — fully laid out by
+      // the browser but scrolled far off the visible viewport. html2canvas
+      // captures the element's painted pixels, not the viewport, so this
+      // placement is safe on all browsers including mobile Safari.
+      const html = buildPdfHtml({ monthLabel, monthLogs, tally, groups, queueRemaining });
+      element.innerHTML = html;
+
+      // ── Step 4: explicit content guard ──────────────────────────────────
+      //
+      // If the container has no children after innerHTML injection (e.g.
+      // DOMParser rejected the markup), abort early with a clear error
+      // rather than silently generating a blank PDF.
+      if (element.children.length === 0) {
+        throw new Error('PDF template rendered no DOM nodes — aborting');
+      }
+
+      // ── Step 5: font readiness ──────────────────────────────────────────
+      //
+      // document.fonts.ready resolves once every @font-face rule referenced
+      // in the document has been decoded (including Noto Sans Bengali loaded
+      // from Google Fonts in index.html). Skipping this wait causes Bengali
+      // text to render as square boxes in the captured canvas.
       await document.fonts.ready;
 
-      // 4. Yield one animation frame so the browser completes its layout pass
-      //    on the newly inserted HTML before html2canvas starts rasterising.
-      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      // ── Step 6: double requestAnimationFrame ────────────────────────────
+      //
+      // A single rAF only guarantees that the browser has *scheduled* the
+      // next paint. For newly-injected innerHTML, the browser needs TWO
+      // frames:
+      //   Frame 1 → style recalculation + layout (reflow) for new nodes
+      //   Frame 2 → paint pass completes → pixels committed to the layer
+      // html2canvas reads from the committed layer. Capturing after only
+      // one frame on mobile Chrome/WebKit frequently produces a blank canvas
+      // because the paint pass hasn't finished.
+      await new Promise<void>(r1 => requestAnimationFrame(() =>
+        requestAnimationFrame(() => r1()),
+      ));
 
-      // 5. Generate and download the PDF.
-      //    windowWidth: 794 tells html2canvas to treat the capture as if the
-      //    viewport is 794 px wide (A4 at 96 dpi) regardless of the real screen
-      //    width. Without this, a 390 px mobile viewport causes html2canvas to
-      //    capture only ~half the A4 column, which then gets stretched and blurry.
+      // ── Step 7: generate PDF ─────────────────────────────────────────────
+      //
+      // Configuration rationale:
+      //   windowWidth:794   — tells html2canvas to emulate an A4-wide desktop
+      //                        viewport (794 px ≈ A4 @ 96 dpi). Without this,
+      //                        mobile Chrome uses the physical viewport (~390 px)
+      //                        and clips half the page content.
+      //   scale:2           — 2× renders at 192 dpi for crisp text in PDF.
+      //   useCORS:true      — required for Google Fonts cross-origin resources.
+      //   allowTaint:true   — prevents canvas abort on tainted cross-origin
+      //                        resources (fonts, background images).
+      //   letterRendering:  — forces sub-pixel letter spacing on WebKit,
+      //                        matching what the CSS engine calculated during
+      //                        layout. Without it, rendered text can overlap
+      //                        or have gaps that differ from the live DOM.
       await html2pdf()
         .set({
-          margin:      [10, 8, 10, 8],
+          margin:      [10, 10, 10, 10],
           filename:    `ডিউটি-স্টেটমেন্ট-${pdfMonth}.pdf`,
-          image:       { type: 'jpeg', quality: 0.97 },
+          image:       { type: 'jpeg', quality: 0.98 },
           html2canvas: {
-            scale:       2,          // 2× resolution for crisp text
-            useCORS:     true,       // cross-origin font/image resources
-            allowTaint:  true,       // don't abort on tainted canvas resources
-            windowWidth: 794,        // A4 width — prevents mobile viewport clipping
-            logging:     false,
+            scale:           2,
+            useCORS:         true,
+            allowTaint:      true,
+            letterRendering: true,
+            windowWidth:     794,
+            logging:         false,
           },
-          jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         })
-        .from(pdfRef.current)
+        .from(element)
         .save();
 
-      pdfRef.current.innerHTML = '';
+      element.innerHTML = '';
       toast.success('PDF ডাউনলোড হয়েছে');
     } catch (err) {
       console.error('[PDF export]', err);
@@ -1148,14 +1194,24 @@ export function StaffDeploymentPage() {
       <SettingsDrawer open={showSettings} onOpenChange={setShowSettings} />
 
       {/*
-        PDF rendering container — intentionally off-screen, NOT display:none.
-        html2canvas cannot capture display:none elements; it returns a blank
-        canvas. Positioning far off-screen keeps it invisible to the user while
-        remaining fully renderable. The explicit 794 px width matches A4 at
-        96 dpi so html2canvas captures a full page rather than a mobile-width
-        sliver that gets stretched into the PDF.
+        PDF print template — off-screen but FULLY RENDERED.
+
+        Rules that make html2canvas work on mobile:
+        • NOT display:none — html2canvas returns an empty canvas for hidden
+          elements; position:fixed; left:-9999px keeps it invisible while
+          remaining in the layout tree.
+        • Explicit width:794px — matches A4 at 96 dpi; prevents mobile
+          viewports (≈390 px) from clipping half the page.
+        • zIndex must be POSITIVE — zIndex:-1 pushes the element behind the
+          stacking context root; some mobile browsers exclude back-painted
+          layers from the compositor snapshot that html2canvas reads, causing
+          a blank capture. Using a high positive value keeps it in-tree but
+          visually off-screen.
+        • id="pdf-print-template" — used by handleExportPdf as a belt-and-
+          suspenders getElementById fallback alongside the React ref.
       */}
       <div
+        id="pdf-print-template"
         ref={pdfRef}
         aria-hidden
         style={{
@@ -1165,7 +1221,7 @@ export function StaffDeploymentPage() {
           width:           '794px',
           backgroundColor: '#fff',
           pointerEvents:   'none',
-          zIndex:          -1,
+          zIndex:          9999,
         }}
       />
     </div>
