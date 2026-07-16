@@ -31,9 +31,66 @@ export function billImageSrc(billImage: string | null | undefined): string | nul
 }
 
 /**
+ * Maximum pixel dimension (width or height) for bill image thumbnails embedded
+ * in PDFs. Camera photos can be several megapixels; even though the PDF renders
+ * them at 48×48 px, html2canvas rasterizes the full canvas at 2× scale and
+ * must hold the decoded bitmap in memory. Capping at 200 px keeps peak RAM
+ * well under the ~256 MB limit common on low-end Android WebViews while
+ * preserving enough detail for a receipt thumbnail.
+ */
+const PDF_THUMB_MAX_PX = 200;
+
+/**
+ * Decodes a Blob into an HTMLImageElement (waits for load/error).
+ */
+function blobToImage(blob: Blob): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('image decode failed'));
+    };
+    img.src = url;
+  });
+}
+
+/**
+ * Scales a decoded image down so neither dimension exceeds `maxPx`, then
+ * returns it as a JPEG data URL. If the image is already small enough it is
+ * re-encoded without scaling (quality 0.85 is enough for a 48 px thumbnail).
+ *
+ * Using a canvas keeps the base64 payload small so html2canvas never has to
+ * hold a multi-megapixel bitmap in memory during PDF rasterization.
+ */
+function scaleImageToDataUrl(imgEl: HTMLImageElement, maxPx: number): string {
+  const scale = Math.min(1, maxPx / Math.max(imgEl.naturalWidth, imgEl.naturalHeight, 1));
+  const w = Math.round(imgEl.naturalWidth * scale);
+  const h = Math.round(imgEl.naturalHeight * scale);
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('canvas 2d context unavailable');
+  ctx.drawImage(imgEl, 0, 0, w, h);
+  return canvas.toDataURL('image/jpeg', 0.85);
+}
+
+/**
  * Pre-fetches every cloud image inside a DOM subtree and temporarily replaces
- * their `src` attributes with inline base64 data URLs so that html2canvas can
- * rasterize them without network access (offline-safe PDF generation).
+ * their `src` attributes with small inline base64 JPEG data URLs so that
+ * html2canvas can rasterize them without network access (offline-safe PDF
+ * generation) and without running out of memory on low-end devices.
+ *
+ * Each image is scaled down to at most PDF_THUMB_MAX_PX on its longest side
+ * before encoding — camera photos can be several megapixels and html2canvas
+ * silently drops them on memory-constrained Android WebViews even when they
+ * are already base64-encoded. Scaling before rasterization keeps peak RAM
+ * usage predictable regardless of the original upload resolution.
  *
  * Returns a restore function that puts the original `src` values back.
  * Also returns the count of images that could not be fetched (so the caller
@@ -60,13 +117,11 @@ export async function prefetchImagesForPdf(container: HTMLElement): Promise<{
         const res = await fetch(originalSrc, { credentials: 'include' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const blob = await res.blob();
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-        img.src = base64;
+        // Decode and scale down so html2canvas never holds a large bitmap in
+        // memory (low-memory devices silently drop oversized images).
+        const imgEl = await blobToImage(blob);
+        const dataUrl = scaleImageToDataUrl(imgEl, PDF_THUMB_MAX_PX);
+        img.src = dataUrl;
       } catch {
         failedCount++;
         // Replace with a transparent placeholder so html2canvas renders a
