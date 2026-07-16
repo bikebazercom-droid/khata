@@ -56,7 +56,8 @@ import {
   toWhatsAppNumber,
   stampPageNumbers,
 } from '@/lib/ledger-report';
-import { billImageSrc } from '@/lib/billImageStorage';
+import { billImageSrc, prefetchImagesForPdf } from '@/lib/billImageStorage';
+import { toast } from 'sonner';
 import { format, isToday } from 'date-fns';
 
 /**
@@ -220,9 +221,22 @@ export function PartyView() {
       }) as unknown as NonNullable<ReturnType<typeof buildReportPdf>>;
 
   const handleReport = async () => {
-    if (!party) return;
+    if (!party || !reportRef.current) return;
     setIsGeneratingReport(true);
+    let restore: (() => void) | null = null;
     try {
+      // Pre-fetch all cloud bill images into base64 so html2canvas can render
+      // them even when the device is offline or the API is temporarily down.
+      const { restore: restoreFn, failedCount } = await prefetchImagesForPdf(reportRef.current);
+      restore = restoreFn;
+
+      if (failedCount > 0) {
+        toast.warning(
+          `${failedCount}টি বিলের ছবি লোড করা যায়নি — সেগুলো পিডিএফে দেখাবে না`,
+          { duration: 5000 }
+        );
+      }
+
       const worker = buildReportPdf();
       if (!worker) throw new Error('report element not ready');
       await finalizeReportPdf(worker).save();
@@ -231,14 +245,28 @@ export function PartyView() {
     } catch (err) {
       console.error('Report generation failed', err);
     } finally {
+      restore?.();
       setIsGeneratingReport(false);
     }
   };
 
   const handleReminderShare = async () => {
-    if (!party) return;
+    if (!party || !reportRef.current) return;
     setIsGeneratingReminder(true);
+    let restore: (() => void) | null = null;
     try {
+      // Pre-fetch all cloud bill images into base64 so html2canvas can render
+      // them even when the device is offline or the API is temporarily down.
+      const { restore: restoreFn, failedCount } = await prefetchImagesForPdf(reportRef.current);
+      restore = restoreFn;
+
+      if (failedCount > 0) {
+        toast.warning(
+          `${failedCount}টি বিলের ছবি লোড করা যায়নি — সেগুলো পিডিএফে দেখাবে না`,
+          { duration: 5000 }
+        );
+      }
+
       const worker = buildReportPdf();
       if (!worker) throw new Error('report element not ready');
       const blob = await finalizeReportPdf(worker).outputPdf('blob');
@@ -284,6 +312,7 @@ export function PartyView() {
       }
       console.error('Reminder share failed', err);
     } finally {
+      restore?.();
       setIsGeneratingReminder(false);
     }
   };

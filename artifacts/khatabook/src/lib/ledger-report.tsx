@@ -2,6 +2,7 @@ import { forwardRef, Fragment } from 'react';
 import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
+import { billImageSrc } from '@/lib/billImageStorage';
 
 export interface ReportEntry {
   id: string;
@@ -9,6 +10,7 @@ export interface ReportEntry {
   amount: number;
   description: string;
   billReference: string | null;
+  billImage?: string | null;
   dueDate: string | null;
   createdAt: string | Date;
   balanceAfter: number;
@@ -183,12 +185,30 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                   </tr>
                   {group.entries.map((entry, i) => {
                     const isGave = entry.type === 'YOU_GAVE';
+                    const imgSrc = billImageSrc(entry.billImage);
                     return (
                       <tr key={entry.id} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#fafafa' }}>
                         <td style={{ padding: '7px 10px', border: GRID_BORDER, whiteSpace: 'nowrap' }}>
                           {format(entryDate(entry), 'dd/MM')}
                         </td>
-                        <td style={{ padding: '7px 10px', border: GRID_BORDER, color: '#334155' }}>{entryDetails(entry)}</td>
+                        <td style={{ padding: '7px 10px', border: GRID_BORDER, color: '#334155' }}>
+                          {entryDetails(entry)}
+                          {imgSrc && (
+                            <img
+                              src={imgSrc}
+                              alt="বিল"
+                              style={{
+                                display: 'block',
+                                marginTop: '4px',
+                                width: '48px',
+                                height: '48px',
+                                objectFit: 'cover',
+                                borderRadius: '4px',
+                                border: '1px solid #e2e8f0',
+                              }}
+                            />
+                          )}
+                        </td>
                         <td
                           style={{
                             padding: '7px 10px',
