@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { SignIn } from '@clerk/react';
 import { sendOtp, verifyOtp } from '@/lib/phoneAuth';
 import { useLocation } from 'wouter';
+import { useQueryClient } from '@tanstack/react-query';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -106,6 +107,7 @@ function ClerkSignIn() {
 
 function PhoneSignIn() {
   const [, setLocation] = useLocation();
+  const qc = useQueryClient();
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
@@ -131,9 +133,11 @@ function PhoneSignIn() {
     setError('');
     setLoading(true);
     try {
-      await verifyOtp(phone, code);
-      // Reload to let React Query re-fetch /api/auth/me with the new cookie.
-      window.location.href = basePath || '/';
+      const me = await verifyOtp(phone, code);
+      // Seed React Query's auth-me cache with the fresh response so
+      // useAppAuth resolves immediately — no hard reload needed.
+      qc.setQueryData(['auth-me'], me);
+      setLocation('/');
     } catch (err: any) {
       setError(err.message ?? 'Invalid code');
     } finally {

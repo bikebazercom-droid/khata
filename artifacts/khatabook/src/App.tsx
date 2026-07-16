@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ClerkProvider, SignIn, SignUp, Show, useClerk, useAuth } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
@@ -20,6 +20,7 @@ import NotFound from '@/pages/not-found';
 import { fetchMe } from '@/lib/phoneAuth';
 import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import { useRetryPendingUploads } from '@/lib/useRetryPendingUploads';
+import { readAuthCache, writeAuthCache, clearAuthCache } from '@/lib/authCache';
 
 // ─── Clerk setup ──────────────────────────────────────────────────────────────
 
@@ -152,6 +153,9 @@ function ClerkCacheInvalidator() {
       const userId = user?.id ?? null;
       if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== userId) {
         qc.clear();
+        // User signed out — clear the optimistic auth cache so next open
+        // shows the landing page without a stale-cache flash.
+        if (userId === null) clearAuthCache();
       }
       prevUserIdRef.current = userId;
     });
@@ -167,9 +171,18 @@ function ClerkCacheInvalidator() {
  * Returns the combined auth state across Clerk (email/Google) and the custom
  * phone-OTP path. Phone auth is confirmed by a successful /api/auth/me fetch
  * (the server reads the httpOnly `phone_session` cookie).
+ *
+ * Optimistic loading: if a previous session was cached in localStorage we
+ * treat the user as authenticated immediately, skipping the spinner entirely.
+ * The real check still runs in the background — if it fails (session expired),
+ * we clear the cache and redirect to sign-in seamlessly.
  */
 function useAppAuth() {
   const { isLoaded, isSignedIn: clerkSignedIn } = useAuth();
+
+  // Read once at mount — synchronous, ~0 ms, avoids any re-render on change.
+  const [cachedAuth] = useState(() => readAuthCache());
+
   // Only call /me when Clerk says we're NOT signed in — avoids a redundant
   // round-trip for Clerk users.
   const enabled = isLoaded && !clerkSignedIn;
@@ -181,10 +194,52 @@ function useAppAuth() {
     retry: false,
   });
 
-  const isAuthenticated = clerkSignedIn || (enabled && !!phoneAuth?.userId);
-  const isLoading = !isLoaded || (enabled && phoneLoading);
+  // Whether we have a definitive answer from both auth paths.
+  const authSettled = isLoaded && (!enabled || !phoneLoading);
+
+  const realAuth = clerkSignedIn || (enabled && !!phoneAuth?.userId);
+
+  // If settled, use the real answer. If still loading but we have a cache
+  // hit, optimistically report authenticated so the UI renders immediately.
+  const isAuthenticated = authSettled ? realAuth : (cachedAuth !== null);
+
+  // Only block with a loading state if we have no cache and haven't settled.
+  const isLoading = !authSettled && cachedAuth === null;
+
+  // Persist / clear the cache whenever auth settles.
+  useEffect(() => {
+    if (!authSettled) return;
+    if (realAuth) {
+      writeAuthCache(clerkSignedIn ? 'clerk' : 'phone');
+    } else {
+      // Session expired or user logged out — evict the optimistic cache.
+      clearAuthCache();
+    }
+  }, [authSettled, realAuth, clerkSignedIn]);
 
   return { isAuthenticated, isLoading, authMethod: clerkSignedIn ? 'clerk' : (phoneAuth ? 'phone' : null) };
+}
+
+// ─── Branded splash (first-visit only) ───────────────────────────────────────
+
+/**
+ * Shown only on the very first visit (no cached auth) while Clerk loads.
+ * Matches the landing-page hero so the transition feels like a natural
+ * continuation rather than a loading artifact.
+ */
+function AppSplash() {
+  return (
+    <div className="h-[100dvh] w-full bg-gradient-to-b from-[#1B3A6B] to-[#2a5298] flex flex-col items-center justify-center">
+      <img
+        src={`${basePath}/logo-icon.svg`}
+        alt="ডিজিটাল খাতা"
+        className="w-20 h-20 mb-5 drop-shadow-xl"
+      />
+      <p className="text-white font-extrabold text-2xl tracking-tight">Digital Khata</p>
+      <p className="text-white/70 font-semibold text-base mt-1">ডিজিটাল খাতা</p>
+      <div className="mt-8 w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+    </div>
+  );
 }
 
 // ─── Protected wrapper ────────────────────────────────────────────────────────
@@ -192,15 +247,7 @@ function useAppAuth() {
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAppAuth();
 
-  if (isLoading) {
-    return (
-      <div className="h-[100dvh] w-full bg-slate-200/60 flex justify-center">
-        <div className="w-full max-w-lg h-[100dvh] bg-[#f8fafc] flex items-center justify-center">
-          <div className="w-6 h-6 border-2 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return <AppSplash />;
 
   if (!isAuthenticated) {
     return <Redirect to="/sign-in" />;
@@ -214,15 +261,7 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
 function HomeRoute() {
   const { isAuthenticated, isLoading } = useAppAuth();
 
-  if (isLoading) {
-    return (
-      <div className="h-[100dvh] w-full bg-slate-200/60 flex justify-center">
-        <div className="w-full max-w-lg h-[100dvh] bg-[#f8fafc] flex items-center justify-center">
-          <div className="w-6 h-6 border-2 border-slate-200 border-t-slate-900 rounded-full animate-spin" />
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return <AppSplash />;
 
   if (isAuthenticated) {
     return (
