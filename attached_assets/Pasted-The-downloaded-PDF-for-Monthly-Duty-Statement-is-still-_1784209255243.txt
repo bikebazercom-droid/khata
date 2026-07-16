@@ -1,0 +1,40 @@
+The downloaded PDF for "Monthly Duty Statement" (ডিউটি-স্টেটমেন্ট) is still rendering as a blank white page. This is a critical bug caused by CSS overflow/scroll clipping or improper DOM target capture by the PDF engine.
+
+Please rewrite the PDF export handler to use this bulletproof, dynamic DOM-injection method. We will generate the PDF from a dynamically created, clean HTML document in memory to completely bypass any app-level CSS layout interference.
+
+Replace the current PDF download function (e.g., handleDownloadPDF, exportToPDF, or similar) with the following implementation:
+
+1. BULLETPROOF GENERATOR IMPLEMENTATION (কপি-পেস্ট কোড):
+```javascript
+const handleDownloadPDF = () => {
+  // 1. Verify we have the monthly log data
+  const logsToExport = dutyLogs || []; // Use the actual state variable representing the 20 staff logs
+  if (logsToExport.length === 0) {
+    alert("ডাউনলোড করার জন্য কোনো ডিউটি ডাটা পাওয়া যায়নি!");
+    return;
+  }
+
+  // 2. Create a temporary print container entirely isolated from the app's CSS
+  const printContainer = document.createElement('div');
+  printContainer.id = 'temp-pdf-export-container';
+  printContainer.style.position = 'absolute';
+  printContainer.style.left = '-9999px';
+  printContainer.style.top = '-9999px';
+  printContainer.style.width = '794px'; // Standard A4 width in pixels at 72 DPI
+  printContainer.style.padding = '40px';
+  printContainer.style.backgroundColor = '#ffffff';
+  printContainer.style.color = '#000000';
+  printContainer.style.boxSizing = 'border-box';
+
+  // 3. Inject standard styles and Google Font for Bengali rendering
+  const style = document.createElement('style');
+  style.innerHTML = `
+    @import url('[https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700&display=swap](https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700&display=swap)');
+    #temp-pdf-export-container {
+      font-family: 'Noto Sans Bengali', Arial, sans-serif !important;
+    }
+    .pdf-header { text-align: center; margin-bottom: 30px; }
+    .pdf-title { font-size: 24px; font-weight: bold; color: #1e3a8a; margin: 0; }
+    .pdf-subtitle { font-size: 14px; color: #4b5563; margin-top: 5px; }
+    .pdf-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    .pdf-table th { background-color: #f3f4f6; border: 1px solid #d1d5db; padding: 12px 10px; font-size: 14px
