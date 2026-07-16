@@ -8,6 +8,7 @@ import settingsRouter from "./settings";
 import ledgerRouter from "./ledger";
 import eventsRouter from "./events";
 import storageRouter from "./storage";
+import staffRouter from "./staff";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,8 @@ router.use(dashboardRouter);
 router.use(settingsRouter);
 router.use(ledgerRouter);
 router.use(eventsRouter);
+
+// Staff duty deployment — fully isolated from customer ledger.
+router.use(staffRouter);
 
 export default router;

@@ -7,7 +7,7 @@ import {
   PartyRole,
   DueFilter,
 } from '@workspace/api-client-react';
-import { Search, Plus, Settings, User, ChevronRight, UserPlus2, SlidersHorizontal, FileText, Users, Pencil, UserCircle2 } from 'lucide-react';
+import { Search, Plus, Settings, User, ChevronRight, UserPlus2, SlidersHorizontal, FileText, Users, Pencil, FolderOpen } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { AddPartyModal } from '@/components/modals/add-party-modal';
@@ -22,7 +22,7 @@ export function HomeView() {
   const [search, setSearch] = useState('');
   const [dueFilter, setDueFilter] = useState<DueFilter>(DueFilter.ALL);
   const [showDueFilters, setShowDueFilters] = useState(false);
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [isAddPartyOpen, setIsAddPartyOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
@@ -57,18 +57,18 @@ export function HomeView() {
 
           <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={() => setIsAddStaffOpen(true)}
+              onClick={() => navigate('/staff-deployment')}
               className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-2 rounded-xl active:scale-95 transition-all"
             >
               <UserPlus2 className="w-3.5 h-3.5" />
               স্টাফ যোগ করুন
             </button>
             <button
-              onClick={() => setIsSettingsOpen(true)}
-              aria-label="প্রোফাইল"
+              onClick={() => navigate('/staff-deployment')}
+              aria-label="ডিউটি ফোল্ডার"
               className="w-9 h-9 rounded-xl bg-white/15 text-white flex items-center justify-center active:scale-95 active:bg-white/25 transition-all"
             >
-              <UserCircle2 className="w-[18px] h-[18px]" />
+              <FolderOpen className="w-[18px] h-[18px]" />
             </button>
           </div>
         </div>

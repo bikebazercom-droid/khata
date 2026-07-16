@@ -1,0 +1,28 @@
+Create a completely isolated and independent "Staff Duty Deployment & Rotation Module" that is triggered by the "স্টাফ যোগ করুন" button and the adjacent profile folder icon. This module must have absolutely ZERO connection to the core customer ledger or transactional financial accounting databases.
+
+Please build this isolated architecture with the following mechanics:
+
+1. COMPONENT ISOLATION & SEPARATE DATABASE TABLING:
+- Build a dedicated dashboard route or full-screen view (`/staff-deployment`) entirely decoupled from customer transactions.
+- Implement independent database models for `StaffPersonnel` (to store employee names in a manual index) and `StaffDeploymentLogs` (to store dates, times, and location details).
+
+2. MANUAL REGISTRATION & INFINITE CIRCULAR QUEUE UI:
+- In this view, provide a manual input field to register employees (e.g., a pool of 30–40 names).
+- Render these employees in a top-to-bottom queue list. The topmost staff member is the "Active Deployment Target".
+- When the user taps the top name, open an instant modal with office destinations: "ঢাকা" (Dhaka), "চিটাগং" (Chittagong), "বরিশাল" (Barisal), "খুলনা" (Khulna), and "সিলেট" (Sylhet).
+- Upon selecting a destination, automatically log that person's deployment, immediately remove them from the top of the list, and append them to the absolute bottom of the queue. The next employee shifts up instantly.
+
+3. DATE-GROUPED CHRONOLOGICAL LOGS (ফোল্ডার ভিউ):
+- Inside the dedicated folder interface, display the deployment history automatically sorted by Date (তারিখ অনুযায়ী).
+- Group records cleanly: for example, under a specific header like "১ই জুলাই, ২০২৬", show a nested list of all staff dispatched on that day and exactly where they were sent (e.g., "রহিম -> ঢাকা", "করিম -> খুলনা").
+- Display active visual metrics indicating: "আজকে কতজন ডিউটিতে গেছেন" (Total deployed today) and "কতজন লাইনে বাকি আছেন" (Total pending in queue).
+
+4. ISOLATED MONTHLY PDF STATEMENT GENERATION:
+- Add a standalone button labeled "মাসিক ডিউটি স্টেটমেন্ট ডাউনলোড (PDF)" (Download Monthly Duty Statement).
+- Generate a highly formatted PDF containing:
+  * Summary metrics: Deployed vs. Remaining counts for the month.
+  * Location Deployment Tally: Total count of personnel dispatched to Dhaka, Chittagong, Barisal, Khulna, and Sylhet.
+  * Chronological Ledger Grid: Columns for Date (তারিখ), Staff Name (স্টাফের নাম), and Assigned Destination (ডিউটি লোকেশন).
+  * Design: Professional dark blue headers, striped rows, and clean margins under the "ডিজিটাল খাতা" header layout.
+
+Compile this entire isolated module without mixing any code states with the customer account screens, and push the active build now.

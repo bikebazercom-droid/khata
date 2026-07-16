@@ -12,6 +12,7 @@ import { HomeView } from '@/pages/home';
 import { PartyView } from '@/pages/party-view';
 import { TransactionDetailPage } from '@/pages/transaction-detail';
 import { ReportView } from '@/pages/report-view';
+import { StaffDeploymentPage } from '@/pages/staff-deployment';
 import { LandingPage } from '@/pages/landing';
 import { SignInPage } from '@/pages/sign-in';
 import { SignUpPage } from '@/pages/sign-up';
@@ -286,6 +287,11 @@ function AppRouter() {
             <Route path="/reports">
               <ProtectedLayout>
                 <ReportView />
+              </ProtectedLayout>
+            </Route>
+            <Route path="/staff-deployment">
+              <ProtectedLayout>
+                <StaffDeploymentPage />
               </ProtectedLayout>
             </Route>
             <Route component={NotFound} />
