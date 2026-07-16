@@ -448,9 +448,9 @@ export function StaffDeploymentPage() {
               <div key={member.id} className="relative">
                 {/* Active target card */}
                 {idx === 0 ? (
-                  <button
+                  <div
                     onClick={() => setDeployTarget(member)}
-                    className="w-full text-left bg-white rounded-2xl border-2 border-[#1B3A6B] shadow-md active:scale-[0.98] transition-all overflow-hidden"
+                    className="w-full text-left bg-white rounded-2xl border-2 border-[#1B3A6B] shadow-md active:scale-[0.98] transition-all overflow-hidden cursor-pointer select-none"
                   >
                     {/* Active badge */}
                     <div className="bg-[#1B3A6B] px-4 py-2 flex items-center justify-between">
@@ -474,9 +474,17 @@ export function StaffDeploymentPage() {
                           <p className="text-[11px] text-slate-400 font-medium">#১ — ডিউটি না দেওয়া পর্যন্ত এখানেই থাকবেন</p>
                         </div>
                       </div>
-                      <MapPin className="w-5 h-5 text-[#1B3A6B]" />
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={e => { e.stopPropagation(); setDeleteTarget(member); }}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-400 hover:bg-red-50 active:scale-95 transition-all"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                        <MapPin className="w-5 h-5 text-[#1B3A6B]" />
+                      </div>
                     </div>
-                  </button>
+                  </div>
                 ) : (
                   /* Queue member card — tappable for manual override deploy */
                   <div
@@ -887,10 +895,11 @@ export function StaffDeploymentPage() {
       <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
         <AlertDialogContent className="max-w-sm rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>স্টাফ সরিয়ে দেবেন?</AlertDialogTitle>
+            <AlertDialogTitle>স্টাফ ডিলিট করবেন?</AlertDialogTitle>
             <AlertDialogDescription>
+              আপনি কি এই স্টাফের নাম সম্পূর্ণ ডিলিট করতে চান?{' '}
               <span className="font-semibold text-slate-800">{deleteTarget?.name}</span>-কে ডিউটি লাইন থেকে
-              সরিয়ে দেওয়া হবে। তার পুরনো লগ মুছবে না।
+              সরিয়ে দেওয়া হবে এবং পরবর্তী জন স্বয়ংক্রিয়ভাবে #১ হবেন। পুরনো লগ মুছবে না।
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
