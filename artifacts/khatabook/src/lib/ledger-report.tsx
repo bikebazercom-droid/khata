@@ -202,7 +202,8 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                                 marginTop: '4px',
                                 width: '48px',
                                 height: '48px',
-                                objectFit: 'cover',
+                                objectFit: 'contain',
+                                backgroundColor: '#f1f5f9',
                                 borderRadius: '4px',
                                 border: '1px solid #e2e8f0',
                               }}
