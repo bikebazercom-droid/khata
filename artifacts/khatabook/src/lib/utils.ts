@@ -5,14 +5,46 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(amount: number) {
-  // minimumFractionDigits:0 → whole numbers show without ".00"
-  // maximumFractionDigits:2 → decimals are preserved up to 2 places
-  // (the previous maximumFractionDigits:0 was silently rounding 2332.82 → 2333)
-  return `৳${new Intl.NumberFormat('en-IN', {
-    minimumFractionDigits: 0,
+// ── Bengali numeral helpers ────────────────────────────────────────────────────
+
+/** Maps ASCII digits to their Unicode Bengali equivalents. */
+const EN_TO_BN: Readonly<Record<string, string>> = {
+  '0': '০', '1': '১', '2': '২', '3': '৩', '4': '৪',
+  '5': '৫', '6': '৬', '7': '৭', '8': '৮', '9': '৯',
+} as const;
+
+/**
+ * Converts a formatted English-digit string to Bengali digits,
+ * leaving all other characters (commas, period, ৳) unchanged.
+ * Exported so other modules (e.g. receiptCanvas.ts) can reuse the same map.
+ */
+export function toBengaliDigits(str: string): string {
+  return str.split('').map(ch => EN_TO_BN[ch] ?? ch).join('');
+}
+
+/**
+ * Formats a number in Bengali digits with Indian-style grouping
+ * (used in Bangladesh: lakhs/crores).
+ *
+ * - Whole numbers show no decimal places  (২,৫০০)
+ * - Decimal amounts show exactly 2 places (২,৩৩২.৮২)
+ */
+export function formatBengaliNumber(amount: number): string {
+  const hasDecimal = !Number.isInteger(amount);
+  const formatted = new Intl.NumberFormat('en-IN', {
+    minimumFractionDigits: hasDecimal ? 2 : 0,
     maximumFractionDigits: 2,
-  }).format(amount)}`
+  }).format(amount);
+  return toBengaliDigits(formatted);
+}
+
+/**
+ * Formats a monetary amount with the ৳ prefix and Bengali digits.
+ * Examples:  2500   → ৳২,৫০০
+ *            2332.82 → ৳২,৩৩২.৮২
+ */
+export function formatCurrency(amount: number): string {
+  return `৳${formatBengaliNumber(amount)}`;
 }
 
 /**

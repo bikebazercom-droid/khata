@@ -24,6 +24,8 @@
  *  └────────────────────────────────────────┘
  */
 
+import { toBengaliDigits } from './utils';
+
 // ── canvas constants ──────────────────────────────────────────────────────────
 const W     = 800;   // logical width (px)
 const SCALE = 2;     // retina → 1600 × dynamic physical px
@@ -76,10 +78,12 @@ export interface ReceiptData {
 // ── private helpers ───────────────────────────────────────────────────────────
 
 function fmt(amount: number): string {
-  return `৳ ${new Intl.NumberFormat('en-IN', {
+  // Always show exactly 2 decimal places on receipts; convert digits to Bengali script.
+  const enStr = new Intl.NumberFormat('en-IN', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(amount)}`;
+  }).format(amount);
+  return `৳ ${toBengaliDigits(enStr)}`;
 }
 
 function rrPath(
