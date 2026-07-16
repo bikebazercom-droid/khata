@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,11 +13,14 @@ import {
   ActivityIndicator,
   ScrollView,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
+import { useAuth } from '@clerk/expo';
 import {
   useGetParty,
   useListLedgerEntries,
@@ -26,6 +29,76 @@ import {
 import type { LedgerEntry } from '@workspace/api-client-react';
 import { useColors } from '@/hooks/useColors';
 import { useQueryClient } from '@tanstack/react-query';
+
+// ---------------------------------------------------------------------------
+// Bill image helpers
+// ---------------------------------------------------------------------------
+
+const API_BASE = process.env.EXPO_PUBLIC_DOMAIN
+  ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
+  : '';
+
+/**
+ * Resolve a stored billImage value to a displayable URI for React Native's
+ * Image component.
+ * - base64 data URLs → returned as-is (renderable without auth)
+ * - /objects/… paths → full URL to our storage API endpoint
+ * - anything else   → null
+ */
+function billImageSrc(
+  billImage: string | null | undefined,
+): string | null {
+  if (!billImage) return null;
+  if (billImage.startsWith('data:')) return billImage;
+  if (billImage.startsWith('/objects/')) return `${API_BASE}/api/storage${billImage}`;
+  return null;
+}
+
+/**
+ * Upload a bill image to cloud storage using the two-step presigned URL flow.
+ * Returns the objectPath (e.g. "/objects/uploads/uuid") or null on failure.
+ */
+async function uploadBillImage(
+  localUri: string,
+  getToken: () => Promise<string | null>,
+): Promise<string | null> {
+  try {
+    // Fetch the local image as a Blob.
+    const fetchRes = await fetch(localUri);
+    const blob = await fetchRes.blob();
+    const mimeType = blob.type || 'image/jpeg';
+
+    const token = await getToken();
+    const authHeaders: Record<string, string> = token
+      ? { Authorization: `Bearer ${token}` }
+      : {};
+
+    // Step 1: request a presigned upload URL from the API.
+    const metaRes = await fetch(`${API_BASE}/api/storage/uploads/request-url`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
+      body: JSON.stringify({ name: 'bill.jpg', size: blob.size, contentType: mimeType }),
+    });
+    if (!metaRes.ok) return null;
+
+    const { uploadURL, objectPath } = (await metaRes.json()) as {
+      uploadURL: string;
+      objectPath: string;
+    };
+
+    // Step 2: upload image bytes directly to GCS via the presigned URL.
+    const uploadRes = await fetch(uploadURL, {
+      method: 'PUT',
+      body: blob,
+      headers: { 'Content-Type': mimeType },
+    });
+    if (!uploadRes.ok) return null;
+
+    return objectPath; // e.g. "/objects/uploads/some-uuid"
+  } catch {
+    return null;
+  }
+}
 
 function formatAmount(n: number): string {
   return '৳' + new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n);
@@ -53,9 +126,12 @@ interface TransactionSheetProps {
 function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyName, onClose, onSuccess }: TransactionSheetProps) {
   const colors = useColors();
   const qc = useQueryClient();
+  const { getToken } = useAuth();
   const [type, setType] = useState<'YOU_GAVE' | 'YOU_GOT'>(initialType);
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
+  const [billImageUri, setBillImageUri] = useState<string | null>(null);
+  const uploadPromiseRef = useRef<Promise<string | null> | null>(null);
   const createEntry = useCreateLedgerEntry();
 
   // Sync the preselected type every time the sheet opens
@@ -67,6 +143,56 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
     setAmount('');
     setDescription('');
     setType(initialType);
+    setBillImageUri(null);
+    uploadPromiseRef.current = null;
+  }
+
+  async function pickImage() {
+    Alert.alert(
+      'Attach Bill Photo',
+      'Choose a source',
+      [
+        {
+          text: 'Camera',
+          onPress: async () => {
+            const perm = await ImagePicker.requestCameraPermissionsAsync();
+            if (perm.status !== 'granted') {
+              Alert.alert('Permission required', 'Please allow camera access to take a photo.');
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ['images'],
+              quality: 0.6,
+            });
+            if (!result.canceled && result.assets[0]) {
+              const uri = result.assets[0].uri;
+              setBillImageUri(uri);
+              uploadPromiseRef.current = uploadBillImage(uri, getToken);
+            }
+          },
+        },
+        {
+          text: 'Photo Library',
+          onPress: async () => {
+            const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (perm.status !== 'granted') {
+              Alert.alert('Permission required', 'Please allow access to your photo library.');
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              quality: 0.6,
+            });
+            if (!result.canceled && result.assets[0]) {
+              const uri = result.assets[0].uri;
+              setBillImageUri(uri);
+              uploadPromiseRef.current = uploadBillImage(uri, getToken);
+            }
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
   }
 
   async function handleSubmit() {
@@ -76,9 +202,20 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
       return;
     }
     try {
+      // If an image was attached, wait for the background upload to finish
+      // before submitting — in most cases it's already done.
+      const pendingUpload = uploadPromiseRef.current;
+      uploadPromiseRef.current = null;
+      const objectPath = pendingUpload ? await pendingUpload : null;
+
       await createEntry.mutateAsync({
         partyId,
-        data: { type, amount: parsed, description: description.trim() || undefined },
+        data: {
+          type,
+          amount: parsed,
+          description: description.trim() || undefined,
+          billImage: objectPath ?? undefined,
+        },
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       qc.invalidateQueries({ queryKey: [`/api/parties/${partyId}/ledger-entries`] });
@@ -157,7 +294,49 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
       fontSize: 14,
       fontFamily: 'Inter_400Regular',
       color: colors.foreground,
+      marginBottom: 12,
+    },
+    attachRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
       marginBottom: 20,
+    },
+    attachBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      borderRadius: colors.radius,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderStyle: 'dashed',
+    },
+    attachBtnText: {
+      fontSize: 13,
+      fontFamily: 'Inter_500Medium',
+      color: colors.mutedForeground,
+    },
+    thumbWrapper: {
+      position: 'relative',
+    },
+    thumb: {
+      width: 56,
+      height: 56,
+      borderRadius: 8,
+      backgroundColor: colors.card,
+    },
+    thumbRemove: {
+      position: 'absolute',
+      top: -6,
+      right: -6,
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: colors.destructive,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     submitBtn: {
       borderRadius: colors.radius,
@@ -231,6 +410,28 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
             returnKeyType="done"
           />
 
+          {/* Bill photo */}
+          <View style={s.attachRow}>
+            {billImageUri ? (
+              <View style={s.thumbWrapper}>
+                <Image source={{ uri: billImageUri }} style={s.thumb} resizeMode="cover" />
+                <TouchableOpacity
+                  style={s.thumbRemove}
+                  onPress={() => { setBillImageUri(null); uploadPromiseRef.current = null; }}
+                  hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+                >
+                  <Feather name="x" size={11} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            ) : null}
+            <TouchableOpacity style={s.attachBtn} onPress={pickImage} activeOpacity={0.7}>
+              <Feather name="camera" size={16} color={colors.mutedForeground} />
+              <Text style={s.attachBtnText}>
+                {billImageUri ? 'Change photo' : 'Attach bill photo'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity
             style={[s.submitBtn, {
               backgroundColor: isGave ? colors.willGet : colors.willGive,
@@ -259,7 +460,29 @@ interface LedgerRowProps {
 }
 
 function LedgerRow({ entry, colors }: LedgerRowProps) {
+  const { getToken } = useAuth();
   const isGave = entry.type === 'YOU_GAVE';
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  // Resolve the bill image URI. For object paths (/objects/…) we need
+  // auth headers, so we use the Image source.headers prop. For base64
+  // data URLs no headers are needed.
+  const rawSrc = billImageSrc(entry.billImage);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (rawSrc && entry.billImage?.startsWith('/objects/')) {
+      getToken().then(setAuthToken);
+    }
+  }, [rawSrc, entry.billImage, getToken]);
+
+  const imageSource = rawSrc
+    ? {
+        uri: rawSrc,
+        ...(authToken ? { headers: { Authorization: `Bearer ${authToken}` } } : {}),
+      }
+    : null;
+
   const s = StyleSheet.create({
     row: {
       flexDirection: 'row',
@@ -281,24 +504,63 @@ function LedgerRow({ entry, colors }: LedgerRowProps) {
     meta: { fontSize: 12, color: colors.mutedForeground, fontFamily: 'Inter_400Regular', marginTop: 2 },
     type: { fontSize: 11, fontFamily: 'Inter_600SemiBold', marginTop: 3 },
     amount: { fontSize: 16, fontFamily: 'Inter_700Bold', textAlign: 'right' },
+    billThumb: {
+      width: 44,
+      height: 44,
+      borderRadius: 6,
+      marginTop: 6,
+      backgroundColor: colors.card,
+    },
   });
 
   return (
-    <View style={s.row}>
-      <View style={s.dot} />
-      <View style={{ flex: 1 }}>
-        <Text style={s.desc} numberOfLines={2}>
-          {entry.description || (isGave ? 'You gave' : 'You got')}
-        </Text>
-        <Text style={s.meta}>{formatDate(entry.createdAt)} · {formatTime(entry.createdAt)}</Text>
-        <Text style={[s.type, { color: isGave ? colors.willGet : colors.willGive }]}>
-          {isGave ? '▲ YOU GAVE' : '▼ YOU GOT'}
+    <>
+      <View style={s.row}>
+        <View style={s.dot} />
+        <View style={{ flex: 1 }}>
+          <Text style={s.desc} numberOfLines={2}>
+            {entry.description || (isGave ? 'You gave' : 'You got')}
+          </Text>
+          <Text style={s.meta}>{formatDate(entry.createdAt)} · {formatTime(entry.createdAt)}</Text>
+          <Text style={[s.type, { color: isGave ? colors.willGet : colors.willGive }]}>
+            {isGave ? '▲ YOU GAVE' : '▼ YOU GOT'}
+          </Text>
+          {imageSource ? (
+            <TouchableOpacity onPress={() => setLightboxOpen(true)} activeOpacity={0.85}>
+              <Image source={imageSource} style={s.billThumb} resizeMode="cover" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        <Text style={[s.amount, { color: isGave ? colors.willGet : colors.willGive }]}>
+          {isGave ? '+' : '-'}{formatAmount(entry.amount)}
         </Text>
       </View>
-      <Text style={[s.amount, { color: isGave ? colors.willGet : colors.willGive }]}>
-        {isGave ? '+' : '-'}{formatAmount(entry.amount)}
-      </Text>
-    </View>
+
+      {/* Full-screen bill image lightbox */}
+      {imageSource ? (
+        <Modal
+          visible={lightboxOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setLightboxOpen(false)}
+        >
+          <TouchableOpacity
+            style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center' }}
+            activeOpacity={1}
+            onPress={() => setLightboxOpen(false)}
+          >
+            <Image
+              source={imageSource}
+              style={{ width: '92%', height: '70%' }}
+              resizeMode="contain"
+            />
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 16 }}>
+              Tap to close
+            </Text>
+          </TouchableOpacity>
+        </Modal>
+      ) : null}
+    </>
   );
 }
 
