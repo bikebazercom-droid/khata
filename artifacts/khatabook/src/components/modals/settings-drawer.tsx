@@ -1,25 +1,54 @@
+import { useState } from 'react';
+import { useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
+import { useClerk, useAuth } from '@clerk/react';
 import {
   useGetBusinessSettings,
   useUpdateBusinessSettings,
   getGetBusinessSettingsQueryKey,
   type BusinessSettings,
 } from '@workspace/api-client-react';
-import { Languages } from 'lucide-react';
+import { Settings, Languages, LogOut } from 'lucide-react';
 import {
   Drawer,
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
-  DrawerDescription,
 } from '@/components/ui/drawer';
+import { phoneLogout } from '@/lib/phoneAuth';
+import { clearAllPendingUploads } from '@/lib/pendingUploads';
 
-export function SettingsDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+/**
+ * Full-screen settings drawer.
+ *
+ * Sections:
+ *   1. System Language — বাংলা / English only (Hindi removed)
+ *   2. Session — লগআউট করুন
+ *
+ * Logout sequence (clears everything before redirecting):
+ *   a. wipe React Query cache (drops all server data)
+ *   b. clear in-memory pending-upload queue
+ *   c. revoke Clerk session (no-op for phone users)
+ *   d. clear phone_session cookie via the server's logout endpoint
+ *   e. navigate to /sign-in  ← SSE disconnects automatically because
+ *      RealtimeSyncManager's `enabled` prop becomes false once isAuthenticated
+ *      returns false after the cache clear + session revocation.
+ */
+export function SettingsDrawer({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const { data: settings } = useGetBusinessSettings();
   const queryClient = useQueryClient();
-  // Optimistic update: the selected language pill highlights instantly via
-  // the cache write in onMutate; a silent background write persists it,
-  // rolling back quietly on failure.
+  const { signOut } = useClerk();
+  const { isSignedIn } = useAuth();
+  const [, navigate] = useLocation();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // ── Language update (optimistic) ──────────────────────────────────────────
   const updateSettings = useUpdateBusinessSettings({
     mutation: {
       onMutate: async ({ data }) => {
@@ -31,7 +60,7 @@ export function SettingsDrawer({ open, onOpenChange }: { open: boolean; onOpenCh
         return { settingsKey, previousSettings };
       },
       onError: (err, _vars, context) => {
-        console.error('ভাষা পরিবর্তন ব্যর্থ হয়েছে, পরিবর্তন ফিরিয়ে নেওয়া হচ্ছে:', err);
+        console.error('ভাষা পরিবর্তন ব্যর্থ হয়েছে:', err);
         if (context) queryClient.setQueryData(context.settingsKey, context.previousSettings);
       },
       onSettled: () => {
@@ -40,33 +69,105 @@ export function SettingsDrawer({ open, onOpenChange }: { open: boolean; onOpenCh
     },
   });
 
-  const handleLanguageChange = (lang: string) => {
-    updateSettings.mutate({ data: { language: lang } });
-  };
+  // ── Logout ────────────────────────────────────────────────────────────────
+  async function handleLogout() {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      // 1. Wipe all cached server data immediately.
+      queryClient.clear();
+      // 2. Drop any pending bill-photo upload references.
+      clearAllPendingUploads();
+      // 3. Revoke Clerk session token (no-op for phone-only users).
+      if (isSignedIn) {
+        await signOut();
+      }
+      // 4. Clear the httpOnly phone_session cookie on the server.
+      //    Safe to call unconditionally — returns 200 even without a session.
+      await phoneLogout().catch(() => {});
+      // 5. Redirect. The SSE stream closes on its own because
+      //    RealtimeSyncManager's `enabled` prop turns false when isAuthenticated
+      //    resolves to false after the session tokens are gone.
+      onOpenChange(false);
+      navigate('/sign-in');
+    } catch (err) {
+      console.error('লগআউট ব্যর্থ হয়েছে:', err);
+      setIsLoggingOut(false);
+    }
+  }
+
+  const LANGUAGES = ['বাংলা', 'English'] as const;
+  const currentLang = settings?.language ?? 'বাংলা';
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent>
         <DrawerHeader className="text-left">
-          <DrawerTitle className="flex items-center gap-2">
-            <Languages className="w-5 h-5 text-slate-600" /> সিস্টেম ভাষা
+          <DrawerTitle className="flex items-center gap-2 text-slate-800">
+            <Settings className="w-5 h-5 text-slate-500" />
+            সেটিংস
           </DrawerTitle>
-          <DrawerDescription>বিল ও ইন্টারফেসের জন্য আপনার পছন্দের ভাষা বেছে নিন</DrawerDescription>
         </DrawerHeader>
-        <div className="grid grid-cols-3 gap-3 px-4 pb-8">
-          {['বাংলা', 'English', 'हिंदी'].map((lang) => (
+
+        <div className="px-4 pb-10 space-y-6">
+
+          {/* ── Language section ────────────────────────────────────── */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <Languages className="w-4 h-4 text-slate-400" />
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                সিস্টেম ভাষা
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {LANGUAGES.map((lang) => {
+                const active = currentLang === lang;
+                return (
+                  <button
+                    key={lang}
+                    type="button"
+                    onClick={() => updateSettings.mutate({ data: { language: lang } })}
+                    className={`py-4 rounded-2xl border-2 text-center font-bold text-[15px] transition-all active:scale-95 ${
+                      active
+                        ? 'border-slate-900 bg-slate-900 text-white shadow-md'
+                        : 'border-slate-100 bg-white text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    {lang}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-2 text-center">
+              বিল ও ইন্টারফেসের জন্য পছন্দের ভাষা বেছে নিন
+            </p>
+          </div>
+
+          {/* ── Divider ─────────────────────────────────────────────── */}
+          <div className="border-t border-slate-100" />
+
+          {/* ── Logout section ──────────────────────────────────────── */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <LogOut className="w-4 h-4 text-slate-400" />
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                অ্যাকাউন্ট
+              </p>
+            </div>
             <button
-              key={lang}
-              onClick={() => handleLanguageChange(lang)}
-              className={`p-4 rounded-2xl border-2 text-center transition-all active:scale-95 ${
-                settings?.language === lang
-                  ? 'border-primary bg-primary text-primary-foreground font-bold shadow-md'
-                  : 'border-slate-100 bg-white text-slate-600 font-semibold'
-              }`}
+              type="button"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl border-2 border-red-100 bg-red-50 text-red-600 font-bold text-[15px] transition-all active:scale-95 hover:border-red-200 hover:bg-red-100 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {lang}
+              <LogOut className="w-4 h-4" />
+              {isLoggingOut ? 'লগআউট হচ্ছে…' : 'লগআউট করুন'}
             </button>
-          ))}
+            <p className="text-[11px] text-slate-400 mt-2 text-center">
+              লগআউট করলে সব ডিভাইসে সংযোগ বিচ্ছিন্ন হবে
+            </p>
+          </div>
+
         </div>
       </DrawerContent>
     </Drawer>

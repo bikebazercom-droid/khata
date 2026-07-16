@@ -226,8 +226,8 @@ export default function SettingsScreen() {
         <Text style={s.sectionLabel}>ABOUT</Text>
         <View style={s.aboutCard}>
           <Feather name="book-open" size={32} color={colors.primary} />
-          <Text style={s.appName}>হাজারী খাতাবুক</Text>
-          <Text style={s.appVersion}>Hazari Khatabook Mobile · v1.0</Text>
+          <Text style={s.appName}>ডিজিটাল খাতা</Text>
+          <Text style={s.appVersion}>Digital Khata Mobile · v1.0</Text>
         </View>
 
         <View style={s.bottomPad} />

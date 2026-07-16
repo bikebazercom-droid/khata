@@ -1,0 +1,22 @@
+Please execute a unified system integration to connect the Landing Website, the Core Live Software ("ডিজিটাল খাতা"), the Cloud Database Sync engine, and the Mobile App Binaries (APK/IPA) into a single seamlessly linked network architecture.
+
+Implement the following integrations concurrently:
+
+1. FULL BRANDING & METADATA OVERHAUL:
+- Apply the official name "ডিজিটাল খাতা" (Digital Khata) across the entire project. Update the HTML document title to: "ডিজিটাল খাতা — নিরাপদ ও দ্রুততম ক্লাউড হিসাব".
+- Update all website headers, navbars, footers, and transaction receipt templates to display the "ডিজিটাল খাতা" branding uniformly.
+
+2. LANDING WEBSITE TO SOFTWARE INTERCONNECTION:
+- Connect the core landing website to the live software web app dashboard. 
+- Create a prominent, premium action button labeled "লাইভ অ্যাপে প্রবেশ করুন" (Launch Live Web App) in the navigation bar and hero section that routes users instantly to the live ledger system (`/dashboard` or `/ledger`).
+
+3. MOBILE BINARY DOWNLOADING PATHS (APK & IPA):
+- Map the "Android APK ডাউনলোড" button on the landing page directly to our production server file asset path: `/public/packages/app-release.apk`.
+- Map the "iOS IPA ডাউনলোড" button on the landing page directly to our production server file asset path: `/public/packages/app-release.ipa`.
+- Ensure the server serves these exact file names with correct MIME-types for standalone device installations.
+
+4. MANUAL CLOUD ACTIVATION MASTER SWITCH:
+- Implement a centralized configuration layer (`config/cloud_config.json` or secure server context) featuring a boolean master flag: `"IS_CLOUD_SYNC_ACTIVE": false`.
+- Build the real-time sync engine conditionally: if the flag is `false`, pause active streaming. The moment the owner manually changes this configuration to `true`, instantly activate live cloud streaming and multi-device synchronization.
+
+Review the build paths, verify zero-compilation errors across TypeScript, and activate this entire unified architecture now.
