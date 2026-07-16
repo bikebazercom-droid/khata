@@ -1,0 +1,139 @@
+The third-party PDF libraries (html2pdf / html2canvas) are consistently failing and rendering blank white pages on the client's browser. We need to completely abandon these libraries. 
+
+Implement the "Hidden Iframe Native Printing" technique, which is 100% bulletproof, bypasses all CSS/stacking contexts, and utilizes the browser's native rendering engine to generate a perfect PDF.
+
+Please completely replace the PDF export/download function with this exact native JS implementation:
+
+1. THE BULLETPROOF IFRAME PRINTING CODE:
+```javascript
+const handleDownloadPDF = () => {
+  const logsToExport = dutyLogs || []; // Use the state variable holding the 20 staff logs
+  if (logsToExport.length === 0) {
+    alert("ডাউনলোড করার জন্য কোনো ডিউটি ডাটা পাওয়া যায়নি!");
+    return;
+  }
+
+  // 1. Create a completely isolated hidden iframe
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  document.body.appendChild(iframe);
+
+  const iframeDoc = iframe.contentWindow.document;
+  const monthName = selectedMonth || "July 2026";
+
+  // 2. Generate clean HTML for the 20 staff logs
+  let tableRows = '';
+  logsToExport.forEach((log) => {
+    const name = log.name || log.staffName || "অজানা স্টাফ";
+    const time = log.time || "07:17 PM";
+    const dest = log.destination || log.location || "কোনো তথ্য নেই";
+    tableRows += `
+      <tr>
+        <td>${name}</td>
+        <td>${time}</td>
+        <td class="dest-col">${dest}</td>
+      </tr>
+    `;
+  });
+
+  // 3. Write isolated HTML, Google Bengali fonts, and styles into the iframe
+  iframeDoc.open();
+  iframeDoc.write(`
+    <html>
+      <head>
+        <title>ডিউটি স্টেটমেন্ট - ${monthName}</title>
+        <link href="[https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700&display=swap](https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700&display=swap)" rel="stylesheet">
+        <style>
+          body {
+            font-family: 'Noto Sans Bengali', Arial, sans-serif;
+            padding: 40px;
+            color: #1f2937;
+            background-color: #ffffff;
+          }
+          .header {
+            text-align: center;
+            border-bottom: 3px solid #1e3a8a;
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+          }
+          .title {
+            font-size: 26px;
+            font-weight: bold;
+            color: #1e3a8a;
+            margin: 0;
+          }
+          .subtitle {
+            font-size: 14px;
+            color: #4b5563;
+            margin-top: 8px;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+          }
+          th {
+            background-color: #f3f4f6;
+            border: 1px solid #9ca3af;
+            padding: 12px;
+            font-size: 14px;
+            text-align: left;
+            font-weight: bold;
+          }
+          td {
+            border: 1px solid #d1d5db;
+            padding: 12px;
+            font-size: 13px;
+          }
+          .dest-col {
+            font-weight: bold;
+            color: #16a34a;
+          }
+          @media print {
+            @page {
+              size: A4;
+              margin: 15mm;
+            }
+            body {
+              padding: 0;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="title">ডিজিটাল খাতা — ডিউটি ব্যবস্থাপনা</div>
+          <div class="subtitle">মাসিক স্টেটমেন্ট: ${monthName} | মোট ডিউটি: ${logsToExport.length} জন</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>স্টাফের নাম</th>
+              <th>সময়</th>
+              <th>গন্তব্য</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `);
+  iframeDoc.close();
+
+  // 4. Trigger print and automatically destroy the iframe afterwards
+  setTimeout(() => {
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+    // Allow slight delay for the print spooler to hand off, then clean up DOM
+    setTimeout(() => {
+      document.body.removeChild(iframe);
+    }, 1000);
+  }, 500);
+};

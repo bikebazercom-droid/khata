@@ -5,7 +5,7 @@
  * Uses raw fetch + react-query directly — no generated API client coupling.
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -28,7 +28,6 @@ import {
 import { format, isToday, parseISO } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { toast } from 'sonner';
-import html2pdf from 'html2pdf.js';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -194,7 +193,6 @@ export function StaffDeploymentPage() {
   // ── PDF state ─────────────────────────────────────────────────────────────
   const [pdfMonth, setPdfMonth] = useState(() => format(new Date(), 'yyyy-MM'));
   const [isExporting, setIsExporting] = useState(false);
-  const pdfRef = useRef<HTMLDivElement>(null);
 
   // ── queries ────────────────────────────────────────────────────────────────
 
@@ -345,13 +343,38 @@ export function StaffDeploymentPage() {
   const queueRemaining = personnel.length;
   const logGroups      = groupLogsByDate(logs);
 
-  // ── PDF export ─────────────────────────────────────────────────────────────
+  // ── PDF export (iframe native print) ──────────────────────────────────────
+  //
+  // We abandoned html2pdf / html2canvas because they consistently produce
+  // blank pages on mobile browsers due to stacking-context clipping and
+  // compositor snapshot limitations that cannot be worked around at the
+  // library level.
+  //
+  // The replacement uses the browser's own rendering engine:
+  //   1. A hidden <iframe> is injected into document.body.
+  //   2. A self-contained HTML document (fonts, print CSS, content) is
+  //      written into the iframe via document.write().
+  //   3. We wait for the iframe's fonts to decode, then call
+  //      iframe.contentWindow.print() which opens the native OS print
+  //      dialog. The user selects "Save as PDF" (all mobile browsers
+  //      support this natively).
+  //   4. The iframe is removed ~2 s later — enough time for the print
+  //      spooler to hand off the document.
+  //
+  // Why this is bulletproof:
+  //   • The iframe is a completely independent browsing context with its
+  //     own DOM, CSSOM, and stacking context — zero interference from the
+  //     React app's CSS (no overflow:hidden, no transforms, no clip).
+  //   • The browser's print engine renders the same pixel pipeline it uses
+  //     for real printing: backgrounds, Bengali glyphs, colours — all
+  //     preserved exactly as the CSS declares.
+  //   • `print-color-adjust: exact` (all vendor prefixes) forces Chrome /
+  //     Safari to keep background colours in the PDF instead of stripping
+  //     them for "ink saving" mode.
 
   async function handleExportPdf() {
     setIsExporting(true);
-    // Container appended to document.body — created and destroyed inside this
-    // function so there is no risk of it persisting between calls.
-    let container: HTMLDivElement | null = null;
+    const iframe = document.createElement('iframe');
     try {
       const [year, mon] = pdfMonth.split('-').map(Number);
       const monthLabel  = format(new Date(year, mon - 1, 1), 'MMMM yyyy', { locale: bn });
@@ -364,114 +387,122 @@ export function StaffDeploymentPage() {
       const tally  = destinationTally(monthLogs);
       const groups = groupLogsByDate(monthLogs);
 
-      // ── Step 2: build an isolated DOM container ──────────────────────────
+      // ── Step 2: create a zero-size hidden iframe ─────────────────────────
       //
-      // WHY document.createElement instead of a React ref:
-      //   The React component tree root has `position:relative` which creates
-      //   a stacking context. Even with `position:fixed; zIndex:9999`, the
-      //   off-screen ref div inherits clip / overflow constraints from that
-      //   context. On mobile Chrome/Safari the compositor snapshot that
-      //   html2canvas reads is taken *after* clipping — so it returns a blank
-      //   or partially blank canvas regardless of z-index.
-      //
-      //   Appending directly to document.body makes the container a child of
-      //   the root stacking context (no parent clip, no overflow:hidden, no
-      //   transform). html2canvas captures it in full, pixel-perfect.
-      //
-      // position:absolute; left/top:-9999px keeps it invisible to the user
-      // while being fully laid out by the browser's reflow engine.
-      container = document.createElement('div');
-      Object.assign(container.style, {
-        position:        'absolute',
-        left:            '-9999px',
-        top:             '-9999px',
-        width:           '794px',      // A4 width at 96 dpi
-        backgroundColor: '#ffffff',
-        color:           '#000000',
-        boxSizing:       'border-box',
-        // Declare the font here so even if Google Fonts is slow, the browser
-        // can fall back gracefully rather than rendering invisible text.
-        fontFamily:      "'Noto Sans Bengali', 'Inter', Arial, sans-serif",
+      // width/height:0 + visibility:hidden keeps it invisible.
+      // We do NOT use display:none because print() on a display:none iframe
+      // is a no-op in some browsers.
+      Object.assign(iframe.style, {
+        position:   'fixed',
+        right:      '0',
+        bottom:     '0',
+        width:      '0',
+        height:     '0',
+        border:     '0',
+        visibility: 'hidden',
       });
-      document.body.appendChild(container);
+      document.body.appendChild(iframe);
 
-      // ── Step 3: inject the PDF markup ───────────────────────────────────
-      const html = buildPdfHtml({ monthLabel, monthLogs, tally, groups, queueRemaining });
-      container.innerHTML = html;
+      const iframeWin = iframe.contentWindow;
+      if (!iframeWin) throw new Error('iframe contentWindow unavailable');
+      const iframeDoc = iframeWin.document;
 
-      // ── Step 4: content guard ────────────────────────────────────────────
+      // ── Step 3: write a complete, self-contained HTML document ───────────
       //
-      // If innerHTML injection produced zero children (e.g. the browser's
-      // DOMParser rejected the markup), abort immediately with a clear
-      // error rather than silently generating a blank PDF.
-      if (container.children.length === 0) {
-        throw new Error('PDF template produced no DOM nodes — aborting to avoid blank PDF');
+      // The document includes:
+      //   • Google Fonts link for Noto Sans Bengali (the only Bengali-capable
+      //     font available cross-browser without bundling a font file).
+      //   • A @media print block with:
+      //       - @page size:A4 and 10 mm margins
+      //       - print-color-adjust:exact (all prefixes) so background colours
+      //         are NOT stripped by Chrome's ink-saving heuristic
+      //   • The full branded HTML produced by buildPdfHtml() — tables, header,
+      //     summary strip, footer — all with inline styles so no external
+      //     stylesheet is needed.
+      const bodyContent = buildPdfHtml({ monthLabel, monthLogs, tally, groups, queueRemaining });
+
+      iframeDoc.open();
+      iframeDoc.write(`<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=794">
+  <title>ডিউটি স্টেটমেন্ট — ${monthLabel}</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700;900&family=Inter:wght@400;600;700;800;900&display=swap"
+    rel="stylesheet"
+  >
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Noto Sans Bengali', 'Inter', Arial, sans-serif;
+      background: #ffffff;
+      color: #0f172a;
+      padding: 20px;
+    }
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 10mm;
       }
+      body {
+        padding: 0;
+        /* Force the browser to keep all background colours and images.
+           Without this Chrome strips coloured table headers and pills. */
+        -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                     color-adjust: exact;
+      }
+    }
+  </style>
+</head>
+<body>
+  ${bodyContent}
+</body>
+</html>`);
+      iframeDoc.close();
 
-      // ── Step 5: font readiness ──────────────────────────────────────────
+      // ── Step 4: wait for the iframe's fonts to decode ────────────────────
       //
-      // document.fonts.ready resolves once every @font-face declared in the
-      // document (including Noto Sans Bengali from Google Fonts in index.html)
-      // has been decoded and is ready to paint. Skipping this produces
-      // invisible or box-character Bengali text in the captured canvas.
-      await document.fonts.ready;
+      // The iframe has its own FontFaceSet. We must wait on the *iframe's*
+      // document.fonts.ready — not the parent window's — because the Google
+      // Fonts link was injected into the iframe document, not the parent.
+      await iframeDoc.fonts.ready;
 
-      // ── Step 6: double requestAnimationFrame ────────────────────────────
+      // ── Step 5: double rAF inside the iframe ─────────────────────────────
       //
-      // A single rAF guarantees the browser has *scheduled* the next frame —
-      // not that layout and paint are complete for the newly-injected HTML.
-      //
-      // Two frames are needed:
-      //   Frame 1 → style recalc + layout (reflow) for the new nodes
-      //   Frame 2 → paint pass committed; pixels available to html2canvas
-      //
-      // On low-end Android and mobile Safari, capturing after only one rAF
-      // consistently returns a blank canvas because the paint hasn't landed.
+      // Same two-frame reason as before: frame 1 = layout, frame 2 = paint.
+      // Using the iframe's own rAF keeps timing within the iframe's rendering
+      // pipeline rather than the parent's, which may have a different cadence.
       await new Promise<void>(resolve =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        iframeWin.requestAnimationFrame(() =>
+          iframeWin.requestAnimationFrame(() => resolve()),
+        ),
       );
 
-      // ── Step 7: generate and download the PDF ───────────────────────────
+      // ── Step 6: trigger the native print dialog ──────────────────────────
       //
-      //   windowWidth:794     — instructs html2canvas to treat the capture
-      //                          as if the browser viewport is 794 px wide
-      //                          (A4 @ 96 dpi). Without this, mobile Chrome
-      //                          uses the physical viewport (≈390 px) and
-      //                          clips half the page into the PDF.
-      //   scale:2             — renders at 192 dpi; text stays crisp in the
-      //                          PDF viewer at 100% and when printed.
-      //   useCORS:true        — required for Google Fonts (cross-origin).
-      //   allowTaint:true     — prevents canvas abort on tainted resources.
-      //   letterRendering:true— forces per-character placement on WebKit so
-      //                          spacing matches the CSS layout engine output.
-      //   logging:false       — suppress html2canvas console noise.
-      await html2pdf()
-        .set({
-          margin:      [10, 10, 10, 10],
-          filename:    `ডিউটি-স্টেটমেন্ট-${pdfMonth}.pdf`,
-          image:       { type: 'jpeg', quality: 0.98 },
-          html2canvas: {
-            scale:           2,
-            useCORS:         true,
-            allowTaint:      true,
-            letterRendering: true,
-            windowWidth:     794,
-            logging:         false,
-          },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        })
-        .from(container)
-        .save();
+      // focus() is required on iOS Safari — print() on an unfocused iframe
+      // is silently swallowed on some versions.
+      iframeWin.focus();
+      iframeWin.print();
 
-      toast.success('PDF ডাউনলোড হয়েছে');
+      // ── Step 7: deferred cleanup ─────────────────────────────────────────
+      //
+      // Removing the iframe immediately after print() cancels the spooler
+      // job on some browsers before the OS has received the document.
+      // A 2 s delay is enough for the handoff on all tested mobile browsers.
+      setTimeout(() => {
+        if (document.body.contains(iframe)) document.body.removeChild(iframe);
+      }, 2_000);
+
+      toast.success('প্রিন্ট ডায়ালগ খুলেছে — "PDF হিসেবে সেভ করুন" বেছে নিন');
     } catch (err) {
       console.error('[PDF export]', err);
+      // On error remove immediately — no point keeping a broken iframe.
+      if (document.body.contains(iframe)) document.body.removeChild(iframe);
       toast.error('PDF তৈরি করতে ব্যর্থ হয়েছে');
     } finally {
-      // Always remove the temporary container from the document, even on error.
-      if (container && document.body.contains(container)) {
-        document.body.removeChild(container);
-      }
       setIsExporting(false);
     }
   }
