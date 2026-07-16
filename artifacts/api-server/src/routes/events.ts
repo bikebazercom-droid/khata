@@ -29,6 +29,12 @@ router.get("/events", (req, res): void => {
   res.setHeader("X-Accel-Buffering", "no"); // nginx: disable proxy buffering
   res.flushHeaders();
 
+  // Tell the browser to attempt reconnection after 3 seconds (instead of
+  // the browser's own default, which varies and can be as long as several
+  // seconds). On mobile networks that drop frequently, a shorter retry
+  // interval means faster resync after a cell handoff or brief outage.
+  res.write("retry: 3000\n\n");
+
   // Send an initial connection confirmation the client can use to mark the
   // channel as "ready" before applying any pending invalidations.
   res.write("event: connected\ndata: {}\n\n");

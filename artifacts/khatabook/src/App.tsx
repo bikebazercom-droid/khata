@@ -98,7 +98,27 @@ const clerkAppearance = {
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: false, staleTime: 30_000 },
+    queries: {
+      // Never auto-retry failed requests — SSE-driven invalidation handles
+      // re-fetching when connectivity is restored.
+      retry: false,
+      // Data is considered fresh for 30 seconds. After that, a background
+      // refetch is triggered on the next mount/focus/reconnect. SSE events
+      // bypass staleTime entirely — they call invalidateQueries directly.
+      staleTime: 30_000,
+      // Refetch automatically when the user switches back to this tab
+      // (catches the case where data changed on another device while this
+      // tab was in the background and the SSE connection was throttled).
+      refetchOnWindowFocus: true,
+      // When the browser re-establishes a network connection, resume any
+      // queries that were paused while offline and refetch stale data.
+      refetchOnReconnect: true,
+      // With `online` mode, queries are paused when the browser reports
+      // no network and automatically resume (and refetch) once it returns.
+      // This is the default but we declare it explicitly so the intent is
+      // visible and won't be accidentally overridden.
+      networkMode: 'online',
+    },
   },
 });
 
