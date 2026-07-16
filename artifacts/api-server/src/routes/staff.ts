@@ -11,6 +11,7 @@ import {
   db,
   staffPersonnelTable,
   staffDeploymentLogsTable,
+  staffDestinationsTable,
 } from "@workspace/db";
 import { type AuthenticatedRequest } from "../middlewares/requireAuth";
 
@@ -18,7 +19,6 @@ const router: IRouter = Router();
 
 // ─── validation helpers ───────────────────────────────────────────────────────
 
-const VALID_DESTINATIONS = new Set(["ঢাকা", "চিটাগং", "বরিশাল", "খুলনা", "সিলেট", "রাজশাহী"]);
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
 // ─── GET /staff/personnel ─────────────────────────────────────────────────────
@@ -185,6 +185,72 @@ router.get("/staff/logs", async (req, res): Promise<void> => {
     .orderBy(desc(staffDeploymentLogsTable.deployedAt));
 
   res.json(rows);
+});
+
+// ─── GET /staff/destinations ──────────────────────────────────────────────────
+
+router.get("/staff/destinations", async (req, res): Promise<void> => {
+  const { businessId } = req as unknown as AuthenticatedRequest;
+
+  const rows = await db
+    .select()
+    .from(staffDestinationsTable)
+    .where(eq(staffDestinationsTable.businessId, businessId))
+    .orderBy(asc(staffDestinationsTable.createdAt));
+
+  res.json(rows);
+});
+
+// ─── POST /staff/destinations ─────────────────────────────────────────────────
+
+router.post("/staff/destinations", async (req, res): Promise<void> => {
+  const { businessId } = req as unknown as AuthenticatedRequest;
+  const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+  if (!name || name.length > 120) {
+    res.status(400).json({ error: "name must be 1-120 characters" });
+    return;
+  }
+
+  // Check uniqueness per business
+  const existing = await db
+    .select({ id: staffDestinationsTable.id })
+    .from(staffDestinationsTable)
+    .where(
+      and(
+        eq(staffDestinationsTable.businessId, businessId),
+        eq(staffDestinationsTable.name, name),
+      ),
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    res.status(409).json({ error: "এই গন্তব্য ইতিমধ্যে তালিকায় আছে" });
+    return;
+  }
+
+  const [row] = await db
+    .insert(staffDestinationsTable)
+    .values({ businessId, name })
+    .returning();
+
+  res.status(201).json(row);
+});
+
+// ─── DELETE /staff/destinations/:id ──────────────────────────────────────────
+
+router.delete("/staff/destinations/:id", async (req, res): Promise<void> => {
+  const { businessId } = req as unknown as AuthenticatedRequest;
+
+  await db
+    .delete(staffDestinationsTable)
+    .where(
+      and(
+        eq(staffDestinationsTable.id, req.params.id),
+        eq(staffDestinationsTable.businessId, businessId),
+      ),
+    );
+
+  res.json({ ok: true });
 });
 
 export default router;

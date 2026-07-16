@@ -22,9 +22,10 @@ import {
   Pencil,
   Clock,
   SendHorizontal,
-  Settings,
+  PlusCircle,
+  ListChecks,
 } from 'lucide-react';
-import { format, isToday, parseISO, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { format, isToday, parseISO } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { toast } from 'sonner';
 import html2pdf from 'html2pdf.js';
@@ -46,19 +47,25 @@ import { SettingsDrawer } from '@/components/modals/settings-drawer';
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
-const DESTINATIONS = ['ঢাকা', 'চিটাগং', 'বরিশাল', 'খুলনা', 'সিলেট', 'রাজশাহী'] as const;
-type Destination = (typeof DESTINATIONS)[number];
-
-const DEST_COLORS: Record<Destination, { bg: string; text: string; border: string }> = {
-  ঢাকা:    { bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200' },
-  চিটাগং:  { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
-  বরিশাল:  { bg: 'bg-emerald-50',text: 'text-emerald-700',border: 'border-emerald-200' },
-  খুলনা:   { bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200' },
-  সিলেট:   { bg: 'bg-rose-50',   text: 'text-rose-700',   border: 'border-rose-200' },
-  রাজশাহী: { bg: 'bg-teal-50',   text: 'text-teal-700',   border: 'border-teal-200' },
-};
+// Cycling colour palette for dynamic destination badges
+const PALETTE = [
+  { bg: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-200' },
+  { bg: 'bg-purple-50',  text: 'text-purple-700',  border: 'border-purple-200' },
+  { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+  { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200' },
+  { bg: 'bg-rose-50',    text: 'text-rose-700',    border: 'border-rose-200' },
+  { bg: 'bg-teal-50',    text: 'text-teal-700',    border: 'border-teal-200' },
+  { bg: 'bg-orange-50',  text: 'text-orange-700',  border: 'border-orange-200' },
+  { bg: 'bg-indigo-50',  text: 'text-indigo-700',  border: 'border-indigo-200' },
+] as const;
 
 const FALLBACK_COLOR = { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200' };
+
+function destColor(name: string, allDests: StaffDestination[]) {
+  const idx = allDests.findIndex(d => d.name === name);
+  if (idx < 0) return FALLBACK_COLOR;
+  return PALETTE[idx % PALETTE.length];
+}
 
 // ── types ─────────────────────────────────────────────────────────────────────
 
@@ -75,6 +82,12 @@ interface DeploymentLog {
   staffName: string;
   destination: string;
   deployedAt: string;
+}
+
+interface StaffDestination {
+  id: string;
+  name: string;
+  createdAt: string;
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -111,22 +124,27 @@ export function StaffDeploymentPage() {
   const qc = useQueryClient();
 
   // ── tab state ──────────────────────────────────────────────────────────────
-  const [tab, setTab] = useState<'queue' | 'logs'>('queue');
+  const [tab, setTab] = useState<'queue' | 'logs' | 'destinations'>('queue');
 
   // ── deploy modal ───────────────────────────────────────────────────────────
   const [deployTarget, setDeployTarget] = useState<StaffMember | null>(null);
-  const [customDest, setCustomDest] = useState('');
+
+  // ── edit log modal ─────────────────────────────────────────────────────────
+  const [editLog, setEditLog] = useState<DeploymentLog | null>(null);
   const [customEditDest, setCustomEditDest] = useState('');
 
   // ── add staff ──────────────────────────────────────────────────────────────
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState('');
 
-  // ── delete confirm ─────────────────────────────────────────────────────────
+  // ── delete staff confirm ───────────────────────────────────────────────────
   const [deleteTarget, setDeleteTarget] = useState<StaffMember | null>(null);
 
-  // ── log editing ────────────────────────────────────────────────────────────
-  const [editLog, setEditLog] = useState<DeploymentLog | null>(null);
+  // ── add destination ────────────────────────────────────────────────────────
+  const [newDestName, setNewDestName] = useState('');
+
+  // ── delete destination confirm ─────────────────────────────────────────────
+  const [deleteDestTarget, setDeleteDestTarget] = useState<StaffDestination | null>(null);
 
   // ── settings drawer ────────────────────────────────────────────────────────
   const [showSettings, setShowSettings] = useState(false);
@@ -152,6 +170,15 @@ export function StaffDeploymentPage() {
     queryFn: async () => {
       const r = await fetch(`${BASE}/api/staff/logs`, { credentials: 'include' });
       if (!r.ok) throw new Error('Failed to fetch logs');
+      return r.json();
+    },
+  });
+
+  const { data: destinations = [], isLoading: destinationsLoading } = useQuery<StaffDestination[]>({
+    queryKey: ['staff-destinations'],
+    queryFn: async () => {
+      const r = await fetch(`${BASE}/api/staff/destinations`, { credentials: 'include' });
+      if (!r.ok) throw new Error('Failed to fetch destinations');
       return r.json();
     },
   });
@@ -193,7 +220,6 @@ export function StaffDeploymentPage() {
       qc.invalidateQueries({ queryKey: ['staff-personnel'] });
       qc.invalidateQueries({ queryKey: ['staff-logs'] });
       setDeployTarget(null);
-      setCustomDest('');
       toast.success('ডিউটি লগ করা হয়েছে');
     },
     onError: () => toast.error('ডিউটি লগ করতে ব্যর্থ হয়েছে'),
@@ -233,6 +259,42 @@ export function StaffDeploymentPage() {
       toast.success('ডিউটি লোকেশন আপডেট হয়েছে');
     },
     onError: () => toast.error('আপডেট করতে ব্যর্থ হয়েছে'),
+  });
+
+  const addDestMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const r = await fetch(`${BASE}/api/staff/destinations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ name }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data?.error ?? 'Failed to add destination');
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['staff-destinations'] });
+      setNewDestName('');
+      toast.success('গন্তব্য যোগ করা হয়েছে');
+    },
+    onError: (err: Error) => toast.error(err.message || 'গন্তব্য যোগ করতে ব্যর্থ হয়েছে'),
+  });
+
+  const deleteDestMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const r = await fetch(`${BASE}/api/staff/destinations/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!r.ok) throw new Error('Failed to delete destination');
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['staff-destinations'] });
+      setDeleteDestTarget(null);
+      toast.success('গন্তব্য সরানো হয়েছে');
+    },
+    onError: () => toast.error('গন্তব্য সরাতে ব্যর্থ হয়েছে'),
   });
 
   // ── computed ───────────────────────────────────────────────────────────────
@@ -302,16 +364,16 @@ export function StaffDeploymentPage() {
             onClick={() => setShowSettings(true)}
             className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-white active:scale-95 transition-all"
           >
-            <Settings className="w-[18px] h-[18px]" />
+            <ListChecks className="w-[18px] h-[18px]" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex px-4 gap-6 border-b border-white/15">
+        <div className="flex px-4 gap-5 border-b border-white/15">
           <button
             onClick={() => setTab('queue')}
             className={cn(
-              'text-sm font-bold pb-3 pt-1 transition-all border-b-2',
+              'text-[12px] font-bold pb-3 pt-1 transition-all border-b-2 whitespace-nowrap',
               tab === 'queue' ? 'text-white border-white' : 'text-white/55 border-transparent',
             )}
           >
@@ -323,13 +385,25 @@ export function StaffDeploymentPage() {
           <button
             onClick={() => setTab('logs')}
             className={cn(
-              'text-sm font-bold pb-3 pt-1 transition-all border-b-2',
+              'text-[12px] font-bold pb-3 pt-1 transition-all border-b-2 whitespace-nowrap',
               tab === 'logs' ? 'text-white border-white' : 'text-white/55 border-transparent',
             )}
           >
             <span className="flex items-center gap-1.5">
               <FolderOpen className="w-3.5 h-3.5" />
               লগ ফোল্ডার
+            </span>
+          </button>
+          <button
+            onClick={() => setTab('destinations')}
+            className={cn(
+              'text-[12px] font-bold pb-3 pt-1 transition-all border-b-2 whitespace-nowrap',
+              tab === 'destinations' ? 'text-white border-white' : 'text-white/55 border-transparent',
+            )}
+          >
+            <span className="flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5" />
+              গন্তব্য তালিকা
             </span>
           </button>
         </div>
@@ -523,8 +597,7 @@ export function StaffDeploymentPage() {
                 {/* Log entries for this day */}
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                   {dayLogs.map((log, i) => {
-                    const dest = log.destination as Destination;
-                    const colors = DEST_COLORS[dest] ?? FALLBACK_COLOR;
+                    const colors = destColor(log.destination, destinations);
                     return (
                       <div
                         key={log.id}
@@ -550,7 +623,7 @@ export function StaffDeploymentPage() {
                         </span>
                         {/* Edit button */}
                         <button
-                          onClick={() => setEditLog(log)}
+                          onClick={() => { setEditLog(log); setCustomEditDest(''); }}
                           className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-[#1B3A6B] hover:bg-[#1B3A6B]/10 active:scale-95 transition-all shrink-0"
                           title="লোকেশন পরিবর্তন করুন"
                         >
@@ -562,6 +635,99 @@ export function StaffDeploymentPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* ════════════════ DESTINATIONS TAB ════════════════ */}
+        {tab === 'destinations' && (
+          <div className="px-4 pt-4 pb-28 space-y-4">
+
+            {/* Add destination card */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <PlusCircle className="w-4 h-4 text-[#1B3A6B]" />
+                <p className="font-bold text-slate-800 text-[13px]">নতুন গন্তব্য যোগ করুন</p>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="যেমন: রাজশাহী, রংপুর, হেড অফিস…"
+                  value={newDestName}
+                  onChange={e => setNewDestName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && newDestName.trim() && !addDestMutation.isPending) {
+                      addDestMutation.mutate(newDestName.trim());
+                    }
+                  }}
+                  className="flex-1 rounded-xl border-slate-200 text-[14px] font-medium"
+                />
+                <Button
+                  disabled={!newDestName.trim() || addDestMutation.isPending}
+                  onClick={() => addDestMutation.mutate(newDestName.trim())}
+                  className="bg-[#1B3A6B] hover:bg-[#243E72] font-bold px-4 shrink-0"
+                >
+                  {addDestMutation.isPending
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : 'যোগ করুন'
+                  }
+                </Button>
+              </div>
+            </div>
+
+            {/* Destination list */}
+            {destinationsLoading && (
+              <div className="flex justify-center py-10">
+                <Loader2 className="w-6 h-6 text-slate-300 animate-spin" />
+              </div>
+            )}
+
+            {!destinationsLoading && destinations.length === 0 && (
+              <div className="flex flex-col items-center gap-3 py-16 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
+                  <MapPin className="w-8 h-8 text-slate-300" />
+                </div>
+                <p className="text-slate-500 font-semibold text-[14px]">গন্তব্য তালিকা খালি</p>
+                <p className="text-slate-400 text-[12px] max-w-[220px]">
+                  উপরের ফিল্ডে গন্তব্যের নাম লিখে "যোগ করুন" বাটনে ট্যাপ করুন
+                </p>
+              </div>
+            )}
+
+            {destinations.length > 0 && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                {destinations.map((dest, i) => {
+                  const colors = PALETTE[i % PALETTE.length];
+                  return (
+                    <div
+                      key={dest.id}
+                      className={cn(
+                        'flex items-center gap-3 px-4 py-3.5',
+                        i < destinations.length - 1 && 'border-b border-slate-100',
+                      )}
+                    >
+                      <span className={cn(
+                        'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
+                        colors.bg,
+                      )}>
+                        <MapPin className={cn('w-4 h-4', colors.text)} />
+                      </span>
+                      <p className="flex-1 font-semibold text-slate-800 text-[14px]">{dest.name}</p>
+                      <button
+                        onClick={() => setDeleteDestTarget(dest)}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-400 hover:bg-red-50 active:scale-95 transition-all"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {destinations.length > 0 && (
+              <p className="text-center text-[11px] text-slate-400 font-medium px-2">
+                মোট {destinations.length}টি গন্তব্য · ডিপ্লয় মোডালে এই তালিকা দেখাবে
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -580,12 +746,12 @@ export function StaffDeploymentPage() {
       )}
 
       {/* ════════════════════════════════════════════
-          DEPLOY MODAL — destination picker
+          DEPLOY MODAL — dynamic destination picker
       ════════════════════════════════════════════ */}
       {deployTarget && (
         <div
           className="fixed inset-0 bg-black/50 z-50 flex items-end"
-          onClick={() => { if (!deployMutation.isPending) { setDeployTarget(null); setCustomDest(''); } }}
+          onClick={() => { if (!deployMutation.isPending) setDeployTarget(null); }}
         >
           <div
             className="w-full bg-white rounded-t-3xl overflow-hidden shadow-2xl"
@@ -611,61 +777,56 @@ export function StaffDeploymentPage() {
               </div>
             </div>
 
-            {/* Destination grid */}
-            <div className="px-5 pt-4 pb-3">
+            {/* Dynamic destination grid */}
+            <div className="px-5 pt-4 pb-5">
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
                 গন্তব্য নির্বাচন করুন
               </p>
-              <div className="grid grid-cols-3 gap-2">
-                {DESTINATIONS.map(dest => {
-                  const colors = DEST_COLORS[dest];
-                  return (
-                    <button
-                      key={dest}
-                      disabled={deployMutation.isPending}
-                      onClick={() => deployMutation.mutate({ id: deployTarget.id, destination: dest })}
-                      className={cn(
-                        'flex items-center justify-center gap-1.5 px-2 py-3 rounded-2xl border-2 font-bold text-[13px] transition-all active:scale-[0.96]',
-                        colors.bg, colors.text, colors.border,
-                        deployMutation.isPending && 'opacity-50 cursor-not-allowed',
-                      )}
-                    >
-                      <MapPin className="w-3.5 h-3.5 shrink-0" />
-                      {dest}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
 
-            {/* Custom destination input */}
-            <div className="px-5 pb-4 pt-2 border-t border-slate-100">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                নতুন গন্তব্য লিখুন / এডিট করুন
-              </p>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="যেমন: রংপুর, কুমিল্লা শাখা, হেড অফিস…"
-                  value={customDest}
-                  onChange={e => setCustomDest(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && customDest.trim() && !deployMutation.isPending) {
-                      deployMutation.mutate({ id: deployTarget.id, destination: customDest.trim() });
-                    }
-                  }}
-                  className="flex-1 rounded-xl border-slate-200 text-[14px] font-medium"
-                />
-                <Button
-                  disabled={!customDest.trim() || deployMutation.isPending}
-                  onClick={() => deployMutation.mutate({ id: deployTarget.id, destination: customDest.trim() })}
-                  className="bg-[#1B3A6B] hover:bg-[#243E72] font-bold px-4 shrink-0"
-                >
-                  {deployMutation.isPending
-                    ? <Loader2 className="w-4 h-4 animate-spin" />
-                    : <SendHorizontal className="w-4 h-4" />
-                  }
-                </Button>
-              </div>
+              {destinationsLoading && (
+                <div className="flex justify-center py-6">
+                  <Loader2 className="w-5 h-5 text-slate-300 animate-spin" />
+                </div>
+              )}
+
+              {!destinationsLoading && destinations.length === 0 && (
+                <div className="flex flex-col items-center gap-2 py-6 text-center bg-amber-50 rounded-2xl border border-amber-100">
+                  <MapPin className="w-6 h-6 text-amber-400" />
+                  <p className="text-amber-700 font-bold text-[13px]">অনুগ্রহ করে প্রথমে গন্তব্য যোগ করুন</p>
+                  <p className="text-amber-600 text-[11px] font-medium">
+                    "গন্তব্য তালিকা" ট্যাবে গিয়ে গন্তব্য যোগ করুন
+                  </p>
+                  <button
+                    onClick={() => { setDeployTarget(null); setTab('destinations'); }}
+                    className="mt-1 text-[12px] font-bold text-[#1B3A6B] underline underline-offset-2"
+                  >
+                    গন্তব্য তালিকায় যান →
+                  </button>
+                </div>
+              )}
+
+              {destinations.length > 0 && (
+                <div className="grid grid-cols-2 gap-2">
+                  {destinations.map((dest, i) => {
+                    const colors = PALETTE[i % PALETTE.length];
+                    return (
+                      <button
+                        key={dest.id}
+                        disabled={deployMutation.isPending}
+                        onClick={() => deployMutation.mutate({ id: deployTarget.id, destination: dest.name })}
+                        className={cn(
+                          'flex items-center gap-2 px-3 py-3.5 rounded-2xl border-2 font-bold text-[13px] transition-all active:scale-[0.96] text-left',
+                          colors.bg, colors.text, colors.border,
+                          deployMutation.isPending && 'opacity-50 cursor-not-allowed',
+                        )}
+                      >
+                        <MapPin className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{dest.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Safety padding */}
@@ -721,7 +882,7 @@ export function StaffDeploymentPage() {
       )}
 
       {/* ════════════════════════════════════════════
-          DELETE CONFIRM
+          DELETE STAFF CONFIRM
       ════════════════════════════════════════════ */}
       <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
         <AlertDialogContent className="max-w-sm rounded-2xl">
@@ -741,6 +902,32 @@ export function StaffDeploymentPage() {
               onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
             >
               {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'সরিয়ে দিন'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ════════════════════════════════════════════
+          DELETE DESTINATION CONFIRM
+      ════════════════════════════════════════════ */}
+      <AlertDialog open={!!deleteDestTarget} onOpenChange={open => !open && setDeleteDestTarget(null)}>
+        <AlertDialogContent className="max-w-sm rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>গন্তব্য সরিয়ে দেবেন?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <span className="font-semibold text-slate-800">"{deleteDestTarget?.name}"</span> গন্তব্যটি তালিকা থেকে
+              সরানো হবে। পুরনো লগে এই নাম থেকে যাবে।
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="font-bold">বাতিল</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              className="font-bold"
+              disabled={deleteDestMutation.isPending}
+              onClick={() => deleteDestTarget && deleteDestMutation.mutate(deleteDestTarget.id)}
+            >
+              {deleteDestMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'সরিয়ে দিন'}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -782,8 +969,7 @@ export function StaffDeploymentPage() {
                 </div>
                 {/* Current destination badge */}
                 {(() => {
-                  const d = editLog.destination as Destination;
-                  const c = DEST_COLORS[d] ?? FALLBACK_COLOR;
+                  const c = destColor(editLog.destination, destinations);
                   return (
                     <span className={cn('text-[12px] font-bold px-3 py-1.5 rounded-full border shrink-0', c.bg, c.text, c.border)}>
                       {editLog.destination}
@@ -793,42 +979,49 @@ export function StaffDeploymentPage() {
               </div>
             </div>
 
-            {/* New destination picker */}
+            {/* Destination list from saved destinations */}
             <div className="px-5 pt-4 pb-3">
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
                 নতুন লোকেশন বেছে নিন
               </p>
-              <div className="grid grid-cols-3 gap-2">
-                {DESTINATIONS.map(dest => {
-                  const colors = DEST_COLORS[dest];
-                  const isCurrent = dest === editLog.destination;
-                  return (
-                    <button
-                      key={dest}
-                      disabled={editLogMutation.isPending || isCurrent}
-                      onClick={() => editLogMutation.mutate({ id: editLog.id, destination: dest })}
-                      className={cn(
-                        'flex items-center justify-center gap-1.5 px-2 py-3 rounded-2xl border-2 font-bold text-[13px] transition-all active:scale-[0.96] relative',
-                        colors.bg, colors.text, colors.border,
-                        isCurrent && 'opacity-40 cursor-not-allowed',
-                        editLogMutation.isPending && !isCurrent && 'opacity-60 cursor-not-allowed',
-                      )}
-                    >
-                      <MapPin className="w-3.5 h-3.5 shrink-0" />
-                      {dest}
-                      {isCurrent && (
-                        <span className="absolute top-0.5 right-1 text-[9px] font-bold opacity-60">বর্তমান</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+
+              {destinations.length === 0 ? (
+                <p className="text-slate-400 text-[12px] text-center py-3">
+                  কোনো সংরক্ষিত গন্তব্য নেই — নিচে লিখে পরিবর্তন করুন
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 mb-0">
+                  {destinations.map((dest, i) => {
+                    const colors = PALETTE[i % PALETTE.length];
+                    const isCurrent = dest.name === editLog.destination;
+                    return (
+                      <button
+                        key={dest.id}
+                        disabled={editLogMutation.isPending || isCurrent}
+                        onClick={() => editLogMutation.mutate({ id: editLog.id, destination: dest.name })}
+                        className={cn(
+                          'flex items-center gap-2 px-3 py-3 rounded-2xl border-2 font-bold text-[13px] transition-all active:scale-[0.96] text-left relative',
+                          colors.bg, colors.text, colors.border,
+                          isCurrent && 'opacity-40 cursor-not-allowed',
+                          editLogMutation.isPending && !isCurrent && 'opacity-60 cursor-not-allowed',
+                        )}
+                      >
+                        <MapPin className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{dest.name}</span>
+                        {isCurrent && (
+                          <span className="absolute top-0.5 right-1.5 text-[9px] font-bold opacity-60">বর্তমান</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            {/* Custom destination input */}
+            {/* Free-text override input (for corrections not in the list) */}
             <div className="px-5 pb-4 pt-2 border-t border-slate-100">
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                নতুন গন্তব্য লিখুন / এডিট করুন
+                অথবা সরাসরি লিখুন
               </p>
               <div className="flex gap-2">
                 <Input
@@ -889,11 +1082,17 @@ function buildPdfHtml({
   const accentOr    = '#F5A623';
   const footerBg    = '#0f1d35';
   const rowEven     = '#f8fafc';
-  const totalDest   = Object.entries(tally)
-    .map(([dest, count]) => `<td style="padding:6px 12px;text-align:center">${dest}</td><td style="padding:6px 12px;text-align:center;font-weight:700">${count}</td>`)
+
+  // Dynamic tally — render all destination columns that actually appear in this month
+  const tallyEntries = Object.entries(tally);
+  const tallyHeaders = tallyEntries
+    .map(([dest]) => `<th style="padding:7px 12px;font-size:11px;color:#64748b;font-weight:700;text-align:center">${dest}</th>`)
+    .join('');
+  const tallyValues = tallyEntries
+    .map(([, count]) => `<td style="padding:10px 12px;text-align:center;font-size:18px;font-weight:900;color:${headerBg}">${count}</td>`)
     .join('');
 
-  const logRows = Array.from(groups.entries()).flatMap(([dateKey, dayLogs]) =>
+  const logRows = Array.from(groups.entries()).flatMap(([, dayLogs]) =>
     dayLogs.map((log, i) => {
       const bgColor = i % 2 === 0 ? rowEven : '#ffffff';
       return `
@@ -942,6 +1141,7 @@ function buildPdfHtml({
       </div>
 
       <!-- Location tally -->
+      ${tallyEntries.length > 0 ? `
       <div style="margin:16px 0 0">
         <div style="background:${headerBg};padding:8px 14px;border-radius:6px 6px 0 0">
           <p style="color:#fff;font-size:11px;font-weight:700;letter-spacing:0.08em;margin:0">লোকেশন অনুযায়ী ডিউটি</p>
@@ -949,20 +1149,14 @@ function buildPdfHtml({
         <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-top:none">
           <thead>
             <tr style="background:#f1f5f9">
-              ${DESTINATIONS.map(d =>
-                `<th style="padding:7px 12px;font-size:11px;color:#64748b;font-weight:700;text-align:center">${d}</th>`,
-              ).join('')}
+              ${tallyHeaders}
             </tr>
           </thead>
           <tbody>
-            <tr>
-              ${DESTINATIONS.map(d =>
-                `<td style="padding:10px 12px;text-align:center;font-size:18px;font-weight:900;color:${headerBg}">${tally[d] ?? 0}</td>`,
-              ).join('')}
-            </tr>
+            <tr>${tallyValues}</tr>
           </tbody>
         </table>
-      </div>
+      </div>` : ''}
 
       <!-- Chronological ledger -->
       <div style="margin:16px 0 0">
