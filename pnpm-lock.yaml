@@ -94,6 +94,9 @@ importers:
       '@google-cloud/storage':
         specifier: ^7.21.0
         version: 7.21.0
+      '@types/pg':
+        specifier: ^8.20.0
+        version: 8.20.0
       '@workspace/api-zod':
         specifier: workspace:*
         version: link:../../lib/api-zod
@@ -121,6 +124,9 @@ importers:
       jsonwebtoken:
         specifier: ^9.0.3
         version: 9.0.3
+      pg:
+        specifier: ^8.22.0
+        version: 8.22.0
       pino:
         specifier: ^9.14.0
         version: 9.14.0
