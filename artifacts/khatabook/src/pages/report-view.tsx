@@ -23,7 +23,7 @@ import { ReportPeriodDrawer, type ReportPeriod } from '@/components/modals/repor
 import { GlobalReportDocument, buildGlobalReportFilename } from '@/lib/global-ledger-report';
 import { stampPageNumbers } from '@/lib/ledger-report';
 import { BillImageLightbox } from '@/components/modals/bill-image-lightbox';
-import { billImageSrc } from '@/lib/billImageStorage';
+import { billImageSrc, prefetchImagesForPdf } from '@/lib/billImageStorage';
 
 const PERIOD_LABELS: Record<ReportPeriod, string> = {
   ALL: 'সব',
@@ -118,7 +118,20 @@ export function ReportView() {
   const handleDownload = async () => {
     if (!reportRef.current) return;
     setIsGenerating(true);
+    let restore: (() => void) | null = null;
     try {
+      // Pre-fetch all cloud bill images into base64 so html2canvas can render
+      // them even when the device is offline or the API is temporarily down.
+      const { restore: restoreFn, failedCount } = await prefetchImagesForPdf(reportRef.current);
+      restore = restoreFn;
+
+      if (failedCount > 0) {
+        toast.warning(
+          `${failedCount}টি বিলের ছবি লোড করা যায়নি — সেগুলো পিডিএফে দেখাবে না`,
+          { duration: 5000 }
+        );
+      }
+
       const worker = html2pdf().set({
         margin: 10,
         filename: buildGlobalReportFilename(storeName),
@@ -137,6 +150,7 @@ export function ReportView() {
       console.error('Global report generation failed', err);
       toast.error('রিপোর্ট তৈরি করা যায়নি');
     } finally {
+      restore?.();
       setIsGenerating(false);
     }
   };

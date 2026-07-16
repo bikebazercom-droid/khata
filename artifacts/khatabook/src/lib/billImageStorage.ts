@@ -30,6 +30,63 @@ export function billImageSrc(billImage: string | null | undefined): string | nul
   return billImage;
 }
 
+/**
+ * Pre-fetches every cloud image inside a DOM subtree and temporarily replaces
+ * their `src` attributes with inline base64 data URLs so that html2canvas can
+ * rasterize them without network access (offline-safe PDF generation).
+ *
+ * Returns a restore function that puts the original `src` values back.
+ * Also returns the count of images that could not be fetched (so the caller
+ * can warn the user).
+ *
+ * Only images whose `src` contains "/api/storage/" are touched; base64 images
+ * already embedded in the DOM are left unchanged.
+ */
+export async function prefetchImagesForPdf(container: HTMLElement): Promise<{
+  restore: () => void;
+  failedCount: number;
+}> {
+  const images = Array.from(container.querySelectorAll<HTMLImageElement>('img'));
+  const cloudImages = images.filter((img) => img.src.includes('/api/storage/'));
+
+  const originals = new Map<HTMLImageElement, string>();
+  let failedCount = 0;
+
+  await Promise.all(
+    cloudImages.map(async (img) => {
+      const originalSrc = img.src;
+      originals.set(img, originalSrc);
+      try {
+        const res = await fetch(originalSrc, { credentials: 'include' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        img.src = base64;
+      } catch {
+        failedCount++;
+        // Replace with a transparent placeholder so html2canvas renders a
+        // visible "image missing" indicator rather than a blank/broken cell.
+        img.src =
+          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect width='40' height='40' fill='%23f1f5f9' rx='3'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-size='18' fill='%2394a3b8'%3E%3F%3C/text%3E%3C/svg%3E";
+      }
+    })
+  );
+
+  return {
+    restore: () => {
+      for (const [img, src] of originals) {
+        img.src = src;
+      }
+    },
+    failedCount,
+  };
+}
+
 /** Convert a base64 data URL to a `Blob` for direct upload. */
 function dataUrlToBlob(dataUrl: string): Blob {
   const [header, data] = dataUrl.split(',');
