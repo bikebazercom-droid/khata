@@ -1128,6 +1128,39 @@ export function StaffDeploymentPage() {
   );
 }
 
+// ── PDF helpers ───────────────────────────────────────────────────────────────
+
+/** Convert ASCII digits to Bangla numerals (e.g. 42 → ৪২). */
+function toBangla(n: number): string {
+  const map: Record<string, string> = {
+    '0': '০', '1': '১', '2': '২', '3': '৩', '4': '৪',
+    '5': '৫', '6': '৬', '7': '৭', '8': '৮', '9': '৯',
+  };
+  return String(n).replace(/[0-9]/g, d => map[d]);
+}
+
+/**
+ * Groups a day's logs into (destination → staffNames[]) pairs, preserving the
+ * order in which each destination first appeared that day.
+ */
+function buildDateDestGroups(groups: Map<string, DeploymentLog[]>) {
+  return Array.from(groups.entries()).map(([, dayLogs]) => {
+    const destMap = new Map<string, string[]>();
+    for (const log of dayLogs) {
+      if (!destMap.has(log.destination)) destMap.set(log.destination, []);
+      destMap.get(log.destination)!.push(log.staffName);
+    }
+    return {
+      dateLabel: format(parseISO(dayLogs[0].deployedAt), 'd MMMM, yyyy', { locale: bn }),
+      destinations: Array.from(destMap.entries()).map(([name, staffNames]) => ({
+        name,
+        staffNames,
+        count: staffNames.length,
+      })),
+    };
+  });
+}
+
 // ── PDF HTML builder ──────────────────────────────────────────────────────────
 
 function buildPdfHtml({
@@ -1143,113 +1176,230 @@ function buildPdfHtml({
   groups: Map<string, DeploymentLog[]>;
   queueRemaining: number;
 }) {
-  const headerBg    = '#1B3A6B';
-  const accentOr    = '#F5A623';
-  const footerBg    = '#0f1d35';
-  const rowEven     = '#f8fafc';
+  const NAV   = '#1B3A6B';   // brand navy
+  const OR    = '#F5A623';   // accent orange
+  const DARK  = '#0f1d35';   // footer dark
+  const CNT_E = '#EFF6FF';   // count col, even row  (light blue)
+  const CNT_O = '#DBEAFE';   // count col, odd row   (slightly deeper blue)
+  const ROW_E = '#f8fafc';   // zebra even
+  const ROW_O = '#ffffff';   // zebra odd
 
-  // Dynamic tally — render all destination columns that actually appear in this month
-  const tallyEntries = Object.entries(tally);
-  const tallyHeaders = tallyEntries
-    .map(([dest]) => `<th style="padding:7px 12px;font-size:11px;color:#64748b;font-weight:700;text-align:center">${dest}</th>`)
-    .join('');
-  const tallyValues = tallyEntries
-    .map(([, count]) => `<td style="padding:10px 12px;text-align:center;font-size:18px;font-weight:900;color:${headerBg}">${count}</td>`)
-    .join('');
+  const tallyEntries  = Object.entries(tally);
+  const uniqueDests   = tallyEntries.length;
+  const dateGroups    = buildDateDestGroups(groups);
 
-  const logRows = Array.from(groups.entries()).flatMap(([, dayLogs]) =>
-    dayLogs.map((log, i) => {
-      const bgColor = i % 2 === 0 ? rowEven : '#ffffff';
-      return `
-        <tr style="background:${bgColor}">
-          <td style="padding:7px 14px;font-size:12px;color:#334155">
-            ${format(parseISO(log.deployedAt), 'd MMM yyyy', { locale: bn })}
-          </td>
-          <td style="padding:7px 14px;font-size:12px;font-weight:600;color:#1e293b">${log.staffName}</td>
-          <td style="padding:7px 14px;font-size:12px;color:#334155">${format(parseISO(log.deployedAt), 'hh:mm a')}</td>
-          <td style="padding:7px 14px;font-size:12px;font-weight:700;color:${headerBg}">${log.destination}</td>
-        </tr>`;
+  // ── Main ledger rows (grouped by date × destination) ──────────────────────
+  //
+  // Layout: 4 columns — তারিখ | গন্তব্য | স্টাফের নাম | কতজন গেল
+  //
+  // For each date group we emit N rows (one per destination).
+  // • The first row of each group carries the date badge + a thick 2 px top
+  //   separator to visually break date blocks.
+  // • Subsequent rows inside the same group show an empty date cell with a
+  //   3 px left accent bar so the reader can see they belong to the same day,
+  //   without needing fragile rowspan.
+
+  let rowIdx = 0; // global counter drives zebra striping across all rows
+
+  const ledgerRows = dateGroups.flatMap(({ dateLabel, destinations }) =>
+    destinations.map((dest, dIdx) => {
+      const isFirst = dIdx === 0;
+      const isEven  = rowIdx % 2 === 0;
+      rowIdx++;
+
+      const rowBg    = isEven ? ROW_E : ROW_O;
+      const cntBg    = isEven ? CNT_E : CNT_O;
+      const topBdr   = isFirst
+        ? `border-top:2px solid #cbd5e1`   // thick line = new date group
+        : `border-top:1px solid #f1f5f9`;  // thin line = same date, next dest
+
+      // Date cell: badge on first row, accent-bar placeholder on subsequent rows
+      const dateCell = isFirst
+        ? `<td style="padding:10px 12px 10px 14px;vertical-align:middle;
+              ${topBdr};border-right:1px solid #e2e8f0;width:22%">
+             <div style="display:inline-block;background:#EFF6FF;border:1px solid #BFDBFE;
+                         border-radius:6px;padding:3px 9px">
+               <span style="font-size:11px;font-weight:800;color:${NAV};
+                            white-space:nowrap">${dateLabel}</span>
+             </div>
+           </td>`
+        : `<td style="padding:0;vertical-align:top;${topBdr};
+              border-right:1px solid #e2e8f0;border-left:3px solid ${NAV};
+              width:22%;background:${rowBg}"></td>`;
+
+      // Destination pill
+      const destCell = `
+        <td style="padding:10px 12px;vertical-align:middle;${topBdr};
+            border-right:1px solid #e2e8f0;width:18%;background:${rowBg}">
+          <span style="display:inline-block;background:${NAV};color:#fff;
+                       padding:3px 11px;border-radius:20px;
+                       font-size:11px;font-weight:700;white-space:nowrap">
+            ${dest.name}
+          </span>
+        </td>`;
+
+      // Staff names (comma-separated, wraps naturally)
+      const namesCell = `
+        <td style="padding:10px 14px;vertical-align:middle;${topBdr};
+            border-right:1px solid #e2e8f0;font-size:12px;color:#334155;
+            line-height:1.6;background:${rowBg}">
+          ${dest.staffNames.join(', ')}
+        </td>`;
+
+      // Count column — always highlighted regardless of zebra row
+      const countCell = `
+        <td style="padding:10px 8px;vertical-align:middle;text-align:center;
+            ${topBdr};background:${cntBg};width:13%">
+          <span style="font-size:20px;font-weight:900;color:${NAV};
+                       display:block;line-height:1.1">
+            ${toBangla(dest.count)}
+          </span>
+          <span style="font-size:10px;font-weight:700;color:#4B70B0">জন</span>
+        </td>`;
+
+      return `<tr style="background:${rowBg}">
+        ${dateCell}${destCell}${namesCell}${countCell}
+      </tr>`;
     }),
   ).join('');
+
+  // ── Destination summary rows ───────────────────────────────────────────────
+  const summaryRows = tallyEntries.map(([dest, count], i) => {
+    const bg = i % 2 === 0 ? ROW_E : ROW_O;
+    return `
+      <tr style="background:${bg}">
+        <td style="padding:9px 14px;font-size:12px;font-weight:700;color:#1e293b;
+            border-top:1px solid #e2e8f0;border-right:1px solid #e2e8f0">
+          ${dest}
+        </td>
+        <td style="padding:9px 14px;text-align:center;${i % 2 === 0 ? `background:${CNT_E}` : `background:${CNT_O}`};
+            border-top:1px solid #e2e8f0">
+          <span style="font-size:18px;font-weight:900;color:${NAV}">${toBangla(count)}</span>
+          <span style="font-size:11px;font-weight:600;color:#4B70B0"> জন</span>
+        </td>
+      </tr>`;
+  }).join('');
 
   return `
     <div style="font-family:Inter,'Noto Sans Bengali',sans-serif;color:#0f172a;padding:0;background:#fff">
 
-      <!-- Brand header -->
-      <div style="background:${headerBg};padding:20px 24px;display:flex;align-items:center;justify-content:space-between;border-radius:8px 8px 0 0">
+      <!-- ═══ Brand header ═══ -->
+      <div style="background:${NAV};padding:20px 24px;display:flex;align-items:center;
+                  justify-content:space-between;border-radius:8px 8px 0 0">
         <div>
-          <p style="color:#fff;font-size:20px;font-weight:900;margin:0;letter-spacing:-0.5px">ডিজিটাল খাতা</p>
-          <p style="color:rgba(255,255,255,0.65);font-size:12px;margin:4px 0 0;font-weight:600">Digital Khata — Staff Duty Statement</p>
+          <p style="color:#fff;font-size:21px;font-weight:900;margin:0;letter-spacing:-0.5px">
+            ডিজিটাল খাতা
+          </p>
+          <p style="color:rgba(255,255,255,0.70);font-size:12px;margin:5px 0 0;font-weight:600">
+            মাসিক ডিউটি স্টেটমেন্ট
+          </p>
         </div>
-        <div style="background:${accentOr};padding:6px 14px;border-radius:20px">
-          <p style="color:${headerBg};font-size:11px;font-weight:800;margin:0">${monthLabel}</p>
+        <div style="background:${OR};padding:6px 16px;border-radius:20px">
+          <p style="color:${NAV};font-size:12px;font-weight:900;margin:0">${monthLabel}</p>
         </div>
       </div>
 
       <!-- Orange accent bar -->
-      <div style="height:4px;background:${accentOr}"></div>
+      <div style="height:4px;background:${OR}"></div>
 
-      <!-- Summary row -->
+      <!-- ═══ Summary strip ═══ -->
       <div style="display:flex;gap:0;border:1px solid #e2e8f0;border-top:none">
-        <div style="flex:1;padding:16px;text-align:center;border-right:1px solid #e2e8f0">
-          <p style="font-size:28px;font-weight:900;color:${headerBg};margin:0">${monthLogs.length}</p>
-          <p style="font-size:11px;color:#64748b;margin:4px 0 0;font-weight:600">এই মাসে ডিউটি হয়েছে</p>
+        <div style="flex:1;padding:14px 8px;text-align:center;border-right:1px solid #e2e8f0">
+          <p style="font-size:26px;font-weight:900;color:${NAV};margin:0">${toBangla(monthLogs.length)}</p>
+          <p style="font-size:10px;color:#64748b;margin:4px 0 0;font-weight:600">মোট ডিউটি</p>
         </div>
-        <div style="flex:1;padding:16px;text-align:center;border-right:1px solid #e2e8f0">
-          <p style="font-size:28px;font-weight:900;color:#059669;margin:0">${queueRemaining}</p>
-          <p style="font-size:11px;color:#64748b;margin:4px 0 0;font-weight:600">এখন লাইনে আছেন</p>
+        <div style="flex:1;padding:14px 8px;text-align:center;border-right:1px solid #e2e8f0">
+          <p style="font-size:26px;font-weight:900;color:#059669;margin:0">${toBangla(groups.size)}</p>
+          <p style="font-size:10px;color:#64748b;margin:4px 0 0;font-weight:600">কার্যদিন</p>
         </div>
-        <div style="flex:1;padding:16px;text-align:center">
-          <p style="font-size:28px;font-weight:900;color:#f59e0b;margin:0">${groups.size}</p>
-          <p style="font-size:11px;color:#64748b;margin:4px 0 0;font-weight:600">কার্যদিন</p>
+        <div style="flex:1;padding:14px 8px;text-align:center;border-right:1px solid #e2e8f0">
+          <p style="font-size:26px;font-weight:900;color:#f59e0b;margin:0">${toBangla(uniqueDests)}</p>
+          <p style="font-size:10px;color:#64748b;margin:4px 0 0;font-weight:600">গন্তব্য</p>
+        </div>
+        <div style="flex:1;padding:14px 8px;text-align:center">
+          <p style="font-size:26px;font-weight:900;color:#7c3aed;margin:0">${toBangla(queueRemaining)}</p>
+          <p style="font-size:10px;color:#64748b;margin:4px 0 0;font-weight:600">লাইনে আছেন</p>
         </div>
       </div>
 
-      <!-- Location tally -->
-      ${tallyEntries.length > 0 ? `
+      <!-- ═══ Main ledger table ═══ -->
       <div style="margin:16px 0 0">
-        <div style="background:${headerBg};padding:8px 14px;border-radius:6px 6px 0 0">
-          <p style="color:#fff;font-size:11px;font-weight:700;letter-spacing:0.08em;margin:0">লোকেশন অনুযায়ী ডিউটি</p>
-        </div>
-        <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-top:none">
-          <thead>
-            <tr style="background:#f1f5f9">
-              ${tallyHeaders}
-            </tr>
-          </thead>
-          <tbody>
-            <tr>${tallyValues}</tr>
-          </tbody>
-        </table>
-      </div>` : ''}
-
-      <!-- Chronological ledger -->
-      <div style="margin:16px 0 0">
-        <div style="background:${headerBg};padding:8px 14px;border-radius:6px 6px 0 0">
-          <p style="color:#fff;font-size:11px;font-weight:700;letter-spacing:0.08em;margin:0">ডিউটি লেজার</p>
+        <div style="background:${NAV};padding:9px 16px;border-radius:6px 6px 0 0;
+                    display:flex;align-items:center;justify-content:space-between">
+          <p style="color:#fff;font-size:12px;font-weight:800;letter-spacing:0.04em;margin:0">
+            তারিখ ও গন্তব্য অনুযায়ী ডিউটি বিবরণ
+          </p>
+          <span style="color:rgba(255,255,255,0.55);font-size:10px;font-weight:600">
+            ${toBangla(monthLogs.length)} টি এন্ট্রি
+          </span>
         </div>
         <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-top:none">
           <thead>
             <tr style="background:#1e3a8a">
-              <th style="padding:8px 14px;font-size:11px;color:#fff;font-weight:700;text-align:left">তারিখ</th>
-              <th style="padding:8px 14px;font-size:11px;color:#fff;font-weight:700;text-align:left">স্টাফের নাম</th>
-              <th style="padding:8px 14px;font-size:11px;color:#fff;font-weight:700;text-align:left">সময়</th>
-              <th style="padding:8px 14px;font-size:11px;color:#fff;font-weight:700;text-align:left">ডিউটি লোকেশন</th>
+              <th style="padding:9px 14px;font-size:11px;color:#fff;font-weight:700;
+                         text-align:left;width:22%;border-right:1px solid rgba(255,255,255,0.15)">
+                তারিখ
+              </th>
+              <th style="padding:9px 14px;font-size:11px;color:#fff;font-weight:700;
+                         text-align:left;width:18%;border-right:1px solid rgba(255,255,255,0.15)">
+                গন্তব্য
+              </th>
+              <th style="padding:9px 14px;font-size:11px;color:#fff;font-weight:700;
+                         text-align:left;border-right:1px solid rgba(255,255,255,0.15)">
+                স্টাফের নাম
+              </th>
+              <th style="padding:9px 8px;font-size:11px;color:${OR};font-weight:800;
+                         text-align:center;width:13%;background:rgba(0,0,0,0.20)">
+                কতজন গেল
+              </th>
             </tr>
           </thead>
           <tbody>
-            ${logRows || `<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;font-size:12px">এই মাসে কোনো ডিউটি নেই</td></tr>`}
+            ${ledgerRows || `
+              <tr>
+                <td colspan="4" style="padding:28px;text-align:center;color:#94a3b8;font-size:13px">
+                  এই মাসে কোনো ডিউটি নেই
+                </td>
+              </tr>`}
           </tbody>
         </table>
       </div>
 
-      <!-- Footer -->
-      <div style="margin-top:20px;background:${footerBg};padding:12px 20px;border-radius:0 0 8px 8px;display:flex;align-items:center;gap:10px">
-        <div style="width:20px;height:20px;background:${accentOr};border-radius:50%;display:flex;align-items:center;justify-content:center">
-          <span style="color:${footerBg};font-size:11px;font-weight:900">✓</span>
+      <!-- ═══ Destination summary table ═══ -->
+      ${summaryRows ? `
+      <div style="margin:16px 0 0">
+        <div style="background:#334155;padding:9px 16px;border-radius:6px 6px 0 0">
+          <p style="color:#fff;font-size:11px;font-weight:700;letter-spacing:0.06em;margin:0">
+            গন্তব্য অনুযায়ী মোট সারসংক্ষেপ
+          </p>
         </div>
-        <p style="color:rgba(255,255,255,0.8);font-size:11px;font-weight:600;margin:0">
-          ১০০% নিরাপদ ও সুরক্ষিত ডিজিটাল খাতা — তৈরি হয়েছে: ${format(new Date(), 'd MMM yyyy, hh:mm a', { locale: bn })}
+        <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-top:none">
+          <thead>
+            <tr style="background:#f1f5f9">
+              <th style="padding:8px 14px;font-size:11px;color:#64748b;font-weight:700;
+                         text-align:left;border-right:1px solid #e2e8f0">
+                গন্তব্য
+              </th>
+              <th style="padding:8px 14px;font-size:11px;color:#64748b;font-weight:700;
+                         text-align:center">
+                মোট স্টাফ পাঠানো হয়েছে
+              </th>
+            </tr>
+          </thead>
+          <tbody>${summaryRows}</tbody>
+        </table>
+      </div>` : ''}
+
+      <!-- ═══ Footer ═══ -->
+      <div style="margin-top:20px;background:${DARK};padding:12px 20px;
+                  border-radius:0 0 8px 8px;display:flex;align-items:center;gap:10px">
+        <div style="width:22px;height:22px;background:${OR};border-radius:50%;flex-shrink:0;
+                    display:flex;align-items:center;justify-content:center">
+          <span style="color:${DARK};font-size:12px;font-weight:900">✓</span>
+        </div>
+        <p style="color:rgba(255,255,255,0.75);font-size:10px;font-weight:600;margin:0">
+          ১০০% নিরাপদ ও সুরক্ষিত ডিজিটাল খাতা — তৈরি হয়েছে:
+          ${format(new Date(), 'd MMM yyyy, hh:mm a', { locale: bn })}
         </p>
       </div>
 
