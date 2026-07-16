@@ -714,27 +714,43 @@ export function StaffDeploymentPage() {
                 <FileDown className="w-4 h-4 text-[#1B3A6B]" />
                 <p className="font-bold text-slate-800 text-[13px]">মাসিক ডিউটি স্টেটমেন্ট</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2.5">
                 <input
                   type="month"
                   value={pdfMonth}
                   onChange={e => setPdfMonth(e.target.value)}
-                  className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-[13px] text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]/20 focus:border-[#1B3A6B]"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-[13px] text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]/20 focus:border-[#1B3A6B]"
                 />
-                <Button
+                <button
                   onClick={handleExportPdf}
                   disabled={isExporting}
-                  className="bg-[#1B3A6B] hover:bg-[#243E72] font-bold text-[12px] px-4"
+                  className="flex items-center justify-center gap-2 bg-blue-700 hover:bg-blue-800 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-2.5 px-5 rounded-lg shadow-md transition-all duration-200 active:scale-95"
                 >
                   {isExporting ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>তৈরি হচ্ছে…</span>
+                    </>
                   ) : (
                     <>
-                      <FileDown className="w-3.5 h-3.5 mr-1.5" />
-                      PDF
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={2}
+                        stroke="currentColor"
+                        className="w-5 h-5"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
+                        />
+                      </svg>
+                      <span>ডাউনলোড পিডিএফ</span>
                     </>
                   )}
-                </Button>
+                </button>
               </div>
             </div>
 
