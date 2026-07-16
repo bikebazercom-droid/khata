@@ -115,7 +115,7 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
           <h1 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: '#ffffff', letterSpacing: '0.02em' }}>{storeName}</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ width: '10px', height: '10px', backgroundColor: '#ffffff', borderRadius: '2px', display: 'inline-block' }} />
-            <span style={{ fontSize: '14px', fontWeight: 700, color: '#ffffff' }}>হাজারী খাতাবুক</span>
+            <span style={{ fontSize: '14px', fontWeight: 700, color: '#ffffff' }}>ডিজিটাল খাতা</span>
           </div>
         </div>
 
@@ -283,7 +283,7 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
           }}
         >
           <p style={{ fontSize: '11px', fontWeight: 700, color: '#ffffff', margin: 0 }}>
-            {storeName} থেকে স্বয়ংক্রিয়ভাবে তৈরি করা এই রিপোর্টটি হাজারী খাতাবুক ব্যবহার করে তৈরি।
+            {storeName} থেকে স্বয়ংক্রিয়ভাবে তৈরি করা এই রিপোর্টটি ডিজিটাল খাতা ব্যবহার করে তৈরি।
           </p>
           <div style={{ textAlign: 'right' }}>
             <p style={{ fontSize: '11px', fontWeight: 700, color: '#ffffff', margin: 0 }}>

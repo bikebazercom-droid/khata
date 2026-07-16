@@ -42,7 +42,7 @@ export function HomeView() {
               <BookOpen className="w-[18px] h-[18px]" />
             </div>
             <h1 className="font-extrabold tracking-tight text-[15px] text-white truncate max-w-[120px]">
-              {settings?.storeName || 'হাজারী খাতাবুক'}
+              {settings?.storeName || 'ডিজিটাল খাতা'}
             </h1>
             <button
               onClick={() => setIsRenameStoreOpen(true)}

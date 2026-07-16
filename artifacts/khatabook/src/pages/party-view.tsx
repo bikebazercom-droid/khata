@@ -146,7 +146,7 @@ export function PartyView() {
   const [isGeneratingReminder, setIsGeneratingReminder] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
-  const storeName = settings?.storeName || 'হাজারী খাতাবুক';
+  const storeName = settings?.storeName || 'ডিজিটাল খাতা';
 
   // Dual-sorting pipeline: one true chronological reconstruction feeds both
   // the newest-first screen view and the oldest-first PDF/reminder timeline.
@@ -321,7 +321,7 @@ export function PartyView() {
     if (!party) return;
     const label = party.balanceType === 'YOU_WILL_GET' ? 'আপনি পাবেন' : 'আপনি দেবেন';
     setSmsMessage(
-      `প্রিয় ${party.name}, আপনার হিসাবে ${label} ${formatCurrency(party.currentBalance)}। ধন্যবাদান্তে, হাজারী খাতাবুক।`
+      `প্রিয় ${party.name}, আপনার হিসাবে ${label} ${formatCurrency(party.currentBalance)}। ধন্যবাদান্তে, ডিজিটাল খাতা।`
     );
     setCopiedSms(false);
   };

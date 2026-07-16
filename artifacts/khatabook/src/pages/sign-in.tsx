@@ -134,7 +134,7 @@ function PhoneSignIn() {
       <div className="flex justify-center mb-6">
         <img
           src={`${basePath}/logo.svg`}
-          alt="Hazari Khatabook"
+          alt="ডিজিটাল খাতা"
           className="w-14 h-14"
         />
       </div>

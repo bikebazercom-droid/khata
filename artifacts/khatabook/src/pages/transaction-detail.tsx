@@ -65,7 +65,7 @@ export function TransactionDetailPage() {
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   const entry = entries.find((e) => e.id === entryId);
-  const storeName = settings?.storeName || 'হাজারী খাতাবুক';
+  const storeName = settings?.storeName || 'ডিজিটাল খাতা';
   const isGave = entry?.type === 'YOU_GAVE';
   const imageSrc = billImageSrc(entry?.billImage ?? null);
   const partyInitials = (party?.name ?? '??').slice(0, 2).toUpperCase();
@@ -88,7 +88,7 @@ export function TransactionDetailPage() {
       entry.description ? `নোট: ${entry.description}` : null,
       `বর্তমান ব্যালেন্স: ${formatCurrency(party.currentBalance)} (আপনি ${balanceLabel})`,
       '━━━━━━━━━━━━━━━━━━',
-      'হাজারী খাতাবুক দ্বারা তৈরি',
+      'ডিজিটাল খাতা দ্বারা তৈরি',
     ];
     return lines.filter(Boolean).join('\n');
   }

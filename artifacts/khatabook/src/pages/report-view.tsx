@@ -69,7 +69,7 @@ function resolveDateRange(period: ReportPeriod, customStart: Date | null, custom
 export function ReportView() {
   const [, navigate] = useLocation();
   const { data: settings } = useGetBusinessSettings();
-  const storeName = settings?.storeName || 'হাজারী খাতাবুক';
+  const storeName = settings?.storeName || 'ডিজিটাল খাতা';
 
   const [period, setPeriod] = useState<ReportPeriod>('ALL');
   const [isPeriodOpen, setIsPeriodOpen] = useState(false);

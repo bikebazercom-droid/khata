@@ -43,7 +43,7 @@ export function RenameStoreDialog({ open, onOpenChange }: { open: boolean; onOpe
 
   useEffect(() => {
     if (open) {
-      setName(settings?.storeName || 'হাজারী খাতাবুক');
+      setName(settings?.storeName || 'ডিজিটাল খাতা');
       setIsEmptyError(false);
     }
   }, [open, settings?.storeName]);

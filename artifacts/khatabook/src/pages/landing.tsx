@@ -12,13 +12,13 @@ export function LandingPage() {
         <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
           <img
             src={`${basePath}/logo.svg`}
-            alt="Hazari Khatabook"
+            alt="ডিজিটাল খাতা"
             className="w-24 h-24 mb-6"
           />
           <h1 className="text-3xl font-bold text-slate-900 mb-2">
-            হাজারী খাতাবুক
+            ডিজিটাল খাতা
           </h1>
-          <p className="text-slate-500 text-base mb-1">Hazari Khatabook</p>
+          <p className="text-slate-500 text-base mb-1">Digital Khata</p>
           <p className="text-slate-400 text-sm mt-3 max-w-xs leading-relaxed">
             আপনার ব্যবসার হিসাব রাখুন সহজেই — কাস্টমার, সাপ্লায়ার, বকেয়া, এবং লেনদেন এক জায়গায়।
           </p>
