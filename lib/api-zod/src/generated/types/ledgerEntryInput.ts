@@ -15,7 +15,7 @@ export interface LedgerEntryInput {
   /** @nullable */
   billReference?: string | null;
   /**
-     * Scanned bill/receipt image, stored as a base64 data URL.
+     * Cloud storage object path for the scanned bill/receipt image (e.g. /objects/uploads/uuid).
      * @nullable
      */
   billImage?: string | null;

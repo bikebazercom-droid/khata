@@ -160,7 +160,7 @@ export const ListLedgerEntriesResponseItem = zod.object({
   "amount": zod.number(),
   "description": zod.string(),
   "billReference": zod.string().nullable(),
-  "billImage": zod.string().nullable().describe('Scanned bill\/receipt image, stored as a base64 data URL.'),
+  "billImage": zod.string().nullable().describe('Scanned bill\/receipt image stored as a cloud storage object path (e.g. \/objects\/uploads\/uuid). Legacy rows may hold a base64 data URL during migration.'),
   "dueDate": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date()
 })
@@ -184,7 +184,7 @@ export const CreateLedgerEntryBody = zod.object({
   "amount": zod.number().gt(createLedgerEntryBodyAmountExclusiveMin),
   "description": zod.string().optional(),
   "billReference": zod.string().nullish(),
-  "billImage": zod.string().nullish().describe('Scanned bill\/receipt image, stored as a base64 data URL.'),
+  "billImage": zod.string().nullish().describe('Cloud storage object path for the scanned bill\/receipt image (e.g. \/objects\/uploads\/uuid).'),
   "dueDate": zod.coerce.date().nullish()
 })
 
@@ -195,7 +195,7 @@ export const CreateLedgerEntryResponse = zod.object({
   "amount": zod.number(),
   "description": zod.string(),
   "billReference": zod.string().nullable(),
-  "billImage": zod.string().nullable().describe('Scanned bill\/receipt image, stored as a base64 data URL.'),
+  "billImage": zod.string().nullable().describe('Scanned bill\/receipt image stored as a cloud storage object path (e.g. \/objects\/uploads\/uuid). Legacy rows may hold a base64 data URL during migration.'),
   "dueDate": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date()
 })
@@ -220,11 +220,63 @@ export const ListGlobalLedgerEntriesResponseItem = zod.object({
   "amount": zod.number(),
   "description": zod.string(),
   "billReference": zod.string().nullable(),
-  "billImage": zod.string().nullable().describe('Scanned bill\/receipt image, stored as a base64 data URL.'),
+  "billImage": zod.string().nullable().describe('Cloud storage object path for the scanned bill\/receipt image (e.g. \/objects\/uploads\/uuid).'),
   "dueDate": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date()
 })
 export const ListGlobalLedgerEntriesResponse = zod.array(ListGlobalLedgerEntriesResponseItem)
+
+
+/**
+ * Returns a presigned GCS URL for direct upload. The client sends JSON
+ * metadata here, then uploads the file directly to the returned URL.
+ * @summary Request a presigned URL for file upload
+ */
+
+
+
+
+
+export const RequestUploadUrlBody = zod.object({
+  "name": zod.string().min(1).describe('Original file name.'),
+  "size": zod.number().min(1).describe('File size in bytes.'),
+  "contentType": zod.string().min(1).describe('MIME type of the file (e.g. `image\/jpeg`).')
+})
+
+
+
+
+
+
+export const RequestUploadUrlResponse = zod.object({
+  "uploadURL": zod.string().describe('Presigned GCS URL for PUT upload.'),
+  "objectPath": zod.string().describe('Normalized object path (e.g. `\/objects\/uploads\/uuid`). Store this in your database.'),
+  "metadata": zod.object({
+  "name": zod.string().min(1).describe('Original file name.'),
+  "size": zod.number().min(1).describe('File size in bytes.'),
+  "contentType": zod.string().min(1).describe('MIME type of the file (e.g. `image\/jpeg`).')
+}).optional()
+})
+
+
+/**
+ * @summary Serve a public asset from PUBLIC_OBJECT_SEARCH_PATHS
+ */
+export const GetPublicObjectParams = zod.object({
+  "filePath": zod.coerce.string()
+})
+
+export const GetPublicObjectResponse = zod.unknown()
+
+
+/**
+ * @summary Serve an object entity from PRIVATE_OBJECT_DIR
+ */
+export const GetStorageObjectParams = zod.object({
+  "objectPath": zod.coerce.string()
+})
+
+export const GetStorageObjectResponse = zod.unknown()
 
 
 /**

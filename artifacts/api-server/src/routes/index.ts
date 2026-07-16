@@ -7,6 +7,7 @@ import dashboardRouter from "./dashboard";
 import settingsRouter from "./settings";
 import ledgerRouter from "./ledger";
 import eventsRouter from "./events";
+import storageRouter from "./storage";
 
 const router: IRouter = Router();
 
@@ -16,6 +17,10 @@ router.use(authRouter);
 
 // All routes below require a valid session (Clerk or phone OTP).
 router.use(requireAuth as any);
+
+// Storage routes — all require auth (upload mints write-capable presigned URLs;
+// object serving requires auth so bill images are only accessible to signed-in users).
+router.use(storageRouter);
 router.use(partiesRouter);
 router.use(dashboardRouter);
 router.use(settingsRouter);

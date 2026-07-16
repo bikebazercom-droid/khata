@@ -17,6 +17,7 @@ import { cn, evaluateCalculatorExpression, formatCurrency, formatExpressionForDi
 import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic';
 import { CameraCaptureModal } from '@/components/modals/camera-capture-modal';
 import { scanDocument } from '@/lib/document-scan';
+import { uploadBillImage, billImageSrc } from '@/lib/billImageStorage';
 
 type KeyKind = 'digit' | 'muted' | 'accent';
 type KeyDef = { label: string; value: string; kind: KeyKind; span?: number };
@@ -219,7 +220,13 @@ export function TransactionEntryScreen({
   const [showError, setShowError] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  // Local display copy of the bill image (base64 while uploading, then objectPath after save).
   const [billImage, setBillImage] = useState<string | null>(null);
+  // Background upload promise started as soon as the image is scanned/selected.
+  // By the time the user fills in the amount and presses save, the upload is
+  // almost always already complete — so awaiting it in handleSave adds no
+  // perceptible delay.
+  const uploadPromiseRef = useRef<Promise<string | null> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Once the user presses any numeric/operator key, the metadata panel
   // (details/bill/date/camera) locks open and never collapses again for the
@@ -260,14 +267,17 @@ export function TransactionEntryScreen({
     setIsScanning(true);
     try {
       const scanned = await scanDocument(dataUrl);
-      // Success is silently visible: the thumbnail appears in the metadata
-      // panel the instant `billImage` is set — no toast needed.
+      // Show the scanned image as a local thumbnail immediately.
       setBillImage(scanned);
+      // Start the background upload right away so that by the time the user
+      // fills in the amount and presses save, the upload is likely complete.
+      uploadPromiseRef.current = uploadBillImage(scanned);
     } catch (err) {
       // Falls back to the raw captured photo rather than blocking the user
       // with an error toast — they can still attach it or retake it.
       console.error('বিল স্ক্যান করা যায়নি, মূল ছবি ব্যবহার করা হচ্ছে:', err);
       setBillImage(dataUrl);
+      uploadPromiseRef.current = uploadBillImage(dataUrl);
     } finally {
       setIsScanning(false);
     }
@@ -378,25 +388,37 @@ export function TransactionEntryScreen({
       return;
     }
 
-    // Optimistic UI: commit to the final view instantly. The memory log is
-    // scoped to this transaction entry, so it's cleared the moment the
-    // amount is handed off — the actual network write happens silently in
-    // the background (see the mutation's onMutate/onError/onSettled above)
-    // and is never awaited here.
+    // Optimistic UI: close the entry screen immediately so the user never
+    // waits. The memory log is scoped to this transaction entry, so it's
+    // cleared the moment the amount is handed off.
     clearMemory();
     onClose();
-    createEntry.mutate({
-      partyId,
-      data: {
-        type,
-        amount: finalAmount,
-        description,
-        billReference: undefined,
-        billImage: billImage ?? undefined,
-        dueDate: dueDate || undefined,
-      },
-    });
-  }, [memoryHistory.length, memoryValue, expression, createEntry, partyId, type, description, billImage, dueDate, clearMemory, onClose]);
+
+    // Capture the pending upload promise before clearing any state.
+    const pendingUpload = uploadPromiseRef.current;
+    uploadPromiseRef.current = null;
+
+    // If an image was attached, await the background upload (started the
+    // moment the image was scanned — well before this save press) before
+    // firing the mutation. For entries with no image the promise is null so
+    // the mutation fires synchronously in the same microtask.
+    void (async () => {
+      const objectPath = pendingUpload ? await pendingUpload : null;
+      createEntry.mutate({
+        partyId,
+        data: {
+          type,
+          amount: finalAmount,
+          description,
+          billReference: undefined,
+          // Store the objectPath (e.g. "/objects/uploads/uuid") returned by
+          // cloud storage, NOT the local base64 data URL.
+          billImage: objectPath ?? undefined,
+          dueDate: dueDate || undefined,
+        },
+      });
+    })();
+  }, [memoryHistory.length, memoryValue, expression, createEntry, partyId, type, description, dueDate, clearMemory, onClose]);
 
   return (
     <div className="absolute inset-0 z-50 bg-[#f8fafc] flex flex-col">

@@ -12,6 +12,7 @@ import {
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { ensureDefaultBusiness } from "./middlewares/requireAuth";
+import { migrateBillImages } from "./lib/migrateBillImages";
 
 const app: Express = express();
 
@@ -61,8 +62,9 @@ app.use(
 
 app.use("/api", router);
 
-// Fire-and-forget startup migration: create the seed business and assign all
-// legacy (pre-auth) parties/settings rows to it.
+// Fire-and-forget startup migrations.
 void ensureDefaultBusiness();
+// Move any bill images stored as base64 data URLs into cloud object storage.
+void migrateBillImages();
 
 export default app;

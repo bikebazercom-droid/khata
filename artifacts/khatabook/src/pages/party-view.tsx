@@ -56,6 +56,7 @@ import {
   toWhatsAppNumber,
   stampPageNumbers,
 } from '@/lib/ledger-report';
+import { billImageSrc } from '@/lib/billImageStorage';
 import { format, isToday } from 'date-fns';
 
 /**
@@ -492,15 +493,15 @@ export function PartyView() {
                               বিল: {entry.billReference}
                             </span>
                           )}
-                          {entry.billImage && (
+                          {billImageSrc(entry.billImage) && (
                             <button
                               type="button"
-                              onClick={() => setLightboxImage(entry.billImage)}
+                              onClick={() => setLightboxImage(billImageSrc(entry.billImage))}
                               aria-label="বিলের ছবি দেখুন"
                               className="block mt-1.5 active:scale-95 transition-transform"
                             >
                               <img
-                                src={entry.billImage}
+                                src={billImageSrc(entry.billImage)!}
                                 alt="সংযুক্ত বিল"
                                 className="w-10 h-10 rounded-md object-cover border border-slate-200"
                               />
