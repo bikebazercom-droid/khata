@@ -5,7 +5,7 @@
  * Uses raw fetch + react-query directly — no generated API client coupling.
  */
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -90,6 +90,45 @@ interface StaffDestination {
   createdAt: string;
 }
 
+// ── keyboard height hook ──────────────────────────────────────────────────────
+
+/**
+ * Tracks the height (px) of the on-screen virtual keyboard using the
+ * VisualViewport API. Returns 0 when no keyboard is visible.
+ *
+ * How it works:
+ *   window.innerHeight  = full layout viewport (unchanged when keyboard opens)
+ *   visualViewport.height = visible area above the keyboard
+ *   difference          = keyboard height
+ *
+ * We also subtract visualViewport.offsetTop (scroll offset on some browsers)
+ * so the value is always the true keyboard clearance needed.
+ */
+function useKeyboardHeight(): number {
+  const [kbHeight, setKbHeight] = useState(0);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    function update() {
+      const height = window.innerHeight - vv!.height - vv!.offsetTop;
+      setKbHeight(Math.max(0, Math.round(height)));
+    }
+
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    update(); // read initial state
+
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, []);
+
+  return kbHeight;
+}
+
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function groupLogsByDate(logs: DeploymentLog[]): Map<string, DeploymentLog[]> {
@@ -122,6 +161,9 @@ function destinationTally(logs: DeploymentLog[]): Record<string, number> {
 export function StaffDeploymentPage() {
   const [, navigate] = useLocation();
   const qc = useQueryClient();
+
+  // ── keyboard clearance (for Add Staff bottom sheet) ───────────────────────
+  const keyboardHeight = useKeyboardHeight();
 
   // ── tab state ──────────────────────────────────────────────────────────────
   const [tab, setTab] = useState<'queue' | 'logs' | 'destinations'>('queue');
@@ -854,8 +896,16 @@ export function StaffDeploymentPage() {
           className="fixed inset-0 bg-black/50 z-50 flex items-end"
           onClick={() => !addMutation.isPending && setShowAdd(false)}
         >
+          {/*
+            The inner sheet shifts up by exactly keyboardHeight pixels when the
+            virtual keyboard is open. transition-[margin] provides a smooth
+            200 ms ease-out so it tracks the keyboard animation naturally.
+            When the keyboard is absent (keyboardHeight === 0) the standard
+            safe-area bottom padding takes over.
+          */}
           <div
-            className="w-full bg-white rounded-t-3xl shadow-2xl"
+            className="w-full bg-white rounded-t-3xl shadow-2xl transition-[margin] duration-200 ease-out"
+            style={{ marginBottom: keyboardHeight }}
             onClick={e => e.stopPropagation()}
           >
             <div className="flex justify-center pt-3 pb-2">
@@ -887,7 +937,10 @@ export function StaffDeploymentPage() {
                 )}
               </Button>
             </div>
-            <div className="pb-[calc(env(safe-area-inset-bottom,0px)+8px)]" />
+            {/* Safe-area padding — only meaningful when keyboard is hidden */}
+            {keyboardHeight === 0 && (
+              <div className="pb-[calc(env(safe-area-inset-bottom,0px)+8px)]" />
+            )}
           </div>
         </div>
       )}
