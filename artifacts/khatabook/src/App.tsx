@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tan
 import { Toaster } from 'sonner';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { MainLayout } from '@/components/layout/main-layout';
+import { ConnectionStateProvider, useConnectionState } from '@/context/connection-state';
 import { HomeView } from '@/pages/home';
 import { PartyView } from '@/pages/party-view';
 import { ReportView } from '@/pages/report-view';
@@ -108,7 +109,8 @@ const queryClient = new QueryClient({
  */
 function RealtimeSyncManager() {
   const { isAuthenticated } = useAppAuth();
-  useRealtimeSync(isAuthenticated);
+  const { setIsOnline } = useConnectionState();
+  useRealtimeSync(isAuthenticated, setIsOnline);
   return null;
 }
 
@@ -231,6 +233,7 @@ function AppRouter() {
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
       <QueryClientProvider client={queryClient}>
+        <ConnectionStateProvider>
         <ClerkCacheInvalidator />
         <RealtimeSyncManager />
         <TooltipProvider>
@@ -257,6 +260,7 @@ function AppRouter() {
           </Switch>
         </TooltipProvider>
         <Toaster position="bottom-right" richColors />
+        </ConnectionStateProvider>
       </QueryClientProvider>
     </ClerkProvider>
   );

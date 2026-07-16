@@ -30,8 +30,13 @@ const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
  *
  * @param enabled - Only opens the connection when true. Pass `isAuthenticated`
  *   from useAppAuth so we don't attempt an unauthenticated connection.
+ * @param onConnectionChange - Called with `true` when the SSE connection is
+ *   established and `false` when it drops.
  */
-export function useRealtimeSync(enabled: boolean) {
+export function useRealtimeSync(
+  enabled: boolean,
+  onConnectionChange?: (isOnline: boolean) => void,
+) {
   const qc = useQueryClient();
 
   useEffect(() => {
@@ -43,7 +48,14 @@ export function useRealtimeSync(enabled: boolean) {
     // On (re)connect, invalidate everything so missed events are caught up
     // silently in the background.
     es.addEventListener('connected', () => {
+      onConnectionChange?.(true);
       void qc.invalidateQueries();
+    });
+
+    // EventSource fires onerror when the connection drops or fails.
+    // It will keep retrying automatically; we mark offline until reconnect.
+    es.addEventListener('error', () => {
+      onConnectionChange?.(false);
     });
 
     // party.created — new party added on another device
@@ -91,5 +103,5 @@ export function useRealtimeSync(enabled: boolean) {
     return () => {
       es.close();
     };
-  }, [enabled, qc]);
+  }, [enabled, onConnectionChange, qc]);
 }
