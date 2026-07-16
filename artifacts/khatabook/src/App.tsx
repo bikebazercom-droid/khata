@@ -21,6 +21,7 @@ import { fetchMe } from '@/lib/phoneAuth';
 import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import { useRetryPendingUploads } from '@/lib/useRetryPendingUploads';
 import { readAuthCache, writeAuthCache, clearAuthCache } from '@/lib/authCache';
+import { restoreCache, persistCache, clearPersistedCache } from '@/lib/queryPersister';
 
 // ─── Clerk setup ──────────────────────────────────────────────────────────────
 
@@ -101,28 +102,57 @@ const clerkAppearance = {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Never auto-retry failed requests — SSE-driven invalidation handles
-      // re-fetching when connectivity is restored.
-      retry: false,
-      // Data is considered fresh for 30 seconds. After that, a background
-      // refetch is triggered on the next mount/focus/reconnect. SSE events
-      // bypass staleTime entirely — they call invalidateQueries directly.
-      staleTime: 30_000,
-      // Refetch automatically when the user switches back to this tab
-      // (catches the case where data changed on another device while this
-      // tab was in the background and the SSE connection was throttled).
-      refetchOnWindowFocus: true,
-      // When the browser re-establishes a network connection, resume any
-      // queries that were paused while offline and refetch stale data.
+      // ── Offline-first configuration ──────────────────────────────────────
+      //
+      // networkMode: 'offlineFirst' — queries fire regardless of what the
+      // browser's navigator.onLine reports. When the network is genuinely
+      // unreachable the query will fail as normal, but the persisted cache
+      // (restored synchronously before first render) means the UI shows
+      // real data rather than an empty/loading state. Background refetches
+      // are paused while offline and resume the moment connectivity returns.
+      networkMode: 'offlineFirst',
+      //
+      // staleTime: 5 min — reduces unnecessary background refetches on
+      // every tab switch or component mount. SSE-driven invalidateQueries
+      // already handles cross-device updates instantly; the staleTime is
+      // just a ceiling on "how long can data stay fresh without SSE".
+      staleTime: 5 * 60 * 1000,
+      //
+      // gcTime: 24 h — keeps query results in the in-memory cache overnight.
+      // The queryPersister also writes to localStorage (24 h TTL), so both
+      // layers stay aligned.
+      gcTime: 24 * 60 * 60 * 1000,
+      //
+      // refetchOnWindowFocus: false — the SSE connection + visibilitychange
+      // listener (in useRealtimeSync) already perform a full invalidation
+      // when the user returns to the tab after ≥60 s. An additional
+      // refetchOnWindowFocus would trigger duplicate fetches on every
+      // Alt-Tab and unnecessarily drain mobile data.
+      refetchOnWindowFocus: false,
+      //
+      // refetchOnReconnect: true — still resume fetches when the browser
+      // network interface comes back (complements the SSE reconnect path).
       refetchOnReconnect: true,
-      // With `online` mode, queries are paused when the browser reports
-      // no network and automatically resume (and refetch) once it returns.
-      // This is the default but we declare it explicitly so the intent is
-      // visible and won't be accidentally overridden.
-      networkMode: 'online',
+      //
+      // retry: 1 — allow one automatic retry for transient network errors
+      // (the previous `false` setting caused permanent failures on brief
+      // connectivity blips). SSE-driven invalidation handles longer outages.
+      retry: 1,
     },
   },
 });
+
+// ── Seed the QueryClient with last-session data before the first render ───────
+//
+// restoreCache() reads the localStorage snapshot synchronously and calls
+// queryClient.setQueryData() for every stored query key. This means the
+// very first render of HomeView, PartyView, etc. already has data —
+// no spinner, no blank screen, even when the network is slow or offline.
+//
+// persistCache() subscribes to the cache and writes each successful fetch
+// to localStorage so the next session can restore from it.
+restoreCache(queryClient);
+persistCache(queryClient);
 
 // ─── Real-time sync ───────────────────────────────────────────────────────────
 
@@ -153,9 +183,13 @@ function ClerkCacheInvalidator() {
       const userId = user?.id ?? null;
       if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== userId) {
         qc.clear();
-        // User signed out — clear the optimistic auth cache so next open
-        // shows the landing page without a stale-cache flash.
-        if (userId === null) clearAuthCache();
+        if (userId === null) {
+          // User signed out — clear both the optimistic auth cache and the
+          // persisted query cache so a different user signing in never sees
+          // the previous session's data during the optimistic-render window.
+          clearAuthCache();
+          clearPersistedCache();
+        }
       }
       prevUserIdRef.current = userId;
     });
