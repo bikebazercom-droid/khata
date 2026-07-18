@@ -1,0 +1,84 @@
+Hey Agent, the user is explicitly requesting that clicking the "📢 শেয়ার করুন" button MUST share the receipt strictly as a real JPG image file across all social apps (Imo, WhatsApp, Facebook). Right now, the buttons are completely frozen and not responding because the modern browser file-sharing API is crashing due to webview/subdomain security restrictions.
+
+WE MUST FIX THIS NOW WITH A 100% WORKING DUAL FALLBACK MECHANISM:
+1. When clicked, instantly render the referenced component wrapper (`entryDetailsRef` or `receiptRef`) into a high-res image via `html2canvas` using `{ scale: 3, useCORS: true }`.
+2. Convert the canvas cleanly to a JPEG data stream: `canvas.toDataURL('image/jpeg', 0.98)`.
+3. UNSTOPPABLE AUTOMATIC DOWNLOAD: Instantly trigger a phantom anchor link click to force-download the `.jpg` image file directly into the user's mobile gallery/downloads folder.
+4. PROMPT & REDIRECT: Since direct binary file passing is blocked by the browser, immediately show a clean browser prompt/alert confirming the save, and automatically redirect the user to WhatsApp/social deep-link gateway so they can attach the fresh image from their recent gallery files.
+
+Please rewrite the share handler functions for BOTH the Entry Details page and the Payment Request modal with this absolute bulletproof, error-free logic right now:
+
+```javascript
+// ==========================================
+// 1. FIXED ENTRY DETAILS SCREEN SHARE FUNCTION
+// ==========================================
+const handleEntryDetailsJpgShare = async () => {
+  if (!entryDetailsRef.current) return;
+
+  try {
+    // Take a pristine high-resolution snapshot
+    const canvas = await html2canvas(entryDetailsRef.current, {
+      backgroundColor: '#ffffff',
+      scale: 3,
+      useCORS: true,
+      logging: false
+    });
+
+    const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
+    
+    // Force immediate silent download to device gallery
+    const link = document.createElement('a');
+    link.href = jpgDataUrl;
+    link.download = `Banglakhata_Entry_${new Date().getTime()}.jpg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Instant bridge fallback to prevent button freeze or toast errors
+    setTimeout(() => {
+      alert("✅ রসিদটি সফলভাবে আপনার গ্যালারিতে JPG ছবি হিসেবে সেভ হয়েছে!\n\nএখন ইমু, ফেসবুক বা হোয়াটসঅ্যাপে গ্যালারি থেকে ছবিটি সিলেক্ট করে পাঠিয়ে দিন।");
+      window.open(`[https://api.whatsapp.com/send?text=ল](https://api.whatsapp.com/send?text=ল)েনদেনের JPG রসিদটি আমার গ্যালারি থেকে পাঠানো হচ্ছে।`, '_blank');
+    }, 200);
+
+  } catch (err) {
+    console.error('Snapshot failure:', err);
+    window.open(`[https://api.whatsapp.com/send?text=রস](https://api.whatsapp.com/send?text=রস)িদটি গ্যালারি থেকে শেয়ার করুন।`, '_blank');
+  }
+};
+
+// ==========================================
+// 2. FIXED PAYMENT REQUEST MODAL SHARE FUNCTION
+// ==========================================
+const handleModalRequestJpgShare = async () => {
+  if (!receiptRef.current) return;
+
+  try {
+    // Take a pristine high-resolution snapshot
+    const canvas = await html2canvas(receiptRef.current, {
+      backgroundColor: '#ffffff',
+      scale: 3,
+      useCORS: true,
+      logging: false
+    });
+
+    const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
+
+    // Force immediate silent download to device gallery
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.href = jpgDataUrl;
+    downloadAnchor.download = `Payment_Request_${new Date().getTime()}.jpg`;
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    document.body.removeChild(downloadAnchor);
+
+    // Instant bridge fallback to prevent button freeze or toast errors
+    setTimeout(() => {
+      alert("✅ পেমেন্ট রসিদটি আপনার গ্যালারিতে JPG ছবি হিসেবে সেভ হয়েছে!\n\nএখন আপনার ইমু বা হোয়াটসঅ্যাপ চ্যাটে গিয়ে গ্যালারি থেকে এটি সিলেক্ট করুন।");
+      window.open(`[https://api.whatsapp.com/send?text=প](https://api.whatsapp.com/send?text=প)েমেন্ট অনুরোধের JPG রসিদটি আমার গ্যালারি থেকে পাঠানো হচ্ছে।`, '_blank');
+    }, 200);
+
+  } catch (err) {
+    console.error('Snapshot failure:', err);
+    window.open(`[https://api.whatsapp.com/send?text=রস](https://api.whatsapp.com/send?text=রস)িদটি গ্যালারি থেকে শেয়ার করুন।`, '_blank');
+  }
+};

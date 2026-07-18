@@ -130,8 +130,7 @@ export function HomeView() {
       });
 
       const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
-      const ownerName = settings?.storeName || 'Banglakhata';
-      const fileName = `Payment_Request_${requestModalParty.name || 'Customer'}.jpg`;
+      const fileName = `Payment_Request_${Date.now()}.jpg`;
 
       // Force-download into device gallery immediately
       const downloadAnchor = document.createElement('a');
@@ -141,28 +140,20 @@ export function HomeView() {
       downloadAnchor.click();
       document.body.removeChild(downloadAnchor);
 
-      // Attempt native share sheet with the file
-      const base64Response = await fetch(jpgDataUrl);
-      const rawBlob = await base64Response.blob();
-      const sharedImageFile = new File([rawBlob], 'payment_receipt.jpg', { type: 'image/jpeg' });
-
-      const waFallback = `https://api.whatsapp.com/send?text=${encodeURIComponent('পেমেন্ট রসিদটি আপনার গ্যালারিতে JPG ফরম্যাটে সেভ করা হয়েছে।')}`;
-
-      if (navigator.canShare && navigator.canShare({ files: [sharedImageFile] })) {
-        try {
-          await navigator.share({
-            files: [sharedImageFile],
-            title: 'পেমেন্ট অনুরোধ',
-            text: `অর্থ প্রদানের ডিজিটাল রসিদ — ${ownerName}`,
-          });
-        } catch {
-          window.open(waFallback, '_blank');
-        }
-      } else {
-        window.open(waFallback, '_blank');
-      }
+      // Confirm save and open WhatsApp so the user can attach from gallery
+      setTimeout(() => {
+        alert('✅ পেমেন্ট রসিদটি আপনার গ্যালারিতে JPG ছবি হিসেবে সেভ হয়েছে!\n\nএখন আপনার ইমু বা হোয়াটসঅ্যাপ চ্যাটে গিয়ে গ্যালারি থেকে এটি সিলেক্ট করুন।');
+        window.open(
+          `https://api.whatsapp.com/send?text=${encodeURIComponent('পেমেন্ট অনুরোধের JPG রসিদটি আমার গ্যালারি থেকে পাঠানো হচ্ছে।')}`,
+          '_blank',
+        );
+      }, 200);
     } catch (err) {
-      console.error('Snapshot or sharing pipeline experienced an error:', err);
+      console.error('Snapshot failure:', err);
+      window.open(
+        `https://api.whatsapp.com/send?text=${encodeURIComponent('রসিদটি গ্যালারি থেকে শেয়ার করুন।')}`,
+        '_blank',
+      );
     } finally {
       setIsWhatsAppSharing(false);
     }

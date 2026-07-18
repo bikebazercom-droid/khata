@@ -204,33 +204,25 @@ export function TransactionDetailPage() {
       // Force download into device gallery immediately
       const link = document.createElement('a');
       link.href = jpgDataUrl;
-      link.download = `Banglakhata_Entry_${entry?.id || 'Record'}.jpg`;
+      link.download = `Banglakhata_Entry_${Date.now()}.jpg`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
 
-      // Attempt native share sheet with the file
-      const base64Response = await fetch(jpgDataUrl);
-      const rawBlob = await base64Response.blob();
-      const sharedImageFile = new File([rawBlob], 'entry_receipt.jpg', { type: 'image/jpeg' });
-
-      const waFallback = `https://api.whatsapp.com/send?text=${encodeURIComponent('রসিদটি গ্যালারিতে JPG ছবি হিসেবে সেভ হয়েছে।')}`;
-
-      if (navigator.canShare && navigator.canShare({ files: [sharedImageFile] })) {
-        try {
-          await navigator.share({
-            files: [sharedImageFile],
-            title: 'লেনদেন বিবরণ',
-            text: 'বিস্তারিত লেনদেনের রসিদপত্র।',
-          });
-        } catch {
-          window.open(waFallback, '_blank');
-        }
-      } else {
-        window.open(waFallback, '_blank');
-      }
+      // Confirm save and open WhatsApp so the user can attach from gallery
+      setTimeout(() => {
+        alert('✅ রসিদটি সফলভাবে আপনার গ্যালারিতে JPG ছবি হিসেবে সেভ হয়েছে!\n\nএখন ইমু, ফেসবুক বা হোয়াটসঅ্যাপে গ্যালারি থেকে ছবিটি সিলেক্ট করে পাঠিয়ে দিন।');
+        window.open(
+          `https://api.whatsapp.com/send?text=${encodeURIComponent('লেনদেনের JPG রসিদটি আমার গ্যালারি থেকে পাঠানো হচ্ছে।')}`,
+          '_blank',
+        );
+      }, 200);
     } catch (err: unknown) {
-      console.error('Critical capture failure:', err);
+      console.error('Snapshot failure:', err);
+      window.open(
+        `https://api.whatsapp.com/send?text=${encodeURIComponent('রসিদটি গ্যালারি থেকে শেয়ার করুন।')}`,
+        '_blank',
+      );
     } finally {
       setIsSharing(false);
     }
