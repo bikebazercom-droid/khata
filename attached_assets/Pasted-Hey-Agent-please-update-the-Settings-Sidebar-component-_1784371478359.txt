@@ -1,0 +1,178 @@
+Hey Agent, please update the Settings Sidebar component to use a clean, nested list-item hierarchy (Accordion structure). When the user clicks "সেটিংস", the sidebar opens containing distinct rows. Clicking each row toggles its nested options inline.
+
+YOUR IMPLEMENTATION REQUIREMENTS:
+1. "👤 প্রোফাইল তথ্য" Row:
+   - When clicked/touched, it expands downward to reveal inputs for: User Name (ব্যবহারকারীর নাম), Shop Name (দোকানের নাম), Mobile Number (মোবাইল নাম্বার), Gmail Address (জিমেইল), and Address (ঠিকানা).
+2. "🌐 ভাষা পরিবর্তন (Change Language)" Row:
+   - When clicked/touched, it expands downward to show two toggle buttons: "বাংলা" and "English".
+3. "🔐 লগইন / লগআউট (Account)" Row:
+   - When clicked/touched, it expands downward to show login or logout triggers based on the active user session authentication status.
+
+4. Core Integration:
+   - The Shop/User Name must be parsed into the HTML-to-PDF Header engine.
+   - The Address and Mobile Number must print dynamically in the PDF Footer template.
+
+Please overwrite the `SettingsSidebar.jsx` component completely using this standardized, polished accordion blueprint:
+
+---
+
+### FIXED NESTED SETTINGS SIDEBAR COMPONENT (`src/components/SettingsSidebar.jsx`)
+```javascript
+import React, { useState, useEffect } from 'react';
+
+export const SettingsSidebar = ({ isOpen, onClose, authSession, onLogout, onLoginClick }) => {
+  const [profile, setProfile] = useState({
+    userName: '',
+    businessName: '',
+    address: '',
+    phone: '',
+    email: '',
+    language: 'bn'
+  });
+
+  // Track which sub-menu is currently open inside the settings
+  const [activeMenu, setActiveMenu] = useState(null); // 'profile' | 'language' | 'auth' | null
+
+  useEffect(() => {
+    const savedProfile = localStorage.getItem('user_settings_profile');
+    if (savedProfile) {
+      setProfile(JSON.parse(savedProfile));
+    }
+  }, [isOpen]);
+
+  const toggleSubMenu = (menuName) => {
+    setActiveMenu(activeMenu === menuName ? null : menuName);
+  };
+
+  const handleFieldChange = (field, value) => {
+    const updatedProfile = { ...profile, [field]: value };
+    setProfile(updatedProfile);
+    localStorage.setItem('user_settings_profile', JSON.stringify(updatedProfile));
+    window.dispatchEvent(new Event('settingsUpdated'));
+  };
+
+  if (!isOpen) return null;
+  const isBn = profile.language === 'bn';
+
+  return (
+    <>
+      {/* BACKGROUND BACKDROP CLOSURE LAYER */}
+      <div 
+        onClick={onClose}
+        style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.4)', zIndex: 9999, backdropFilter: 'blur(2px)' }}
+      />
+      
+      {/* MAIN SETTINGS SIDEBAR DRAWER BODY */}
+      <div style={{ position: 'fixed', top: 0, right: 0, width: '340px', height: '100vh', backgroundColor: '#ffffff', boxShadow: '-4px 0 25px rgba(0,0,0,0.15)', zIndex: 10000, padding: '24px 20px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', fontFamily: 'inherit' }}>
+        
+        {/* PANEL BAR TOP HEADER */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E2E8F0', paddingBottom: '14px', marginBottom: '20px' }}>
+          <h3 style={{ margin: 0, fontSize: '18px', color: '#1E293B', fontWeight: 'bold' }}>
+            {isBn ? 'সেটিংস' : 'Settings'}
+          </h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '22px', cursor: 'pointer', color: '#94A3B8' }}>✕</button>
+        </div>
+
+        {/* NESTED MENU CONTAINER LIST */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, overflowY: 'auto' }}>
+          
+          {/* MENU 1: PROFILE ROW ACORDION */}
+          <div>
+            <div 
+              onClick={() => toggleSubMenu('profile')}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', backgroundColor: '#F8FAFC', borderRadius: '8px', cursor: 'pointer', border: '1px solid #E2E8F0', fontWeight: '500', color: '#1E293B' }}
+            >
+              <span>👤 {isBn ? 'প্রোফাইল তথ্য ও নাম যোগ' : 'Profile Information'}</span>
+              <span style={{ fontSize: '12px', color: '#64748B' }}>{activeMenu === 'profile' ? '▲' : '▼'}</span>
+            </div>
+            
+            {activeMenu === 'profile' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', backgroundColor: '#F1F5F9', padding: '14px', borderRadius: '0 0 8px 8px', border: '1px solid #E2E8F0', borderTop: 'none', boxSizing: 'border-box' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#475569', marginBottom: '4px' }}>{isBn ? 'ব্যবহারকারীর নাম' : 'User Name'}</label>
+                  <input type="text" placeholder={isBn ? "আপনার নাম লিখুন" : "Enter name"} value={profile.userName} onChange={(e) => handleFieldChange('userName', e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #CBD5E1', borderRadius: '6px', boxSizing: 'border-box', fontSize: '13px' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#475569', marginBottom: '4px' }}>{isBn ? 'দোকান / বিজনেসের নাম' : 'Shop / Business Name'}</label>
+                  <input type="text" placeholder={isBn ? "দোকানের নাম (পিডিএফ হেডার)" : "Shop name"} value={profile.businessName} onChange={(e) => handleFieldChange('businessName', e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #CBD5E1', borderRadius: '6px', boxSizing: 'border-box', fontSize: '13px' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#475569', marginBottom: '4px' }}>{isBn ? 'মোবাইল নাম্বার' : 'Mobile Number'}</label>
+                  <input type="text" placeholder={isBn ? "মোবাইল নাম্বার (পিডিএফ ফুটার)" : "Mobile number"} value={profile.phone} onChange={(e) => handleFieldChange('phone', e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #CBD5E1', borderRadius: '6px', boxSizing: 'border-box', fontSize: '13px' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#475569', marginBottom: '4px' }}>{isBn ? 'জিমেইল এড্রেস' : 'Gmail Address'}</label>
+                  <input type="email" placeholder="example@gmail.com" value={profile.email} onChange={(e) => handleFieldChange('email', e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #CBD5E1', borderRadius: '6px', boxSizing: 'border-box', fontSize: '13px' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#475569', marginBottom: '4px' }}>{isBn ? 'ঠিকানা' : 'Address'}</label>
+                  <input type="text" placeholder={isBn ? "ঠিকানা (পিডিএফ ফুটার)" : "Address"} value={profile.address} onChange={(e) => handleFieldChange('address', e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #CBD5E1', borderRadius: '6px', boxSizing: 'border-box', fontSize: '13px' }} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* MENU 2: LANGUAGE SELECTION ACCORDION */}
+          <div>
+            <div 
+              onClick={() => toggleSubMenu('language')}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', backgroundColor: '#F8FAFC', borderRadius: '8px', cursor: 'pointer', border: '1px solid #E2E8F0', fontWeight: '500', color: '#1E293B' }}
+            >
+              <span>🌐 {isBn ? 'ভাষা পরিবর্তন' : 'Change Language'}</span>
+              <span style={{ fontSize: '12px', color: '#64748B' }}>{activeMenu === 'language' ? '▲' : '▼'}</span>
+            </div>
+
+            {activeMenu === 'language' && (
+              <div style={{ display: 'flex', gap: '10px', backgroundColor: '#F1F5F9', padding: '14px', borderRadius: '0 0 8px 8px', border: '1px solid #E2E8F0', borderTop: 'none', boxSizing: 'border-box' }}>
+                <button 
+                  onClick={() => handleFieldChange('language', 'bn')} 
+                  style={{ flex: 1, padding: '10px', backgroundColor: profile.language === 'bn' ? '#004BA0' : '#ffffff', color: profile.language === 'bn' ? '#ffffff' : '#334155', border: '1px solid #CBD5E1', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+                >
+                  বাংলা
+                </button>
+                <button 
+                  onClick={() => handleFieldChange('language', 'en')} 
+                  style={{ flex: 1, padding: '10px', backgroundColor: profile.language === 'en' ? '#004BA0' : '#ffffff', color: profile.language === 'en' ? '#ffffff' : '#334155', border: '1px solid #CBD5E1', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+                >
+                  English
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* MENU 3: AUTH LOGIN / LOGOUT ACCORDION */}
+          <div>
+            <div 
+              onClick={() => toggleSubMenu('auth')}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', backgroundColor: '#F8FAFC', borderRadius: '8px', cursor: 'pointer', border: '1px solid #E2E8F0', fontWeight: '500', color: '#1E293B' }}
+            >
+              <span>🔐 {isBn ? 'লগইন / লগআউট' : 'Login / Logout'}</span>
+              <span style={{ fontSize: '12px', color: '#64748B' }}>{activeMenu === 'auth' ? '▲' : '▼'}</span>
+            </div>
+
+            {activeMenu === 'auth' && (
+              <div style={{ backgroundColor: '#F1F5F9', padding: '14px', borderRadius: '0 0 8px 8px', border: '1px solid #E2E8F0', borderTop: 'none', textCenter: 'center', boxSizing: 'border-box' }}>
+                {authSession ? (
+                  <button 
+                    onClick={() => { onLogout(); onClose(); }}
+                    style={{ width: '100%', padding: '10px', backgroundColor: '#DC2626', color: '#ffffff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+                  >
+                    {isBn ? 'লগআউট করুন' : 'Logout'}
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => { onLoginClick(); onClose(); }}
+                    style={{ width: '100%', padding: '10px', backgroundColor: '#16A34A', color: '#ffffff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+                  >
+                    {isBn ? 'লগইন করুন' : 'Login'}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+        </div>
+      </div>
+    </>
+  );
+};
