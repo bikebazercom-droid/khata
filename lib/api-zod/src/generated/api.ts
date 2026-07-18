@@ -207,7 +207,16 @@ export const PatchLedgerEntryParams = zod.object({
 })
 
 export const PatchLedgerEntryBody = zod.object({
-  "billImage": zod.string().describe('Cloud storage object path to attach to the entry (e.g. /objects/uploads/uuid).')
+  /** Cloud storage object path. Pass null to remove the image; omit to leave unchanged. */
+  "billImage": zod.string().nullable().optional(),
+  /** Updated transaction amount (must be > 0). */
+  "amount": zod.number().gt(0).optional(),
+  /** Updated transaction direction. */
+  "type": zod.enum(['YOU_GAVE', 'YOU_GOT']).optional(),
+  /** Updated note / description. */
+  "description": zod.string().optional(),
+  /** Updated transaction date as YYYY-MM-DD string. */
+  "dueDate": zod.string().optional(),
 })
 
 export const PatchLedgerEntryResponse = zod.object({

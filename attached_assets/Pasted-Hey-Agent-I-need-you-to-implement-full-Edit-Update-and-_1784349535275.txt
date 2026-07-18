@@ -1,0 +1,55 @@
+Hey Agent, I need you to implement full Edit, Update, and Delete actions for the Digital Khata system, with a specific focus on the Amount field interaction.
+
+LOOKING AT THE DESIGNED FLOWS:
+1. Entry Form Screen (Screen 1): The amount is displayed inside a large top card showing "₹ 50". I want this specific Amount input container to be fully interactive. When a user clicks directly on this Amount text/container, it must instantly activate/focus the custom calculator keypad layout below.
+2. Transaction Details View (Screen 2): Contains an "এন্ট্রি এডিট করুন" (Edit Entry) section card and a bottom red "মুছে ফেলুন" (Delete) button.
+
+YOUR TASK:
+Refactor the codebase to bind the click event handler on the Amount field, populate current data when entering Edit Mode, toggle between Create/Update states on "সংরক্ষণ করুন", and add safety popups for deleting entries.
+
+Please update the code in the respective component files as described below:
+
+---
+
+### 1. MAKE AMOUNT CONTAINER INTERACTIVE & BIND TO CALCULATOR KEYPAD
+Wrap the main top Amount Display in a clickable component (`TouchableOpacity` or `div`). Clicking it will toggle or keep the custom keypad view visible.
+
+```jsx
+// Inside Transaction Entry Form Component
+const [calculatorValue, setCalculatorValue] = useState(initialTransaction ? initialTransaction.amount.toString() : "0");
+const [isKeypadVisible, setIsKeypadVisible] = useState(true); // default true or triggered on focus
+
+const handleAmountContainerClick = () => {
+  // Ensure the custom calculator keypad focuses/opens when clicking the amount box
+  setIsKeypadVisible(true);
+  
+  // Highlight or clear default '0' if starting a fresh click
+  if (calculatorValue === "0") {
+    setCalculatorValue("");
+  }
+};
+
+return (
+  <div className="entry-container">
+    {/* CLICKABLE AMOUNT BOX */}
+    <div 
+      className="amount-display-card cursor-pointer border p-4 rounded bg-white text-green-700 font-bold text-3xl"
+      onClick={handleAmountContainerClick}
+    >
+      ₹ {calculatorValue || "0"}
+    </div>
+
+    {/* Rest of form: Details/Description, Date Picker */}
+    <input 
+      type="text" 
+      placeholder="ডিটেলস প্রবেশ করুন..." 
+      value={description} 
+      onChange={(e) => setDescription(e.target.value)}
+    />
+
+    {/* CUSTOM CALCULATOR KEYPAD - Rendered Conditionally or Always Visible */}
+    {isKeypadVisible && (
+      <CustomCalculatorKeypad currentValue="{calculatorValue}" onKeyPress="{handleCalculatorKeyPress}"/>
+    )}
+  </div>
+);

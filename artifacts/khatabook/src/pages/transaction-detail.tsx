@@ -9,10 +9,12 @@ import {
   getListLedgerEntriesQueryKey,
   getListPartiesQueryKey,
   getGetDashboardSummaryQueryKey,
+  LedgerEntryType,
   type LedgerEntry,
   type Party,
   type DashboardSummary,
 } from '@workspace/api-client-react';
+import { TransactionEntryScreen } from '@/components/modals/transaction-entry-screen';
 import {
   ChevronLeft,
   Trash2,
@@ -22,6 +24,7 @@ import {
   Receipt,
   ImageIcon,
   Loader2,
+  Pencil,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -64,6 +67,7 @@ export function TransactionDetailPage() {
   const { data: settings } = useGetBusinessSettings();
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
@@ -504,32 +508,43 @@ export function TransactionDetailPage() {
       </div>
 
       {/* ── Fixed footer ─────────────────────────────────────── */}
-      <div className="fixed bottom-0 inset-x-0 flex gap-3 px-4 py-4 bg-white border-t border-slate-200 z-20">
+      <div className="fixed bottom-0 inset-x-0 flex flex-col gap-2 px-4 pt-3 pb-4 bg-white border-t border-slate-200 z-20">
+        {/* Edit — primary action, full width */}
         <Button
-          variant="outline"
-          className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 hover:text-red-700 font-bold"
-          onClick={() => setShowDeleteConfirm(true)}
+          className="w-full bg-[#1B3A6B] hover:bg-[#243E72] font-bold"
+          onClick={() => setIsEditOpen(true)}
         >
-          <Trash2 className="w-4 h-4 mr-2" />
-          মুছে ফেলুন
+          <Pencil className="w-4 h-4 mr-2" />
+          এন্ট্রি এডিট করুন
         </Button>
-        <Button
-          className="flex-1 bg-[#1B3A6B] hover:bg-[#243E72] font-bold"
-          onClick={handleShare}
-          disabled={isSharing}
-        >
-          {isSharing ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              রসিদ তৈরি হচ্ছে…
-            </>
-          ) : (
-            <>
-              <Share2 className="w-4 h-4 mr-2" />
-              শেয়ার করুন
-            </>
-          )}
-        </Button>
+        {/* Secondary row: Delete + Share */}
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 hover:text-red-700 font-bold"
+            onClick={() => setShowDeleteConfirm(true)}
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            মুছে ফেলুন
+          </Button>
+          <Button
+            className="flex-1 bg-slate-700 hover:bg-slate-800 font-bold"
+            onClick={handleShare}
+            disabled={isSharing}
+          >
+            {isSharing ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                রসিদ…
+              </>
+            ) : (
+              <>
+                <Share2 className="w-4 h-4 mr-2" />
+                শেয়ার করুন
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Delete confirmation */}
@@ -558,6 +573,19 @@ export function TransactionDetailPage() {
       {/* Lightbox */}
       {lightboxImage && (
         <BillImageLightbox src={lightboxImage} onClose={() => setLightboxImage(null)} />
+      )}
+
+      {/* Edit overlay — mounts as a full-screen layer on top of the detail page.
+          Passing initialEntry activates edit mode: pre-populates the form and
+          routes the save button to PATCH instead of POST. */}
+      {isEditOpen && entry && (
+        <TransactionEntryScreen
+          partyId={partyId}
+          partyName={party.name}
+          type={entry.type as LedgerEntryType}
+          initialEntry={entry}
+          onClose={() => setIsEditOpen(false)}
+        />
       )}
     </div>
   );

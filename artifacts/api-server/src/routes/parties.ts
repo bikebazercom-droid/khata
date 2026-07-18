@@ -287,9 +287,10 @@ router.patch(
       return;
     }
 
-    // Verify the party belongs to this business.
+    // Fetch the full party row — needed for balance recalculation when the
+    // amount or direction changes, and for ownership verification.
     const [party] = await db
-      .select({ id: partiesTable.id })
+      .select()
       .from(partiesTable)
       .where(
         and(
@@ -318,11 +319,50 @@ router.patch(
       return;
     }
 
+    // Build the update set from only the fields provided in the body.
+    // Fields omitted by the caller are left untouched in the database.
+    const updateSet: Partial<{
+      billImage: string | null;
+      amount: string;
+      type: "YOU_GAVE" | "YOU_GOT";
+      description: string;
+      dueDate: string | null;
+    }> = {};
+
+    if (body.data.billImage !== undefined) updateSet.billImage = body.data.billImage;
+    if (body.data.amount    !== undefined) updateSet.amount    = body.data.amount.toFixed(2);
+    if (body.data.type      !== undefined) updateSet.type      = body.data.type;
+    if (body.data.description !== undefined) updateSet.description = body.data.description;
+    if (body.data.dueDate   !== undefined) updateSet.dueDate   = body.data.dueDate || null;
+
     const [updated] = await db
       .update(ledgerEntriesTable)
-      .set({ billImage: body.data.billImage })
+      .set(updateSet)
       .where(eq(ledgerEntriesTable.id, params.data.entryId))
       .returning();
+
+    // If the amount or direction changed we must recompute the party's
+    // running balance: reverse the old entry's effect, apply the new one.
+    const amountChanged = body.data.amount !== undefined;
+    const typeChanged   = body.data.type   !== undefined;
+
+    if (amountChanged || typeChanged) {
+      const oldAmount = Number(entry.amount);
+      const newAmount = body.data.amount ?? oldAmount;
+      const oldType   = entry.type as "YOU_GAVE" | "YOU_GOT";
+      const newType   = body.data.type   ?? oldType;
+
+      const currentSigned = toSignedBalance(party);
+      const oldDelta = oldType === "YOU_GAVE" ?  oldAmount : -oldAmount;
+      const newDelta = newType === "YOU_GAVE" ?  newAmount : -newAmount;
+      const nextSigned = currentSigned - oldDelta + newDelta;
+      const { currentBalance, balanceType } = fromSignedBalance(nextSigned);
+
+      await db
+        .update(partiesTable)
+        .set({ currentBalance, balanceType })
+        .where(eq(partiesTable.id, params.data.partyId));
+    }
 
     broadcast(businessId, {
       type: "ledger.updated",

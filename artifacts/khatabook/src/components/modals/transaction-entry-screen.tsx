@@ -98,12 +98,21 @@ export function TransactionEntryScreen({
   partyName,
   type,
   onClose,
+  initialEntry,
 }: {
   partyId: string;
   partyName: string;
   type: LedgerEntryType;
   onClose: () => void;
+  /** When provided the screen opens in edit mode, pre-populated with the
+   *  existing entry's data. Saving issues a PATCH instead of a POST. */
+  initialEntry?: LedgerEntry;
 }) {
+  const isEditMode = !!initialEntry;
+  const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
+  /** Stores the cloud-storage path of the bill image already on the entry so
+   *  handleUpdate can keep it unchanged when the user hasn't replaced it. */
+  const originalBillImagePathRef = useRef<string | null>(initialEntry?.billImage ?? null);
   const queryClient = useQueryClient();
   // Optimistic mutation: onMutate applies the expected ledger/balance/
   // dashboard changes to the cache synchronously (instant UI, no spinner),
@@ -176,7 +185,11 @@ export function TransactionEntryScreen({
     },
   });
 
-  const [expression, setExpression] = useState('');
+  // In edit mode: pre-populate the expression with the existing amount so the
+  // user sees the current value immediately when the screen opens.
+  const [expression, setExpression] = useState(() =>
+    isEditMode ? trimNumberForExpression(initialEntry!.amount) : ''
+  );
   // Dedicated calculator memory register (M+/M-/MR/MC), independent of the
   // live expression/result state above.
   const [memoryValue, setMemoryValue] = useState(0);
@@ -217,13 +230,24 @@ export function TransactionEntryScreen({
     setHasInteracted(true);
     justRecalledRef.current = true;
   }, [clearMemory]);
-  const [description, setDescription] = useState('');
-  const [dueDate, setDueDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [description, setDescription] = useState(initialEntry?.description ?? '');
+  const [dueDate, setDueDate] = useState(() => {
+    if (isEditMode) {
+      // Use the stored transaction date (dueDate field) if present; otherwise
+      // fall back to the server-assigned createdAt timestamp.
+      const raw = initialEntry!.dueDate ?? initialEntry!.createdAt;
+      return format(new Date(raw as string), 'yyyy-MM-dd');
+    }
+    return format(new Date(), 'yyyy-MM-dd');
+  });
   const [showError, setShowError] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   // Local display copy of the bill image (base64 while uploading, then objectPath after save).
-  const [billImage, setBillImage] = useState<string | null>(null);
+  // In edit mode, start with the existing entry's image so the user sees it immediately.
+  const [billImage, setBillImage] = useState<string | null>(() =>
+    initialEntry?.billImage ? (billImageSrc(initialEntry.billImage) ?? null) : null
+  );
   // Mirrors the raw base64 data URL set at image capture time so handleSave
   // can access it synchronously even after onClose() clears component state.
   // Needed to persist a retry record when the upload fails.
@@ -237,8 +261,9 @@ export function TransactionEntryScreen({
   // Once the user presses any numeric/operator key, the metadata panel
   // (details/bill/date/camera) locks open and never collapses again for the
   // rest of this session — even if the formula is later cleared or edited
-  // back down to zero. Only a fresh mount (new entry sheet) or save resets it.
-  const [hasInteracted, setHasInteracted] = useState(false);
+  // back down to zero. In edit mode it starts open immediately so all fields
+  // are visible without requiring a keypad interaction first.
+  const [hasInteracted, setHasInteracted] = useState(isEditMode);
 
   const isGet = type === LedgerEntryType.YOU_GOT;
   const hasFormula = /[+\-*/%]/.test(expression.replace(/^-/, ''));
@@ -410,6 +435,161 @@ export function TransactionEntryScreen({
     setHasInteracted(true);
     setExpression((prev) => prev + value);
   }, []);
+
+  /**
+   * Edit-mode save: issues an optimistic PATCH for the existing entry.
+   *
+   * Pattern mirrors handleDelete in TransactionDetailPage:
+   *   1. Snapshot caches.
+   *   2. Update entry in the list + adjust party balance.
+   *   3. Close the edit overlay immediately.
+   *   4. Fire PATCH in the background.
+   *   5. On success: invalidate caches for server truth.
+   *   6. On failure: restore snapshots + show non-blocking toast.
+   */
+  const handleUpdate = useCallback(() => {
+    if (!initialEntry) return;
+
+    const finalAmount =
+      memoryHistory.length > 0
+        ? memoryValue
+        : evaluateCalculatorExpression(expression);
+    if (finalAmount === null || finalAmount <= 0) {
+      setShowError(true);
+      return;
+    }
+
+    const entriesKey = getListLedgerEntriesQueryKey(partyId);
+    const partyKey   = getGetPartyQueryKey(partyId);
+    const partiesKey = getListPartiesQueryKey();
+    const summaryKey = getGetDashboardSummaryQueryKey();
+
+    // ── 1. Snapshot ──────────────────────────────────────────────────────
+    const previousEntries = queryClient.getQueryData<LedgerEntry[]>(entriesKey);
+    const previousParty   = queryClient.getQueryData<Party>(partyKey);
+    const previousParties = queryClient.getQueryData<Party[]>(partiesKey);
+    const previousSummary = queryClient.getQueryData<DashboardSummary>(summaryKey);
+
+    // ── 2. Optimistic cache update ────────────────────────────────────────
+    const updatedEntry: LedgerEntry = {
+      ...initialEntry,
+      amount:      finalAmount,
+      type,
+      description,
+      dueDate:     dueDate
+        ? (new Date(`${dueDate}T00:00:00`) as unknown as null)
+        : null,
+    };
+    queryClient.setQueryData<LedgerEntry[]>(entriesKey, (old) =>
+      (old ?? []).map((e) => (e.id === initialEntry.id ? updatedEntry : e))
+    );
+
+    // Reverse the old entry's balance effect, then apply the new one.
+    const oldDelta = initialEntry.type === LedgerEntryType.YOU_GAVE
+      ?  initialEntry.amount
+      : -initialEntry.amount;
+    const newDelta = type === LedgerEntryType.YOU_GAVE
+      ?  finalAmount
+      : -finalAmount;
+    const netDelta = newDelta - oldDelta;
+
+    const updatedParty = previousParty
+      ? applyBalanceDelta(previousParty, netDelta)
+      : undefined;
+
+    if (updatedParty) {
+      queryClient.setQueryData<Party>(partyKey, updatedParty);
+      queryClient.setQueryData<Party[]>(partiesKey, (old) =>
+        (old ?? []).map((p) => (p.id === partyId ? applyBalanceDelta(p, netDelta) : p))
+      );
+    }
+    if (previousSummary && previousParty && updatedParty) {
+      queryClient.setQueryData<DashboardSummary>(
+        summaryKey,
+        shiftSummaryForPartyChange(previousSummary, previousParty, updatedParty),
+      );
+    }
+
+    // ── 3. Close edit overlay immediately ────────────────────────────────
+    clearMemory();
+    onClose();
+
+    // Capture refs before any state is cleared so the async block can
+    // access them even after unmount.
+    const pendingUpload  = uploadPromiseRef.current;
+    const origPath       = originalBillImagePathRef.current;
+    const capturedBase64 = pendingBase64Ref.current;
+    uploadPromiseRef.current = null;
+    pendingBase64Ref.current = null;
+
+    // ── 4. Background PATCH ───────────────────────────────────────────────
+    void (async () => {
+      // Determine the final bill-image object path to send:
+      //   • null  → user explicitly removed the image
+      //   • new upload pending → await it, use new objectPath
+      //   • unchanged → keep the server's existing path (send nothing)
+      let objectPath: string | null | undefined = origPath; // default: unchanged
+      let billImageChanged = false;
+
+      if (billImage === null) {
+        objectPath = null;
+        billImageChanged = true;
+      } else if (pendingUpload) {
+        billImageChanged = true;
+        const result = await pendingUpload;
+        if (result.ok) {
+          objectPath = result.objectPath;
+        } else {
+          objectPath = origPath; // keep existing on upload failure
+          toast.warning('বিল ছবি আপডেট হয়নি', {
+            description: 'নেটওয়ার্ক সমস্যায় নতুন ছবি সংরক্ষণ হয়নি।',
+            duration: 5000,
+          });
+          if (capturedBase64 && initialEntry.id) {
+            savePendingUpload({ entryId: initialEntry.id, partyId, base64: capturedBase64 });
+          }
+        }
+      }
+
+      try {
+        const res = await fetch(
+          `${BASE}/api/parties/${partyId}/ledger-entries/${initialEntry.id}`,
+          {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              amount:      finalAmount,
+              type,
+              description,
+              dueDate:     dueDate || undefined,
+              ...(billImageChanged ? { billImage: objectPath } : {}),
+            }),
+          },
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        // ── 5. Background reconciliation ──────────────────────────────────
+        queryClient.invalidateQueries({ queryKey: entriesKey });
+        queryClient.invalidateQueries({ queryKey: partyKey });
+        queryClient.invalidateQueries({ queryKey: partiesKey });
+        queryClient.invalidateQueries({ queryKey: summaryKey });
+      } catch (err) {
+        console.error('Edit entry failed, rolling back:', err);
+
+        // ── 6. Rollback on failure ────────────────────────────────────────
+        queryClient.setQueryData(entriesKey, previousEntries);
+        queryClient.setQueryData(partyKey,   previousParty);
+        queryClient.setQueryData(partiesKey, previousParties);
+        queryClient.setQueryData(summaryKey, previousSummary);
+        toast.error('লেনদেন আপডেট ব্যর্থ হয়েছে — পরিবর্তন বাতিল হয়েছে');
+      }
+    })();
+  }, [
+    initialEntry, memoryHistory.length, memoryValue, expression,
+    partyId, type, description, dueDate, billImage,
+    queryClient, clearMemory, onClose, BASE,
+  ]);
 
   const handleSave = useCallback(() => {
     // If memory logs exist, the grand total accumulated in memory is the
@@ -644,14 +824,14 @@ export function TransactionEntryScreen({
       <div className="px-3 pt-1 shrink-0">
         <button
           type="button"
-          onClick={handleSave}
+          onClick={isEditMode ? handleUpdate : handleSave}
           disabled={!isActive}
           className={cn(
             'w-full h-14 rounded-xl font-extrabold text-white text-base shadow-[0_4px_14px_0_rgba(0,0,0,0.15)] active:scale-[0.98] transition-all disabled:opacity-40 disabled:active:scale-100',
             isGet ? 'bg-emerald-600' : 'bg-red-500'
           )}
         >
-          এন্ট্রি নিশ্চিত করুন
+          {isEditMode ? 'সংরক্ষণ করুন' : 'এন্ট্রি নিশ্চিত করুন'}
         </button>
       </div>
 
