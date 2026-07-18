@@ -1,0 +1,179 @@
+Hey Agent, looking at the updated screenshot (photo_2026-07-18_13-15-45.jpg), I need to update the PDF generation flow. Instead of just triggering a raw local download, the system must generate this exact pixel-perfect Khatabook PDF report, convert it into a file blob, and trigger the native mobile Share Sheet (using `navigator.share` API). This will allow the user to instantly send the PDF via WhatsApp, Imo, Gmail, or any available social media app.
+
+THE EXACT LAYOUT REQUIREMENTS:
+1. Top Banner: Dark blue (#004BA0) full-width ribbon with "হাজারি গোল্ড" on the left and "Khatabook" on the right.
+2. Headings: Centered title "গ্রাহক তালিকার রিপোর্ট" and subtitle "(আজ পর্যন্ত - 18 জুলাই 2026)".
+3. Summary Grid: 3-column boxed grid for "আপনি পাবেন", "আপনি দেবেন", and "মোট ব্যালেন্স" (Total balance text must reflect Cr/Dr and colors accurately).
+4. Data Rows Counter: "গ্রাহক সংখ্যা: X (সব)" dynamically rendered above the grid.
+5. Column Formatting: 5 columns exactly matching: ["নাম", "ডিটেলস", "আপনি পাবেন", "আপনি দেবেন", "সংগ্রহের দিন"]. 
+   - Column 3 ("আপনি পাবেন") must have a light reddish/pink background (#FEF2F2).
+   - Column 4 ("আপনি দেবেন") must have a light greenish background (#F0FDF4).
+6. Total Footer: A "সর্বমোট" row calculated at the bottom with a gray accent highlight fill.
+
+Please implement the updated Native Share + jsPDF generation setup below:
+
+---
+
+### DYNAMIC GENERATE & SHARE PDF ENGINE CODE
+
+```javascript
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+
+// Ensure your base64 Bengali font configuration is active to prevent character crashes
+// import { banglaFontBase64 } from './fonts/SolaimanLipi';
+
+const generateAndShareReportPDF = async (filteredData, businessName = "হাজারি গোল্ড") => {
+  const doc = new jsPDF('p', 'mm', 'a4');
+  const pageWidth = doc.internal.pageSize.width;
+  const currentDateStr = new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  // REGISTER BANGLA FONT ROUTINE (Required for Unicode rendering)
+  // doc.addFileToVFS('BanglaFont.ttf', banglaFontBase64);
+  // doc.addFont('BanglaFont.ttf', 'BanglaFont', 'normal');
+  // doc.setFont('BanglaFont');
+
+  // 1. TOP BLUE BANNER
+  doc.setFillColor(0, 75, 160);
+  doc.rect(0, 0, pageWidth, 14, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(10);
+  doc.text(businessName, 14, 9);
+  doc.text("Khatabook", pageWidth - 30, 9);
+
+  // 2. HEADINGS
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(13);
+  doc.text("গ্রাহক তালিকার রিপোর্ট", pageWidth / 2, 24, { align: "center" });
+  doc.setFontSize(9);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`(আজ পর্যন্ত - ${currentDateStr})`, pageWidth / 2, 30, { align: "center" });
+
+  // SUMMATION CALCULATIONS
+  let totalGet = 0;
+  let totalGive = 0;
+  filteredData.forEach(item => {
+    if (item.balance > 0) totalGet += item.balance;
+    else if (item.balance < 0) totalGive += Math.abs(item.balance);
+  });
+  const netBalance = totalGet - totalGive;
+
+  // 3. THREE-COLUMN METRICS STATS CARD
+  const cardY = 36;
+  const cardWidth = pageWidth - 28;
+  const colWidth = cardWidth / 3;
+
+  doc.setDrawColor(226, 232, 240);
+  doc.setFillColor(255, 255, 255);
+  doc.rect(14, cardY, cardWidth, 18, 'DF');
+
+  doc.line(14 + colWidth, cardY, 14 + colWidth, cardY + 18);
+  doc.line(14 + (colWidth * 2), cardY, 14 + (colWidth * 2), cardY + 18);
+
+  // Column 1
+  doc.setFontSize(8); doc.setTextColor(148, 163, 184);
+  doc.text("আপনি পাবেন", 14 + (colWidth / 2), cardY + 5, { align: "center" });
+  doc.setFontSize(10); doc.setTextColor(15, 23, 42);
+  doc.text(`৳${totalGet.toLocaleString('bn-BD', { minimumFractionDigits: 2 })}`, 14 + (colWidth / 2), cardY + 12, { align: "center" });
+
+  // Column 2
+  doc.setFontSize(8); doc.setTextColor(148, 163, 184);
+  doc.text("আপনি দেবেন", 14 + colWidth + (colWidth / 2), cardY + 5, { align: "center" });
+  doc.setFontSize(10); doc.setTextColor(15, 23, 42);
+  doc.text(`৳${totalGive.toLocaleString('bn-BD', { minimumFractionDigits: 2 })}`, 14 + colWidth + (colWidth / 2), cardY + 12, { align: "center" });
+
+  // Column 3
+  doc.setFontSize(8); doc.setTextColor(148, 163, 184);
+  doc.text("মোট ব্যালেন্স", 14 + (colWidth * 2) + (colWidth / 2), cardY + 5, { align: "center" });
+  doc.setFontSize(10); doc.setTextColor(22, 163, 74); // Match green/red balance text dynamically
+  doc.text(`৳${Math.abs(netBalance).toLocaleString('bn-BD', { minimumFractionDigits: 2 })} ${netBalance >= 0 ? 'Cr' : 'Dr'}`, 14 + (colWidth * 2) + (colWidth / 2), cardY + 12, { align: "center" });
+
+  // 4. COUNTER LABEL
+  doc.setFontSize(9);
+  doc.setTextColor(51, 65, 85);
+  doc.text(`গ্রাহক সংখ্যা: ${filteredData.length} (সব)`, 14, 62);
+
+  // 5. AUTO-TABLE GENERATION WITH SHARP STRUCTURAL CELLS
+  const columns = ["নাম", "ডিটেলস", "আপনি পাবেন", "আপনি দেবেন", "সংগ্রহের দিন"];
+  const bodyRows = filteredData.map(item => [
+    item.name || "N/A",
+    item.mobile || "N/A",
+    item.balance > 0 ? item.balance.toFixed(2) : "",
+    item.balance < 0 ? Math.abs(item.balance).toFixed(2) : "",
+    item.collectionDay || ""
+  ]);
+
+  // Append Total Row Array Data
+  bodyRows.push(["সর্বমোট", "", totalGet.toFixed(2), totalGive.toFixed(2), ""]);
+
+  doc.autoTable({
+    startY: 66,
+    head: [columns],
+    body: bodyRows,
+    theme: 'grid',
+    styles: { fontSize: 8.5, cellPadding: 3, textColor: [51, 65, 85] },
+    headStyles: {
+      fillColor: [248, 250, 252],
+      textColor: [15, 23, 42],
+      lineWidth: 0.1,
+      lineColor: [226, 232, 240]
+    },
+    columnStyles: {
+      0: { cellWidth: 42 },
+      1: { cellWidth: 42 },
+      2: { cellWidth: 34 }, 
+      3: { cellWidth: 34 }, 
+      4: { cellWidth: 30 }
+    },
+    willDrawCell: (data) => {
+      // Precise column background logic injection matching screenshot color highlights
+      if (data.row.type === 'body' && data.row.index !== bodyRows.length - 1) {
+        if (data.column.index === 2 && data.cell.text[0] !== "") {
+          data.cell.styles.fillColor = [254, 242, 242]; // Light Pink/Red highlight background
+        }
+        if (data.column.index === 3 && data.cell.text[0] !== "") {
+          data.cell.styles.fillColor = [240, 253, 250]; // Light Mint/Green highlight background
+        }
+      }
+      // Style bottom row boundary
+      if (data.row.index === bodyRows.length - 1) {
+        data.cell.styles.fillColor = [241, 245, 249];
+        data.cell.styles.fontStyle = 'bold';
+      }
+    }
+  });
+
+  // 6. BOTTOM TIMESTAMP FOOTER
+  const finalY = doc.lastAutoTable.finalY + 8;
+  doc.setFontSize(8);
+  doc.setTextColor(148, 163, 184);
+  const currentTimeStr = new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' });
+  doc.text(`রিপোর্ট তৈরি হয়েছে : ${currentTimeStr} | ${currentDateStr}`, 14, finalY);
+
+  /* -------------------------------------------------------------
+     CRITICAL STEP 7: CONVERT TO BLOB & TRIGGER NATIVE SOCIAL SHARE
+     ------------------------------------------------------------- */
+  const pdfBlob = doc.output('blob');
+  const pdfFile = new File([pdfBlob], `Report_${new Date().toISOString().split('T')[0]}.pdf`, {
+    type: 'application/pdf',
+  });
+
+  // Verify if native sharing feature is natively compatible with current environment
+  if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+    try {
+      await navigator.share({
+        files: [pdfFile],
+        title: 'গ্রাহক তালিকার রিপোর্ট',
+        text: 'হাজারি গোল্ড এর ফিল্টার করা গ্রাহক তালিকার রিপোর্ট স্টেটমেন্ট',
+      });
+    } catch (shareError) {
+      console.log("Sharing cancelled or blocked", shareError);
+      // Fallback behavior if action is cancelled by client
+      doc.save(`Report_${new Date().toISOString().split('T')[0]}.pdf`);
+    }
+  } else {
+    // Standard Desktop browser download fallback fallback pipeline
+    alert("আপনার ডিভাইসটি সরাসরি ফাইল শেয়ারিং সাপোর্ট করছে না। পিডিএফ ফাইলটি ডাউনলোড করা হচ্ছে।");
+    doc.save(`Report_${new Date().toISOString().split('T')[0]}.pdf`);
+  }
+};

@@ -221,8 +221,18 @@ export function HomeView() {
       );
 
       // ── 4. Count label ───────────────────────────────────────────────────
+      const filterDisplayLabel: Record<string, string> = {
+        all:       'সব',
+        will_get:  'আপনি পাবেন',
+        will_give: 'আপনি দেবেন',
+        today:     'আজকের বাকি',
+        upcoming:  'আপকামিং',
+        permanent: 'স্থায়ী',
+        no_date:   'তারিখ নেই',
+      };
+      const countTag = filterDisplayLabel[appliedFilter] ?? 'সব';
       doc.setFont(BN, 'normal'); doc.setFontSize(9); doc.setTextColor(51, 65, 85);
-      doc.text(`${roleLabel} সংখ্যা: ${parties.length} (প্রাপ্ত)`, 14, 62);
+      doc.text(`${roleLabel} সংখ্যা: ${parties.length} (${countTag})`, 14, 62);
 
       // ── 5. Data table ────────────────────────────────────────────────────
       const head = [['নাম', 'ডিটেলস', 'আপনি পাবেন', 'আপনি দেবেন', 'সংগ্রহের দিন']];
@@ -267,11 +277,11 @@ export function HomeView() {
               data.cell.styles.fillColor = [241, 245, 249];
               data.cell.styles.fontStyle = 'bold';
             } else {
-              // Body data rows — column tints matching screenshot
-              // "আপনি পাবেন" col: light pink  (#FEF2F2)
-              if (data.column.index === 2) data.cell.styles.fillColor = [254, 242, 242];
-              // "আপনি দেবেন" col: light green (#F0FDF4)
-              if (data.column.index === 3) data.cell.styles.fillColor = [240, 253, 244];
+              // Body data rows — tint only non-empty cells so blank cells stay white
+              if (data.column.index === 2 && data.cell.text[0] !== '')
+                data.cell.styles.fillColor = [254, 242, 242]; // light pink  #FEF2F2
+              if (data.column.index === 3 && data.cell.text[0] !== '')
+                data.cell.styles.fillColor = [240, 253, 244]; // light green #F0FDF4
             }
           }
         },
@@ -296,8 +306,29 @@ export function HomeView() {
       doc.setTextColor(148, 163, 184);
       doc.text(`রিপোর্ট তৈরি হয়েছে: ${timeStr} | ${dateStr}`, 14, finalY);
 
-      const roleTag = role === PartyRole.CUSTOMER ? 'Customer' : 'Supplier';
-      doc.save(`HazariKhata_${roleTag}_${new Date().toISOString().split('T')[0]}.pdf`);
+      // ── 7. Share Sheet (native) or download fallback ─────────────────────
+      const roleTag  = role === PartyRole.CUSTOMER ? 'Customer' : 'Supplier';
+      const filename = `HazariKhata_${roleTag}_${new Date().toISOString().split('T')[0]}.pdf`;
+      const pdfBlob  = doc.output('blob');
+      const pdfFile  = new File([pdfBlob], filename, { type: 'application/pdf' });
+
+      if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+        try {
+          await navigator.share({
+            files: [pdfFile],
+            title: `${roleLabel} তালিকার রিপোর্ট`,
+            text: `${storeName} এর ফিল্টার করা ${roleLabel} তালিকার রিপোর্ট`,
+          });
+        } catch (shareErr) {
+          // User dismissed the sheet or share was blocked — fall back to download
+          if ((shareErr as DOMException).name !== 'AbortError') {
+            doc.save(filename);
+          }
+        }
+      } else {
+        // Desktop or browser without file-share support — direct download
+        doc.save(filename);
+      }
     } catch (err) {
       console.error('PDF export failed:', err);
       toast.error('PDF তৈরি করতে সমস্যা হয়েছে।');
