@@ -1,0 +1,154 @@
+Hey Agent, we need to strictly implement the "বিস্তারিত প্রবেশিকা" (Entry Details) screen exactly as displayed in the provided images (photo_2026-07-18_18-44-05.jpg and photo_2026-07-18_18-20-24_2.jpg). The layout must be perfectly boxed, styled, and aligned without any layout shifting.
+
+YOUR COMPLIANCE LAYOUT TASKS:
+
+1. FIXED DEEP BLUE ACTION HEADER:
+   - Background color: Deep Solid Royal Blue (`#0056B3` or current application theme).
+   - Left side: White back arrow icon (`←`).
+   - Title text: Centered or aligned perfectly as "বিস্তারিত প্রবেশিকা".
+
+2. CORE WHITE CONTAINER BOX (TOP MAIN CARD):
+   - Background color: `#ffffff` with smooth corners (`border-radius: 8px`) and a subtle shadow.
+   - Row 1: Left-aligned circle icon with customer's initials (e.g., "MW"). Adjacent to it, show the Customer Name and the exact original timestamp (`15 Jul 26 • 06:00 PM`). Right side displays the highlighted large amount (e.g., `₹ 50`) and status text below it (`আপনি পেয়েছেন` / `আপনি দিয়েছেন`).
+   - Row 2: Shaded or bordered separation line showing `বর্তমান ব্যালেন্স` on the left and the value `₹ 561` highlighted on the right.
+   - Row 3: A clean, centered click trigger button with a pencil icon: `🖋️ এন্ট্রি এডিট করুন`. When clicked, it opens the edit field modal while strictly maintaining the original creation date.
+
+3. LOWER MIDDLEBOX ARTIFACTS:
+   - SMS Status Block: A border-isolated box with `💬 SMS পাঠানো হয়নি` written in deep crimson, followed by formatted transactional details text and link placeholder.
+   - Backup Block: A subtle light box displaying `☁️ এন্ট্রি ব্যাক আপ করা হয়েছে`.
+   - Bottom Shield: Centered green text `🛡️ 100% নিরাপদ ও সুরক্ষিত` with a clean secure emblem icon.
+
+4. FOOTER FIXED BANNER CONTROLS:
+   - Must be strictly fixed at the bottom viewport.
+   - Left Button: `🗑️ মুছে ফেলুন` inside a clean container with a dark red border outline and red text.
+   - Right Button: `📢 শেয়ার করুন` inside a solid dark blue rectangular layout block with white text.
+
+Please inject this absolute functional code structure into our entry visualization template immediately:
+
+```javascript
+import React, { useState } from 'react';
+
+export const EntryDetailsView = ({ selectedEntry, targetCustomer, onCloseView, onModifySave, onHardDelete }) => {
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editedAmount, setEditedAmount] = useState(selectedEntry.amount);
+  const [editedDetails, setEditedDetails] = useState(selectedEntry.details || '');
+
+  const commitEntryUpdate = () => {
+    // Preserve the exact original date and time timestamp upon re-saving
+    const revisedPayload = {
+      ...selectedEntry,
+      amount: parseFloat(editedAmount),
+      details: editedDetails,
+      date: selectedEntry.date 
+    };
+    onModifySave(revisedPayload);
+    setIsEditModalOpen(false);
+  };
+
+  return (
+    <div style={{ backgroundColor: '#F4F6F9', minHeight: '100vh', width: '100%', position: 'absolute', top: 0, left: 0, zIndex: 100, fontFamily: 'sans-serif', boxSizing: 'border-box', paddingBottom: '80px' }}>
+      
+      {/* 1. Header Navigation Bar */}
+      <div style={{ backgroundColor: '#004B93', color: '#ffffff', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '20px' }}>
+        <button onClick={onCloseView} style={{ background: 'none', border: 'none', color: '#ffffff', fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>←</button>
+        <span style={{ fontSize: '18px', fontStyle: 'normal', fontWeight: 'bold' }}>বিস্তারিত প্রবেশিকা</span>
+      </div>
+
+      <div style={{ padding: '16px' }}>
+        
+        {/* 2. Primary Upper White Box Wrapper */}
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #E2E8F0', boxShadow: '0 2px 6px rgba(0,0,0,0.06)', overflow: 'hidden', marginBottom: '16px' }}>
+          
+          <div style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{ width: '48px', height: '48px', backgroundColor: '#3B82F6', color: '#ffffff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContext: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '18px' }}>
+                {targetCustomer.name ? targetCustomer.name.substring(0, 2).toUpperCase() : 'MW'}
+              </div>
+              <div>
+                <div style={{ fontSize: '17px', fontWeight: '600', color: '#1E293B' }}>{targetCustomer.name}</div>
+                <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>{selectedEntry.date}</div>
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '22px', fontWeight: 'bold', color: selectedEntry.type === 'credit' ? '#16A34A' : '#DC2626' }}>
+                ₹ {Math.abs(selectedEntry.amount)}
+              </div>
+              <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+                {selectedEntry.type === 'credit' ? 'আপনি পেয়েছেন' : 'আপনি দিয়েছেন'}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 20px', backgroundColor: '#ffffff', borderTop: '1px solid #F1F5F9', borderBottom: '1px solid #F1F5F9', fontSize: '15px' }}>
+            <span style={{ color: '#475569' }}>বর্তমান ব্যালেন্স</span>
+            <span style={{ fontWeight: 'bold', color: '#DC2626' }}>₹ {targetCustomer.balance || '561'}</span>
+          </div>
+
+          {/* Edit Box Click Strip */}
+          <button 
+            onClick={() => setIsEditModalOpen(true)}
+            style={{ width: '100%', padding: '16px', background: 'none', border: 'none', color: '#004B93', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+          >
+            🖊️ এন্ট্রি এডিট করুন
+          </button>
+        </div>
+
+        {/* 3. Lower Detail Info Grid Blocks */}
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '16px', marginBottom: '12px' }}>
+          <div style={{ color: '#B91C1C', fontWeight: 'bold', fontSize: '14px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            📋 SMS পাঠানো হয়নি
+          </div>
+          <div style={{ fontSize: '14px', color: '#475569', lineHeight: '1.6' }}>
+            আপনি দিয়েছেন: ₹ {Math.abs(selectedEntry.amount)}<br />
+            ব্যালেন্স: -(₹ {targetCustomer.balance})<br />
+            <span style={{ color: '#004B93', wordBreak: 'break-all' }}>[https://banglakhata.com/a2/LCwGHOdIFp](https://banglakhata.com/a2/LCwGHOdIFp)</span>
+          </div>
+        </div>
+
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '14px 16px', color: '#64748B', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
+          ☁️ এন্ট্রি ব্যাক আপ করা হয়েছে
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', color: '#16A34A', fontSize: '14px', fontWeight: 'bold' }}>
+          ✔️ <span style={{ color: '#16A34A' }}>100% নিরাপদ ও সুরক্ষিত</span>
+        </div>
+      </div>
+
+      {/* 4. Strict Sticky Footer Action Controls */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, width: '100%', backgroundColor: '#ffffff', padding: '12px 16px', borderTop: '1px solid #E2E8F0', display: 'flex', gap: '12px', boxSizing: 'border-box', zIndex: 10 }}>
+        <button 
+          onClick={() => onHardDelete(selectedEntry.id)}
+          style={{ flex: 1, padding: '14px', backgroundColor: '#ffffff', color: '#DC2626', border: '1px solid #DC2626', borderRadius: '6px', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+        >
+          🗑️ মুছে ফেলুন
+        </button>
+        <button 
+          style={{ flex: 1, padding: '14px', backgroundColor: '#004B93', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+        >
+          📬 শেয়ার করুন
+        </button>
+      </div>
+
+      {/* Structured Overlay Re-Entry Form Box Component */}
+      {isEditModalOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 999, boxSizing: 'border-box' }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '20px', width: '100%', maxWidth: '380px', boxSizing: 'border-box' }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', color: '#1E293B' }}>এন্ট্রি সংশোধন (Re-entry)</h3>
+            
+            <label style={{ display: 'block', fontSize: '13px', color: '#64748B', marginBottom: '6px' }}>টাকার পরিমাণ (₹)</label>
+            <input type="number" value={editedAmount} onChange={(e) => setEditedAmount(e.target.value)} style={{ width: '100%', padding: '10px', border: '1px solid #CBD5E1', borderRadius: '6px', marginBottom: '16px', boxSizing: 'border-box', fontSize: '15px' }} />
+            
+            <label style={{ display: 'block', fontSize: '13px', color: '#64748B', marginBottom: '6px' }}>বিবরণ / ডিটেলস</label>
+            <input type="text" value={editedDetails} onChange={(e) => setEditedDetails(e.target.value)} style={{ width: '100%', padding: '10px', border: '1px solid #CBD5E1', borderRadius: '6px', marginBottom: '20px', boxSizing: 'border-box', fontSize: '15px' }} />
+            
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setIsEditModalOpen(false)} style={{ padding: '8px 16px', border: '1px solid #CBD5E1', background: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px' }}>বাতিল</button>
+              <button onClick={commitEntryUpdate} style={{ padding: '8px 16px', backgroundColor: '#004B93', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold' }}>সংরক্ষণ করুন</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+};

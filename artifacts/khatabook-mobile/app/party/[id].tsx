@@ -745,7 +745,6 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
   const [isEditing, setIsEditing] = useState(false);
   const [editAmount, setEditAmount] = useState(String(initialEntry.amount));
   const [editDesc, setEditDesc]   = useState(initialEntry.description || '');
-  const [editType, setEditType]   = useState<'YOU_GAVE' | 'YOU_GOT'>(initialEntry.type);
 
   // Re-sync when the parent re-opens with a different entry
   useEffect(() => {
@@ -753,7 +752,6 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
       setEntry(initialEntry);
       setEditAmount(String(initialEntry.amount));
       setEditDesc(initialEntry.description || '');
-      setEditType(initialEntry.type);
       setIsEditing(false);
     }
   }, [visible, initialEntry.id]);
@@ -780,12 +778,11 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
       const updated = await patchEntry.mutateAsync({
         partyId: entry.partyId,
         entryId: entry.id,
-        data: { amount: parsed, description: editDesc.trim() || undefined, type: editType },
+        data: { amount: parsed, description: editDesc.trim() || undefined },
       });
       setEntry(updated);
       setEditAmount(String(updated.amount));
       setEditDesc(updated.description || '');
-      setEditType(updated.type);
       qc.invalidateQueries({ queryKey: [`/api/parties/${entry.partyId}/ledger-entries`] });
       qc.invalidateQueries({ queryKey: [`/api/parties/${entry.partyId}`] });
       qc.invalidateQueries({ queryKey: ['/api/dashboard/summary'] });
@@ -835,31 +832,33 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
   }
 
   const s = StyleSheet.create({
-    overlay:   { flex: 1, backgroundColor: colors.background },
+    overlay:   { flex: 1, backgroundColor: '#F4F6F9' },
     header: {
       paddingTop: Platform.OS === 'web' ? 16 : insets.top + 8,
       paddingBottom: 16,
-      paddingHorizontal: 16,
-      backgroundColor: colors.primary,
+      paddingHorizontal: 20,
+      backgroundColor: '#004B93',
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 14,
+      gap: 20,
     },
-    headerTitle: { flex: 1, fontSize: 18, fontFamily: 'Inter_700Bold', color: '#fff', textAlign: 'center', marginRight: 34 },
-    body:      { flex: 1, backgroundColor: '#F1F5F9' },
+    headerTitle: { flex: 1, fontSize: 18, fontFamily: 'Inter_700Bold', color: '#fff' },
+    body:      { flex: 1 },
     card: {
       backgroundColor: '#fff',
-      borderRadius: 12,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: '#E2E8F0',
       marginHorizontal: 16,
       marginTop: 16,
-      padding: 18,
+      overflow: 'hidden',
       shadowColor: '#000',
       shadowOpacity: 0.06,
       shadowOffset: { width: 0, height: 2 },
-      shadowRadius: 8,
+      shadowRadius: 6,
       elevation: 3,
+      padding: 0,
     },
-    cardSeparator: { height: 1, backgroundColor: '#F1F5F9', marginVertical: 12 },
     initials: {
       width: 46,
       height: 46,
@@ -884,17 +883,17 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
       borderTopWidth: 1,
       borderTopColor: '#F1F5F9',
     },
-    editBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary },
+    editBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#004B93' },
     infoCard: {
       backgroundColor: '#fff',
-      borderRadius: 12,
+      borderRadius: 8,
       marginHorizontal: 16,
       marginTop: 12,
       padding: 16,
       borderWidth: 1,
       borderColor: '#E2E8F0',
     },
-    smsHeading: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#DC2626', marginBottom: 8 },
+    smsHeading: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#B91C1C', marginBottom: 8 },
     smsBody:    { fontSize: 13, color: '#475569', fontFamily: 'Inter_400Regular', lineHeight: 20 },
     smsLink:    { color: '#004B93', fontFamily: 'Inter_500Medium' },
     backupText: { fontSize: 13, color: '#64748B', fontFamily: 'Inter_400Regular' },
@@ -920,8 +919,8 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
     deleteBtn: {
       flex: 1,
       paddingVertical: 14,
-      borderRadius: 8,
-      borderWidth: 1.5,
+      borderRadius: 6,
+      borderWidth: 1,
       borderColor: '#DC2626',
       alignItems: 'center',
       justifyContent: 'center',
@@ -932,8 +931,8 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
     shareBtn: {
       flex: 1,
       paddingVertical: 14,
-      borderRadius: 8,
-      backgroundColor: colors.primary,
+      borderRadius: 6,
+      backgroundColor: '#004B93',
       alignItems: 'center',
       justifyContent: 'center',
       flexDirection: 'row',
@@ -988,8 +987,8 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
     saveBtn: {
       paddingVertical: 10,
       paddingHorizontal: 20,
-      borderRadius: 6,
-      backgroundColor: colors.primary,
+      borderRadius: 4,
+      backgroundColor: '#004B93',
     },
     saveBtnText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
   });
@@ -1014,9 +1013,9 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
         <ScrollView style={s.body} contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
           {/* 2. Transaction summary card */}
           <View style={s.card}>
-            {/* Party + amount row */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+            {/* Row 1: Party + amount */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 }}>
                 <View style={s.initials}>
                   <Text style={s.initialsText}>{initials}</Text>
                 </View>
@@ -1025,53 +1024,46 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
                   <Text style={s.dateText}>{dateLabel}</Text>
                 </View>
               </View>
-              <View style={{ marginLeft: 12 }}>
-                <Text style={[s.amountBig, { color: amtColor }]}>৳ {formatAmount(entry.amount).replace('৳', '')}</Text>
+              <View style={{ marginLeft: 12, alignItems: 'flex-end' }}>
+                <Text style={[s.amountBig, { color: amtColor }]}>৳ {Math.abs(entry.amount)}</Text>
                 <Text style={s.dirLabel}>{balanceLabel}</Text>
               </View>
             </View>
 
-            {/* Balance row */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+            {/* Row 2: Balance */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', backgroundColor: '#fff' }}>
               <Text style={s.balLabel}>বর্তমান ব্যালেন্স</Text>
               <Text style={[s.balValue, { color: balColor }]}>
-                ৳ {formatAmount(party.currentBalance).replace('৳', '')}
+                ৳ {Math.abs(party.currentBalance)}
               </Text>
             </View>
 
-            {/* Edit button */}
+            {/* Row 3: Edit button */}
             <TouchableOpacity style={s.editBtn} onPress={() => setIsEditing(true)} activeOpacity={0.7}>
-              <Feather name="edit-2" size={15} color={colors.primary} />
+              <Text style={{ fontSize: 15 }}>🖊️</Text>
               <Text style={s.editBtnText}>এন্ট্রি এডিট করুন</Text>
             </TouchableOpacity>
           </View>
 
           {/* 3a. SMS card */}
           <View style={s.infoCard}>
-            <Text style={s.smsHeading}>💬 SMS পাঠানো হয়নি</Text>
+            <Text style={s.smsHeading}>📋 SMS পাঠানো হয়নি</Text>
             <Text style={s.smsBody}>
-              {smsBody.split('\n').map((line, i) =>
-                line.startsWith('https://') ? (
-                  <Text key={i} style={s.smsLink} onPress={() => Linking.openURL(line)}>{line}</Text>
-                ) : (
-                  <Text key={i}>{line}{i < 2 ? '\n' : ''}</Text>
-                )
-              )}
+              {`আপনি ${isGave ? 'দিয়েছেন' : 'পেয়েছেন'}: ৳ ${Math.abs(entry.amount)}\nব্যালেন্স: -(৳ ${Math.abs(party.currentBalance)})\n`}
+              <Text style={s.smsLink} onPress={() => Linking.openURL(`https://banglakhata.com/p/${entry.partyId}`)}>
+                {`https://banglakhata.com/p/${entry.partyId}`}
+              </Text>
             </Text>
           </View>
 
           {/* 3b. Backup card */}
           <View style={s.infoCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Feather name="cloud" size={16} color="#94A3B8" />
-              <Text style={s.backupText}>এন্ট্রি ব্যাক আপ করা হয়েছে</Text>
-            </View>
+            <Text style={s.backupText}>☁️ এন্ট্রি ব্যাক আপ করা হয়েছে</Text>
           </View>
 
           {/* 3c. Security badge */}
           <View style={s.secBadge}>
-            <Feather name="shield" size={16} color="#16A34A" />
-            <Text style={s.secText}>100% নিরাপদ ও সুরক্ষিত</Text>
+            <Text style={s.secText}>✔️ 100% নিরাপদ ও সুরক্ষিত</Text>
           </View>
         </ScrollView>
 
@@ -1083,11 +1075,11 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
             disabled={deleteEntry.isPending}
             activeOpacity={0.8}
           >
-            <Feather name="trash-2" size={16} color="#DC2626" />
+            <Text style={{ fontSize: 16 }}>🗑️</Text>
             <Text style={s.deleteBtnText}>মুছে ফেলুন</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.shareBtn} onPress={handleShare} activeOpacity={0.8}>
-            <Feather name="share-2" size={16} color="#fff" />
+            <Text style={{ fontSize: 16 }}>📬</Text>
             <Text style={s.shareBtnText}>শেয়ার করুন</Text>
           </TouchableOpacity>
         </View>
@@ -1097,37 +1089,7 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
       <Modal visible={isEditing} transparent animationType="fade" onRequestClose={() => setIsEditing(false)}>
         <KeyboardAvoidingView style={s.editOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={s.editCard}>
-            <Text style={s.editTitle}>এন্ট্রি সংশোধন করুন</Text>
-
-            {/* Type toggle */}
-            <View style={s.editTypeRow}>
-              <TouchableOpacity
-                style={[s.editTypeBtn, {
-                  backgroundColor: editType === 'YOU_GAVE' ? colors.willGetBg : colors.card,
-                  borderColor: editType === 'YOU_GAVE' ? colors.willGet : colors.border,
-                }]}
-                onPress={() => setEditType('YOU_GAVE')}
-                activeOpacity={0.8}
-              >
-                <Feather name="arrow-up-right" size={16} color={editType === 'YOU_GAVE' ? colors.willGet : colors.mutedForeground} />
-                <Text style={[s.editTypeBtnText, { color: editType === 'YOU_GAVE' ? colors.willGet : colors.mutedForeground, marginTop: 2 }]}>
-                  You Gave
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.editTypeBtn, {
-                  backgroundColor: editType === 'YOU_GOT' ? colors.willGiveBg : colors.card,
-                  borderColor: editType === 'YOU_GOT' ? colors.willGive : colors.border,
-                }]}
-                onPress={() => setEditType('YOU_GOT')}
-                activeOpacity={0.8}
-              >
-                <Feather name="arrow-down-left" size={16} color={editType === 'YOU_GOT' ? colors.willGive : colors.mutedForeground} />
-                <Text style={[s.editTypeBtnText, { color: editType === 'YOU_GOT' ? colors.willGive : colors.mutedForeground, marginTop: 2 }]}>
-                  You Got
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={s.editTitle}>এন্ট্রি সংশোধন (Re-entry)</Text>
 
             {/* Amount */}
             <Text style={s.editLabel}>টাকার পরিমাণ (৳)</Text>
