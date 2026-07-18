@@ -1,0 +1,185 @@
+Hey Agent, look at the provided sample report PDF screenshot (photo_2026-07-18_12-57-21.jpg). We need to replace the generic PDF style with this exact corporate layout structure. 
+
+CRITICAL REQUIREMENTS:
+1. BANGLA FONT SUPPORT: Since the layout contains Bengali text like "গ্রাহক তালিকার রিপোর্ট", "আপনি পাবেন", etc., you MUST load a base64 encoded Bengali font (like SolaimanLipi or Kalpurush) into jsPDF to prevent text breaking or rendering as question marks.
+2. TOP BLUE STRIP HEADER: Full-width dark blue colored container block stretching across the top, showing the business name (e.g., "হাজারি গোল্ড") on the left and app branding on the right.
+3. THREE-COLUMN METRICS CARD: A boxed container containing 3 sections: "আপনি পাবেন", "আপনি দেবেন", and "মোট ব্যালেন্স" formatted with clear dividers.
+4. TABLE STRUCTURE:
+   - Header Row: ["নাম", "ডিটেলস", "আপনি পাবেন", "আপনি দেবেন", "সংগ্রহের দিন"]
+   - Body Rows: Filtered entries matching the current system view.
+   - Summary Row: A bottom "সর্বমোট" row summing up the total column amounts.
+
+YOUR TASK:
+Write a clean jsPDF + jsPDF-AutoTable export script. Embed a default Bengali font context, style the elements precisely to mimic the photo layout, and hook it up to the dashboard's PDF option action trigger.
+
+Here is the structured implementation roadmap for the codebase:
+
+---
+
+### 1. COMPUTE DATA AND GENERATE LAYOUT WITH jspdf
+
+```javascript
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+
+// NOTE FOR AGENT: You must include/import a base64 string of a Bengali font here 
+// Example: import { banglaFontBase64 } from './fonts/SolaimanLipi.js';
+
+const exportToKhatabookPDF = (filteredData, businessName = "হাজারি গোল্ড") => {
+  const doc = new jsPDF('p', 'mm', 'a4');
+
+  /* -------------------------------------------------------------
+     STEP 1: ADD & REGISTER BENGALI UNICODE FONT (CRITICAL FOR BANGLA)
+     ------------------------------------------------------------- */
+  // doc.addFileToVFS('BanglaFont.ttf', banglaFontBase64);
+  // doc.addFont('BanglaFont.ttf', 'BanglaFont', 'normal');
+  // doc.setFont('BanglaFont');
+
+  const pageWidth = doc.internal.pageSize.width; // A4 is ~210mm
+  const currentDate = new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  /* -------------------------------------------------------------
+     STEP 2: TOP SOLID BLUE HEADER STRIP
+     ------------------------------------------------------------- */
+  doc.setFillColor(0, 75, 160); // Accurate dark blue profile tone
+  doc.rect(0, 0, pageWidth, 15, 'F');
+  
+  // Business Name Left-Aligned
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(11);
+  doc.text(businessName, 14, 10);
+  
+  // Brand Logo Right-Aligned
+  doc.text("Khatabook", pageWidth - 32, 10);
+
+  /* -------------------------------------------------------------
+     STEP 3: REPORT SUB-TITLES
+     ------------------------------------------------------------- */
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(14);
+  doc.text("গ্রাহক তালিকার রিপোর্ট - ফিল্টার করা", pageWidth / 2, 28, { align: "center" });
+  
+  doc.setFontSize(10);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`(আজ পর্যন্ত - ${currentDate})`, pageWidth / 2, 34, { align: "center" });
+
+  /* -------------------------------------------------------------
+     STEP 4: SUMMARY 3-COLUMN METRICS CARD PANEL
+     ------------------------------------------------------------- */
+  const cardY = 40;
+  const cardWidth = pageWidth - 28; // Padding 14 on each side
+  const colWidth = cardWidth / 3;
+
+  // Draw Card Outline Border Box
+  doc.setDrawColor(226, 232, 240);
+  doc.setFillColor(255, 255, 255);
+  doc.rect(14, cardY, cardWidth, 18, 'DF');
+
+  // Inner Vertical Divider Lines
+  doc.line(14 + colWidth, cardY, 14 + colWidth, cardY + 18);
+  doc.line(14 + (colWidth * 2), cardY, 14 + (colWidth * 2), cardY + 18);
+
+  // Calculate dynamic filtered balance parameters
+  let totalGet = 0;
+  let totalGive = 0;
+  filteredData.forEach(item => {
+    if (item.balance > 0) totalGet += item.balance;
+    else if (item.balance < 0) totalGive += Math.abs(item.balance);
+  });
+  const netBalance = totalGet - totalGive;
+
+  // Column 1 Text content: আপনি পাবেন
+  doc.setFontSize(8);
+  doc.setTextColor(100, 116, 139);
+  doc.text("আপনি পাবেন", 14 + (colWidth / 2), cardY + 6, { align: "center" });
+  doc.setFontSize(11);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`৳${totalGet.toFixed(2)}`, 14 + (colWidth / 2), cardY + 13, { align: "center" });
+
+  // Column 2 Text content: আপনি দেবেন
+  doc.setFontSize(8);
+  doc.setTextColor(100, 116, 139);
+  doc.text("আপনি দেবেন", 14 + colWidth + (colWidth / 2), cardY + 6, { align: "center" });
+  doc.setFontSize(11);
+  doc.text(`৳${totalGive.toFixed(2)}`, 14 + colWidth + (colWidth / 2), cardY + 13, { align: "center" });
+
+  // Column 3 Text content: মোট ব্যালেন্স
+  doc.setFontSize(8);
+  doc.setTextColor(100, 116, 139);
+  doc.text("মোট ব্যালেন্স", 14 + (colWidth * 2) + (colWidth / 2), cardY + 6, { align: "center" });
+  doc.setFontSize(11);
+  doc.setTextColor(220, 38, 38); // Red tint style matched for debit
+  doc.text(`৳${Math.abs(netBalance).toFixed(2)} ${netBalance >= 0 ? 'Cr' : 'Dr'}`, 14 + (colWidth * 2) + (colWidth / 2), cardY + 13, { align: "center" });
+
+  /* -------------------------------------------------------------
+     STEP 5: CUSTOMER COUNT LABEL & MAIN DATA TABLE
+     ------------------------------------------------------------- */
+  doc.setFontSize(9);
+  doc.setTextColor(51, 65, 85);
+  doc.text(`গ্রাহক সংখ্যা: ${filteredData.length} (প্রাপ্ত)`, 14, 66);
+
+  const columns = ["নাম", "ডিটেলস", "আপনি পাবেন", "আপনি দেবেন", "সংগ্রহের দিন"];
+  
+  const bodyRows = filteredData.map(item => [
+    item.name || "N/A",
+    item.mobile || "N/A",
+    item.balance > 0 ? item.balance.toFixed(2) : "",
+    item.balance < 0 ? Math.abs(item.balance).toFixed(2) : "",
+    item.collectionDay || ""
+  ]);
+
+  // Append Total / সর্বমোট Row at the bottom array structure
+  bodyRows.push([
+    "সর্বমোট", 
+    "", 
+    totalGet.toFixed(2), 
+    totalGive.toFixed(2), 
+    ""
+  ]);
+
+  doc.autoTable({
+    startY: 70,
+    head: [columns],
+    body: bodyRows,
+    theme: 'grid',
+    styles: {
+      // font: 'BanglaFont', // Uncomment after adding file base64 configuration hook
+      fontSize: 9,
+      textColor: [51, 65, 85],
+      cellPadding: 3
+    },
+    headStyles: {
+      fillColor: [248, 250, 252], // Off-white/slate light background header look
+      textColor: [15, 23, 42],
+      fontStyle: 'bold',
+      lineWidth: 0.2,
+      lineColor: [226, 232, 240]
+    },
+    columnStyles: {
+      0: { cellWidth: 40 }, // Name cell scale spacing
+      1: { cellWidth: 45 }, // Details cell scale spacing
+      2: { cellWidth: 35, fillColor: [254, 242, 242] }, // Light Red tint background for 'Get' amounts matching screenshot
+      3: { cellWidth: 35, fillColor: [240, 253, 250] }, // Light Green tint background for 'Give' amounts matching screenshot
+      4: { cellWidth: 27 }
+    },
+    willDrawCell: (data) => {
+      // Highlight row background specifically if it is the footer "সর্বমোট" index
+      if (data.row.index === bodyRows.length - 1) {
+        doc.setFillColor(241, 245, 249);
+        data.cell.styles.fontStyle = 'bold';
+      }
+    }
+  });
+
+  /* -------------------------------------------------------------
+     STEP 6: TIMESTAMPS FOOTNOTE DATA INDICATOR
+     ------------------------------------------------------------- */
+  const finalY = doc.lastAutoTable.finalY + 8;
+  doc.setFontSize(8);
+  doc.setTextColor(148, 163, 184);
+  const currentTimeStamp = new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' });
+  doc.text(`রিপোর্ট তৈরি হয়েছে : ${currentTimeStamp} | ${currentDate}`, 14, finalY);
+
+  // Save the layout output file trigger asset
+  doc.save(`Khatabook_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+};
