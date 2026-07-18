@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import { banglaFontBase64 } from '@/utils/bengaliFont';
+import html2canvas from 'html2canvas';
 import { Link, useLocation } from 'wouter';
 import {
   useListParties,
@@ -125,181 +124,162 @@ export function HomeView() {
 
   const exportFilteredReportToPDF = useCallback(async () => {
     setIsExportingPdf(true);
+
+    const storeName  = settings?.storeName || 'ডিজিটাল খাতা';
+    const roleLabel  = role === PartyRole.CUSTOMER ? 'গ্রাহক' : 'সাপ্লায়ার';
+    const dateStr    = new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
+    const timeStr    = new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' });
+
+    let filteredGet  = 0;
+    let filteredGive = 0;
+    for (const p of parties) {
+      if (p.balanceType === 'YOU_WILL_GET') filteredGet  += p.currentBalance;
+      else                                  filteredGive += p.currentBalance;
+    }
+    const netBalance = filteredGet - filteredGive;
+
+    const filterDisplayLabel: Record<string, string> = {
+      all:       'সব',
+      will_get:  'আপনি পাবেন',
+      will_give: 'আপনি দেবেন',
+      today:     'আজকের বাকি',
+      upcoming:  'আপকামিং',
+      permanent: 'স্থায়ী',
+      no_date:   'তারিখ নেই',
+    };
+    const countTag = filterDisplayLabel[appliedFilter] ?? 'সব';
+
+    // ── Build an off-screen DOM node — the browser shapes Bengali perfectly ──
+    const container = document.createElement('div');
+    container.style.cssText = [
+      'position:absolute',
+      'left:-9999px',
+      'top:0',
+      'width:794px',
+      'background:#fff',
+      "font-family:'Noto Sans Bengali','Hind Siliguri',sans-serif",
+      'padding-bottom:40px',
+    ].join(';');
+
+    const rowsHtml = parties.map(p => {
+      const dateCell = p.lastTransactionAt
+        ? new Date(p.lastTransactionAt).toLocaleDateString('en-GB')
+        : '—';
+      const getCell = p.balanceType === 'YOU_WILL_GET'
+        ? `<td style="padding:10px;border:1px solid #E2E8F0;text-align:right;background:#FEF2F2;color:#DC2626;font-weight:bold;">৳${p.currentBalance.toFixed(2)}</td>`
+        : `<td style="padding:10px;border:1px solid #E2E8F0;text-align:right;"></td>`;
+      const giveCell = p.balanceType === 'YOU_WILL_GIVE'
+        ? `<td style="padding:10px;border:1px solid #E2E8F0;text-align:right;background:#F0FDF4;color:#16A34A;font-weight:bold;">৳${p.currentBalance.toFixed(2)}</td>`
+        : `<td style="padding:10px;border:1px solid #E2E8F0;text-align:right;"></td>`;
+      return `
+        <tr style="border-bottom:1px solid #E2E8F0;">
+          <td style="padding:10px;border:1px solid #E2E8F0;font-weight:500;">${p.name  || '—'}</td>
+          <td style="padding:10px;border:1px solid #E2E8F0;color:#64748B;">${p.phone || '—'}</td>
+          ${getCell}
+          ${giveCell}
+          <td style="padding:10px;border:1px solid #E2E8F0;text-align:center;color:#64748B;">${dateCell}</td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `
+      <!-- Blue banner -->
+      <div style="background:#004BA0;display:flex;justify-content:space-between;align-items:center;padding:12px 24px;color:#fff;font-size:14px;font-weight:bold;">
+        <div>${storeName}</div>
+        <div>Khatabook</div>
+      </div>
+
+      <!-- Title -->
+      <div style="text-align:center;margin-top:24px;">
+        <div style="margin:0;font-size:20px;font-weight:bold;color:#1E293B;">${roleLabel} তালিকার রিপোর্ট</div>
+        <div style="margin-top:6px;font-size:13px;color:#64748B;">(আজ পর্যন্ত - ${dateStr})</div>
+      </div>
+
+      <!-- 3-column stats card -->
+      <div style="margin:20px 24px 0;border:1px solid #E2E8F0;border-radius:4px;display:table;width:calc(100% - 48px);border-collapse:collapse;">
+        <div style="display:table-row;">
+          <div style="display:table-cell;width:33.33%;text-align:center;padding:12px;border-right:1px solid #E2E8F0;">
+            <div style="font-size:12px;color:#94A3B8;margin-bottom:5px;">আপনি পাবেন</div>
+            <div style="font-size:15px;font-weight:bold;color:#0F172A;">৳${filteredGet.toLocaleString('bn-BD', { minimumFractionDigits: 2 })}</div>
+          </div>
+          <div style="display:table-cell;width:33.33%;text-align:center;padding:12px;border-right:1px solid #E2E8F0;">
+            <div style="font-size:12px;color:#94A3B8;margin-bottom:5px;">আপনি দেবেন</div>
+            <div style="font-size:15px;font-weight:bold;color:#0F172A;">৳${filteredGive.toLocaleString('bn-BD', { minimumFractionDigits: 2 })}</div>
+          </div>
+          <div style="display:table-cell;width:33.33%;text-align:center;padding:12px;">
+            <div style="font-size:12px;color:#94A3B8;margin-bottom:5px;">মোট ব্যালেন্স</div>
+            <div style="font-size:15px;font-weight:bold;color:${netBalance >= 0 ? '#16A34A' : '#DC2626'};">
+              ৳${Math.abs(netBalance).toLocaleString('bn-BD', { minimumFractionDigits: 2 })} ${netBalance >= 0 ? 'Cr' : 'Dr'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Count label -->
+      <div style="margin:16px 24px 8px;font-size:13px;color:#334155;font-weight:bold;">
+        ${roleLabel} সংখ্যা: ${parties.length} (${countTag})
+      </div>
+
+      <!-- Data table -->
+      <table style="width:calc(100% - 48px);margin:0 24px;border-collapse:collapse;font-size:12px;text-align:left;color:#334155;">
+        <thead>
+          <tr style="background:#F8FAFC;">
+            <th style="padding:10px;border:1px solid #E2E8F0;width:22%;">নাম</th>
+            <th style="padding:10px;border:1px solid #E2E8F0;width:22%;">ডিটেলস</th>
+            <th style="padding:10px;border:1px solid #E2E8F0;width:18%;text-align:right;">আপনি পাবেন</th>
+            <th style="padding:10px;border:1px solid #E2E8F0;width:18%;text-align:right;">আপনি দেবেন</th>
+            <th style="padding:10px;border:1px solid #E2E8F0;width:20%;text-align:center;">সংগ্রহের দিন</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+          <tr style="background:#F1F5F9;font-weight:bold;border-top:2px solid #CBD5E1;">
+            <td style="padding:12px 10px;border:1px solid #E2E8F0;">সর্বমোট</td>
+            <td style="padding:12px 10px;border:1px solid #E2E8F0;"></td>
+            <td style="padding:12px 10px;border:1px solid #E2E8F0;text-align:right;color:#DC2626;">৳${filteredGet.toFixed(2)}</td>
+            <td style="padding:12px 10px;border:1px solid #E2E8F0;text-align:right;color:#16A34A;">৳${filteredGive.toFixed(2)}</td>
+            <td style="padding:12px 10px;border:1px solid #E2E8F0;"></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Timestamp footer -->
+      <div style="margin:16px 24px 0;font-size:11px;color:#94A3B8;">
+        রিপোর্ট তৈরি হয়েছে : ${timeStr} | ${dateStr}
+      </div>
+    `;
+
+    document.body.appendChild(container);
+
     try {
-      const doc = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = doc.internal.pageSize.width;
-      const storeName = settings?.storeName || 'ডিজিটাল খাতা';
-      const roleLabel = role === PartyRole.CUSTOMER ? 'গ্রাহক' : 'সাপ্লায়ার';
-
-      // ── Bengali font — pre-baked base64, no network fetch required ─────────
-      doc.addFileToVFS('SolaimanLipi.ttf', banglaFontBase64);
-      doc.addFont('SolaimanLipi.ttf', 'SolaimanLipi', 'normal');
-      // Register the same TTF for 'bold' so autoTable header cells never fall back
-      // to Helvetica (which cannot render Bengali glyphs).
-      doc.addFont('SolaimanLipi.ttf', 'SolaimanLipi', 'bold');
-      doc.setFont('SolaimanLipi');
-      const BN = 'SolaimanLipi';
-
-      // ── Filtered totals (computed from same array driving the screen) ─────
-      let filteredGet  = 0;
-      let filteredGive = 0;
-      for (const p of parties) {
-        if (p.balanceType === 'YOU_WILL_GET') filteredGet  += p.currentBalance;
-        else                                  filteredGive += p.currentBalance;
-      }
-      const netBalance = filteredGet - filteredGive;
-
-      const dateStr = new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
-      const timeStr = new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' });
-      const taka = '\u09F3'; // ৳
-
-      // ── 1. Blue header strip ─────────────────────────────────────────────
-      doc.setFillColor(0, 75, 160);
-      doc.rect(0, 0, pageWidth, 14, 'F');
-      doc.setFont(BN, 'normal');
-      doc.setFontSize(10);
-      doc.setTextColor(255, 255, 255);
-      doc.text(storeName, 14, 9);
-      doc.text('Khatabook', pageWidth - 14, 9, { align: 'right' });
-
-      // ── 2. Report title + date ───────────────────────────────────────────
-      doc.setTextColor(30, 41, 59);
-      doc.setFontSize(13);
-      doc.text(`${roleLabel} তালিকার রিপোর্ট - ফিল্টার করা`, pageWidth / 2, 24, { align: 'center' });
-
-      doc.setFontSize(9);
-      doc.setTextColor(100, 116, 139);
-      doc.text(`(আজ পর্যন্ত - ${dateStr})`, pageWidth / 2, 30, { align: 'center' });
-
-      // ── 3. Three-column metrics card ─────────────────────────────────────
-      const cardY = 36;
-      const cardH = 18;
-      const cardW = pageWidth - 28;
-      const colW  = cardW / 3;
-
-      doc.setDrawColor(226, 232, 240);
-      doc.setFillColor(255, 255, 255);
-      doc.rect(14, cardY, cardW, cardH, 'DF');
-      doc.line(14 + colW,     cardY, 14 + colW,     cardY + cardH);
-      doc.line(14 + colW * 2, cardY, 14 + colW * 2, cardY + cardH);
-
-      const cx1 = 14 + colW / 2;
-      const cx2 = 14 + colW * 1.5;
-      const cx3 = 14 + colW * 2.5;
-
-      // Col 1 — আপনি পাবেন (neutral black value)
-      doc.setFont(BN, 'normal'); doc.setFontSize(8); doc.setTextColor(148, 163, 184);
-      doc.text('আপনি পাবেন', cx1, cardY + 5, { align: 'center' });
-      doc.setFontSize(10); doc.setTextColor(15, 23, 42);
-      doc.text(`${taka}${filteredGet.toFixed(2)}`, cx1, cardY + 12, { align: 'center' });
-
-      // Col 2 — আপনি দেবেন (neutral black value)
-      doc.setFont(BN, 'normal'); doc.setFontSize(8); doc.setTextColor(148, 163, 184);
-      doc.text('আপনি দেবেন', cx2, cardY + 5, { align: 'center' });
-      doc.setFontSize(10); doc.setTextColor(15, 23, 42);
-      doc.text(`${taka}${filteredGive.toFixed(2)}`, cx2, cardY + 12, { align: 'center' });
-
-      // Col 3 — মোট ব্যালেন্স (always crimson red, Dr when net positive)
-      doc.setFont(BN, 'normal'); doc.setFontSize(8); doc.setTextColor(148, 163, 184);
-      doc.text('মোট ব্যালেন্স', cx3, cardY + 5, { align: 'center' });
-      doc.setFontSize(10); doc.setTextColor(220, 38, 38);
-      // Screenshot convention: Dr = you will receive (debit from customer), Cr = you owe
-      doc.text(
-        `${taka}${Math.abs(netBalance).toFixed(2)} ${netBalance >= 0 ? 'Dr' : 'Cr'}`,
-        cx3, cardY + 12, { align: 'center' },
-      );
-
-      // ── 4. Count label ───────────────────────────────────────────────────
-      const filterDisplayLabel: Record<string, string> = {
-        all:       'সব',
-        will_get:  'আপনি পাবেন',
-        will_give: 'আপনি দেবেন',
-        today:     'আজকের বাকি',
-        upcoming:  'আপকামিং',
-        permanent: 'স্থায়ী',
-        no_date:   'তারিখ নেই',
-      };
-      const countTag = filterDisplayLabel[appliedFilter] ?? 'সব';
-      doc.setFont(BN, 'normal'); doc.setFontSize(9); doc.setTextColor(51, 65, 85);
-      doc.text(`${roleLabel} সংখ্যা: ${parties.length} (${countTag})`, 14, 62);
-
-      // ── 5. Data table ────────────────────────────────────────────────────
-      const head = [['নাম', 'ডিটেলস', 'আপনি পাবেন', 'আপনি দেবেন', 'সংগ্রহের দিন']];
-      const bodyRows = parties.map(p => [
-        p.name  || '—',
-        p.phone || '—',
-        p.balanceType === 'YOU_WILL_GET'  ? `${taka}${p.currentBalance.toFixed(2)}` : '',
-        p.balanceType === 'YOU_WILL_GIVE' ? `${taka}${p.currentBalance.toFixed(2)}` : '',
-        p.lastTransactionAt
-          ? new Date(p.lastTransactionAt).toLocaleDateString('en-GB')
-          : '',
-      ]);
-      // সর্বমোট summary row
-      bodyRows.push(['সর্বমোট', '', `${taka}${filteredGet.toFixed(2)}`, `${taka}${filteredGive.toFixed(2)}`, '']);
-      const totalRowIdx = bodyRows.length - 1;
-
-      autoTable(doc, {
-        startY: 66,
-        head,
-        body: bodyRows,
-        theme: 'grid',
-        styles: { font: BN, fontSize: 8.5, textColor: [51, 65, 85], cellPadding: 3 },
-        headStyles: {
-          font: BN,
-          fontStyle: 'normal',
-          fillColor: [248, 250, 252],
-          textColor: [15, 23, 42],
-          lineWidth: 0.1,
-          lineColor: [226, 232, 240],
-        },
-        // No fillColor here — body-only tints are applied in willDrawCell below
-        columnStyles: {
-          0: { cellWidth: 42 },
-          1: { cellWidth: 42 },
-          2: { cellWidth: 34 },
-          3: { cellWidth: 34 },
-          4: { cellWidth: 30 },
-        },
-        willDrawCell: (data) => {
-          if (data.section === 'body') {
-            if (data.row.index === totalRowIdx) {
-              // সর্বমোট row — slate background, bold
-              data.cell.styles.fillColor = [241, 245, 249];
-              data.cell.styles.fontStyle = 'bold';
-            } else {
-              // Body data rows — tint only non-empty cells so blank cells stay white
-              if (data.column.index === 2 && data.cell.text[0] !== '')
-                data.cell.styles.fillColor = [254, 242, 242]; // light pink  #FEF2F2
-              if (data.column.index === 3 && data.cell.text[0] !== '')
-                data.cell.styles.fillColor = [240, 253, 244]; // light green #F0FDF4
-            }
-          }
-        },
-        didDrawPage: (data) => {
-          doc.setFont(BN, 'normal');
-          doc.setFontSize(8);
-          doc.setTextColor(148, 163, 184);
-          doc.text(
-            `পৃষ্ঠা ${data.pageNumber}`,
-            pageWidth / 2,
-            doc.internal.pageSize.height - 6,
-            { align: 'center' },
-          );
-        },
+      // html2canvas — browser renders & shapes Bengali natively
+      const canvas = await html2canvas(container, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
       });
 
-      // ── 6. Timestamp footnote ────────────────────────────────────────────
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const finalY = (doc as any).lastAutoTable.finalY + 8;
-      doc.setFont(BN, 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(148, 163, 184);
-      doc.text(`রিপোর্ট তৈরি হয়েছে: ${timeStr} | ${dateStr}`, 14, finalY);
+      document.body.removeChild(container);
 
-      // ── 7. Share Sheet (native) or download fallback ─────────────────────
+      const imgData   = canvas.toDataURL('image/jpeg', 0.95);
+      const pdf       = new jsPDF('p', 'mm', 'a4');
+      const pdfW      = 210;           // A4 width mm
+      const pdfH      = 297;           // A4 height mm
+      const imgH      = (canvas.height * pdfW) / canvas.width;
+
+      // Slice tall canvases across multiple pages
+      let yOffset = 0;
+      let firstPage = true;
+      while (yOffset < imgH) {
+        if (!firstPage) pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, -yOffset, pdfW, imgH);
+        yOffset   += pdfH;
+        firstPage  = false;
+      }
+
       const roleTag  = role === PartyRole.CUSTOMER ? 'Customer' : 'Supplier';
       const filename = `HazariKhata_${roleTag}_${new Date().toISOString().split('T')[0]}.pdf`;
-      const pdfBlob  = doc.output('blob');
+      const pdfBlob  = pdf.output('blob');
       const pdfFile  = new File([pdfBlob], filename, { type: 'application/pdf' });
 
       if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
@@ -310,22 +290,19 @@ export function HomeView() {
             text: `${storeName} এর ফিল্টার করা ${roleLabel} তালিকার রিপোর্ট`,
           });
         } catch (shareErr) {
-          // User dismissed the sheet or share was blocked — fall back to download
-          if ((shareErr as DOMException).name !== 'AbortError') {
-            doc.save(filename);
-          }
+          if ((shareErr as DOMException).name !== 'AbortError') pdf.save(filename);
         }
       } else {
-        // Desktop or browser without file-share support — direct download
-        doc.save(filename);
+        pdf.save(filename);
       }
     } catch (err) {
+      if (document.body.contains(container)) document.body.removeChild(container);
       console.error('PDF export failed:', err);
       toast.error('PDF তৈরি করতে সমস্যা হয়েছে।');
     } finally {
       setIsExportingPdf(false);
     }
-  }, [parties, role, settings?.storeName]);
+  }, [parties, role, appliedFilter, settings?.storeName]);
 
   return (
     <div className="flex flex-col h-full w-full bg-white relative">

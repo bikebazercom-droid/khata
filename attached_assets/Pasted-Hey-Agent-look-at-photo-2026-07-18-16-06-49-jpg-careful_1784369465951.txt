@@ -1,0 +1,181 @@
+Hey Agent, look at photo_2026-07-18_16-06-49.jpg carefully. The Bengali text is STILL broken because the vowel signs and ligatures are displaced (e.g., "রিপোর্ট" renders as "রপিোর্ট", "মোট" renders as "মোট"). This is a known, hard limitation of jsPDF's native text injection engine with Indic scripts. Custom fonts alone CANNOT fix this text shaping/rendering bug.
+
+CRITICAL ARCHITECTURE UPDATE REQUIRED:
+We must drop native jsPDF string drawing (`doc.text`) for Bengali content. Instead, you must use an HTML-to-PDF approach (`html2canvas` + `jsPDF` OR `html2pdf.js`) to capture a beautifully styled DOM element. The browser natively shapes Bengali text flawlessly, ensuring vowels, i-kars, and ligatures appear exactly how we read them.
+
+YOUR IMPLEMENTATION STEPS:
+1. Install `html2canvas` and `jspdf` if they aren't fully configured together, or use `html2pdf.js`.
+2. Create a hidden or off-screen cleanly styled HTML template that perfectly reflects the Khatabook design from the screenshot:
+   - Full-width Blue Banner (#004BA0) on top with "হাজারি গোল্ড" and "Khatabook".
+   - Centered Title: "গ্রাহক তালিকার রিপোর্ট" and Subtitle "(আজ পর্যন্ত - 18 জুলাই 2026)".
+   - Balanced 3-column top statistics block card ("আপনি পাবেন", "আপনি দেবেন", "মোট ব্যালেন্স").
+   - Explicit column background fills for the table grid (#FEF2F2 for Column 3, #F0FDF4 for Column 4).
+   - Bottom summary row ("সর্বমোট") highlighted with a slate gray background fill.
+3. Use the engine to convert that exact layout into a high-resolution PDF canvas, convert it to a file Blob, and trigger the `navigator.share` sheet.
+
+Here is the exact production-ready replacement script for the report engine:
+
+---
+
+### FIXED SHAPED BENGALI PDF GENERATION ENGINE CODE
+
+```javascript
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+
+export const generateAndSharePerfectReportPDF = async (filteredData, businessName = "হাজারি গোল্ড") => {
+  const currentDateStr = new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
+  const currentTimeStr = new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' });
+
+  // Calculate Aggregates dynamically
+  let totalGet = 0;
+  let totalGive = 0;
+  filteredData.forEach(item => {
+    if (item.balance > 0) totalGet += item.balance;
+    else if (item.balance < 0) totalGive += Math.abs(item.balance);
+  });
+  const netBalance = totalGet - totalGive;
+
+  // 1. CREATE DYNAMIC HIDDEN DOM CONTAINER FOR PRECISE CONTENT RENDERING
+  const renderContainer = document.createElement('div');
+  renderContainer.style.position = 'absolute';
+  renderContainer.style.left = '-9999px';
+  renderContainer.style.top = '-9999px';
+  renderContainer.style.width = '794px'; // Standard A4 pixel equivalent width at 96 DPI
+  renderContainer.style.backgroundColor = '#ffffff';
+  renderContainer.style.fontFamily = "'SolaimanLipi', 'Kalpurush', sans-serif";
+  renderContainer.style.paddingBottom = '40px';
+
+  // Build the complete visual structure matching the target layout perfectly
+  renderContainer.innerHTML = `
+    <!-- TOP STRIP BANNER -->
+    <div style="background-color: #004BA0; display: flex; justify-content: space-between; align-items: center; padding: 12px 24px; color: #ffffff; font-size: 14px; font-weight: bold;">
+      <div>${businessName}</div>
+      <div>Khatabook</div>
+    </div>
+
+    <!-- MAIN HIERARCHY HEADINGS -->
+    <div style="text-align: center; margin-top: 25px;">
+      <h2 style="margin: 0; font-size: 22px; color: #1E293B;">গ্রাহক তালিকার রিপোর্ট</h2>
+      <p style="margin: 5px 0 0 0; font-size: 14px; color: #64748B;">(আজ পর্যন্ত - ${currentDateStr})</p>
+    </div>
+
+    <!-- SUMMARY METRICS STAT CARD -->
+    <div style="margin: 25px 24px 0 24px; border: 1px solid #E2E8F0; border-radius: 4px; display: table; width: calc(100% - 48px); border-collapse: collapse; background-color: #ffffff;">
+      <div style="display: table-row;">
+        <!-- Column 1 -->
+        <div style="display: table-cell; width: 33.33%; text-align: center; padding: 12px; border-right: 1px solid #E2E8F0;">
+          <div style="font-size: 13px; color: #94A3B8; margin-bottom: 6px;">আপনি পাবেন</div>
+          <div style="font-size: 16px; font-weight: bold; color: #0F172A;">৳${totalGet.toLocaleString('bn-BD', { minimumFractionDigits: 2 })}</div>
+        </div>
+        <!-- Column 2 -->
+        <div style="display: table-cell; width: 33.33%; text-align: center; padding: 12px; border-right: 1px solid #E2E8F0;">
+          <div style="font-size: 13px; color: #94A3B8; margin-bottom: 6px;">আপনি দেবেন</div>
+          <div style="font-size: 16px; font-weight: bold; color: #0F172A;">৳${totalGive.toLocaleString('bn-BD', { minimumFractionDigits: 2 })}</div>
+        </div>
+        <!-- Column 3 -->
+        <div style="display: table-cell; width: 33.33%; text-align: center; padding: 12px;">
+          <div style="font-size: 13px; color: #94A3B8; margin-bottom: 6px;">মোট ব্যালেন্স</div>
+          <div style="font-size: 16px; font-weight: bold; color: ${netBalance >= 0 ? '#16A34A' : '#DC2626'};">
+            ৳${Math.abs(netBalance).toLocaleString('bn-BD', { minimumFractionDigits: 2 })} ${netBalance >= 0 ? 'Cr' : 'Dr'}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOTAL ACCOUNTABLE ENTITIES LABELS -->
+    <div style="margin: 20px 24px 8px 24px; font-size: 14px; color: #334155; font-weight: bold;">
+      গ্রাহক সংখ্যা: ${filteredData.length} (সব)
+    </div>
+
+    <!-- TABULAR DATA STATEMENT SEGMENT -->
+    <table style="width: calc(100% - 48px); margin: 0 24px; border-collapse: collapse; font-size: 13px; text-align: left; color: #334155;">
+      <thead>
+        <tr style="background-color: #F8FAFC; border-top: 1px solid #E2E8F0; border-bottom: 2px solid #E2E8F0;">
+          <th style="padding: 10px; border: 1px solid #E2E8F0; width: 25%;">নাম</th>
+          <th style="padding: 10px; border: 1px solid #E2E8F0; width: 25%;">ডিটেলস</th>
+          <th style="padding: 10px; border: 1px solid #E2E8F0; width: 18%; text-align: right;">আপনি পাবেন</th>
+          <th style="padding: 10px; border: 1px solid #E2E8F0; width: 18%; text-align: right;">আপনি দেবেন</th>
+          <th style="padding: 10px; border: 1px solid #E2E8F0; width: 14%; text-align: center;">সংগ্রহের দিন</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${filteredData.map(item => `
+          <tr style="border-bottom: 1px solid #E2E8F0;">
+            <td style="padding: 10px; border: 1px solid #E2E8F0; font-weight: 500;">${item.name || '-'}</td>
+            <td style="padding: 10px; border: 1px solid #E2E8F0; color: #64748B;">${item.mobile || '-'}</td>
+            <td style="padding: 10px; border: 1px solid #E2E8F0; text-align: right; background-color: ${item.balance > 0 ? '#FEF2F2' : 'transparent'}; color: #DC2626; font-weight: bold;">
+              ${item.balance > 0 ? item.balance.toFixed(2) : ''}
+            </td>
+            <td style="padding: 10px; border: 1px solid #E2E8F0; text-align: right; background-color: ${item.balance < 0 ? '#F0FDF4' : 'transparent'}; color: #16A34A; font-weight: bold;">
+              ${item.balance < 0 ? Math.abs(item.balance).toFixed(2) : ''}
+            </td>
+            <td style="padding: 10px; border: 1px solid #E2E8F0; text-align: center; color: #64748B;">${item.collectionDay || '-'}</td>
+          </tr>
+        `).join('')}
+        
+        <!-- FOOTER TOTAL BALANCE BREAKDOWN SUMMARY SUMMARY -->
+        <tr style="background-color: #F1F5F9; font-weight: bold; border-top: 2px solid #CBD5E1;">
+          <td style="padding: 12px 10px; border: 1px solid #E2E8F0;">সর্বমোট</td>
+          <td style="padding: 12px 10px; border: 1px solid #E2E8F0;"></td>
+          <td style="padding: 12px 10px; border: 1px solid #E2E8F0; text-align: right; color: #DC2626;">${totalGet.toFixed(2)}</td>
+          <td style="padding: 12px 10px; border: 1px solid #E2E8F0; text-align: right; color: #16A34A;">${totalGive.toFixed(2)}</td>
+          <td style="padding: 12px 10px; border: 1px solid #E2E8F0;"></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- TIMESTAMP FOOTER -->
+    <div style="margin: 20px 24px 0 24px; font-size: 11px; color: #94A3B8;">
+      রিপোর্ট তৈরি হয়েছে : ${currentTimeStr} | ${currentDateStr}
+    </div>
+  `;
+
+  document.body.appendChild(renderContainer);
+
+  try {
+    // 2. CONVERT THE HTML VISUAL TARGET INTO HIGH RESOLUTION CANVAS BLOB WITH SHAPED TEXT
+    const canvas = await html2canvas(renderContainer, {
+      scale: 2, // Enhances text crispness and prevents pixelated blurriness
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#ffffff'
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', 1.0);
+    
+    // Create pristine PDF container
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const imgWidth = 210; // A4 Standard Width
+    const pageHeight = 297; // A4 Standard Height
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    
+    pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+
+    // Remove temporary node element from tree viewport
+    document.body.removeChild(renderContainer);
+
+    // 3. CONVERT COMPLETED CONTAINER PATH INTO FILE BLOB FOR INSTANT IMMUTABLE SHARING
+    const pdfBlob = pdf.output('blob');
+    const pdfFile = new File([pdfBlob], `Khatabook_Report_${new Date().toISOString().split('T')[0]}.pdf`, {
+      type: 'application/pdf',
+    });
+
+    if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+      await navigator.share({
+        files: [pdfFile],
+        title: 'গ্রাহক তালিকার রিপোর্ট',
+        text: `${businessName} এর ফিল্টার করা কাস্টমার স্টেটমেন্ট রিপোর্ট`,
+      });
+    } else {
+      // Desktop Fallback
+      pdf.save(`Khatabook_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+    }
+  } catch (error) {
+    console.error("Error building crisp html-to-pdf pipeline:", error);
+    // Cleanup if operation breaks down midway
+    if (document.body.contains(renderContainer)) {
+      document.body.removeChild(renderContainer);
+    }
+  }
+};
