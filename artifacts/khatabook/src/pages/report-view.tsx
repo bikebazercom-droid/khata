@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useLocation, useSearch } from 'wouter';
+import { useLocation } from 'wouter';
 import {
   useListGlobalLedgerEntries,
   useGetBusinessSettings,
@@ -67,9 +67,15 @@ function resolveDateRange(period: ReportPeriod, customStart: Date | null, custom
 
 export function ReportView() {
   const [, navigate] = useLocation();
-  const searchStr = useSearch();
-  const urlParams = new URLSearchParams(searchStr);
-  const roleParam = urlParams.get('role') ?? 'customer';
+
+  // useSearch() uses useSyncExternalStore and can produce a stale snapshot in
+  // React 18 concurrent mode before the pushState event is committed.
+  // Reading window.location.search directly is always ground-truth — pushState
+  // already ran before React rendered this component.
+  // useLocation() is kept solely as a reactive trigger: if the URL changes
+  // while the component stays mounted, it will re-render and re-read the search.
+  const [_currentPath] = useLocation(); // reactive trigger — value intentionally unused
+  const roleParam = new URLSearchParams(window.location.search).get('role') ?? 'customer';
   const isSupplier = roleParam === 'supplier';
   const partyRole = isSupplier ? 'SUPPLIER' : 'CUSTOMER';
   const roleLabel = isSupplier ? 'সরবরাহকারী' : 'গ্রাহক';
