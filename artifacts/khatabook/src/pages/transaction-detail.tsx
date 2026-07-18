@@ -183,71 +183,51 @@ export function TransactionDetailPage() {
   }
 
   /**
-   * Universal JPG share pipeline:
-   *  1. Render the receipt card to a high-res canvas snapshot (scale 3).
-   *  2. Convert to a JPG Blob and wrap in a File object.
-   *  3. Launch the native OS multi-app share sheet via navigator.share({ files }).
-   *  4. Fallback: force a local JPG download + toast so the user can share
-   *     manually from their gallery.
+   * Bulletproof share pipeline:
+   *  1. Render the full entry details view to a high-res JPG via html2canvas.
+   *  2. Force-download the JPG to device gallery immediately — no Web Share API.
+   *  3. Alert the user it is saved, then open WhatsApp so they can attach it.
    */
   async function handleShare() {
     if (!entryDetailsRef.current) return;
     setIsSharing(true);
     try {
-      // 1. High-resolution DOM snapshot
+      // 1. Premium high-res snapshot of the entire entry details view
       const canvas = await html2canvas(entryDetailsRef.current, {
         backgroundColor: '#ffffff',
-        scale: 2,
+        scale: 3,
         useCORS: true,
         logging: false,
       });
 
-      // 2. Convert to JPG data URL
+      // 2. Optimized JPG data URL
       const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.95);
 
-      // 3. Force-save to device gallery immediately — always, unconditionally
-      const autoSaveToGallery = (url: string) => {
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Payment_Request_${party?.name || 'Customer'}.jpg`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      };
-      autoSaveToGallery(jpgDataUrl);
+      // 3. Force instant download directly into device gallery
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = jpgDataUrl;
+      downloadAnchor.download = `Banglakhata_Entry_${entry?.id || 'Record'}.jpg`;
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
 
-      // 4. Prepare file for native share sheet (best-effort, silent on failure)
-      const base64Response = await fetch(jpgDataUrl);
-      const rawBlob = await base64Response.blob();
-      const systemImageFile = new File(
-        [rawBlob],
-        'payment_receipt.jpg',
-        { type: 'image/jpeg' },
-      );
-
-      const waFallbackUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(
-        'আপনার পেমেন্ট রসিদের ছবিটি ফোনে ডাউনলোড হয়েছে। অনুগ্রহ করে সেটি গ্যালারি থেকে সেন্ড করে দিন।',
-      )}`;
-
-      if (navigator.canShare && navigator.canShare({ files: [systemImageFile] })) {
-        try {
-          await navigator.share({
-            files: [systemImageFile],
-            title: 'পেমেন্ট রশিদ',
-            text: 'রসিদের JPG ফাইলটি নিচে দেওয়া হলো।',
-          });
-        } catch {
-          // Browser blocked or user cancelled — image already downloaded above.
-          // Open WhatsApp so the user can attach it from their gallery.
-          console.log('Browser blocked direct file streaming sheet. Fallback handled via direct auto-download.');
-          window.open(waFallbackUrl, '_blank');
-        }
-      } else {
-        // No file-share support — redirect to WhatsApp with instruction text
-        window.open(waFallbackUrl, '_blank');
-      }
+      // 4. Inform user and open WhatsApp bridge after a short delay
+      setTimeout(() => {
+        alert(
+          '✅ রশিদটি সফলভাবে আপনার ফোনের গ্যালারি/ডাউনলোড ফোল্ডারে JPG ছবি হিসেবে সেভ হয়েছে!\n\nএখন ইমু, ফেসবুক বা হোয়াটসঅ্যাপ ওপেন করে গ্যালারি থেকে ছবিটি সিলেক্ট করে পাঠিয়ে দিন।',
+        );
+        window.open(
+          `https://api.whatsapp.com/send?text=${encodeURIComponent('আপনার লেনদেনের রসিদটি আমার গ্যালারি থেকে পাঠানো হচ্ছে।')}`,
+          '_blank',
+        );
+      }, 300);
     } catch (err: unknown) {
-      console.error('Failed to encode DOM elements into universal JPG asset package:', err);
+      console.error('Critical capture failure:', err);
+      // Absolute failsafe: redirect to WhatsApp to prevent freeze
+      window.open(
+        `https://api.whatsapp.com/send?text=${encodeURIComponent('রসিদ জেনারেট করা সম্ভব হয়নি।')}`,
+        '_blank',
+      );
     } finally {
       setIsSharing(false);
     }

@@ -1,0 +1,47 @@
+Hey Agent, look closely at Screenshot_5_2.jpg. The "📢 শেয়ার করুন" button is failing silently because mobile webview containers completely block modern binary file sharing over custom subdomains. We need a 100% foolproof solution that guarantees the user gets the JPG file on their device and can send it to Imo, Facebook, and WhatsApp without any errors.
+
+OUR NEW UNSTOPPABLE STRATEGY:
+1. When clicked, instantly render the `entryDetailsRef.current` into a high-res JPG via `html2canvas`.
+2. FORCE DOWNLOAD IMMEDIATELY: Drop the JPG straight into the user's phone downloads/gallery using a native proxy anchor mechanism.
+3. PROVIDE FALLBACK OPTIONS: Instead of relying on the broken Web Share API, immediately trigger a clean, stylish custom browser alert/modal or web fallback bridge to let the user know the image is saved and redirect them.
+
+Please completely replace the `handleUniversalShareJpg` function in the codebase with this rock-solid, error-free setup right now:
+
+```javascript
+const handleUniversalShareJpg = async () => {
+  if (!entryDetailsRef.current) return;
+
+  try {
+    // 1. Take a pristine high-resolution snapshot of the entire layout
+    const canvas = await html2canvas(entryDetailsRef.current, {
+      backgroundColor: '#ffffff',
+      scale: 3, // Premium crisp text resolution
+      useCORS: true,
+      logging: false
+    });
+
+    // 2. Generate optimized JPG Data String
+    const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    
+    // 3. Force instant stealth download directly into the device gallery
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.href = jpgDataUrl;
+    downloadAnchor.download = `Banglakhata_Entry_${targetEntry?.id || 'Record'}.jpg`;
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    document.body.removeChild(downloadAnchor);
+
+    // 4. Fallback Router: Inform the user and provide instant alternative bridge
+    setTimeout(() => {
+      alert("✅ রশিদটি সফলভাবে আপনার ফোনের গ্যালারি/ডাউনলোড ফোল্ডারে JPG ছবি হিসেবে সেভ হয়েছে!\n\nএখন ইমু, ফেসবুক বা হোয়াটসঅ্যাপ ওপেন করে গ্যালারি থেকে ছবিটি সিলেক্ট করে পাঠিয়ে দিন।");
+      
+      // Open a generic messaging layout trigger if they want WhatsApp web fallback link directly
+      window.open(`[https://api.whatsapp.com/send?text=আপন](https://api.whatsapp.com/send?text=আপন)ার লেনদেনের রসিদটি আমার গ্যালারি থেকে পাঠানো হচ্ছে।`, '_blank');
+    }, 300);
+
+  } catch (error) {
+    console.error('Critical capture failure:', error);
+    // Absolute failsafe fallback if html2canvas crashes: just redirect to prevent freeze
+    window.open('[https://api.whatsapp.com/send?text=রস](https://api.whatsapp.com/send?text=রস)িদ জেনারেট করা সম্ভব হয়নি।', '_blank');
+  }
+};
