@@ -1,4 +1,13 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useCreateLedgerEntry,
@@ -265,6 +274,10 @@ export function TransactionEntryScreen({
   // are visible without requiring a keypad interaction first.
   const [hasInteracted, setHasInteracted] = useState(isEditMode);
 
+  // Controls the "unsaved changes" confirmation dialog shown when the user
+  // presses back with a dirty edit-mode form.
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+
   const isGet = type === LedgerEntryType.YOU_GOT;
   const hasFormula = /[+\-*/%]/.test(expression.replace(/^-/, ''));
 
@@ -282,6 +295,40 @@ export function TransactionEntryScreen({
     const suffix = hasFormula && liveResult !== null ? ` = ${trimNumberForExpression(liveResult)}` : '';
     return `${base}${suffix}`;
   }, [expression, hasFormula, liveResult]);
+
+  // True when any editable field differs from the entry's original saved value.
+  // Only meaningful in edit mode — always false in create mode.
+  // Must live after `liveResult` and `formulaPreviewText` which it depends on.
+  const isDirty = useMemo(() => {
+    if (!isEditMode || !initialEntry) return false;
+
+    // Amount: compare the live evaluated result against the stored amount.
+    const currentAmount =
+      memoryHistory.length > 0 ? memoryValue : (liveResult ?? 0);
+    if (Math.abs(currentAmount - initialEntry.amount) > 0.001) return true;
+
+    // Description
+    if (description !== (initialEntry.description ?? '')) return true;
+
+    // Transaction date
+    const initialDateStr = format(
+      new Date((initialEntry.dueDate ?? initialEntry.createdAt) as string),
+      'yyyy-MM-dd',
+    );
+    if (dueDate !== initialDateStr) return true;
+
+    // Bill image (user attached a new image or removed the existing one)
+    const initialBillDisplay = initialEntry.billImage
+      ? (billImageSrc(initialEntry.billImage) ?? null)
+      : null;
+    if (billImage !== initialBillDisplay) return true;
+
+    return false;
+  }, [
+    isEditMode, initialEntry,
+    memoryHistory.length, memoryValue, liveResult,
+    description, dueDate, billImage,
+  ]);
 
   // Once memory logs exist, the big header amount tracks the running memory
   // total rather than whatever is currently being typed for the next entry —
@@ -682,7 +729,7 @@ export function TransactionEntryScreen({
       <div className="flex items-center gap-2 px-3 pb-3 pt-[calc(0.75rem+var(--safe-top))] bg-white border-b border-slate-100 shrink-0">
         <button
           type="button"
-          onClick={onClose}
+          onClick={isEditMode && isDirty ? () => setShowExitConfirm(true) : onClose}
           aria-label="পিছনে যান"
           className={cn('w-9 h-9 shrink-0 rounded-full flex items-center justify-center active:scale-95 transition-all', isGet ? 'text-emerald-600' : 'text-red-500')}
         >
@@ -881,6 +928,49 @@ export function TransactionEntryScreen({
           ))}
         </div>
       </div>
+
+      {/* ── Exit confirmation (edit mode only) ─────────────────────────
+          Shown when the user presses ← with unsaved edits. Choosing
+          "হ্যাঁ" fires handleUpdate (save + close); "না" discards and
+          closes. Dismissing the dialog (tap outside / Escape) returns
+          the user to the edit form so they can keep working.           */}
+      {isEditMode && (
+        <AlertDialog open={showExitConfirm} onOpenChange={setShowExitConfirm}>
+          <AlertDialogContent className="max-w-sm rounded-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-slate-800">
+                পরিবর্তন সংরক্ষণ করবেন?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-slate-600">
+                আপনি কি পরিবর্তনগুলো সংরক্ষণ করতে চান? না করলে এডিট বাতিল হবে।
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              {/* "না" — discard edits and exit */}
+              <AlertDialogCancel
+                className="font-bold"
+                onClick={onClose}
+              >
+                না, বাতিল করুন
+              </AlertDialogCancel>
+              {/* "হ্যাঁ" — save then exit */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowExitConfirm(false);
+                  handleUpdate();
+                }}
+                className={cn(
+                  'inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-bold text-white transition-colors',
+                  isGet ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-500 hover:bg-red-600',
+                )}
+              >
+                হ্যাঁ, সংরক্ষণ করুন
+              </button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }

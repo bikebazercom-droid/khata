@@ -1,0 +1,57 @@
+Hey Agent, I need to add a "Save Changes?" confirmation prompt when the user tries to exit or navigate back from the Transaction Entry Form after making edits.
+
+THE EXPECTED BEHAVIOR:
+If the user has modified the Amount, Description, or Date, and attempts to press the back arrow/exit the screen, the app should NOT close immediately. Instead, it must trigger a confirmation dialog (Popup/Alert) asking:
+"আপনি কি পরিবর্তনগুলো সংরক্ষণ করতে চান?" (Do you want to save the changes?)
+
+With two clear options:
+1. "হ্যাঁ" (Yes) -> Automatically triggers the save/update function and then exits.
+2. "না" (No) -> Discards the changes and exits the screen immediately without saving.
+
+YOUR TASK:
+Implement a dirty-state tracker (to check if values changed from their initial state) and intercept the back-navigation action (using React Navigation's `beforeRemove` listener, custom back button handler, or router guards depending on the setup).
+
+Please refactor the entry form component with this logic:
+
+---
+
+### 1. TRACK CHANGES AND INTERCEPT BACK ACTION
+
+```javascript
+// Inside the Transaction Entry Form Component
+const [calculatorValue, setCalculatorValue] = useState(initialTransaction ? initialTransaction.amount.toString() : "0");
+const [description, setDescription] = useState(initialTransaction ? initialTransaction.description : "");
+const [selectedDate, setSelectedDate] = useState(initialTransaction ? initialTransaction.date : new Date());
+
+// Check if any data has been modified compared to initial values
+const isDirty = () => {
+  const initialAmount = initialTransaction ? initialTransaction.amount.toString() : "0";
+  const initialDesc = initialTransaction ? initialTransaction.description : "";
+  const initialDt = initialTransaction ? initialTransaction.date : "";
+
+  return calculatorValue !== initialAmount || description !== initialDesc || selectedDate !== initialDt;
+};
+
+// Handle Back Button / Exit Action Manually
+const handleBackPress = async () => {
+  if (isDirty()) {
+    // Show confirmation dialog with Yes/No choices
+    const shouldSave = window.confirm("আপনি কি পরিবর্তনগুলো সংরক্ষণ করতে চান?");
+    
+    if (shouldSave) {
+      // User clicked 'হ্যাঁ' (Yes) -> Save and Exit
+      await handleSaveOrUpdateEntry();
+    } else {
+      // User clicked 'না' (No) -> Discard and Exit
+      exitScreen();
+    }
+  } else {
+    // No changes made -> Safe to exit directly
+    exitScreen();
+  }
+};
+
+const exitScreen = () => {
+  // Replace with your actual routing exit command (e.g., router.back() or navigation.goBack())
+  router.back(); 
+};

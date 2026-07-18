@@ -1,0 +1,60 @@
+Hey Agent, I need you to implement a custom exit-confirmation workflow for the Transaction Entry Form while ensuring the UI strictly matches the design provided in the user's screenshot when entering Edit Mode.
+
+THE EXPECTED UI & INTERACTION (Edit Mode):
+1. When the user clicks "এন্ট্রি এডিট করুন" (Edit Entry), navigate them to the Entry Form Screen.
+2. The UI must match Screen 1 exactly: Header showing "← আপনি দিয়েছেন [Customer Name]-কে", followed by the large visual "₹ [Amount]" container, the details text input, date selector, and the custom calculator keypad active at the bottom.
+3. The Amount box must be fully interactive. Clicking it highlights or activates the keypad for immediate modifications.
+
+THE EXPECTED EXIT CONFIRMATION BEHAVIOR:
+If the user modifies ANY field (Amount, Description, or Date) and tries to click the top-left back arrow (`←`) or exit the screen, the app must intercept the navigation and show a confirmation dialog:
+"আপনি কি পরিবর্তনগুলো সংরক্ষণ করতে চান?" (Do you want to save the changes?)
+
+With two choices:
+- "হ্যাঁ" (Yes) -> Automatically fires the `handleSaveOrUpdateEntry` function to save changes to the database and then exits.
+- "না" (No) -> Discards all changes and exits immediately without saving.
+- If no changes were made (data is pristine), it should exit directly without prompting.
+
+Please refactor the components using this production-ready architecture:
+
+---
+
+### 1. IMPLEMENT DIRTY-STATE TRACKING & BACK INTERCEPTION
+
+```javascript
+// Inside the Transaction Entry Form Component
+const [calculatorValue, setCalculatorValue] = useState(initialTransaction ? initialTransaction.amount.toString() : "0");
+const [description, setDescription] = useState(initialTransaction ? initialTransaction.description : "");
+const [selectedDate, setSelectedDate] = useState(initialTransaction ? initialTransaction.date : new Date());
+
+// Track if the form data has been changed from its original values
+const isFormDirty = () => {
+  const originalAmount = initialTransaction ? initialTransaction.amount.toString() : "0";
+  const originalDesc = initialTransaction ? initialTransaction.description : "";
+  const originalDate = initialTransaction ? initialTransaction.date : "";
+
+  return calculatorValue !== originalAmount || description !== originalDesc || selectedDate !== originalDate;
+};
+
+// Custom wrapper for handling the back/exit arrow click
+const handleBackNavigation = async () => {
+  if (isFormDirty()) {
+    // Trigger custom confirmation alert window
+    const shouldSave = window.confirm("আপনি কি পরিবর্তনগুলো সংরক্ষণ করতে চান?");
+    
+    if (shouldSave) {
+      // User chose 'হ্যাঁ' (Yes) -> Save the transaction first, then navigate away
+      await handleSaveOrUpdateEntry();
+    } else {
+      // User chose 'না' (No) -> Safe exit without saving changes
+      proceedToExit();
+    }
+  } else {
+    // Form is not modified -> Exit immediately
+    proceedToExit();
+  }
+};
+
+const proceedToExit = () => {
+  // Use your current routing mechanism to step back (e.g., router.back() or navigation.goBack())
+  router.back();
+};
