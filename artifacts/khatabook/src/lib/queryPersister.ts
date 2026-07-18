@@ -173,6 +173,35 @@ export function persistCache(qc: QueryClient): () => void {
 }
 
 /**
+ * Surgically removes specific query keys from the persisted localStorage
+ * snapshot without touching anything else.
+ *
+ * Call this immediately when a delete SSE event arrives, before the
+ * background refetch completes, so that if the user closes the tab in the
+ * ~200 ms window between the delete and the refetch, the next session
+ * never sees the deleted item from the stale snapshot.
+ *
+ * @param queryKeys - Array of React Query key arrays to evict.
+ *   e.g. [getListPartiesQueryKey(), getGetPartyQueryKey(partyId)]
+ */
+export function evictPersistedCacheEntries(queryKeys: ReadonlyArray<readonly unknown[]>): void {
+  const store = getStore();
+  let changed = false;
+  for (const key of queryKeys) {
+    const keyStr = JSON.stringify(key);
+    if (keyStr in store.entries) {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+      delete store.entries[keyStr];
+      changed = true;
+    }
+  }
+  if (changed) {
+    store.ts = Date.now();
+    scheduleFlush();
+  }
+}
+
+/**
  * Wipes the persisted cache from both memory and localStorage.
  * Call on logout so a different user signing in never sees the previous
  * user's data during the optimistic-render window.

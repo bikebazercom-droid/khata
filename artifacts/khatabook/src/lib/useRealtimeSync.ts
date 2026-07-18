@@ -52,6 +52,7 @@ import {
   getGetBusinessSettingsQueryKey,
   getListGlobalLedgerEntriesQueryKey,
 } from '@workspace/api-client-react';
+import { evictPersistedCacheEntries } from './queryPersister';
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -163,6 +164,16 @@ export function useRealtimeSync(
     es.addEventListener('party.deleted', (e: MessageEvent) => {
       try {
         const { partyId } = JSON.parse(e.data as string) as { partyId: string };
+        // Evict stale snapshot entries immediately so the deleted party never
+        // appears on next page load, even if the tab is closed before the
+        // background refetch completes.
+        evictPersistedCacheEntries([
+          getListPartiesQueryKey(),
+          getGetDashboardSummaryQueryKey(),
+          getGetPartyQueryKey(partyId),
+          getListLedgerEntriesQueryKey(partyId),
+          getListGlobalLedgerEntriesQueryKey(),
+        ]);
         void qc.invalidateQueries({ queryKey: getListPartiesQueryKey() });
         void qc.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
         void qc.invalidateQueries({ queryKey: getGetPartyQueryKey(partyId) });
@@ -209,6 +220,15 @@ export function useRealtimeSync(
     es.addEventListener('ledger.deleted', (e: MessageEvent) => {
       try {
         const { partyId } = JSON.parse(e.data as string) as { partyId: string };
+        // Evict stale snapshot entries immediately so the deleted transaction
+        // never appears on next page load if the tab closes before refetch.
+        evictPersistedCacheEntries([
+          getListLedgerEntriesQueryKey(partyId),
+          getGetPartyQueryKey(partyId),
+          getListPartiesQueryKey(),
+          getGetDashboardSummaryQueryKey(),
+          getListGlobalLedgerEntriesQueryKey(),
+        ]);
         void qc.invalidateQueries({ queryKey: getListLedgerEntriesQueryKey(partyId) });
         void qc.invalidateQueries({ queryKey: getGetPartyQueryKey(partyId) });
         void qc.invalidateQueries({ queryKey: getListPartiesQueryKey() });
