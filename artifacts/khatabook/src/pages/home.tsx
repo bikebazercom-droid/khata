@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Link, useLocation } from 'wouter';
 import {
   useListParties,
@@ -7,7 +7,7 @@ import {
   PartyRole,
   DueFilter,
 } from '@workspace/api-client-react';
-import { Search, Plus, Settings, User, ChevronRight, UserPlus2, SlidersHorizontal, FileText, Users, Pencil, FolderOpen } from 'lucide-react';
+import { Search, Plus, Settings, User, ChevronRight, UserPlus2, SlidersHorizontal, FileText, Users, Pencil, FolderOpen, X, MessageSquare, MessageCircle } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { AddPartyModal } from '@/components/modals/add-party-modal';
@@ -28,9 +28,30 @@ export function HomeView() {
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
   const [isRenameStoreOpen, setIsRenameStoreOpen] = useState(false);
 
+  const [requestModalParty, setRequestModalParty] = useState<{ id: string; name: string; phone?: string | null; currentBalance: number; balanceType: string } | null>(null);
+
   const { data: summary } = useGetDashboardSummary();
   const { data: settings } = useGetBusinessSettings();
   const { data: parties = [] } = useListParties({ role, search, dueFilter });
+
+  const handleShareRequest = useCallback((platform: 'sms' | 'whatsapp') => {
+    if (!requestModalParty) return;
+    const storeName = settings?.storeName || 'ডিজিটাল খাতা';
+    const amount = formatCurrency(requestModalParty.currentBalance);
+    const message =
+      `প্রিয় ${requestModalParty.name}, আপনার বকেয়া ${amount} পরিশোধের জন্য বিনীত অনুরোধ করা হচ্ছে। — ${storeName}`;
+    if (platform === 'whatsapp') {
+      let phone = (requestModalParty.phone ?? '').replace(/\D/g, '');
+      if (phone.startsWith('0')) phone = '880' + phone.slice(1);
+      const url = phone
+        ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+        : `https://wa.me/?text=${encodeURIComponent(message)}`;
+      window.open(url, '_blank', 'noreferrer');
+    } else {
+      const phone = requestModalParty.phone ?? '';
+      window.location.href = `sms:${phone}?body=${encodeURIComponent(message)}`;
+    }
+  }, [requestModalParty, settings?.storeName]);
 
   return (
     <div className="flex flex-col h-full w-full bg-white relative">
@@ -198,11 +219,16 @@ export function HomeView() {
         ) : (
           <div className="divide-y divide-slate-100">
             {parties.map((party, i) => (
-              <Link
+              /* Row is a div+onClick so the right-side amount can be a
+                 separate tappable button (avoids invalid <button> inside <a>). */
+              <div
                 key={party.id}
-                href={`/party/${party.id}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/party/${party.id}`)}
+                onKeyDown={(e) => e.key === 'Enter' && navigate(`/party/${party.id}`)}
                 className={cn(
-                  'flex items-center justify-between p-4 active:bg-slate-50 transition-all w-full text-left relative',
+                  'flex items-center justify-between p-4 active:bg-slate-50 transition-all w-full text-left relative cursor-pointer',
                   location === `/party/${party.id}` && 'bg-blue-50/40',
                   'animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both'
                 )}
@@ -227,8 +253,17 @@ export function HomeView() {
                   </div>
                   <p className="text-xs font-medium text-slate-500 truncate">{party.phone}</p>
                 </div>
-                <div className="text-right shrink-0 flex items-center gap-1.5">
-                  <div>
+                {/* Amount tap → payment request sheet; chevron tap → navigate */}
+                <div className="shrink-0 flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRequestModalParty(party);
+                    }}
+                    aria-label={`${party.name}-এর কাছে অর্থ প্রদানের অনুরোধ করুন`}
+                    className="text-right active:scale-95 transition-all"
+                  >
                     <p
                       className={cn(
                         'text-[15px] font-bold tracking-tight',
@@ -240,10 +275,10 @@ export function HomeView() {
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 text-right">
                       {party.balanceType === 'YOU_WILL_GET' ? 'পাবেন' : 'দেবেন'}
                     </p>
-                  </div>
+                  </button>
                   <ChevronRight className="w-4 h-4 text-slate-300" />
                 </div>
-              </Link>
+              </div>
             ))}
             <div className="h-4" />
           </div>
@@ -285,6 +320,92 @@ export function HomeView() {
       <SettingsDrawer open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
       <AddStaffDialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen} />
       <RenameStoreDialog open={isRenameStoreOpen} onOpenChange={setIsRenameStoreOpen} />
+
+      {/* ── Payment request bottom sheet ─────────────────────────────────
+          Opens when the user taps the balance amount on a party row.
+          SMS fires the native SMS intent; WhatsApp opens wa.me.         */}
+      {requestModalParty && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setRequestModalParty(null)}
+          />
+          {/* Sheet card */}
+          <div className="relative bg-white rounded-t-3xl px-5 pt-4 pb-[calc(1.5rem+var(--safe-bottom))] shadow-2xl">
+            {/* Drag handle */}
+            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4" />
+
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 mb-5">
+              <p className="text-sm font-semibold text-slate-600 leading-snug flex-1">
+                আপনাকে অর্থ প্রদানের জন্য{' '}
+                <span className="text-slate-900 font-extrabold">{requestModalParty.name}</span>
+                -এর কাছে অনুরোধ করুন
+              </p>
+              <button
+                type="button"
+                onClick={() => setRequestModalParty(null)}
+                className="shrink-0 w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 active:scale-90 transition-all"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Large amount */}
+            <div className="mb-5">
+              <p
+                className={cn(
+                  'text-4xl font-extrabold tracking-tight',
+                  requestModalParty.balanceType === 'YOU_WILL_GET'
+                    ? 'text-emerald-600'
+                    : 'text-red-600',
+                )}
+              >
+                {formatCurrency(requestModalParty.currentBalance)}
+              </p>
+              <p className="text-xs font-semibold text-slate-400 mt-1">
+                {requestModalParty.balanceType === 'YOU_WILL_GET' ? 'পাবেন' : 'দেবেন'}
+              </p>
+            </div>
+
+            {/* Bank details nudge — tapping opens Settings */}
+            <button
+              type="button"
+              onClick={() => {
+                setRequestModalParty(null);
+                setIsSettingsOpen(true);
+              }}
+              className="w-full bg-blue-50 border border-blue-100 rounded-2xl p-4 flex items-center justify-between mb-5 active:scale-[0.98] transition-all"
+            >
+              <span className="text-xs font-medium text-blue-800 leading-relaxed text-left pr-2">
+                আপনার অ্যাকাউন্টে এই অর্থপ্রদান পেতে ব্যাংকের বিবরণ যোগ করুন
+              </span>
+              <ChevronRight className="w-4 h-4 text-blue-500 shrink-0" />
+            </button>
+
+            {/* Share buttons */}
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => handleShareRequest('sms')}
+                className="flex-1 bg-blue-600 active:bg-blue-700 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.97] transition-all"
+              >
+                <MessageSquare className="w-4 h-4" />
+                SMS
+              </button>
+              <button
+                type="button"
+                onClick={() => handleShareRequest('whatsapp')}
+                className="flex-1 bg-emerald-500 active:bg-emerald-600 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.97] transition-all"
+              >
+                <MessageCircle className="w-4 h-4" />
+                WhatsApp
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

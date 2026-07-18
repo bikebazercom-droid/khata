@@ -1,0 +1,130 @@
+Hey Agent, I need to implement a Bottom Sheet modal interaction when a user clicks on the Amount displayed on the right side of a customer card in the customer list.
+
+LOOKING AT THE SCREENSHOT (Screen 3):
+- Inside the main dashboard list, each customer row has an amount on the right (e.g., "₹ 561").
+- When the user clicks directly on this Right-Side Amount row/button, it must open a Bottom Sheet Modal.
+- The Bottom Sheet must display:
+  1. Title: "আপনাকে অর্থ প্রদানের জন্য [Customer Name]-এর কাছে অনুরোধ করুন"
+  2. Main Big Text: "₹ [Amount]"
+  3. A Bank details reminder slot: "আপনার অ্যাকাউন্টে এই অর্থপ্রদান পেতে ব্যাংকের বিবরণ যোগ করুন >"
+  4. Two action buttons at the bottom: "SMS" (Blue button with icon) and "WhatsApp" (Green button with icon).
+
+YOUR TASK:
+Create a Bottom Sheet modal state, bind the customer amount click event to trigger this modal with the correct customer context, and implement native/web sharing triggers for the SMS and WhatsApp buttons.
+
+Please refactor the dashboard/ledger component using the following code structure:
+
+---
+
+### 1. BOTTOM SHEET STATES & OVERLAY UI IMPLEMENTATION
+
+```jsx
+// Inside the Main Customer List / Dashboard Component
+const [selectedCustomer, setSelectedCustomer] = useState(null);
+const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+
+const handleAmountClick = (customer) => {
+  setSelectedCustomer(customer);
+  setIsShareModalOpen(true);
+};
+
+const handleShareAction = (platform) => {
+  if (!selectedCustomer) return;
+  
+  const message = `আপনাকে অর্থ প্রদানের জন্য ${selectedCustomer.name}-এর কাছে অনুরোধ করা হচ্ছে। পরিমাণ: ₹${selectedCustomer.amount}`;
+  
+  if (platform === 'whatsapp') {
+    // Standard WhatsApp click-to-chat link api
+    const whatsappUrl = `[https://wa.me/?text=$](https://wa.me/?text=$){encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+  } else if (platform === 'sms') {
+    // Standard SMS link protocol
+    const smsUrl = `sms:?body=${encodeURIComponent(message)}`;
+    window.location.href = smsUrl;
+  }
+};
+
+return (
+  <div className="relative min-h-screen bg-gray-100">
+    {/* CUSTOMER LIST LAYOUT */}
+    <div className="customer-list p-4">
+      {customers.map((customer) => (
+        <div key={customer.id} className="flex justify-between items-center p-4 bg-white rounded-lg mb-2 shadow-sm">
+          <div>
+            <h3 className="font-bold text-gray-800">{customer.name}</h3>
+            <span className="text-xs text-gray-500">{customer.lastActive}</span>
+          </div>
+          
+          {/* INTERACTIVE AMOUNT CLICKABLE BOX */}
+          <button 
+            onClick={() => handleAmountClick(customer)}
+            className="text-right focus:outline-none group active:scale-95 transition"
+          >
+            <span className="block font-bold text-red-600 text-lg">₹ {customer.amount}</span>
+            <span className="text-xs text-gray-400">↙ অনুরোধ</span>
+          </button>
+        </div>
+      ))}
+    </div>
+
+    {/* SHARE REQUEST BOTTOM SHEET MODAL */}
+    {isShareModalOpen && selectedCustomer && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex flex-col justify-end transition-opacity">
+        {/* Backdrop close click hook */}
+        <div className="flex-grow" onClick={() => setIsShareModalOpen(false)}></div>
+        
+        {/* Actual Bottom Sheet Card Container */}
+        <div className="bg-white rounded-t-2xl p-6 shadow-2xl max-w-md mx-auto w-full border-t border-gray-200">
+          {/* Header Close Arrow */}
+          <div className="flex justify-between items-center mb-4">
+            <h4 className="text-sm font-semibold text-gray-800 pr-4">
+              আপনাকে অর্থ প্রদানের জন্য {selectedCustomer.name}-এর কাছে অনুরোধ করুন
+            </h4>
+            <button 
+              onClick={() => setIsShareModalOpen(false)}
+              className="bg-gray-200 text-gray-600 rounded-full p-1 w-7 h-7 flex items-center justify-center text-sm font-bold"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* LARGE AMOUNT TEXT SLOT */}
+          <div className="my-6 text-left">
+            <span className="text-4xl font-extrabold text-gray-900">
+              ₹ {selectedCustomer.amount}
+            </span>
+          </div>
+
+          {/* BANK LINK ADVERTISEMENT BLOCK */}
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex justify-between items-center mb-6 cursor-pointer hover:bg-blue-100 transition">
+            <span className="text-xs text-blue-900 font-medium leading-relaxed max-w-[85%]">
+              আপনার অ্যাকাউন্টে এই অর্থপ্রদান পেতে ব্যাংকের বিবরণ যোগ করুন
+            </span>
+            <span className="text-blue-900 font-bold text-lg">›</span>
+          </div>
+
+          {/* ACTION BUTTON CONSOLE (SMS & WHATSAPP) */}
+          <div className="flex space-x-4">
+            {/* SMS Button */}
+            <button 
+              onClick={() => handleShareAction('sms')}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center space-x-2 transition active:scale-95"
+            >
+              <span>💬</span>
+              <span>SMS</span>
+            </button>
+
+            {/* WhatsApp Button */}
+            <button 
+              onClick={() => handleShareAction('whatsapp')}
+              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center space-x-2 transition active:scale-95"
+            >
+              <span>🟢</span>
+              <span>WhatsApp</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
+);
