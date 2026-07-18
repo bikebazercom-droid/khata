@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { useClerk, useAuth } from '@clerk/react';
@@ -8,7 +8,7 @@ import {
   getGetBusinessSettingsQueryKey,
   type BusinessSettings,
 } from '@workspace/api-client-react';
-import { Settings, Languages, LogOut } from 'lucide-react';
+import { Settings, Languages, LogOut, Store, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   Drawer,
   DrawerContent,
@@ -17,6 +17,30 @@ import {
 } from '@/components/ui/drawer';
 import { phoneLogout } from '@/lib/phoneAuth';
 import { clearAllPendingUploads } from '@/lib/pendingUploads';
+
+/** Shape stored in localStorage under PROFILE_KEY */
+export interface ShopProfile {
+  userName: string;
+  businessName: string;
+  address: string;
+  phone: string;
+  email: string;
+}
+
+export const PROFILE_KEY = 'user_settings_profile';
+
+export function loadShopProfile(): ShopProfile {
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY);
+    if (raw) return JSON.parse(raw) as ShopProfile;
+  } catch {}
+  return { userName: '', businessName: '', address: '', phone: '', email: '' };
+}
+
+function saveShopProfile(profile: ShopProfile) {
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  window.dispatchEvent(new Event('settingsUpdated'));
+}
 
 /**
  * Full-screen settings drawer.
@@ -47,6 +71,21 @@ export function SettingsDrawer({
   const { isSignedIn } = useAuth();
   const [, navigate] = useLocation();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // ── Shop profile (localStorage) ───────────────────────────────────────────
+  const [profile, setProfile] = useState<ShopProfile>(loadShopProfile);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  // Reload from storage whenever the drawer opens
+  useEffect(() => {
+    if (open) setProfile(loadShopProfile());
+  }, [open]);
+
+  const handleProfileField = (field: keyof ShopProfile, value: string) => {
+    const updated = { ...profile, [field]: value };
+    setProfile(updated);
+    saveShopProfile(updated);
+  };
 
   // ── Language update (optimistic) ──────────────────────────────────────────
   const updateSettings = useUpdateBusinessSettings({
@@ -109,7 +148,55 @@ export function SettingsDrawer({
           </DrawerTitle>
         </DrawerHeader>
 
-        <div className="px-4 pb-10 space-y-6">
+        <div className="px-4 pb-10 space-y-6 overflow-y-auto max-h-[70vh]">
+
+          {/* ── Shop profile section ─────────────────────────────────── */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setIsProfileOpen(v => !v)}
+              className="w-full flex items-center justify-between py-2 group"
+            >
+              <div className="flex items-center gap-2">
+                <Store className="w-4 h-4 text-slate-400" />
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                  দোকানের তথ্য (PDF-এ দেখাবে)
+                </p>
+              </div>
+              {isProfileOpen
+                ? <ChevronUp className="w-4 h-4 text-slate-400" />
+                : <ChevronDown className="w-4 h-4 text-slate-400" />}
+            </button>
+
+            {isProfileOpen && (
+              <div className="mt-3 space-y-3">
+                {([
+                  { field: 'userName',     label: 'ব্যবহারকারীর নাম',              placeholder: 'উদা: সাকিল আহমেদ' },
+                  { field: 'businessName', label: 'দোকান / বিজনেসের নাম (PDF হেডার)', placeholder: 'উদা: হাজারি গোল্ড' },
+                  { field: 'address',      label: 'ঠিকানা (PDF ফুটার)',             placeholder: 'উদা: চকবাজার, ঢাকা' },
+                  { field: 'phone',        label: 'মোবাইল নাম্বার (PDF ফুটার)',     placeholder: 'উদা: 017XXXXXXXX' },
+                  { field: 'email',        label: 'জিমেইল এড্রেস',                 placeholder: 'example@gmail.com' },
+                ] as const).map(({ field, label, placeholder }) => (
+                  <div key={field}>
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">{label}</label>
+                    <input
+                      type={field === 'email' ? 'email' : 'text'}
+                      placeholder={placeholder}
+                      value={profile[field]}
+                      onChange={e => handleProfileField(field, e.target.value)}
+                      className="w-full px-3 py-2.5 text-[13px] border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]/30 focus:border-[#1B3A6B]"
+                    />
+                  </div>
+                ))}
+                <p className="text-[10px] text-slate-400 pt-1">
+                  এই তথ্যগুলো শুধুমাত্র আপনার ডিভাইসে সংরক্ষিত হয়
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* ── Divider ─────────────────────────────────────────────── */}
+          <div className="border-t border-slate-100" />
 
           {/* ── Language section ────────────────────────────────────── */}
           <div>

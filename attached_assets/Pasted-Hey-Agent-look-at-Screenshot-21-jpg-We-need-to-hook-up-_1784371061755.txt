@@ -1,0 +1,135 @@
+Hey Agent, look at Screenshot_21.jpg. We need to hook up the bottom navigation "সেটিংস" button to toggle open a beautifully animated Slide-out Settings Sidebar (Drawer) from the right side.
+
+YOUR IMPLEMENTATION TASK:
+1. When the user clicks the "সেটিংস" item in the bottom navigation bar, instead of navigating away or doing nothing, trigger a state change `setIsSettingsOpen(true)`.
+2. Create or inject the `SettingsSidebar` drawer component so it overlays beautifully.
+3. Use a centralized React state or `localStorage` keys to persist the user's profile metadata and language preference.
+4. Integrate the language selection ('bn' / 'en') into the translation framework if available, or make it update the current view text reactively.
+5. Critical: Update our HTML-to-PDF engine (`generateAndSharePerfectReportPDF`) to fetch these dynamic metadata keys directly so the dynamic Shop Name is featured at the top Header, and the Address/Phone Number are placed nicely in the PDF Footer.
+
+Here is the exact production-ready codebase to overwrite and inject. Implement this structure immediately:
+
+---
+
+### STEP 1: SETTINGS SIDEBAR REUSABLE COMPONENT (`src/components/SettingsSidebar.jsx`)
+```javascript
+import React, { useState, useEffect } from 'react';
+
+export const SettingsSidebar = ({ isOpen, onClose }) => {
+  const [profile, setProfile] = useState({
+    userName: '',
+    businessName: '',
+    address: '',
+    phone: '',
+    email: '',
+    language: 'bn'
+  });
+  
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+
+  useEffect(() => {
+    const savedProfile = localStorage.getItem('user_settings_profile');
+    if (savedProfile) {
+      setProfile(JSON.parse(savedProfile));
+    }
+  }, [isOpen]);
+
+  const handleFieldChange = (field, value) => {
+    const updatedProfile = { ...profile, [field]: value };
+    setProfile(updatedProfile);
+    localStorage.setItem('user_settings_profile', JSON.stringify(updatedProfile));
+    
+    // Broadcast event so view layers can reactively reload if needed
+    window.dispatchEvent(new Event('settingsUpdated'));
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <>
+      {/* BACKDROP BLUR OVERLAY */}
+      <div 
+        onClick={onClose}
+        style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.4)', zIndex: 9999, backdropFilter: 'blur(2px)' }}
+      />
+      
+      {/* SLIDE-OUT PANEL DRAWER */}
+      <div style={{ position: 'fixed', top: 0, right: 0, width: '330px', height: '100vh', backgroundColor: '#ffffff', boxShadow: '-4px 0 25px rgba(0,0,0,0.15)', zIndex: 10000, padding: '24px 20px', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', fontFamily: 'inherit' }}>
+        
+        {/* PANEL HEADER */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E2E8F0', paddingBottom: '14px', marginBottom: '20px' }}>
+          <h3 style={{ margin: 0, fontSize: '18px', color: '#1E293B', fontWeight: 'bold' }}>
+            {profile.language === 'bn' ? 'সেটিংস' : 'Settings'}
+          </h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '22px', cursor: 'pointer', color: '#94A3B8' }}>✕</button>
+        </div>
+
+        {/* INTERACTIVE PROFILE DISPLAY CELL ROW */}
+        <div 
+          onClick={() => setIsEditingProfile(!isEditingProfile)} 
+          style={{ padding: '14px 12px', backgroundColor: '#F8FAFC', borderRadius: '8px', cursor: 'pointer', marginBottom: '16px', border: '1px solid #E2E8F0', transition: 'all 0.2s' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ fontSize: '24px' }}>👤</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 'bold', color: '#0F172A', fontSize: '14px' }}>
+                {profile.userName || (profile.language === 'bn' ? 'আপনার নাম যোগ করুন' : 'Add Your Name')}
+              </div>
+              <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
+                {profile.language === 'bn' ? 'প্রোফাইল তথ্য ও ঠিকানা পরিবর্তন করুন' : 'Edit profile info & address'}
+              </div>
+            </div>
+            <div style={{ color: '#94A3B8', fontSize: '12px' }}>{isEditingProfile ? '▲' : '▼'}</div>
+          </div>
+        </div>
+
+        {/* ACCORDION EXPANDABLE PROFILE REGISTRATION CONTAINER */}
+        {isEditingProfile && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', backgroundColor: '#F1F5F9', padding: '14px', borderRadius: '8px', marginBottom: '16px', maxHeight: '320px', overflowY: 'auto', boxSizing: 'border-box' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: '#475569', marginBottom: '4px', fontWeight: '500' }}>ব্যবহারকারীর নাম</label>
+              <input type="text" placeholder="উদা: সাকিল আহমেদ" value={profile.userName} onChange={(e) => handleFieldChange('userName', e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #CBD5E1', borderRadius: '6px', boxSizing: 'border-box', fontSize: '13px' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: '#475569', marginBottom: '4px', fontWeight: '500' }}>দোকান / বিজনেসের নাম (পিডিএফ হেডার)</label>
+              <input type="text" placeholder="উদা: হাজারি গোল্ড" value={profile.businessName} onChange={(e) => handleFieldChange('businessName', e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #CBD5E1', borderRadius: '6px', boxSizing: 'border-box', fontSize: '13px' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: '#475569', marginBottom: '4px', fontWeight: '500' }}>ঠিকানা (পিডিএফ ফুটার)</label>
+              <input type="text" placeholder="উদা: চকবাজার, ঢাকা" value={profile.address} onChange={(e) => handleFieldChange('address', e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #CBD5E1', borderRadius: '6px', boxSizing: 'border-box', fontSize: '13px' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: '#475569', marginBottom: '4px', fontWeight: '500' }}>মোবাইল নাম্বার (পিডিএফ ফুটার)</label>
+              <input type="text" placeholder="উদা: 017XXXXXXXX" value={profile.phone} onChange={(e) => handleFieldChange('phone', e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #CBD5E1', borderRadius: '6px', boxSizing: 'border-box', fontSize: '13px' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: '#475569', marginBottom: '4px', fontWeight: '500' }}>জিমেইল এড্রেস</label>
+              <input type="email" placeholder="example@gmail.com" value={profile.email} onChange={(e) => handleFieldChange('email', e.target.value)} style={{ width: '100%', padding: '8px 10px', border: '1px solid #CBD5E1', borderRadius: '6px', boxSizing: 'border-box', fontSize: '13px' }} />
+            </div>
+          </div>
+        )}
+
+        {/* APPS MULTI-LANGUAGE MANAGEMENT MODULE */}
+        <div style={{ marginTop: 'auto', borderTop: '1px solid #E2E8F0', paddingTop: '20px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '10px' }}>
+            🌐 {profile.language === 'bn' ? 'ভাষা পরিবর্তন করুন' : 'Change Language'}
+          </label>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button 
+              onClick={() => handleFieldChange('language', 'bn')} 
+              style={{ flex: 1, padding: '10px', backgroundColor: profile.language === 'bn' ? '#004BA0' : '#E2E8F0', color: profile.language === 'bn' ? '#ffffff' : '#334155', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', transition: 'all 0.2s' }}
+            >
+              বাংলা
+            </button>
+            <button 
+              onClick={() => handleFieldChange('language', 'en')} 
+              style={{ flex: 1, padding: '10px', backgroundColor: profile.language === 'en' ? '#004BA0' : '#E2E8F0', color: profile.language === 'en' ? '#ffffff' : '#334155', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', transition: 'all 0.2s' }}
+            >
+              English
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};

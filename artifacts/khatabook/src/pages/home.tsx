@@ -13,7 +13,7 @@ import { Search, Plus, Settings, User, ChevronRight, UserPlus2, SlidersHorizonta
 import { formatCurrency, cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { AddPartyModal } from '@/components/modals/add-party-modal';
-import { SettingsDrawer } from '@/components/modals/settings-drawer';
+import { SettingsDrawer, loadShopProfile } from '@/components/modals/settings-drawer';
 import { AddStaffDialog } from '@/components/modals/add-staff-dialog';
 import { RenameStoreDialog } from '@/components/modals/rename-store-dialog';
 import { formatDistanceToNow } from 'date-fns';
@@ -125,11 +125,14 @@ export function HomeView() {
   const exportFilteredReportToPDF = useCallback(async () => {
     setIsExportingPdf(true);
 
-    const storeName  = settings?.storeName || 'ডিজিটাল খাতা';
+    const shopProfile = loadShopProfile();
+    const storeName  = shopProfile.businessName || settings?.storeName || 'ডিজিটাল খাতা';
     const roleLabel  = role === PartyRole.CUSTOMER ? 'গ্রাহক' : 'সরবরাহকারী';
     const nameColHeader = role === PartyRole.CUSTOMER ? 'নাম' : 'সরবরাহকারীর নাম';
     const dateStr    = new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
     const timeStr    = new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' });
+    const footerAddress = shopProfile.address || '';
+    const footerPhone   = shopProfile.phone   || '';
 
     let filteredGet  = 0;
     let filteredGive = 0;
@@ -243,9 +246,15 @@ export function HomeView() {
         </tbody>
       </table>
 
-      <!-- Timestamp footer -->
-      <div style="margin:16px 24px 0;font-size:11px;color:#94A3B8;">
-        রিপোর্ট তৈরি হয়েছে : ${timeStr} | ${dateStr}
+      <!-- Footer -->
+      <div style="margin:16px 24px 0;border-top:1px solid #E2E8F0;padding-top:10px;display:flex;justify-content:space-between;align-items:flex-end;">
+        <div style="font-size:11px;color:#94A3B8;">
+          ${footerAddress ? `<div style="margin-bottom:2px;">📍 ${footerAddress}</div>` : ''}
+          ${footerPhone   ? `<div>📞 ${footerPhone}</div>` : ''}
+        </div>
+        <div style="font-size:10px;color:#CBD5E1;text-align:right;">
+          রিপোর্ট তৈরি: ${timeStr} | ${dateStr}
+        </div>
       </div>
     `;
 
