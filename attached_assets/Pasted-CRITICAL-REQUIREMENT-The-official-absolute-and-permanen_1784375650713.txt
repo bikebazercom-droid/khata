@@ -1,0 +1,51 @@
+CRITICAL REQUIREMENT: The official, absolute, and permanent name of this software is "Banglakhata". Currently, the app still shows generic words like "খাতা" or older variants in certain places, especially during PDF generation, sharing, download file names, and layout components. We must fully enforce "Banglakhata" across the entire repository so it is production-ready for Google Play Store and web deployment.
+
+YOUR SYSTEM-WIDE REFACTORING TASKS:
+
+1. WEB METADATA & WEB/PLAY STORE MANIFESTS:
+   - Locate `index.html` and update the core title element: `<title>Banglakhata - Digital Ledger</title>`.
+   - Check `public/manifest.json` or `vite.config.js` (if present). Change the `name` and `short_name` fields strictly to `"Banglakhata"`.
+
+2. HARD-ISOLATED PDF ENGINE & FILENAME BRANDING:
+   - Open your PDF generation and sharing service script (`generateAndSharePerfectReportPDF`).
+   - Remove any fallback string containing "খাতা". Force the application identifier name to be strictly `"Banglakhata"`.
+   - Update the physical file system download configuration so the output document filename is explicitly and only formatted as `Banglakhata_Report.pdf` (or `Banglakhata_Supplier_Report.pdf` / `Banglakhata_Customer_Report.pdf`).
+
+Apply this exact updated module function structure immediately:
+
+```javascript
+export const generateAndSharePerfectReportPDF = (filteredEntries, currentContext) => {
+  const savedSettings = localStorage.getItem('user_settings_profile');
+  const userProfile = savedSettings ? JSON.parse(savedSettings) : {};
+  
+  // Absolute system brand enforcement
+  const appBrandName = "Banglakhata";
+  const displayShopName = userProfile.businessName || appBrandName;
+  const contextLabel = currentContext === 'supplier' ? 'সরবরাহকারী রিপোর্ট' : 'গ্রাহক রিপোর্ট';
+
+  // Build the clean HTML for PDF conversion
+  const pdfHtmlContent = `
+    <div style="font-family: Arial, sans-serif; padding: 20px;">
+      <!-- Production Branding Header -->
+      <div style="text-align: center; border-bottom: 3px solid #8B0000; padding-bottom: 12px; margin-bottom: 20px;">
+        <h1 style="margin: 0; color: #8B0000; font-size: 26px; font-weight: 800; letter-spacing: 0.5px;">${displayShopName}</h1>
+        <p style="margin: 6px 0 0 0; color: #475569; font-size: 13px; font-weight: bold; letter-spacing: 1px;">Powered by: ${appBrandName}</p>
+      </div>
+      
+      <!-- Ledger Tables mapping block here... -->
+    </div>
+  `;
+
+  // Explicit English Filename formatting for Play Store ecosystem compliance
+  const formattedContext = currentContext === 'supplier' ? 'Supplier_Report' : 'Customer_Report';
+  const cleanFileName = `Banglakhata_${formattedContext}.pdf`;
+  
+  if (window.ReplitPdfBridge) {
+    window.ReplitPdfBridge.download({
+      html: pdfHtmlContent,
+      filename: cleanFileName
+    });
+  } else {
+    console.log(`Exporting production-grade PDF: ${cleanFileName}`);
+  }
+};

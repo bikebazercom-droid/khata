@@ -105,7 +105,7 @@ export function HomeView() {
 
   const handleShareRequest = useCallback((platform: 'sms' | 'whatsapp') => {
     if (!requestModalParty) return;
-    const storeName = settings?.storeName || 'ডিজিটাল খাতা';
+    const storeName = settings?.storeName || 'Banglakhata';
     const amount = formatCurrency(requestModalParty.currentBalance);
     const message =
       `প্রিয় ${requestModalParty.name}, আপনার বকেয়া ${amount} পরিশোধের জন্য বিনীত অনুরোধ করা হচ্ছে। — ${storeName}`;

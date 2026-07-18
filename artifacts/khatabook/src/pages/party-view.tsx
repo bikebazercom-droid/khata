@@ -81,7 +81,7 @@ export function PartyView() {
   const [isGeneratingReminder, setIsGeneratingReminder] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
-  const storeName = settings?.storeName || 'ডিজিটাল খাতা';
+  const storeName = settings?.storeName || 'Banglakhata';
 
   // Dual-sorting pipeline: one true chronological reconstruction feeds both
   // the newest-first screen view and the oldest-first PDF/reminder timeline.
@@ -123,7 +123,7 @@ export function PartyView() {
     if (!reportRef.current) return null;
     return html2pdf().set({
       margin: 10,
-      filename: party ? buildReportFilename(party.name) : 'হিসাব_খাতা.pdf',
+      filename: party ? buildReportFilename(party.name) : 'Banglakhata_Ledger.pdf',
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
       jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' },
@@ -246,7 +246,7 @@ export function PartyView() {
     if (!party) return;
     const label = party.balanceType === 'YOU_WILL_GET' ? 'আপনি পাবেন' : 'আপনি দেবেন';
     setSmsMessage(
-      `প্রিয় ${party.name}, আপনার হিসাবে ${label} ${formatCurrency(party.currentBalance)}। ধন্যবাদান্তে, ডিজিটাল খাতা।`
+      `প্রিয় ${party.name}, আপনার হিসাবে ${label} ${formatCurrency(party.currentBalance)}। ধন্যবাদান্তে, Banglakhata।`
     );
     setCopiedSms(false);
   };

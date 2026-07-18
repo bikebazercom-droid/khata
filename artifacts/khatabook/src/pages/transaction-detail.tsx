@@ -72,7 +72,7 @@ export function TransactionDetailPage() {
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   const entry = entries.find((e) => e.id === entryId);
-  const storeName = settings?.storeName || 'ডিজিটাল খাতা';
+  const storeName = settings?.storeName || 'Banglakhata';
   const isGave = entry?.type === 'YOU_GAVE';
   const imageSrc = billImageSrc(entry?.billImage ?? null);
   const partyInitials = (party?.name ?? '??').slice(0, 2).toUpperCase();
@@ -95,7 +95,7 @@ export function TransactionDetailPage() {
       entry.description ? `নোট: ${entry.description}` : null,
       `বর্তমান ব্যালেন্স: ${formatCurrency(party.currentBalance)} (আপনি ${balanceLabel})`,
       '━━━━━━━━━━━━━━━━━━',
-      'ডিজিটাল খাতা দ্বারা তৈরি',
+      'Banglakhata দ্বারা তৈরি',
     ];
     return lines.filter(Boolean).join('\n');
   }
@@ -424,11 +424,10 @@ export function TransactionDetailPage() {
           <div className="bg-[#1B3A6B] px-5 py-4 flex flex-col items-center gap-1">
             <img
               src={`${BASE}/logo-icon.svg`}
-              alt="ডিজিটাল খাতা"
+              alt="Banglakhata"
               className="w-10 h-10 mb-1"
             />
-            <p className="text-white font-extrabold text-[13px] tracking-tight">Digital Khata</p>
-            <p className="text-white/65 text-[11px]">ডিজিটাল খাতা</p>
+            <p className="text-white font-extrabold text-[13px] tracking-tight">Banglakhata</p>
           </div>
 
           {/* Store name strip */}
@@ -493,7 +492,7 @@ export function TransactionDetailPage() {
               <CheckCircle2 className="w-3 h-3 text-[#0f1d35]" />
             </div>
             <p className="text-white/85 text-[11px] font-semibold">
-              ১০০% নিরাপদ ও সুরক্ষিত ডিজিটাল খাতা
+              ১০০% নিরাপদ ও সুরক্ষিত Banglakhata
             </p>
           </div>
 

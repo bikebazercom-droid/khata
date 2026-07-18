@@ -1,5 +1,5 @@
 /**
- * Digital Khata — Receipt Image Generator
+ * Banglakhata — Receipt Image Generator
  *
  * Renders a production-quality receipt card onto an off-screen HTML5 Canvas
  * and returns a PNG Blob ready for native sharing or download.
@@ -192,20 +192,15 @@ export async function generateReceiptBlob(data: ReceiptData): Promise<Blob> {
     ctx.font       = 'bold 22px Inter, sans-serif';
     ctx.textAlign  = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('DK', W / 2, 18 + iconSz / 2);
+    ctx.fillText('BK', W / 2, 18 + iconSz / 2);
   }
 
-  // "Digital Khata"
+  // "Banglakhata"
   ctx.fillStyle    = C.white;
   ctx.font         = 'bold 22px Inter, "Noto Sans Bengali", sans-serif';
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText('Digital Khata', W / 2, 100);
-
-  // "ডিজিটাল খাতা"
-  ctx.fillStyle = 'rgba(255,255,255,0.68)';
-  ctx.font      = '500 14px "Noto Sans Bengali", Inter, sans-serif';
-  ctx.fillText('ডিজিটাল খাতা', W / 2, 120);
+  ctx.fillText('Banglakhata', W / 2, 110);
 
   // bottom separator
   ctx.fillStyle = 'rgba(255,255,255,0.10)';
@@ -384,7 +379,7 @@ export async function generateReceiptBlob(data: ReceiptData): Promise<Blob> {
   ctx.font         = '600 13px "Noto Sans Bengali", Inter, sans-serif';
   ctx.textAlign    = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText('১০০% নিরাপদ ও সুরক্ষিত ডিজিটাল খাতা', bcx + 22, bcy);
+  ctx.fillText('১০০% নিরাপদ ও সুরক্ষিত Banglakhata', bcx + 22, bcy);
 
   // ── Convert canvas → PNG Blob ───────────────────────────────────────────
   return new Promise<Blob>((resolve, reject) => {

@@ -115,7 +115,7 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
           <h1 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: '#ffffff', letterSpacing: '0.02em' }}>{storeName}</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ width: '10px', height: '10px', backgroundColor: '#ffffff', borderRadius: '2px', display: 'inline-block' }} />
-            <span style={{ fontSize: '14px', fontWeight: 700, color: '#ffffff' }}>ডিজিটাল খাতা</span>
+            <span style={{ fontSize: '14px', fontWeight: 700, color: '#ffffff' }}>Banglakhata</span>
           </div>
         </div>
 
@@ -283,7 +283,7 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
           }}
         >
           <p style={{ fontSize: '11px', fontWeight: 700, color: '#ffffff', margin: 0 }}>
-            {storeName} থেকে স্বয়ংক্রিয়ভাবে তৈরি করা এই রিপোর্টটি ডিজিটাল খাতা ব্যবহার করে তৈরি।
+            {storeName} থেকে স্বয়ংক্রিয়ভাবে তৈরি করা এই রিপোর্টটি Banglakhata ব্যবহার করে তৈরি।
           </p>
           <div style={{ textAlign: 'right' }}>
             <p style={{ fontSize: '11px', fontWeight: 700, color: '#ffffff', margin: 0 }}>
@@ -301,7 +301,7 @@ LedgerReportDocument.displayName = 'LedgerReportDocument';
 /** Builds a safe filename for the generated ledger PDF from a customer name. */
 export function buildReportFilename(partyName: string) {
   const safeName = partyName.trim().replace(/\s+/g, '_');
-  return `${safeName}_হিসাব_খাতা.pdf`;
+  return `${safeName}_Banglakhata_Ledger.pdf`;
 }
 
 /**
