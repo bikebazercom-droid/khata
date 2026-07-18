@@ -115,7 +115,7 @@ export function ReportView() {
   const handleDownload = async () => {
     setIsGenerating(true);
     const shopProfile = loadShopProfile();
-    const storeName  = shopProfile.businessName || settings?.storeName || 'ডিজিটাল খাতা';
+    const storeName  = shopProfile.businessName || settings?.storeName || 'Banglakhata';
     const dateStr    = new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
     const timeStr    = new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' });
     const footerAddress = shopProfile.address || '';
@@ -229,7 +229,7 @@ export function ReportView() {
       }
 
       const tag      = isSupplier ? 'Supplier' : 'Customer';
-      const filename = `HazariKhata_${tag}_Ledger_${new Date().toISOString().split('T')[0]}.pdf`;
+      const filename = `Banglakhata_${tag}_Ledger_${new Date().toISOString().split('T')[0]}.pdf`;
       const pdfBlob  = pdf.output('blob');
       const pdfFile  = new File([pdfBlob], filename, { type: 'application/pdf' });
 

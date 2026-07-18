@@ -1,0 +1,52 @@
+Hey Agent, please update the official brand name of the application to "Banglakhata" in English. This must be applied globally across the entire codebase and replace any previous placeholders (like Digital Khata).
+
+YOUR IMPLEMENTATION REQUIREMENTS:
+1. GLOBAL WEBSITE & INTERFACE BRANDING:
+   - Change the `<title>` in `index.html` to `<title>Banglakhata</title>`.
+   - Update the dashboard navbar headers, settings panel labels, and splash screen elements to strictly read "Banglakhata".
+   - If using the previous visual layout, adjust the logo token text from "DK" to "BK" to cleanly match the initials.
+
+2. PDF GENERATION ENGINE & FILENAME BRANDING:
+   - Within the report generation script (`generateAndSharePerfectReportPDF`), use "Banglakhata" as the main system fallback header title if the user hasn't set a custom business name.
+   - The final generated PDF filename must save or share dynamically with this clean English structure: `Banglakhata_Report.pdf` (or `Banglakhata_Supplier_Report.pdf` / `Banglakhata_Customer_Report.pdf`).
+
+Please overwrite the PDF generation logic and layout branding configurations using this updated setup immediately:
+
+---
+
+### REFACTORED BRANDING LOGIC SNAPSHOT
+```javascript
+export const generateAndSharePerfectReportPDF = (filteredEntries, currentContext) => {
+  const savedSettings = localStorage.getItem('user_settings_profile');
+  const userProfile = savedSettings ? JSON.parse(savedSettings) : {};
+  
+  // Set explicit system brand name
+  const appBrandName = "Banglakhata";
+  const displayShopName = userProfile.businessName || appBrandName;
+  const contextLabel = currentContext === 'supplier' ? 'সরবরাহকারী রিপোর্ট' : 'গ্রাহক রিপোর্ট';
+
+  const pdfHtmlContent = `
+    <div style="font-family: Arial, sans-serif; padding: 20px;">
+      <!-- Main Branding Header -->
+      <div style="text-align: center; border-bottom: 2px solid #8B0000; padding-bottom: 10px; margin-bottom: 20px;">
+        <h1 style="margin: 0; color: #8B0000; font-size: 26px;">${displayShopName}</h1>
+        <p style="margin: 5px 0 0 0; color: #64748B; font-size: 14px;">${contextLabel} | Powered by: ${appBrandName}</p>
+      </div>
+      
+      <!-- Table Rows Mapping Block Goes Here ... -->
+    </div>
+  `;
+
+  // Explicit Filename formatting
+  const formattedContext = currentContext === 'supplier' ? 'Supplier_Report' : 'Customer_Report';
+  const cleanFileName = `Banglakhata_${formattedContext}.pdf`;
+  
+  if (window.ReplitPdfBridge) {
+    window.ReplitPdfBridge.download({
+      html: pdfHtmlContent,
+      filename: cleanFileName
+    });
+  } else {
+    console.log(`Downloading PDF: ${cleanFileName}`);
+  }
+};

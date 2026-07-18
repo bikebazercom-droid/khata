@@ -13,12 +13,11 @@ export function SignInPage() {
       <div className="mb-8 flex flex-col items-center gap-4">
         <img
           src={`${basePath}/logo-icon.svg`}
-          alt="ডিজিটাল খাতা আইকন"
+          alt="Banglakhata"
           className="w-24 h-24 drop-shadow-xl"
         />
         <div className="text-center">
-          <p className="text-white font-extrabold text-3xl tracking-tight leading-tight">Digital Khata</p>
-          <p className="text-white/80 font-semibold text-lg">ডিজিটাল খাতা</p>
+          <p className="text-white font-extrabold text-3xl tracking-tight leading-tight">Banglakhata</p>
         </div>
       </div>
       <div className="w-full max-w-[440px] space-y-6">

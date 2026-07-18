@@ -267,11 +267,10 @@ function AppSplash() {
     <div className="h-[100dvh] w-full bg-gradient-to-b from-[#1B3A6B] to-[#2a5298] flex flex-col items-center justify-center">
       <img
         src={`${basePath}/logo-icon.svg`}
-        alt="ডিজিটাল খাতা"
+        alt="Banglakhata"
         className="w-20 h-20 mb-5 drop-shadow-xl"
       />
-      <p className="text-white font-extrabold text-2xl tracking-tight">Digital Khata</p>
-      <p className="text-white/70 font-semibold text-base mt-1">ডিজিটাল খাতা</p>
+      <p className="text-white font-extrabold text-2xl tracking-tight">Banglakhata</p>
       <div className="mt-8 w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
     </div>
   );

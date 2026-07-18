@@ -126,7 +126,7 @@ export function HomeView() {
     setIsExportingPdf(true);
 
     const shopProfile = loadShopProfile();
-    const storeName  = shopProfile.businessName || settings?.storeName || 'ডিজিটাল খাতা';
+    const storeName  = shopProfile.businessName || settings?.storeName || 'Banglakhata';
     const roleLabel  = role === PartyRole.CUSTOMER ? 'গ্রাহক' : 'সরবরাহকারী';
     const nameColHeader = role === PartyRole.CUSTOMER ? 'নাম' : 'সরবরাহকারীর নাম';
     const dateStr    = new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -288,7 +288,7 @@ export function HomeView() {
       }
 
       const roleTag  = role === PartyRole.CUSTOMER ? 'Customer' : 'Supplier';
-      const filename = `HazariKhata_${roleTag}_${new Date().toISOString().split('T')[0]}.pdf`;
+      const filename = `Banglakhata_${roleTag}_${new Date().toISOString().split('T')[0]}.pdf`;
       const pdfBlob  = pdf.output('blob');
       const pdfFile  = new File([pdfBlob], filename, { type: 'application/pdf' });
 
@@ -322,11 +322,11 @@ export function HomeView() {
           <div className="flex items-center gap-2 min-w-0">
             <img
               src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/logo-icon.svg`}
-              alt="ডিজিটাল খাতা"
+              alt="Banglakhata"
               className="w-9 h-9 shrink-0"
             />
             <h1 className="font-extrabold tracking-tight text-[15px] text-white truncate max-w-[120px]">
-              {settings?.storeName || 'ডিজিটাল খাতা'}
+              {settings?.storeName || 'Banglakhata'}
             </h1>
             <button
               onClick={() => setIsRenameStoreOpen(true)}

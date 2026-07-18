@@ -16,8 +16,6 @@
   <!-- Book spine -->
   <line x1="44" y1="22" x2="44" y2="74" stroke="#0D2040" stroke-width="1.5" opacity="0.4"/>
 
-  <!-- "Digital Khata" text -->
-  <text x="96" y="46" font-family="'Inter', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="800" fill="#1B3A6B" letter-spacing="-0.5">Digital Khata</text>
-  <!-- "ডিজিটাল খাতা" text -->
-  <text x="97" y="68" font-family="'Inter', 'Noto Sans Bengali', Arial, sans-serif" font-size="17" font-weight="600" fill="#1B3A6B">ডিজিটাল খাতা</text>
+  <!-- "Banglakhata" text -->
+  <text x="96" y="52" font-family="'Inter', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="800" fill="#1B3A6B" letter-spacing="-0.5">Banglakhata</text>
 </svg>

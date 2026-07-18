@@ -670,7 +670,7 @@ export function StaffDeploymentPage() {
           <div class="img-subtitle">তারিখ: ${todayDate} | মোট ডিউটি: ${todayLogs.length} জন</div>
         </div>
         <div>${rowsHtml}</div>
-        <div class="footer-note">ডিজিটাল খাতা • WhatsApp-এ শেয়ার করার জন্য তৈরি</div>
+        <div class="footer-note">Banglakhata • WhatsApp-এ শেয়ার করার জন্য তৈরি</div>
       `;
 
       document.body.appendChild(container);
@@ -733,7 +733,7 @@ export function StaffDeploymentPage() {
           await navigator.share({
             files: [file],
             title: 'আজকের ডিউটি তালিকা',
-            text:  'আজকের ডিউটি তালিকা সরাসরি ডিজিটাল খাতা থেকে শেয়ার করা হলো।',
+            text:  'আজকের ডিউটি তালিকা সরাসরি Banglakhata থেকে শেয়ার করা হলো।',
           });
           toast.success('শেয়ার সম্পন্ন হয়েছে!');
         } catch (shareErr: unknown) {
@@ -1715,7 +1715,7 @@ function buildPdfHtml({
                   justify-content:space-between;border-radius:8px 8px 0 0">
         <div>
           <p style="color:#fff;font-size:21px;font-weight:900;margin:0;letter-spacing:-0.5px">
-            ডিজিটাল খাতা
+            Banglakhata
           </p>
           <p style="color:rgba(255,255,255,0.70);font-size:12px;margin:5px 0 0;font-weight:600">
             মাসিক ডিউটি স্টেটমেন্ট
@@ -1825,7 +1825,7 @@ function buildPdfHtml({
           <span style="color:${DARK};font-size:12px;font-weight:900">✓</span>
         </div>
         <p style="color:rgba(255,255,255,0.75);font-size:10px;font-weight:600;margin:0">
-          ১০০% নিরাপদ ও সুরক্ষিত ডিজিটাল খাতা — তৈরি হয়েছে:
+          ১০০% নিরাপদ ও সুরক্ষিত Banglakhata — তৈরি হয়েছে:
           ${format(new Date(), 'd MMM yyyy, hh:mm a', { locale: bn })}
         </p>
       </div>
