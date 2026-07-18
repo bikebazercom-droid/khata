@@ -2,11 +2,11 @@ import { useState, useCallback } from 'react';
 import { Link, useLocation } from 'wouter';
 import {
   useListParties,
-  useGetDashboardSummary,
   useGetBusinessSettings,
   PartyRole,
   DueFilter,
 } from '@workspace/api-client-react';
+import { useMemo } from 'react';
 import { Search, Plus, Settings, User, ChevronRight, UserPlus2, SlidersHorizontal, FileText, Users, Pencil, FolderOpen, X, MessageSquare, MessageCircle } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -30,9 +30,22 @@ export function HomeView() {
 
   const [requestModalParty, setRequestModalParty] = useState<{ id: string; name: string; phone?: string | null; currentBalance: number; balanceType: string } | null>(null);
 
-  const { data: summary } = useGetDashboardSummary();
   const { data: settings } = useGetBusinessSettings();
+  // Role-only parties (no search/dueFilter) — used purely for the summary card so
+  // the totals reflect the active tab, not the current search query.
+  const { data: summaryParties = [] } = useListParties({ role });
   const { data: parties = [] } = useListParties({ role, search, dueFilter });
+
+  // Compute summary totals from the role-filtered list.
+  const roleSummary = useMemo(() => {
+    let youWillGet = 0;
+    let youWillGive = 0;
+    for (const p of summaryParties) {
+      if (p.balanceType === 'YOU_WILL_GET') youWillGet += p.currentBalance;
+      else youWillGive += p.currentBalance;
+    }
+    return { youWillGet, youWillGive };
+  }, [summaryParties]);
 
   const handleShareRequest = useCallback((platform: 'sms' | 'whatsapp') => {
     if (!requestModalParty) return;
@@ -124,13 +137,13 @@ export function HomeView() {
         <div className="bg-white rounded-2xl shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)] border border-slate-100 grid grid-cols-3 divide-x divide-slate-100">
           <div className="px-1.5 py-3 text-center min-w-0">
             <p className="text-emerald-700 font-extrabold text-[13px] tracking-tight truncate">
-              {formatCurrency(summary?.youWillGive || 0)}
+              {formatCurrency(roleSummary.youWillGive)}
             </p>
             <p className="text-[9.5px] font-semibold text-slate-400 mt-1 whitespace-nowrap">আপনি দেবেন</p>
           </div>
           <div className="px-1.5 py-3 text-center min-w-0">
             <p className="text-red-600 font-extrabold text-[13px] tracking-tight truncate">
-              {formatCurrency(summary?.youWillGet || 0)}
+              {formatCurrency(roleSummary.youWillGet)}
             </p>
             <p className="text-[9.5px] font-semibold text-slate-400 mt-1 whitespace-nowrap">আপনি পাবেন</p>
           </div>

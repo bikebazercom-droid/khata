@@ -1,0 +1,42 @@
+Hey Agent, look at the two screenshots provided. There is a data leakage/filtering bug in the top dashboard summary card. 
+Whether the user selects the "গ্রাহক" (Customer) tab or the "সরবরাহকারী" (Supplier) tab, the top summary values ("আপনি দেবেন" and "আপনি পাবেন") remain exactly the same. The calculation is not shifting based on the active tab state.
+
+THE EXPECTED BEHAVIOR:
+- When "গ্রাহক" tab is active: The top card must calculate and display ONLY the total balance sums belonging to entities designated as customers (`type === 'customer'`).
+- When "সরবরাহকারী" tab is active: The top card must calculate and display ONLY the total balance sums belonging to entities designated as suppliers (`type === 'supplier'`).
+
+YOUR TASK:
+Modify the state logic computing the summary card metrics so that it reacts conditionally to the currently selected active tab state.
+
+Please refactor the calculation blocks inside the main Dashboard / Khata ledger component:
+
+---
+
+### 1. CONDITIONAL CALCULATIONS BASED ON ACTIVE TAB STATE
+
+Locate your active tab state hook (usually something like `activeTab`, `currentTab`, or `selectedTab`) and replace the static global calculations with a tab-filtered computation:
+
+```javascript
+// Inside the Main Dashboard Component
+// Assuming activeTab state values are: 'customer' (গ্রাহক) and 'supplier' (সরবরাহকারী)
+const [activeTab, setActiveTab] = useState('customer'); 
+
+// Dynamic calculation of totals filtered by active tab
+const calculatedMetrics = useMemo(() => {
+  // Filter transactions or entities based on the current active view tab
+  const filteredEntities = entities.filter(item => item.type === activeTab);
+
+  let totalYouWillGive = 0; // আপনি দেবেন (Green amount)
+  let totalYouWillGet = 0;  // আপনি পাবেন (Red amount)
+
+  filteredEntities.forEach(entity => {
+    // Modify these keys according to your actual schema structure
+    if (entity.balance > 0) {
+      totalYouWillGet += entity.balance;
+    } else if (entity.balance < 0) {
+      totalYouWillGive += Math.abs(entity.balance);
+    }
+  });
+
+  return { totalYouWillGive, totalYouWillGet };
+}, [entities, activeTab]); // Recalculates instantly whenever tab changes!
