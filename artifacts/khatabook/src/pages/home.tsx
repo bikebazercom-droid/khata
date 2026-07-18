@@ -126,7 +126,8 @@ export function HomeView() {
     setIsExportingPdf(true);
 
     const storeName  = settings?.storeName || 'ডিজিটাল খাতা';
-    const roleLabel  = role === PartyRole.CUSTOMER ? 'গ্রাহক' : 'সাপ্লায়ার';
+    const roleLabel  = role === PartyRole.CUSTOMER ? 'গ্রাহক' : 'সরবরাহকারী';
+    const nameColHeader = role === PartyRole.CUSTOMER ? 'নাম' : 'সরবরাহকারীর নাম';
     const dateStr    = new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
     const timeStr    = new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' });
 
@@ -223,7 +224,7 @@ export function HomeView() {
       <table style="width:calc(100% - 48px);margin:0 24px;border-collapse:collapse;font-size:12px;text-align:left;color:#334155;">
         <thead>
           <tr style="background:#F8FAFC;">
-            <th style="padding:10px;border:1px solid #E2E8F0;width:22%;">নাম</th>
+            <th style="padding:10px;border:1px solid #E2E8F0;width:22%;">${nameColHeader}</th>
             <th style="padding:10px;border:1px solid #E2E8F0;width:22%;">ডিটেলস</th>
             <th style="padding:10px;border:1px solid #E2E8F0;width:18%;text-align:right;">আপনি পাবেন</th>
             <th style="padding:10px;border:1px solid #E2E8F0;width:18%;text-align:right;">আপনি দেবেন</th>
