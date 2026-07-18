@@ -1,0 +1,158 @@
+CRITICAL REQUIREMENT FROM USER: The application contains TWO separate "📢 শেয়ার করুন" buttons as demonstrated in photo_2026-07-18_20-01-33.jpg (Entry Details Screen) and photo_2026-07-18_20-01-35.jpg (Payment Request Modal). Both buttons MUST be 100% bug-free, bypassing all browser sandbox or webview permission blocks, and must strictly share the clean UI segments as pristine JPEG (.jpg) image files to any social platform (Imo, WhatsApp, Messenger, Facebook).
+
+YOU MUST IMPLEMENT THIS HYBRID EXPORT FLOW FOR BOTH BUTTONS INSTANTLY:
+1. Ensure the targets (the scrollable entry details card wrapper and the modal summary card wrapper) are mapped precisely using React refs: `entryDetailsRef` and `receiptRef`.
+2. Upon clicking either share button, convert the referenced DOM area into a high-density image via `html2canvas` using `{ scale: 3, useCORS: true, logging: false }`.
+3. Extract the canvas cleanly to a JPEG stream: `canvas.toDataURL('image/jpeg', 0.98)`.
+4. DUAL-ACTION SILENT BYPASS:
+   - ACTION A: Immediately trigger a phantom download link execution so the JPG file drops directly into the user's mobile gallery/downloads storage.
+   - ACTION B: Fetch the generated data URL as a proper native system `File` object and pass it directly to `navigator.share`. 
+   - FAILSAFE: Wrap the `navigator.share` inside a tight try-catch block. If the browser blocks it or throws an error, SILENTLY ignore the error (DO NOT SHOW ANY ERROR TOASTS) and fallback smoothly by opening a communication link so the user knows the file is ready in their recent downloads.
+
+Please update the core business components with this bulletproof integration layout right now:
+
+```javascript
+import React, { useRef } from 'react';
+import html2canvas from 'html2canvas';
+
+// ============================================================================
+// 1. ENGINE FOR THE ENTRY DETAILS SCREEN BUTTON (photo_2026-07-18_20-01-33.jpg)
+// ============================================================================
+export const EntryDetailsScreen = ({ targetEntry, currentCustomer, onCloseView }) => {
+  const entryDetailsRef = useRef(null);
+
+  const handleEntryDetailsJpgShare = async () => {
+    if (!entryDetailsRef.current) return;
+
+    try {
+      const canvas = await html2canvas(entryDetailsRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 3,
+        useCORS: true,
+        logging: false
+      });
+
+      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
+      
+      // Auto-save download trigger
+      const link = document.createElement('a');
+      link.href = jpgDataUrl;
+      link.download = `Banglakhata_Entry_${targetEntry?.id || 'Record'}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Attempt system application pass sheet
+      const base64Response = await fetch(jpgDataUrl);
+      const rawBlob = await base64Response.blob();
+      const sharedImageFile = new File([rawBlob], 'entry_receipt.jpg', { type: 'image/jpeg' });
+
+      if (navigator.canShare && navigator.canShare({ files: [sharedImageFile] })) {
+        try {
+          await navigator.share({
+            files: [sharedImageFile],
+            title: 'লেনদেন বিবরণ',
+            text: 'বিস্তারিত লেনদেনের রসিদপত্র।'
+          });
+        } catch (e) {
+          window.open(`[https://api.whatsapp.com/send?text=রস](https://api.whatsapp.com/send?text=রস)িদটি গ্যালারিতে JPG ছবি হিসেবে সেভ হয়েছে।`, '_blank');
+        }
+      } else {
+        window.open(`[https://api.whatsapp.com/send?text=রস](https://api.whatsapp.com/send?text=রস)িদটি গ্যালারিতে JPG ছবি হিসেবে সেভ হয়েছে।`, '_blank');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  return (
+    <div>
+      {/* Scrollable layout target container wrapped around the transaction content cards */}
+      <div ref={entryDetailsRef} style={{ backgroundColor: '#ffffff', padding: '16px' }}>
+        {/* Render Customer Name, Dates, Amounts cleanly */}
+      </div>
+
+      {/* Footer bar buttons */}
+      <div style={{ display: 'flex', gap: '12px', padding: '12px' }}>
+        {/* ... Delete button ... */}
+        <button 
+          onClick={handleEntryDetailsJpgShare}
+          style={{ flex: 1, padding: '14px', backgroundColor: '#004B93', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer' }}
+        >
+          📢 শেয়ার করুন
+        </button>
+      </div>
+    </div>
+  );
+};
+
+
+// ============================================================================
+// 2. ENGINE FOR THE MODAL REQUEST SCREEN BUTTON (photo_2026-07-18_20-01-35.jpg)
+// ============================================================================
+export const PaymentRequestModal = ({ customer, onClose }) => {
+  const receiptRef = useRef(null);
+
+  const handleModalRequestJpgShare = async () => {
+    if (!receiptRef.current) return;
+
+    try {
+      const canvas = await html2canvas(receiptRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 3,
+        useCORS: true,
+        logging: false
+      });
+
+      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
+
+      // Instantly drop file into downloads storage
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = jpgDataUrl;
+      downloadAnchor.download = `Payment_Request_${customer?.name || 'Customer'}.jpg`;
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
+
+      // System Share Bridge execution
+      const base64Response = await fetch(jpgDataUrl);
+      const rawBlob = await base64Response.blob();
+      const sharedImageFile = new File([rawBlob], 'payment_receipt.jpg', { type: 'image/jpeg' });
+
+      if (navigator.canShare && navigator.canShare({ files: [sharedImageFile] })) {
+        try {
+          await navigator.share({
+            files: [sharedImageFile],
+            title: 'পেমেন্ট অনুরোধ',
+            text: 'অর্থ প্রদানের ডিজিটাল রসিদ।'
+          });
+        } catch (e) {
+          window.open(`[https://api.whatsapp.com/send?text=প](https://api.whatsapp.com/send?text=প)েমেন্ট রসিদটি আপনার গ্যালারিতে JPG ফরম্যাটে সেভ করা হয়েছে।`, '_blank');
+        }
+      } else {
+        window.open(`[https://api.whatsapp.com/send?text=প](https://api.whatsapp.com/send?text=প)েমেন্ট রসিদটি আপনার গ্যালারিতে JPG ফরম্যাটে সেভ করা হয়েছে।`, '_blank');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  return (
+    <div>
+      {/* Target capture modal viewport box */}
+      <div ref={receiptRef} style={{ backgroundColor: '#ffffff', padding: '20px' }}>
+        {/* Render custom requested amount typography strings */}
+      </div>
+
+      <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+        {/* ... SMS Option button ... */}
+        <button 
+          onClick={handleModalRequestJpgShare}
+          style={{ flex: 1, backgroundColor: '#004B93', color: '#ffffff', border: 'none', borderRadius: '30px', padding: '14px', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer' }}
+        >
+          📢 শেয়ার করুন
+        </button>
+      </div>
+    </div>
+  );
+};

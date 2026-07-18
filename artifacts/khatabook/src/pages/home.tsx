@@ -129,42 +129,37 @@ export function HomeView() {
         logging: false,
       });
 
-      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
       const ownerName = settings?.storeName || 'Banglakhata';
-      const fileName = `Banglakhata_Payment_Request_${requestModalParty.name || 'Customer'}.jpg`;
+      const fileName = `Payment_Request_${requestModalParty.name || 'Customer'}.jpg`;
 
-      // 2. Always force-download to device gallery first — unconditionally
-      const localGallerySave = (url: string) => {
-        const ghostLink = document.createElement('a');
-        ghostLink.href = url;
-        ghostLink.download = fileName;
-        document.body.appendChild(ghostLink);
-        ghostLink.click();
-        document.body.removeChild(ghostLink);
-      };
-      localGallerySave(jpgDataUrl);
+      // Force-download into device gallery immediately
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = jpgDataUrl;
+      downloadAnchor.download = fileName;
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
 
-      // 3. Convert to Blob File and attempt native share sheet
-      const res = await fetch(jpgDataUrl);
-      const blob = await res.blob();
-      const systemImageFile = new File([blob], 'payment_receipt.jpg', { type: 'image/jpeg' });
+      // Attempt native share sheet with the file
+      const base64Response = await fetch(jpgDataUrl);
+      const rawBlob = await base64Response.blob();
+      const sharedImageFile = new File([rawBlob], 'payment_receipt.jpg', { type: 'image/jpeg' });
 
-      if (navigator.canShare && navigator.canShare({ files: [systemImageFile] })) {
+      const waFallback = `https://api.whatsapp.com/send?text=${encodeURIComponent('পেমেন্ট রসিদটি আপনার গ্যালারিতে JPG ফরম্যাটে সেভ করা হয়েছে।')}`;
+
+      if (navigator.canShare && navigator.canShare({ files: [sharedImageFile] })) {
         try {
           await navigator.share({
-            files: [systemImageFile],
-            title: 'পেমেন্ট রশিদ',
-            text: `Banglakhata থেকে পাঠানো পেমেন্ট রসিদের JPG ফাইল — ${ownerName}`,
+            files: [sharedImageFile],
+            title: 'পেমেন্ট অনুরোধ',
+            text: `অর্থ প্রদানের ডিজিটাল রসিদ — ${ownerName}`,
           });
         } catch {
-          // Cancelled or blocked — image already in gallery, nothing to do
-          console.log('Native share cancelled or intercepted smoothly.');
+          window.open(waFallback, '_blank');
         }
       } else {
-        // No file-share API support — alert the user to share from gallery
-        alert(
-          '✅ রসিদটি আপনার ফোনের গ্যালারি/ডাউনলোড ফোল্ডারে ছবি (JPG) হিসেবে সেভ হয়েছে! অনুগ্রহ করে আপনার ইমু, হোয়াটসঅ্যাপ বা ফেসবুক থেকে গ্যালারি সিলেক্ট করে এটি পাঠিয়ে দিন।',
-        );
+        window.open(waFallback, '_blank');
       }
     } catch (err) {
       console.error('Snapshot or sharing pipeline experienced an error:', err);

@@ -184,15 +184,14 @@ export function TransactionDetailPage() {
 
   /**
    * Bulletproof share pipeline:
-   *  1. Render the full entry details view to a high-res JPG via html2canvas.
-   *  2. Force-download the JPG to device gallery immediately — no Web Share API.
-   *  3. Alert the user it is saved, then open WhatsApp so they can attach it.
+   *  1. Render entryDetailsRef to a high-res JPG via html2canvas.
+   *  2. Force-download immediately into device gallery.
+   *  3. Attempt navigator.share — on block/cancel open WhatsApp silently.
    */
   async function handleShare() {
     if (!entryDetailsRef.current) return;
     setIsSharing(true);
     try {
-      // 1. Premium high-res snapshot of the entire entry details view
       const canvas = await html2canvas(entryDetailsRef.current, {
         backgroundColor: '#ffffff',
         scale: 3,
@@ -200,34 +199,38 @@ export function TransactionDetailPage() {
         logging: false,
       });
 
-      // 2. Optimized JPG data URL
-      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
 
-      // 3. Force instant download directly into device gallery
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.href = jpgDataUrl;
-      downloadAnchor.download = `Banglakhata_Entry_${entry?.id || 'Record'}.jpg`;
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      document.body.removeChild(downloadAnchor);
+      // Force download into device gallery immediately
+      const link = document.createElement('a');
+      link.href = jpgDataUrl;
+      link.download = `Banglakhata_Entry_${entry?.id || 'Record'}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
 
-      // 4. Inform user and open WhatsApp bridge after a short delay
-      setTimeout(() => {
-        alert(
-          '✅ রশিদটি সফলভাবে আপনার ফোনের গ্যালারি/ডাউনলোড ফোল্ডারে JPG ছবি হিসেবে সেভ হয়েছে!\n\nএখন ইমু, ফেসবুক বা হোয়াটসঅ্যাপ ওপেন করে গ্যালারি থেকে ছবিটি সিলেক্ট করে পাঠিয়ে দিন।',
-        );
-        window.open(
-          `https://api.whatsapp.com/send?text=${encodeURIComponent('আপনার লেনদেনের রসিদটি আমার গ্যালারি থেকে পাঠানো হচ্ছে।')}`,
-          '_blank',
-        );
-      }, 300);
+      // Attempt native share sheet with the file
+      const base64Response = await fetch(jpgDataUrl);
+      const rawBlob = await base64Response.blob();
+      const sharedImageFile = new File([rawBlob], 'entry_receipt.jpg', { type: 'image/jpeg' });
+
+      const waFallback = `https://api.whatsapp.com/send?text=${encodeURIComponent('রসিদটি গ্যালারিতে JPG ছবি হিসেবে সেভ হয়েছে।')}`;
+
+      if (navigator.canShare && navigator.canShare({ files: [sharedImageFile] })) {
+        try {
+          await navigator.share({
+            files: [sharedImageFile],
+            title: 'লেনদেন বিবরণ',
+            text: 'বিস্তারিত লেনদেনের রসিদপত্র।',
+          });
+        } catch {
+          window.open(waFallback, '_blank');
+        }
+      } else {
+        window.open(waFallback, '_blank');
+      }
     } catch (err: unknown) {
       console.error('Critical capture failure:', err);
-      // Absolute failsafe: redirect to WhatsApp to prevent freeze
-      window.open(
-        `https://api.whatsapp.com/send?text=${encodeURIComponent('রসিদ জেনারেট করা সম্ভব হয়নি।')}`,
-        '_blank',
-      );
     } finally {
       setIsSharing(false);
     }
