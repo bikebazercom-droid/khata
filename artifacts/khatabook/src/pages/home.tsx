@@ -149,6 +149,9 @@ export function HomeView() {
       }
       doc.addFileToVFS('NotoSansBengali.ttf', _banglaFontB64);
       doc.addFont('NotoSansBengali.ttf', 'BN', 'normal');
+      // Register the same TTF for 'bold' so autoTable's header cells don't fall back
+      // to Helvetica (which cannot render Bengali) when fontStyle: 'bold' is applied.
+      doc.addFont('NotoSansBengali.ttf', 'BN', 'bold');
       const BN = 'BN';
 
       // ── Filtered totals (computed from same array driving the screen) ─────
