@@ -179,7 +179,8 @@ export function PartyView() {
 
   /**
    * Captures a single transaction card element as a high-res JPG,
-   * force-downloads it to the device, then attempts native share / WhatsApp.
+   * force-downloads it, tries navigator.share, then falls back to
+   * alert + WhatsApp if the browser blocks sharing.
    */
   const handleEntryShare = async (cardEl: HTMLElement) => {
     try {
@@ -190,42 +191,53 @@ export function PartyView() {
         logging: false,
       });
 
-      const jpgImageStream = canvas.toDataURL('image/jpeg', 0.98);
+      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.95);
 
-      // Force download into device gallery immediately
-      const enforceSilentDownload = (url: string) => {
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Receipt_${Date.now()}.jpg`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+      // Force instant download to phone storage/gallery
+      const downloadLink = document.createElement('a');
+      downloadLink.href = jpgDataUrl;
+      downloadLink.download = `Banglakhata_Receipt_${Date.now()}.jpg`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+
+      // Convert to File blob for native share attempt
+      const response = await fetch(jpgDataUrl);
+      const blob = await response.blob();
+      const imageFile = new File([blob], 'receipt.jpg', { type: 'image/jpeg' });
+
+      const alertAndWhatsApp = () => {
+        setTimeout(() => {
+          alert('✅ রসিদটি সফলভাবে ছবি (JPG) আকারে আপনার ফোনের গ্যালারি/ডাউনলোড ফোল্ডারে সেভ হয়েছে!\n\nএখন ইমু, ফেসবুক বা হোয়াটসঅ্যাপ ওপেন করে গ্যালারি থেকে ছবিটি সিলেক্ট করে পাঠিয়ে দিন।');
+          window.open(
+            `https://api.whatsapp.com/send?text=${encodeURIComponent('লেনদেনের JPG রসিদটি আমার গ্যালারি থেকে পাঠানো হচ্ছে।')}`,
+            '_blank',
+          );
+        }, 200);
       };
-      enforceSilentDownload(jpgImageStream);
 
-      // Attempt native share sheet
-      const base64Fetch = await fetch(jpgImageStream);
-      const rawImageBlob = await base64Fetch.blob();
-      const finalImageFile = new File([rawImageBlob], 'transaction_receipt.jpg', { type: 'image/jpeg' });
-
-      const waFallbackA = `https://api.whatsapp.com/send?text=${encodeURIComponent('লেনদেনের JPG রসিদটি আপনার ফোনে ডাউনলোড হয়েছে। অনুগ্রহ করে চ্যাটে সেটি এটাচ করে দিন।')}`;
-      const waFallbackB = `https://api.whatsapp.com/send?text=${encodeURIComponent('রসিদের JPG ছবিটি ফোনে সেভ হয়েছে। অনুগ্রহ করে গ্যালারি থেকে এটি সেন্ড করুন।')}`;
-
-      if (navigator.canShare && navigator.canShare({ files: [finalImageFile] })) {
+      // Try native OS share sheet — fall back silently if blocked
+      if (navigator.canShare && navigator.canShare({ files: [imageFile] })) {
         try {
           await navigator.share({
-            files: [finalImageFile],
+            files: [imageFile],
             title: 'লেনদেন রশিদ',
-            text: 'Banglakhata অ্যাপ থেকে লেনদেনের JPG রশিদ।',
+            text: 'Banglakhata অ্যাপ থেকে পাঠানো রসিদ।',
           });
+          return; // success — share sheet opened
         } catch {
-          window.open(waFallbackA, '_blank');
+          console.log('Native share intercepted or cancelled smoothly.');
         }
-      } else {
-        window.open(waFallbackB, '_blank');
       }
+
+      // Fallback: alert + WhatsApp deep-link
+      alertAndWhatsApp();
     } catch (err) {
-      console.error('Critical failure while encoding the transactional card snapshot to JPG format:', err);
+      console.error('Critical snapshot capture failure:', err);
+      window.open(
+        `https://api.whatsapp.com/send?text=${encodeURIComponent('রসিদটি গ্যালারি থেকে শেয়ার করুন।')}`,
+        '_blank',
+      );
     }
   };
 

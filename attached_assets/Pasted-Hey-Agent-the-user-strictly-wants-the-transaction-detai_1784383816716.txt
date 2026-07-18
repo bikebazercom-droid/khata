@@ -1,0 +1,66 @@
+Hey Agent, the user strictly wants the transaction details (Amount, Balance, Phone, and Date as shown in photo_2026-07-18_19-56-31_2.jpg) to be shared AS AN IMAGE (JPG format), not plain text. The share button is currently failing or freezing because the browser webview blocks binary files from being passed directly to other applications.
+
+WE MUST FIX THIS BY USING A DUAL-ACTION FALLBACK MECHANISM THAT NEVER FREEZES:
+1. Wrap the entire transaction card UI in a React ref: `ref={transactionCardRef}`.
+2. When clicked/touched, instantly convert the DOM node to a crisp image via `html2canvas` with high density (`scale: 3`, `useCORS: true`).
+3. Generate the JPEG Data URL (`canvas.toDataURL('image/jpeg', 0.95)`).
+4. MANDATORY AUTO-DOWNLOAD: Instantly drop the JPG file directly into the device storage using a phantom anchor execution so the user definitely has the image card in their gallery.
+5. NATIVE SHARE + FAILSAFE INTERCEPT: Try triggering `navigator.share` with the binary File object. If the webview blocks it or throws any permission/security error, intercept it immediately using a clean catch block (DO NOT CRASH OR FREEZE). Instead, open a web fallback deep-link and alert the user that the image is saved in their gallery ready to be sent to Imo, WhatsApp, or Facebook.
+
+Please update the sharing action handler code right now:
+
+```javascript
+const handleTransactionJpgShare = async () => {
+  if (!transactionCardRef.current) return;
+
+  try {
+    // 1. Snapshot the layout cleanly at premium crisp resolution
+    const canvas = await html2canvas(transactionCardRef.current, {
+      backgroundColor: '#ffffff',
+      scale: 3, 
+      useCORS: true,
+      logging: false
+    });
+
+    // 2. Compile into clean JPG data stream
+    const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+
+    // 3. Force instant background download to phone storage/gallery
+    const downloadLink = document.createElement('a');
+    downloadLink.href = jpgDataUrl;
+    downloadLink.download = `Banglakhata_Receipt_${new Date().getTime()}.jpg`;
+    document.body.appendChild(downloadAnchor);
+    downloadLink.click();
+    document.body.removeChild(downloadAnchor);
+
+    // 4. Convert to file blob for native transfer attempt
+    const response = await fetch(jpgDataUrl);
+    const blob = await response.blob();
+    const imageFile = new File([blob], 'receipt.jpg', { type: 'image/jpeg' });
+
+    // 5. Try native OS Share Sheet without risking browser freeze
+    if (navigator.canShare && navigator.canShare({ files: [imageFile] })) {
+      try {
+        await navigator.share({
+          files: [imageFile],
+          title: 'লেনদেন রশিদ',
+          text: 'Banglakhata অ্যাপ থেকে পাঠানো রসিদ।'
+        });
+        return; // Success exit
+      } catch (shareError) {
+        console.log("Native share intercepted or cancelled smoothly.");
+      }
+    }
+
+    // 6. Absolute Failsafe Fallback if sharing is blocked by the phone browser
+    setTimeout(() => {
+      alert("✅ রসিদটি সফলভাবে ছবি (JPG) আকারে আপনার ফোনের গ্যালারি/ডাউনলোড ফোল্ডারে সেভ হয়েছে!\n\nএখন ইমু, ফেসবুক বা হোয়াটসঅ্যাপ ওপেন করে গ্যালারি থেকে ছবিটি সিলেক্ট করে পাঠিয়ে দিন।");
+      window.open(`[https://api.whatsapp.com/send?text=ল](https://api.whatsapp.com/send?text=ল)েনদেনের JPG রসিদটি আমার গ্যালারি থেকে পাঠানো হচ্ছে।`, '_blank');
+    }, 200);
+
+  } catch (error) {
+    console.error('Critical snapshot capture failure:', error);
+    // Absolute backup to prevent button lockups
+    window.open('[https://api.whatsapp.com/send?text=রস](https://api.whatsapp.com/send?text=রস)িদটি গ্যালারি থেকে শেয়ার করুন।', '_blank');
+  }
+};
