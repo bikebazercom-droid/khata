@@ -1,0 +1,65 @@
+Hey Agent, look closely at photo_2026-07-18_19-56-31.jpg. The user wants to share this specific transaction information (+8801629251426, Date, Amount, and Current Balance) strictly as a real JPG image file across social media platforms. 
+
+WE MUST BYPASS ALL BROWSER WEBVIEW SHARING RESTRICTIONS BY GENERATING A CRISP IN-MEMORY IMAGE AND FORCING AN AUTOMATIC LOCAL STORAGE DOWNLOAD COMPLETION:
+1. Create a clean, beautiful off-screen rendering container (or visible component wrapper) with `ref={transactionCardRef}` structured exactly like the card layout in photo_2026-07-18_19-56-31.jpg.
+2. When the user triggers the Share action, instantly render this DOM element node into a high-density canvas block via `html2canvas` using `{ scale: 3, useCORS: true }`.
+3. Extract the high-res canvas object specifically into a binary raw JPEG image string: `canvas.toDataURL('image/jpeg', 0.98)`.
+4. FORCED LOCAL JETSTREAM DOWNLOAD: Instead of risking another sandboxed "navigator.share" error banner crash, immediately invoke a phantom anchor link execution (`download` property) to silently force-download the `.jpg` receipt file onto the client device gallery.
+5. DEEPLINK APPS REDIRECT: Immediately after the download triggers, seamlessly route the tab screen directly to the communications application (`https://api.whatsapp.com/send`) with a short message telling the user to grab the freshly saved image card from their recent photos.
+
+Please replace the sharing transaction logic with this absolute rock-solid production code structure:
+
+```javascript
+const handleTransactionJpgExportShare = async () => {
+  if (!transactionCardRef.current) return;
+
+  try {
+    // 1. Snapshot the target layout viewport cleanly at ultra high definition scale
+    const canvas = await html2canvas(transactionCardRef.current, {
+      backgroundColor: '#ffffff',
+      scale: 3, // Premium rendering resolution for micro typography text
+      useCORS: true,
+      logging: false
+    });
+
+    // 2. Compile into an absolute binary JPG asset link string
+    const jpgImageStream = canvas.toDataURL('image/jpeg', 0.98);
+
+    // 3. Stealth Local Anchor File Injector
+    const enforceSilentDownload = (url) => {
+      const temporaryAnchor = document.createElement('a');
+      temporaryAnchor.href = url;
+      temporaryAnchor.download = `Receipt_${new Date().getTime()}.jpg`;
+      document.body.appendChild(temporaryAnchor);
+      temporaryAnchor.click();
+      document.body.removeChild(temporaryAnchor);
+    };
+
+    // 4. Trigger download directly into the user's phone storage/gallery
+    enforceSilentDownload(jpgImageStream);
+
+    // 5. Native OS Share Dialog Try-Catch Block (Failsafe Mode)
+    const base64Fetch = await fetch(jpgImageStream);
+    const rawImageBlob = await base64Fetch.blob();
+    const finalImageFile = new File([rawImageBlob], 'transaction_receipt.jpg', { type: 'image/jpeg' });
+
+    if (navigator.canShare && navigator.canShare({ files: [finalImageFile] })) {
+      try {
+        await navigator.share({
+          files: [finalImageFile],
+          title: 'লেনদেন রশিদ',
+          text: 'Banglakhata অ্যাপ থেকে লেনদেনের JPG রশিদ।'
+        });
+      } catch (nativeShareCancel) {
+        // Fallback A: If browser drops connection, gracefully shift to instant messaging window redirection
+        window.open(`[https://api.whatsapp.com/send?text=ল](https://api.whatsapp.com/send?text=ল)েনদেনের JPG রসিদটি আপনার ফোনে ডাউনলোড হয়েছে। অনুগ্রহ করে চ্যাটে সেটি এটাচ করে দিন।`, '_blank');
+      }
+    } else {
+      // Fallback B: Standard standalone browser view redirection framework
+      window.open(`[https://api.whatsapp.com/send?text=রস](https://api.whatsapp.com/send?text=রস)িদের JPG ছবিটি ফোনে সেভ হয়েছে। অনুগ্রহ করে গ্যালারি থেকে এটি সেন্ড করুন।`, '_blank');
+    }
+
+  } catch (err) {
+    console.error('Critical failure while encoding the transactional card snapshot to JPG format:', err);
+  }
+};

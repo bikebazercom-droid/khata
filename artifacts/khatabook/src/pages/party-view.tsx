@@ -9,6 +9,7 @@ import {
   LedgerEntryType,
 } from '@workspace/api-client-react';
 import html2pdf from 'html2pdf.js';
+import html2canvas from 'html2canvas';
 import {
   ChevronLeft,
   Phone,
@@ -20,6 +21,7 @@ import {
   MessageSquareText,
   Plus,
   Loader2,
+  Share2,
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -172,6 +174,58 @@ export function PartyView() {
     } finally {
       restore?.();
       setIsGeneratingReport(false);
+    }
+  };
+
+  /**
+   * Captures a single transaction card element as a high-res JPG,
+   * force-downloads it to the device, then attempts native share / WhatsApp.
+   */
+  const handleEntryShare = async (cardEl: HTMLElement) => {
+    try {
+      const canvas = await html2canvas(cardEl, {
+        backgroundColor: '#ffffff',
+        scale: 3,
+        useCORS: true,
+        logging: false,
+      });
+
+      const jpgImageStream = canvas.toDataURL('image/jpeg', 0.98);
+
+      // Force download into device gallery immediately
+      const enforceSilentDownload = (url: string) => {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Receipt_${Date.now()}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      };
+      enforceSilentDownload(jpgImageStream);
+
+      // Attempt native share sheet
+      const base64Fetch = await fetch(jpgImageStream);
+      const rawImageBlob = await base64Fetch.blob();
+      const finalImageFile = new File([rawImageBlob], 'transaction_receipt.jpg', { type: 'image/jpeg' });
+
+      const waFallbackA = `https://api.whatsapp.com/send?text=${encodeURIComponent('লেনদেনের JPG রসিদটি আপনার ফোনে ডাউনলোড হয়েছে। অনুগ্রহ করে চ্যাটে সেটি এটাচ করে দিন।')}`;
+      const waFallbackB = `https://api.whatsapp.com/send?text=${encodeURIComponent('রসিদের JPG ছবিটি ফোনে সেভ হয়েছে। অনুগ্রহ করে গ্যালারি থেকে এটি সেন্ড করুন।')}`;
+
+      if (navigator.canShare && navigator.canShare({ files: [finalImageFile] })) {
+        try {
+          await navigator.share({
+            files: [finalImageFile],
+            title: 'লেনদেন রশিদ',
+            text: 'Banglakhata অ্যাপ থেকে লেনদেনের JPG রশিদ।',
+          });
+        } catch {
+          window.open(waFallbackA, '_blank');
+        }
+      } else {
+        window.open(waFallbackB, '_blank');
+      }
+    } catch (err) {
+      console.error('Critical failure while encoding the transactional card snapshot to JPG format:', err);
     }
   };
 
@@ -422,6 +476,7 @@ export function PartyView() {
                     return (
                       <div
                         key={entry.id}
+                        data-entry-card
                         role="button"
                         tabIndex={0}
                         onClick={() => navigate(`/party/${id}/entry/${entry.id}`)}
@@ -466,6 +521,20 @@ export function PartyView() {
                               />
                             </button>
                           )}
+                          {/* Per-entry share button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const card = e.currentTarget.closest('[data-entry-card]') as HTMLElement | null;
+                              if (card) handleEntryShare(card);
+                            }}
+                            aria-label="শেয়ার করুন"
+                            className="mt-2 flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-[#004B93] active:scale-95 transition-all"
+                          >
+                            <Share2 className="w-3 h-3" />
+                            শেয়ার
+                          </button>
                         </div>
                         <div className={cn('w-20 h-full flex items-center justify-center py-3', isGave ? 'bg-[#FFF5F5]' : 'bg-white')}>
                           {isGave && (
