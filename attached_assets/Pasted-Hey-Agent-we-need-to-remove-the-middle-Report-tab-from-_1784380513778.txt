@@ -1,0 +1,73 @@
+Hey Agent, we need to remove the middle "রিপোর্ট" (Report) tab from the Bottom Navigation Bar as requested. The middle slot must be left empty/blank, preserving the balanced layout for "পার্টিস" (Parties) on the left and "সেটিংস" (Settings) on the right.
+
+YOUR IMPLEMENTATION REQUIREMENTS:
+1. Remove the text "রিপোর্ট" and its document icon from the layout configuration entirely.
+2. In its place, keep an empty placeholder component or a generic transparent flex/grid spacer container so the remaining tabs remain perfectly anchored to the far left and far right sides.
+
+Please overwrite or integrate this updated Bottom Navigation component into our app layout now:
+
+```javascript
+import React from 'react';
+
+export const BottomNavigationBar = ({ currentTab, onTabChange }) => {
+  return (
+    <div style={{
+      position: 'fixed',
+      bottom: 0,
+      left: 0,
+      width: '100%',
+      backgroundColor: '#ffffff',
+      borderTop: '1px solid #E2E8F0',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '8px 0',
+      boxSizing: 'border-box',
+      height: '65px',
+      zIndex: 999
+    }}>
+      
+      {/* 1. Left Tab: পার্টিস */}
+      <button 
+        onClick={() => onTabChange('parties')}
+        style={{
+          flex: 1,
+          background: 'none',
+          border: 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          color: currentTab === 'parties' ? '#004B93' : '#64748B'
+        }}
+      >
+        <span style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '4px' }}>👥</span>
+        <span style={{ fontSize: '12px', fontWeight: 'bold' }}>পার্টিস</span>
+      </button>
+
+      {/* 2. Middle Spacer: KEEP THIS TOTALLY EMPTY / BLANK SLOT AS REQUESTED */}
+      <div style={{ flex: 1, height: '100%', background: 'transparent' }}></div>
+
+      {/* 3. Right Tab: সেটিংস */}
+      <button 
+        onClick={() => onTabChange('settings')}
+        style={{
+          flex: 1,
+          background: 'none',
+          border: 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          color: currentTab === 'settings' ? '#004B93' : '#64748B'
+        }}
+      >
+        <span style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '4px' }}>⚙️</span>
+        <span style={{ fontSize: '12px', fontWeight: 'bold' }}>সেটিংস</span>
+      </button>
+
+    </div>
+  );
+};

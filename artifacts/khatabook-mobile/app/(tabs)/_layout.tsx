@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Platform, StyleSheet, useColorScheme, View } from 'react-native';
+import { Platform, StyleSheet, useColorScheme, TouchableOpacity, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -17,16 +17,12 @@ function NativeTabLayout() {
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: 'house', selected: 'house.fill' }} />
-        <Label>Home</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="parties">
         <Icon sf={{ default: 'person.2', selected: 'person.2.fill' }} />
-        <Label>Parties</Label>
+        <Label>পার্টিস</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="settings">
         <Icon sf={{ default: 'gear', selected: 'gear' }} />
-        <Label>Settings</Label>
+        <Label>সেটিংস</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -70,22 +66,11 @@ function ClassicTabLayout() {
           ) : null,
       }}
     >
+      {/* Left tab: পার্টিস (home/dashboard) */}
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="house" tintColor={color} size={24} />
-            ) : (
-              <Feather name="home" size={22} color={color} />
-            ),
-        }}
-      />
-      <Tabs.Screen
-        name="parties"
-        options={{
-          title: 'Parties',
+          title: 'পার্টিস',
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="person.2" tintColor={color} size={24} />
@@ -94,10 +79,19 @@ function ClassicTabLayout() {
             ),
         }}
       />
+      {/* Middle slot: transparent spacer — route kept alive but tab hidden */}
+      <Tabs.Screen
+        name="parties"
+        options={{
+          title: '',
+          tabBarButton: () => <View style={{ flex: 1 }} />,
+        }}
+      />
+      {/* Right tab: সেটিংস */}
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
+          title: 'সেটিংস',
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="gear" tintColor={color} size={24} />
