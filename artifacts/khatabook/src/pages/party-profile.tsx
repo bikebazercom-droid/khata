@@ -16,7 +16,6 @@ import {
   ChevronRight,
   Phone,
   MapPin,
-  Building2,
   Landmark,
   UserCog,
   Trash2,
@@ -122,7 +121,6 @@ export function PartyProfileView() {
     { icon: <UserCog className="w-5 h-5" />,  label: 'নাম',      value: party.name },
     { icon: <Phone className="w-5 h-5" />,    label: 'মোবাইল',  value: party.phone || null },
     { icon: <MapPin className="w-5 h-5" />,   label: 'ঠিকানা',  value: null },
-    { icon: <Building2 className="w-5 h-5" />,label: 'GSTIN',    value: null },
     { icon: <Landmark className="w-5 h-5" />, label: 'ব্যাংক',  value: null },
   ];
 
