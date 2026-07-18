@@ -1,0 +1,140 @@
+Hey Agent, I have provided the exact filter icon button bar design from the dashboard (Screenshot_13.jpg). When the user clicks on this specific "ফিল্টার" icon button next to the search bar ("কাস্তমার অনুসন্ধান করুন"), it must trigger the Advanced Filter & Sort Bottom Sheet modal shown in the first screenshot.
+
+THE REQUIREMENTS:
+1. Trigger: Clicking the existing layout's Filter button component opens the sheet.
+2. Filter Options: "সব", "আপনাকে পাবেন", "আপনি দেবেন", "স্থায়ী", "আজকের বাকি", "আপকামিং", "কোনো নির্দিষ্ট তারিখ নেই".
+3. Sort Options (Radio Group): "সর্বাধিক সাম্প্রতিক", "সর্বোচ্চ পরিমাণ", "নামের দ্বারা (A-Z)", "সব থেকে পুরোনো", "সর্বনিম্ন রাশি".
+4. Action: Clicking "ফলাফল দেখুন" applies the filtering + sorting rules to the ledger state and closes the sheet.
+
+Please update the main search/filter header section and layout using this production structure:
+
+---
+
+### 1. SEARCH BAR & FILTER BUTTON COMPONENT REFACTOR
+
+Replace or update your current search section with this layout matching the screenshot UI exactly:
+
+```jsx
+// Inside the main ledger or dashboard view component
+const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+const [selectedFilter, setSelectedFilter] = useState('all'); 
+const [selectedSort, setSelectedSort] = useState('recent');
+const [searchQuery, setSearchQuery] = useState('');
+
+return (
+  <div className="w-full bg-gray-50">
+    {/* SEARCH AND FILTER BAR SUB-HEADER */}
+    <div className="flex items-center space-x-2 p-3 bg-white border-b border-gray-100">
+      {/* Search Input Box */}
+      <div className="relative flex-grow">
+        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-lg">🔍</span>
+        <input
+          type="text"
+          placeholder="কাস্তমার অনুসন্ধান করুন"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-10 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+        />
+      </div>
+
+      {/* FILTER BUTTON TRIGGER MATCHING SCREENSHOT 13 */}
+      <button 
+        onClick={() => setIsFilterModalOpen(true)}
+        className="flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl px-3 py-1.5 transition active:scale-95"
+      >
+        <span className="text-gray-600 font-bold text-sm">🎛️</span> {/* Replace with your local filter settings SVG/icon */}
+        <span className="text-[10px] text-gray-500 font-medium mt-0.5">ফিল্টার</span>
+      </button>
+
+      {/* PDF BUTTON */}
+      <button className="flex flex-col items-center justify-center bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5">
+        <span className="text-gray-600 text-sm">📄</span>
+        <span className="text-[10px] text-gray-500 font-bold mt-0.5">PDF</span>
+      </button>
+    </div>
+
+    {/* ADVANCED FILTER & SORT BOTTOM SHEET MODAL */}
+    {isFilterModalOpen && (
+      <div className="fixed inset-0 bg-black bg-opacity-40 z-50 flex flex-col justify-end transition-opacity">
+        <div className="flex-grow" onClick={() => setIsFilterModalOpen(false)}></div>
+        
+        <div className="bg-white rounded-t-2xl p-5 max-w-md mx-auto w-full max-h-[85vh] overflow-y-auto shadow-2xl">
+          
+          {/* SECTION 1: FILTER BY TAGS */}
+          <div className="mb-6">
+            <h3 className="text-gray-800 font-bold text-sm mb-3">মাধ্যমে ফিল্টার</h3>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { id: 'all', label: 'সব' },
+                { id: 'will_get', label: 'আপনি পাবেন' },
+                { id: 'will_give', label: 'আপনি দেবেন' },
+                { id: 'permanent', label: 'স্থায়ী' },
+                { id: 'today', label: 'আজকের বাকি' },
+                { id: 'upcoming', label: 'আপকামিং' },
+              ].map((pill) => (
+                <button
+                  key={pill.id}
+                  onClick={() => setSelectedFilter(pill.id)}
+                  className={`py-2 px-1 rounded-lg border text-xs font-medium text-center transition ${
+                    selectedFilter === pill.id
+                      ? 'bg-blue-700 text-white border-blue-700'
+                      : 'bg-white text-gray-600 border-gray-200'
+                  }`}
+                >
+                  {pill.label}
+                </button>
+              ))}
+            </div>
+            {/* Full width button for longer text pill at row bottom */}
+            <button
+              onClick={() => setSelectedFilter('no_date')}
+              className={`w-full mt-2 py-2 px-4 rounded-lg border text-xs font-medium text-left transition ${
+                selectedFilter === 'no_date'
+                  ? 'bg-blue-700 text-white border-blue-700'
+                  : 'bg-white text-gray-600 border-gray-200'
+              }`}
+            >
+              কোনো নির্দিষ্ট তারিখ নেই
+            </button>
+          </div>
+
+          {/* SECTION 2: SORT BY RADIO LIST */}
+          <div className="mb-6 border-t border-gray-100 pt-4">
+            <h3 className="text-gray-800 font-bold text-sm mb-3">মাধ্যমে বাছাই</h3>
+            <div className="space-y-3">
+              {[
+                { id: 'recent', label: 'সর্বাধিক সাম্প্রতিক' },
+                { id: 'highest', label: 'সর্বোচ্চ পরিমাণ' },
+                { id: 'name', label: 'নামের দ্বারা (A-Z)' },
+                { id: 'oldest', label: 'সব থেকে পুরোনো' },
+                { id: 'lowest', label: 'সর্বনিম্ন রাশি' }
+              ].map((option) => (
+                <label key={option.id} className="flex justify-between items-center cursor-pointer py-1.5">
+                  <span className={`text-sm font-medium ${selectedSort === option.id ? 'text-blue-700 font-semibold' : 'text-gray-600'}`}>
+                    {option.label}
+                  </span>
+                  <input
+                    type="radio"
+                    name="sortOption"
+                    value={option.id}
+                    checked={selectedSort === option.id}
+                    onChange={() => setSelectedSort(option.id)}
+                    className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* SUBMIT ACTION BUTTON */}
+          <button
+            onClick={() => setIsFilterModalOpen(false)}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl text-center text-sm shadow-md transition active:scale-95"
+          >
+            ফলাফল দেখুন
+          </button>
+        </div>
+      </div>
+    )}
+  </div>
+);

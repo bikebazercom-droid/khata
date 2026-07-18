@@ -20,9 +20,41 @@ import { bn } from 'date-fns/locale';
 export function HomeView() {
   const [role, setRole] = useState<PartyRole>(PartyRole.CUSTOMER);
   const [search, setSearch] = useState('');
-  const [dueFilter, setDueFilter] = useState<DueFilter>(DueFilter.ALL);
-  const [showDueFilters, setShowDueFilters] = useState(false);
   const [location, navigate] = useLocation();
+
+  // ── Advanced filter / sort sheet ────────────────────────────────────────
+  // "pending" = draft state while the sheet is open
+  // "applied" = committed state that drives the query + client sort
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [pendingFilter, setPendingFilter] = useState('all');
+  const [pendingSort,   setPendingSort]   = useState('recent');
+  const [appliedFilter, setAppliedFilter] = useState('all');
+  const [appliedSort,   setAppliedSort]   = useState('recent');
+
+  const isFiltered = appliedFilter !== 'all' || appliedSort !== 'recent';
+
+  const openFilterSheet = () => {
+    setPendingFilter(appliedFilter);
+    setPendingSort(appliedSort);
+    setIsFilterSheetOpen(true);
+  };
+
+  const applyFilter = () => {
+    setAppliedFilter(pendingFilter);
+    setAppliedSort(pendingSort);
+    setIsFilterSheetOpen(false);
+  };
+
+  // Map the selected filter pill → DueFilter for the API call
+  const apiDueFilter: DueFilter = (() => {
+    switch (appliedFilter) {
+      case 'today':     return DueFilter.DUE_TODAY;
+      case 'upcoming':  return DueFilter.UPCOMING;
+      case 'permanent':
+      case 'no_date':   return DueFilter.NO_DUE_DATE;
+      default:          return DueFilter.ALL;
+    }
+  })();
   const [isAddPartyOpen, setIsAddPartyOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
@@ -34,7 +66,27 @@ export function HomeView() {
   // Role-only parties (no search/dueFilter) — used purely for the summary card so
   // the totals reflect the active tab, not the current search query.
   const { data: summaryParties = [] } = useListParties({ role });
-  const { data: parties = [] } = useListParties({ role, search, dueFilter });
+  const { data: rawParties = [] } = useListParties({ role, search, dueFilter: apiDueFilter });
+
+  // Client-side balance-type filter + sort applied on top of the server response.
+  const parties = useMemo(() => {
+    let result = rawParties;
+    // Balance-type filter (will_get / will_give) has no server-side equivalent
+    if (appliedFilter === 'will_get') result = result.filter(p => p.balanceType === 'YOU_WILL_GET');
+    if (appliedFilter === 'will_give') result = result.filter(p => p.balanceType === 'YOU_WILL_GIVE');
+    // Sort
+    switch (appliedSort) {
+      case 'highest': return [...result].sort((a, b) => b.currentBalance - a.currentBalance);
+      case 'lowest':  return [...result].sort((a, b) => a.currentBalance - b.currentBalance);
+      case 'name':    return [...result].sort((a, b) => a.name.localeCompare(b.name, 'bn'));
+      case 'oldest':  return [...result].sort((a, b) => {
+        const aT = a.lastTransactionAt ? new Date(a.lastTransactionAt).getTime() : 0;
+        const bT = b.lastTransactionAt ? new Date(b.lastTransactionAt).getTime() : 0;
+        return aT - bT;
+      });
+      default: return result; // 'recent' — API already returns newest-first
+    }
+  }, [rawParties, appliedFilter, appliedSort]);
 
   // Compute summary totals from the role-filtered list.
   const roleSummary = useMemo(() => {
@@ -171,15 +223,18 @@ export function HomeView() {
           />
         </div>
         <button
-          onClick={() => setShowDueFilters((v) => !v)}
+          onClick={openFilterSheet}
           aria-label="ফিল্টার"
           className={cn(
-            'w-14 h-11 shrink-0 rounded-xl flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all',
-            showDueFilters ? 'bg-primary text-primary-foreground' : 'bg-slate-50 text-slate-500 border border-slate-200'
+            'w-14 h-11 shrink-0 rounded-xl flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all relative',
+            isFiltered ? 'bg-primary text-primary-foreground' : 'bg-slate-50 text-slate-500 border border-slate-200'
           )}
         >
           <SlidersHorizontal className="w-4 h-4" />
           <span className="text-[9px] font-bold leading-none">ফিল্টার</span>
+          {isFiltered && (
+            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
+          )}
         </button>
         <Link
           href="/reports"
@@ -191,28 +246,27 @@ export function HomeView() {
         </Link>
       </div>
 
-      {/* Due filters (toggleable) */}
-      {showDueFilters && (
-        <div className="shrink-0 flex gap-2 overflow-x-auto pb-3 no-scrollbar px-4">
-          {[
-            { id: DueFilter.ALL, label: 'সব' },
-            { id: DueFilter.DUE_TODAY, label: 'আজকের বকেয়া' },
-            { id: DueFilter.UPCOMING, label: 'আসন্ন' },
-            { id: DueFilter.NO_DUE_DATE, label: 'তারিখ ছাড়া' },
-          ].map((f) => (
-            <button
-              key={f.id}
-              onClick={() => setDueFilter(f.id)}
-              className={cn(
-                'whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-bold border transition-all active:scale-95',
-                dueFilter === f.id
-                  ? 'bg-slate-800 text-white border-slate-800 shadow-md'
-                  : 'bg-white text-slate-500 border-slate-200'
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
+      {/* Active-filter summary strip — shown when any non-default filter is applied */}
+      {isFiltered && (
+        <div className="shrink-0 flex items-center gap-2 px-4 pb-2">
+          <span className="text-[10px] font-semibold text-primary bg-primary/10 rounded-full px-2.5 py-0.5">
+            {[
+              { id: 'all', label: 'সব' },
+              { id: 'will_get', label: 'আপনি পাবেন' },
+              { id: 'will_give', label: 'আপনি দেবেন' },
+              { id: 'permanent', label: 'স্থায়ী' },
+              { id: 'today', label: 'আজকের বাকি' },
+              { id: 'upcoming', label: 'আপকামিং' },
+              { id: 'no_date', label: 'তারিখ নেই' },
+            ].find(f => f.id === appliedFilter)?.label}
+          </span>
+          <button
+            type="button"
+            onClick={() => { setAppliedFilter('all'); setAppliedSort('recent'); }}
+            className="ml-auto text-[10px] font-bold text-slate-400 active:text-slate-700"
+          >
+            রিসেট
+          </button>
         </div>
       )}
 
@@ -333,6 +387,120 @@ export function HomeView() {
       <SettingsDrawer open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
       <AddStaffDialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen} />
       <RenameStoreDialog open={isRenameStoreOpen} onOpenChange={setIsRenameStoreOpen} />
+
+      {/* ── Advanced filter & sort bottom sheet ─────────────────────────
+          Opens when the user taps the ফিল্টার button in the utility bar.
+          Pending state is drafted while open; committed on "ফলাফল দেখুন". */}
+      {isFilterSheetOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setIsFilterSheetOpen(false)} />
+          <div className="relative bg-white rounded-t-3xl max-h-[88vh] overflow-y-auto shadow-2xl">
+            {/* Drag handle */}
+            <div className="sticky top-0 bg-white pt-4 pb-1 px-5 z-10">
+              <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3" />
+              <div className="flex items-center justify-between mb-1">
+                <p className="font-extrabold text-slate-900 text-base">ফিল্টার ও বাছাই</p>
+                <button
+                  type="button"
+                  onClick={() => setIsFilterSheetOpen(false)}
+                  className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 active:scale-90 transition-all"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="px-5 pb-[calc(1.5rem+var(--safe-bottom))]">
+              {/* ── Section 1: Filter pills ── */}
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 mt-2">
+                মাধ্যমে ফিল্টার
+              </p>
+              <div className="grid grid-cols-3 gap-2 mb-2">
+                {[
+                  { id: 'all',      label: 'সব' },
+                  { id: 'will_get', label: 'আপনি পাবেন' },
+                  { id: 'will_give',label: 'আপনি দেবেন' },
+                  { id: 'permanent',label: 'স্থায়ী' },
+                  { id: 'today',    label: 'আজকের বাকি' },
+                  { id: 'upcoming', label: 'আপকামিং' },
+                ].map((pill) => (
+                  <button
+                    key={pill.id}
+                    type="button"
+                    onClick={() => setPendingFilter(pill.id)}
+                    className={cn(
+                      'py-2.5 px-1 rounded-xl border text-xs font-semibold text-center transition-all active:scale-[0.97]',
+                      pendingFilter === pill.id
+                        ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]'
+                        : 'bg-white text-slate-600 border-slate-200'
+                    )}
+                  >
+                    {pill.label}
+                  </button>
+                ))}
+              </div>
+              {/* Full-width pill for the long label */}
+              <button
+                type="button"
+                onClick={() => setPendingFilter('no_date')}
+                className={cn(
+                  'w-full py-2.5 px-4 rounded-xl border text-xs font-semibold text-left transition-all active:scale-[0.98]',
+                  pendingFilter === 'no_date'
+                    ? 'bg-[#1B3A6B] text-white border-[#1B3A6B]'
+                    : 'bg-white text-slate-600 border-slate-200'
+                )}
+              >
+                কোনো নির্দিষ্ট তারিখ নেই
+              </button>
+
+              {/* ── Section 2: Sort radio list ── */}
+              <div className="border-t border-slate-100 mt-5 pt-4">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+                  মাধ্যমে বাছাই
+                </p>
+                <div className="space-y-1">
+                  {[
+                    { id: 'recent',  label: 'সর্বাধিক সাম্প্রতিক' },
+                    { id: 'highest', label: 'সর্বোচ্চ পরিমাণ' },
+                    { id: 'name',    label: 'নামের দ্বারা (A–Z)' },
+                    { id: 'oldest',  label: 'সব থেকে পুরোনো' },
+                    { id: 'lowest',  label: 'সর্বনিম্ন রাশি' },
+                  ].map((opt) => (
+                    <label
+                      key={opt.id}
+                      className="flex items-center justify-between py-3 border-b border-slate-50 cursor-pointer"
+                    >
+                      <span className={cn(
+                        'text-sm font-medium',
+                        pendingSort === opt.id ? 'text-[#1B3A6B] font-bold' : 'text-slate-600'
+                      )}>
+                        {opt.label}
+                      </span>
+                      <input
+                        type="radio"
+                        name="sortOption"
+                        value={opt.id}
+                        checked={pendingSort === opt.id}
+                        onChange={() => setPendingSort(opt.id)}
+                        className="w-4 h-4 accent-[#1B3A6B]"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── Apply button ── */}
+              <button
+                type="button"
+                onClick={applyFilter}
+                className="w-full mt-6 bg-[#1B3A6B] active:bg-[#142d55] text-white font-bold py-4 rounded-2xl text-sm active:scale-[0.98] transition-all shadow-lg"
+              >
+                ফলাফল দেখুন
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Payment request bottom sheet ─────────────────────────────────
           Opens when the user taps the balance amount on a party row.
