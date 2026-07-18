@@ -1,0 +1,84 @@
+Hey Agent, look at Screenshot_4_5.jpg. We need to replace the bottom-right green "WhatsApp" button with a universal "📢 শেয়ার করুন" button that natively handles high-quality JPG image sharing across all social platforms (Imo, WhatsApp, Facebook, etc.).
+
+IMPLEMENTATION REQUIREMENTS:
+1. Change the button UI: Update the text from "WhatsApp" to "📢 শেয়ার করুন" and style it dynamically.
+2. Ensure `receiptRef` wraps the entire visual receipt content area box perfectly.
+3. Fix the share pipeline logic: When clicked, it must convert the receipt to a high-res JPG via `html2canvas` and instantly execute a dual-action fallback:
+   a. Immediately trigger a silent background anchor download to drop the JPG directly into the phone's storage/gallery.
+   b. Convert the base64 URI into a proper file Blob and trigger `navigator.share` so the native mobile share sheet opens instantly, letting the user pick Imo, WhatsApp, or Facebook.
+
+Please completely replace the bottom button UI and click event handler logic in this modal component with the following code right now:
+
+```javascript
+// 1. UNIVERSAL JPG GENERATION & HYBRID SHARING FLOW
+const handleUniversalJpgShare = async () => {
+  if (!receiptRef.current) return;
+
+  try {
+    // Render the layout wrapper cleanly into a crisp image canvas
+    const canvas = await html2canvas(receiptRef.current, {
+      backgroundColor: '#ffffff',
+      scale: 3, // Premium high-res scale for ultra-sharp text
+      useCORS: true,
+      logging: false
+    });
+
+    const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+
+    // Failsafe: Automatically force download the JPG file straight to device storage
+    const localGallerySave = (url) => {
+      const ghostLink = document.createElement('a');
+      ghostLink.href = url;
+      ghostLink.download = `Banglakhata_Payment_Request_${customer?.name || 'Customer'}.jpg`;
+      document.body.appendChild(ghostLink);
+      ghostLink.click();
+      document.body.removeChild(ghostLink);
+    };
+
+    // Execute the automatic storage download first so the user definitely has the file
+    localGallerySave(jpgDataUrl);
+
+    // Convert data URL to Blob for modern native mobile streaming
+    const res = await fetch(jpgDataUrl);
+    const blob = await res.blob();
+    const systemImageFile = new File([blob], 'payment_receipt.jpg', { type: 'image/jpeg' });
+
+    // Open native mobile share sheet for absolute flexibility (Imo, WhatsApp, FB, etc.)
+    if (navigator.canShare && navigator.canShare({ files: [systemImageFile] })) {
+      try {
+        await navigator.share({
+          files: [systemImageFile],
+          title: 'পেমেন্ট রশিদ',
+          text: 'Banglakhata থেকে পাঠানো পেমেন্ট রসিদের JPG ফাইল।'
+        });
+      } catch (shareCancelError) {
+        console.log("Native share cancelled or intercepted smoothly.");
+      }
+    } else {
+      // Fallback message dialog if browser strictly blocks sharing actions
+      alert("✅ রসিদটি আপনার ফোনের গ্যালারি/ডাউনলোড ফোল্ডারে ছবি (JPG) হিসেবে সেভ হয়েছে! অনুগ্রহ করে আপনার ইমু, হোয়াটসঅ্যাপ বা ফেসবুক থেকে গ্যালারি সিলেক্ট করে এটি পাঠিয়ে দিন।");
+    }
+
+  } catch (error) {
+    console.error('Snapshot or sharing pipeline experienced an error:', error);
+  }
+};
+
+// 2. UPDATED MODAL BUTTONS LAYOUT (REPLACING THE OLD WHATSAPP BUTTON)
+return (
+  {/* Inside the modal layout container wrapper */}
+  <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+    {/* SMS Action Control */}
+    <button style={{ flex: 1, backgroundColor: '#2563EB', color: '#ffffff', border: 'none', borderRadius: '30px', padding: '14px', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+      💬 SMS
+    </button>
+    
+    {/* BRAND NEW UNIVERSAL SHARE BUTTON */}
+    <button 
+      onClick={handleUniversalJpgShare}
+      style={{ flex: 1, backgroundColor: '#004B93', color: '#ffffff', border: 'none', borderRadius: '30px', padding: '14px', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+    >
+      📢 শেয়ার করুন
+    </button>
+  </div>
+);

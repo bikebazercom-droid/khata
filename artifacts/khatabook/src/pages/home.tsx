@@ -121,6 +121,7 @@ export function HomeView() {
     if (!receiptRef.current || !requestModalParty) return;
     setIsWhatsAppSharing(true);
     try {
+      // 1. Premium high-res snapshot of the receipt card
       const canvas = await html2canvas(receiptRef.current, {
         backgroundColor: '#ffffff',
         scale: 3,
@@ -130,45 +131,43 @@ export function HomeView() {
 
       const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.95);
       const ownerName = settings?.storeName || 'Banglakhata';
-      const fileName = `Request_From_${ownerName.replace(/\s+/g, '_')}.jpg`;
+      const fileName = `Banglakhata_Payment_Request_${requestModalParty.name || 'Customer'}.jpg`;
 
-      // Always force-download the JPG to device storage first — unconditionally
-      const autoSave = (url: string) => {
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+      // 2. Always force-download to device gallery first — unconditionally
+      const localGallerySave = (url: string) => {
+        const ghostLink = document.createElement('a');
+        ghostLink.href = url;
+        ghostLink.download = fileName;
+        document.body.appendChild(ghostLink);
+        ghostLink.click();
+        document.body.removeChild(ghostLink);
       };
-      autoSave(jpgDataUrl);
+      localGallerySave(jpgDataUrl);
 
-      // Then silently attempt the native share sheet
-      const blobResponse = await fetch(jpgDataUrl);
-      const rawBlob = await blobResponse.blob();
-      const jpgFile = new File([rawBlob], fileName, { type: 'image/jpeg' });
+      // 3. Convert to Blob File and attempt native share sheet
+      const res = await fetch(jpgDataUrl);
+      const blob = await res.blob();
+      const systemImageFile = new File([blob], 'payment_receipt.jpg', { type: 'image/jpeg' });
 
-      const waFallback = `https://api.whatsapp.com/send?text=${encodeURIComponent(
-        'আপনার পেমেন্ট রসিদের ছবিটি ফোনে ডাউনলোড হয়েছে। অনুগ্রহ করে সেটি গ্যালারি থেকে সেন্ড করে দিন।',
-      )}`;
-
-      if (navigator.canShare && navigator.canShare({ files: [jpgFile] })) {
-        // .catch(() => {}) silences any browser-level block without showing a toast
-        await navigator.share({
-          files: [jpgFile],
-          title: 'পেমেন্ট অনুরোধ রসিদ',
-          text: `আপনাকে অর্থ প্রদানের জন্য ${ownerName}-এর কাছে অনুরোধ করুন।`,
-        }).catch(() => {
-          console.log('Native share blocked/cancelled. Image already downloaded.');
-          window.open(waFallback, '_blank');
-        });
+      if (navigator.canShare && navigator.canShare({ files: [systemImageFile] })) {
+        try {
+          await navigator.share({
+            files: [systemImageFile],
+            title: 'পেমেন্ট রশিদ',
+            text: `Banglakhata থেকে পাঠানো পেমেন্ট রসিদের JPG ফাইল — ${ownerName}`,
+          });
+        } catch {
+          // Cancelled or blocked — image already in gallery, nothing to do
+          console.log('Native share cancelled or intercepted smoothly.');
+        }
       } else {
-        // No file-share support — redirect to WhatsApp with instruction text
-        window.open(waFallback, '_blank');
+        // No file-share API support — alert the user to share from gallery
+        alert(
+          '✅ রসিদটি আপনার ফোনের গ্যালারি/ডাউনলোড ফোল্ডারে ছবি (JPG) হিসেবে সেভ হয়েছে! অনুগ্রহ করে আপনার ইমু, হোয়াটসঅ্যাপ বা ফেসবুক থেকে গ্যালারি সিলেক্ট করে এটি পাঠিয়ে দিন।',
+        );
       }
     } catch (err) {
-      // Capture phase failed — log only, never show an error toast
-      console.error('WhatsApp JPG share error:', err);
+      console.error('Snapshot or sharing pipeline experienced an error:', err);
     } finally {
       setIsWhatsAppSharing(false);
     }
@@ -839,10 +838,9 @@ export function HomeView() {
                 type="button"
                 onClick={handleWhatsAppJpgShare}
                 disabled={isWhatsAppSharing}
-                className="flex-1 bg-emerald-500 active:bg-emerald-600 disabled:opacity-60 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.97] transition-all"
+                className="flex-1 bg-[#004B93] active:bg-[#003a72] disabled:opacity-60 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.97] transition-all"
               >
-                <MessageCircle className="w-4 h-4" />
-                {isWhatsAppSharing ? 'তৈরি হচ্ছে…' : 'WhatsApp'}
+                {isWhatsAppSharing ? 'তৈরি হচ্ছে…' : '📢 শেয়ার করুন'}
               </button>
             </div>
           </div>
