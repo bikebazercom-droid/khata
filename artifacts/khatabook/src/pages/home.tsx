@@ -166,31 +166,31 @@ export function HomeView() {
 
       // ── 1. Blue header strip ─────────────────────────────────────────────
       doc.setFillColor(0, 75, 160);
-      doc.rect(0, 0, pageWidth, 16, 'F');
+      doc.rect(0, 0, pageWidth, 14, 'F');
       doc.setFont(BN, 'normal');
-      doc.setFontSize(11);
+      doc.setFontSize(10);
       doc.setTextColor(255, 255, 255);
-      doc.text(storeName, 14, 10.5);
-      doc.text('হাজারী খাতা', pageWidth - 14, 10.5, { align: 'right' });
+      doc.text(storeName, 14, 9);
+      doc.text('Khatabook', pageWidth - 14, 9, { align: 'right' });
 
       // ── 2. Report title + date ───────────────────────────────────────────
       doc.setTextColor(30, 41, 59);
-      doc.setFontSize(14);
-      doc.text(`${roleLabel} তালিকার রিপোর্ট`, pageWidth / 2, 26, { align: 'center' });
+      doc.setFontSize(13);
+      doc.text(`${roleLabel} তালিকার রিপোর্ট - ফিল্টার করা`, pageWidth / 2, 24, { align: 'center' });
 
       doc.setFontSize(9);
       doc.setTextColor(100, 116, 139);
-      doc.text(`আজ পর্যন্ত — ${dateStr}`, pageWidth / 2, 33, { align: 'center' });
+      doc.text(`(আজ পর্যন্ত - ${dateStr})`, pageWidth / 2, 30, { align: 'center' });
 
       // ── 3. Three-column metrics card ─────────────────────────────────────
-      const cardY = 38;
-      const cardH = 20;
+      const cardY = 36;
+      const cardH = 18;
       const cardW = pageWidth - 28;
       const colW  = cardW / 3;
 
       doc.setDrawColor(226, 232, 240);
       doc.setFillColor(255, 255, 255);
-      doc.roundedRect(14, cardY, cardW, cardH, 2, 2, 'DF');
+      doc.rect(14, cardY, cardW, cardH, 'DF');
       doc.line(14 + colW,     cardY, 14 + colW,     cardY + cardH);
       doc.line(14 + colW * 2, cardY, 14 + colW * 2, cardY + cardH);
 
@@ -198,32 +198,34 @@ export function HomeView() {
       const cx2 = 14 + colW * 1.5;
       const cx3 = 14 + colW * 2.5;
 
-      // Col 1 — আপনি পাবেন
-      doc.setFont(BN, 'normal'); doc.setFontSize(8); doc.setTextColor(100, 116, 139);
-      doc.text('আপনি পাবেন', cx1, cardY + 7, { align: 'center' });
-      doc.setFontSize(11); doc.setTextColor(5, 150, 105);
-      doc.text(`${taka}${filteredGet.toFixed(2)}`, cx1, cardY + 14.5, { align: 'center' });
+      // Col 1 — আপনি পাবেন (neutral black value)
+      doc.setFont(BN, 'normal'); doc.setFontSize(8); doc.setTextColor(148, 163, 184);
+      doc.text('আপনি পাবেন', cx1, cardY + 5, { align: 'center' });
+      doc.setFontSize(10); doc.setTextColor(15, 23, 42);
+      doc.text(`${taka}${filteredGet.toFixed(2)}`, cx1, cardY + 12, { align: 'center' });
 
-      // Col 2 — আপনি দেবেন
-      doc.setFont(BN, 'normal'); doc.setFontSize(8); doc.setTextColor(100, 116, 139);
-      doc.text('আপনি দেবেন', cx2, cardY + 7, { align: 'center' });
-      doc.setFontSize(11); doc.setTextColor(220, 38, 38);
-      doc.text(`${taka}${filteredGive.toFixed(2)}`, cx2, cardY + 14.5, { align: 'center' });
+      // Col 2 — আপনি দেবেন (neutral black value)
+      doc.setFont(BN, 'normal'); doc.setFontSize(8); doc.setTextColor(148, 163, 184);
+      doc.text('আপনি দেবেন', cx2, cardY + 5, { align: 'center' });
+      doc.setFontSize(10); doc.setTextColor(15, 23, 42);
+      doc.text(`${taka}${filteredGive.toFixed(2)}`, cx2, cardY + 12, { align: 'center' });
 
-      // Col 3 — মোট ব্যালেন্স
-      doc.setFont(BN, 'normal'); doc.setFontSize(8); doc.setTextColor(100, 116, 139);
-      doc.text('মোট ব্যালেন্স', cx3, cardY + 7, { align: 'center' });
-      doc.setFontSize(11);
-      if (netBalance >= 0) doc.setTextColor(5, 150, 105);
-      else                 doc.setTextColor(220, 38, 38);
-      doc.text(`${taka}${Math.abs(netBalance).toFixed(2)} ${netBalance >= 0 ? 'Cr' : 'Dr'}`, cx3, cardY + 14.5, { align: 'center' });
+      // Col 3 — মোট ব্যালেন্স (always crimson red, Dr when net positive)
+      doc.setFont(BN, 'normal'); doc.setFontSize(8); doc.setTextColor(148, 163, 184);
+      doc.text('মোট ব্যালেন্স', cx3, cardY + 5, { align: 'center' });
+      doc.setFontSize(10); doc.setTextColor(220, 38, 38);
+      // Screenshot convention: Dr = you will receive (debit from customer), Cr = you owe
+      doc.text(
+        `${taka}${Math.abs(netBalance).toFixed(2)} ${netBalance >= 0 ? 'Dr' : 'Cr'}`,
+        cx3, cardY + 12, { align: 'center' },
+      );
 
       // ── 4. Count label ───────────────────────────────────────────────────
       doc.setFont(BN, 'normal'); doc.setFontSize(9); doc.setTextColor(51, 65, 85);
-      doc.text(`${roleLabel} সংখ্যা: ${parties.length}`, 14, 67);
+      doc.text(`${roleLabel} সংখ্যা: ${parties.length} (প্রাপ্ত)`, 14, 62);
 
       // ── 5. Data table ────────────────────────────────────────────────────
-      const head = [['নাম', 'ডিটেলস', 'আপনি পাবেন', 'আপনি দেবেন', 'শেষ লেনদেন']];
+      const head = [['নাম', 'ডিটেলস', 'আপনি পাবেন', 'আপনি দেবেন', 'সংগ্রহের দিন']];
       const bodyRows = parties.map(p => [
         p.name  || '—',
         p.phone || '—',
@@ -231,36 +233,46 @@ export function HomeView() {
         p.balanceType === 'YOU_WILL_GIVE' ? `${taka}${p.currentBalance.toFixed(2)}` : '',
         p.lastTransactionAt
           ? new Date(p.lastTransactionAt).toLocaleDateString('en-GB')
-          : '—',
+          : '',
       ]);
       // সর্বমোট summary row
       bodyRows.push(['সর্বমোট', '', `${taka}${filteredGet.toFixed(2)}`, `${taka}${filteredGive.toFixed(2)}`, '']);
       const totalRowIdx = bodyRows.length - 1;
 
       autoTable(doc, {
-        startY: 71,
+        startY: 66,
         head,
         body: bodyRows,
         theme: 'grid',
-        styles: { font: BN, fontSize: 9, textColor: [51, 65, 85], cellPadding: 3 },
+        styles: { font: BN, fontSize: 8.5, textColor: [51, 65, 85], cellPadding: 3 },
         headStyles: {
           fillColor: [248, 250, 252],
           textColor: [15, 23, 42],
           fontStyle: 'bold',
-          lineWidth: 0.2,
+          lineWidth: 0.1,
           lineColor: [226, 232, 240],
         },
+        // No fillColor here — body-only tints are applied in willDrawCell below
         columnStyles: {
-          0: { cellWidth: 45 },
-          1: { cellWidth: 38 },
-          2: { cellWidth: 33, fillColor: [240, 253, 250] },
-          3: { cellWidth: 33, fillColor: [254, 242, 242] },
-          4: { cellWidth: 27 },
+          0: { cellWidth: 42 },
+          1: { cellWidth: 42 },
+          2: { cellWidth: 34 },
+          3: { cellWidth: 34 },
+          4: { cellWidth: 30 },
         },
         willDrawCell: (data) => {
-          if (data.section === 'body' && data.row.index === totalRowIdx) {
-            doc.setFillColor(241, 245, 249);
-            data.cell.styles.fontStyle = 'bold';
+          if (data.section === 'body') {
+            if (data.row.index === totalRowIdx) {
+              // সর্বমোট row — slate background, bold
+              data.cell.styles.fillColor = [241, 245, 249];
+              data.cell.styles.fontStyle = 'bold';
+            } else {
+              // Body data rows — column tints matching screenshot
+              // "আপনি পাবেন" col: light pink  (#FEF2F2)
+              if (data.column.index === 2) data.cell.styles.fillColor = [254, 242, 242];
+              // "আপনি দেবেন" col: light green (#F0FDF4)
+              if (data.column.index === 3) data.cell.styles.fillColor = [240, 253, 244];
+            }
           }
         },
         didDrawPage: (data) => {
