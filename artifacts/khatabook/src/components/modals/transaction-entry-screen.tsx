@@ -614,7 +614,11 @@ export function TransactionEntryScreen({
             }),
           },
         );
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          console.error('[PATCH] server error body:', JSON.stringify(errBody));
+          throw new Error(`HTTP ${res.status}: ${JSON.stringify(errBody)}`);
+        }
 
         // ── 5. Background reconciliation ──────────────────────────────────
         queryClient.invalidateQueries({ queryKey: entriesKey });

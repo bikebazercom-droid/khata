@@ -1,0 +1,51 @@
+Hey Agent, I am hitting a critical bug during the transaction edit/update flow. When the save action is confirmed ("হ্যাঁ"), the system triggers a toast alert saying: "লেনদেন আপডেট ব্যর্থ হয়েছে — পরিবর্তন বাতিল হয়েছে". 
+
+THE CAUSE:
+This is a classic async race condition. The router navigation guard or back-handler interceptor is navigating away/preventing state mutation BEFORE the asynchronous API call (`updateTransaction`) has successfully finished resolving. Thus, the database transaction gets cancelled or aborted mid-flight.
+
+YOUR TASK:
+Refactor the state block and navigation handler. Ensure that we explicitly `await` the network request or database mutation state to finish, and ONLY THEN allow the router navigation guard to discharge and move screens.
+
+Please implement the fix inside the Transaction Form component:
+
+---
+
+### 1. RESOLVE ASYNC RACE CONDITION ON CONFIRM SAVE
+
+Update the save/update handler to ensure it resolves completely before letting the router clean up or navigate back:
+
+```javascript
+// Inside the Transaction Entry Form Component
+const [isSaving, setIsSaving] = useState(false);
+
+const handleSaveOrUpdateEntry = async () => {
+  const finalAmount = parseFloat(calculatorValue);
+  if (isNaN(finalAmount) || finalAmount <= 0) {
+    alert("অনুগ্রহ করে একটি সঠিক পরিমাণ ইনপুট দিন!");
+    return false; // Return status instead of void
+  }
+
+  const transactionPayload = {
+    amount: finalAmount,
+    description: description,
+    date: selectedDate,
+  };
+
+  try {
+    setIsSaving(true);
+    
+    if (isEditMode) {
+      // CRITICAL: Await the response fully before proceeding!
+      await api.updateTransaction(transactionId, transactionPayload);
+    } else {
+      await api.createNewTransaction(transactionPayload);
+    }
+    
+    setIsSaving(false);
+    return true; // Successfully saved
+  } catch (error) {
+    console.error("Transaction save failed:", error);
+    setIsSaving(false);
+    return false; // Failed to save
+  }
+};
