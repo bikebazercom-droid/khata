@@ -169,91 +169,95 @@ export function HomeView() {
       const dateCell = p.lastTransactionAt
         ? new Date(p.lastTransactionAt).toLocaleDateString('en-GB')
         : '—';
-      const getCell = p.balanceType === 'YOU_WILL_GET'
-        ? `<td style="padding:10px;border:1px solid #E2E8F0;text-align:right;background:#FEF2F2;color:#DC2626;font-weight:bold;">৳${p.currentBalance.toFixed(2)}</td>`
-        : `<td style="padding:10px;border:1px solid #E2E8F0;text-align:right;"></td>`;
-      const giveCell = p.balanceType === 'YOU_WILL_GIVE'
-        ? `<td style="padding:10px;border:1px solid #E2E8F0;text-align:right;background:#F0FDF4;color:#16A34A;font-weight:bold;">৳${p.currentBalance.toFixed(2)}</td>`
-        : `<td style="padding:10px;border:1px solid #E2E8F0;text-align:right;"></td>`;
+      // ডেবিট (-) col: money YOU owe this party (YOU_WILL_GIVE) — red
+      const debitCell = p.balanceType === 'YOU_WILL_GIVE'
+        ? `<td style="padding:10px;border:1px solid #CBD5E1;text-align:right;background:#FEF2F2;color:#DC2626;font-weight:bold;">৳${p.currentBalance.toFixed(2)}</td>`
+        : `<td style="padding:10px;border:1px solid #CBD5E1;background:#FEF2F2;"></td>`;
+      // ক্রেডিট (+) col: money this party owes YOU (YOU_WILL_GET) — green
+      const creditCell = p.balanceType === 'YOU_WILL_GET'
+        ? `<td style="padding:10px;border:1px solid #CBD5E1;text-align:right;background:#F0FDF4;color:#16A34A;font-weight:bold;">৳${p.currentBalance.toFixed(2)}</td>`
+        : `<td style="padding:10px;border:1px solid #CBD5E1;background:#F0FDF4;"></td>`;
       return `
-        <tr style="border-bottom:1px solid #E2E8F0;">
-          <td style="padding:10px;border:1px solid #E2E8F0;font-weight:500;">${p.name  || '—'}</td>
-          <td style="padding:10px;border:1px solid #E2E8F0;color:#64748B;">${p.phone || '—'}</td>
-          ${getCell}
-          ${giveCell}
-          <td style="padding:10px;border:1px solid #E2E8F0;text-align:center;color:#64748B;">${dateCell}</td>
+        <tr style="border-bottom:1px solid #E2E8F0;vertical-align:top;">
+          <td style="padding:10px;border:1px solid #CBD5E1;font-weight:500;">${p.name  || '—'}</td>
+          <td style="padding:10px;border:1px solid #CBD5E1;color:#64748B;">${p.phone || '—'}</td>
+          ${debitCell}
+          ${creditCell}
+          <td style="padding:10px;border:1px solid #CBD5E1;text-align:center;color:#64748B;">${dateCell}</td>
         </tr>`;
     }).join('');
 
     container.innerHTML = `
-      <!-- Blue banner -->
-      <div style="background:#004BA0;display:flex;justify-content:space-between;align-items:center;padding:12px 24px;color:#fff;font-size:14px;font-weight:bold;">
-        <div>${storeName}</div>
-        <div>Banglakhata</div>
+      <!-- 1. Top Royal Blue Header -->
+      <div style="background:#004B93;display:flex;justify-content:space-between;align-items:center;padding:14px 24px;color:#fff;font-size:15px;font-weight:bold;">
+        <span>${storeName}</span>
+        <span style="letter-spacing:0.5px;">📘 Banglakhata</span>
       </div>
 
-      <!-- Title -->
-      <div style="text-align:center;margin-top:24px;">
-        <div style="margin:0;font-size:20px;font-weight:bold;color:#1E293B;">${roleLabel} তালিকার রিপোর্ট</div>
-        <div style="margin-top:6px;font-size:13px;color:#64748B;">(আজ পর্যন্ত - ${dateStr})</div>
-      </div>
-
-      <!-- 3-column stats card -->
-      <div style="margin:20px 24px 0;border:1px solid #E2E8F0;border-radius:4px;display:table;width:calc(100% - 48px);border-collapse:collapse;">
-        <div style="display:table-row;">
-          <div style="display:table-cell;width:33.33%;text-align:center;padding:12px;border-right:1px solid #E2E8F0;">
-            <div style="font-size:12px;color:#94A3B8;margin-bottom:5px;">আপনি পাবেন</div>
-            <div style="font-size:15px;font-weight:bold;color:#0F172A;">৳${filteredGet.toLocaleString('bn-BD', { minimumFractionDigits: 2 })}</div>
-          </div>
-          <div style="display:table-cell;width:33.33%;text-align:center;padding:12px;border-right:1px solid #E2E8F0;">
-            <div style="font-size:12px;color:#94A3B8;margin-bottom:5px;">আপনি দেবেন</div>
-            <div style="font-size:15px;font-weight:bold;color:#0F172A;">৳${filteredGive.toLocaleString('bn-BD', { minimumFractionDigits: 2 })}</div>
-          </div>
-          <div style="display:table-cell;width:33.33%;text-align:center;padding:12px;">
-            <div style="font-size:12px;color:#94A3B8;margin-bottom:5px;">মোট ব্যালেন্স</div>
-            <div style="font-size:15px;font-weight:bold;color:${netBalance >= 0 ? '#16A34A' : '#DC2626'};">
-              ৳${Math.abs(netBalance).toLocaleString('bn-BD', { minimumFractionDigits: 2 })} ${netBalance >= 0 ? 'Cr' : 'Dr'}
-            </div>
-          </div>
+      <div style="padding:24px;">
+        <!-- 2. Title -->
+        <div style="text-align:center;margin-bottom:20px;">
+          <div style="font-size:22px;font-weight:700;color:#000;">${roleLabel} তালিকার স্টেটমেন্ট</div>
+          <div style="font-size:13px;color:#475569;margin-top:6px;">(আজ পর্যন্ত — ${dateStr})</div>
         </div>
-      </div>
 
-      <!-- Count label -->
-      <div style="margin:16px 24px 8px;font-size:13px;color:#334155;font-weight:bold;">
-        ${roleLabel} সংখ্যা: ${parties.length} (${countTag})
-      </div>
-
-      <!-- Data table -->
-      <table style="width:calc(100% - 48px);margin:0 24px;border-collapse:collapse;font-size:12px;text-align:left;color:#334155;">
-        <thead>
-          <tr style="background:#F8FAFC;">
-            <th style="padding:10px;border:1px solid #E2E8F0;width:22%;">${nameColHeader}</th>
-            <th style="padding:10px;border:1px solid #E2E8F0;width:22%;">ডিটেলস</th>
-            <th style="padding:10px;border:1px solid #E2E8F0;width:18%;text-align:right;">আপনি পাবেন</th>
-            <th style="padding:10px;border:1px solid #E2E8F0;width:18%;text-align:right;">আপনি দেবেন</th>
-            <th style="padding:10px;border:1px solid #E2E8F0;width:20%;text-align:center;">সংগ্রহের দিন</th>
+        <!-- 3. Summary Cards -->
+        <table style="width:100%;border-collapse:collapse;margin-bottom:16px;text-align:center;">
+          <tr>
+            <td style="width:33.33%;padding:12px;border:1px solid #E2E8F0;background:#FAFAFA;">
+              <div style="font-size:12px;color:#64748B;margin-bottom:4px;">মোট খরচ(-)</div>
+              <div style="font-size:16px;font-weight:bold;color:#DC2626;">৳${filteredGive.toFixed(2)}</div>
+            </td>
+            <td style="width:33.33%;padding:12px;border:1px solid #E2E8F0;background:#FAFAFA;">
+              <div style="font-size:12px;color:#64748B;margin-bottom:4px;">মোট জমা(+)</div>
+              <div style="font-size:16px;font-weight:bold;color:#16A34A;">৳${filteredGet.toFixed(2)}</div>
+            </td>
+            <td style="width:33.33%;padding:12px;border:1px solid #E2E8F0;background:#FAFAFA;">
+              <div style="font-size:12px;color:#64748B;margin-bottom:4px;">মোট ব্যালেন্স</div>
+              <div style="font-size:16px;font-weight:bold;color:${netBalance >= 0 ? '#16A34A' : '#DC2626'};">
+                ৳${Math.abs(netBalance).toFixed(2)} ${netBalance >= 0 ? 'Cr' : 'Dr'}
+              </div>
+            </td>
           </tr>
-        </thead>
-        <tbody>
-          ${rowsHtml}
-          <tr style="background:#F1F5F9;font-weight:bold;border-top:2px solid #CBD5E1;">
-            <td style="padding:12px 10px;border:1px solid #E2E8F0;">সর্বমোট</td>
-            <td style="padding:12px 10px;border:1px solid #E2E8F0;"></td>
-            <td style="padding:12px 10px;border:1px solid #E2E8F0;text-align:right;color:#DC2626;">৳${filteredGet.toFixed(2)}</td>
-            <td style="padding:12px 10px;border:1px solid #E2E8F0;text-align:right;color:#16A34A;">৳${filteredGive.toFixed(2)}</td>
-            <td style="padding:12px 10px;border:1px solid #E2E8F0;"></td>
-          </tr>
-        </tbody>
-      </table>
+        </table>
 
-      <!-- Footer -->
-      <div style="margin:16px 24px 0;border-top:1px solid #E2E8F0;padding-top:10px;display:flex;justify-content:space-between;align-items:flex-end;">
-        <div style="font-size:11px;color:#94A3B8;">
-          ${footerAddress ? `<div style="margin-bottom:2px;">📍 ${footerAddress}</div>` : ''}
-          ${footerPhone   ? `<div>📞 ${footerPhone}</div>` : ''}
+        <!-- Count label -->
+        <div style="font-size:13px;font-weight:600;color:#334155;margin-bottom:10px;">
+          ${roleLabel} সংখ্যা: ${parties.length} (${countTag})
         </div>
-        <div style="font-size:10px;color:#CBD5E1;text-align:right;">
-          রিপোর্ট তৈরি: ${timeStr} | ${dateStr}
+
+        <!-- 4. Party Table -->
+        <table style="width:100%;border-collapse:collapse;font-size:12px;text-align:left;color:#334155;">
+          <thead>
+            <tr style="background:#F8FAFC;font-weight:bold;border-top:1px solid #94A3B8;border-bottom:1px solid #94A3B8;">
+              <th style="padding:10px;border:1px solid #CBD5E1;width:22%;">${nameColHeader}</th>
+              <th style="padding:10px;border:1px solid #CBD5E1;width:20%;">ফোন</th>
+              <th style="padding:10px;border:1px solid #CBD5E1;width:18%;text-align:right;background:#FEF2F2;">ডেবিট (-)</th>
+              <th style="padding:10px;border:1px solid #CBD5E1;width:18%;text-align:right;background:#F0FDF4;">ক্রেডিট (+)</th>
+              <th style="padding:10px;border:1px solid #CBD5E1;width:22%;text-align:center;">সর্বশেষ লেনদেন</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+            <tr style="background:#F1F5F9;font-weight:bold;border-top:2px solid #CBD5E1;">
+              <td style="padding:12px 10px;border:1px solid #CBD5E1;">সর্বমোট</td>
+              <td style="padding:12px 10px;border:1px solid #CBD5E1;"></td>
+              <td style="padding:12px 10px;border:1px solid #CBD5E1;text-align:right;color:#DC2626;">৳${filteredGive.toFixed(2)}</td>
+              <td style="padding:12px 10px;border:1px solid #CBD5E1;text-align:right;color:#16A34A;">৳${filteredGet.toFixed(2)}</td>
+              <td style="padding:12px 10px;border:1px solid #CBD5E1;"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 5. Deep Blue Footer Strip -->
+      <div style="background:#004B93;color:#fff;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:32px;font-size:12px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span>এখনই Banglakhata ব্যবহার শুরু করুন</span>
+          <span style="background:#fff;color:#004B93;padding:3px 10px;font-weight:bold;border-radius:4px;">ইনস্টল করুন</span>
+        </div>
+        <div style="text-align:right;">
+          ${footerPhone ? `📞 ${footerPhone}` : 'সাহায্য: support@banglakhata.com'} | রিপোর্ট তৈরি: ${timeStr}
         </div>
       </div>
     `;

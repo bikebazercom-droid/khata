@@ -124,15 +124,19 @@ export function ReportView() {
     const rowsHtml = entries.map(e => {
       const isGave   = e.type === 'YOU_GAVE';
       const dateCell = format(new Date(e.createdAt), 'd MMM yy • hh:mm a');
-      const amtStyle = isGave
-        ? 'background:#FEF2F2;color:#DC2626;font-weight:bold;'
-        : 'background:#F0FDF4;color:#16A34A;font-weight:bold;';
+      const debitCell  = isGave
+        ? `<td style="padding:8px 10px;border:1px solid #CBD5E1;text-align:right;background:#FEF2F2;color:#DC2626;font-weight:bold;font-size:12px;">৳${e.amount.toFixed(2)}</td>`
+        : `<td style="padding:8px 10px;border:1px solid #CBD5E1;background:#FEF2F2;"></td>`;
+      const creditCell = !isGave
+        ? `<td style="padding:8px 10px;border:1px solid #CBD5E1;text-align:right;background:#F0FDF4;color:#16A34A;font-weight:bold;font-size:12px;">৳${e.amount.toFixed(2)}</td>`
+        : `<td style="padding:8px 10px;border:1px solid #CBD5E1;background:#F0FDF4;"></td>`;
       return `
-        <tr>
-          <td style="padding:8px 10px;border:1px solid #E2E8F0;font-size:12px;color:#475569;">${dateCell}</td>
-          <td style="padding:8px 10px;border:1px solid #E2E8F0;font-size:12px;font-weight:500;">${e.partyName || '—'}</td>
-          <td style="padding:8px 10px;border:1px solid #E2E8F0;font-size:11px;color:#64748B;">${e.description || '—'}</td>
-          <td style="padding:8px 10px;border:1px solid #E2E8F0;text-align:right;${amtStyle}">৳${e.amount.toFixed(2)}</td>
+        <tr style="border-bottom:1px solid #E2E8F0;vertical-align:top;">
+          <td style="padding:8px 10px;border:1px solid #CBD5E1;font-size:12px;color:#475569;">${dateCell}</td>
+          <td style="padding:8px 10px;border:1px solid #CBD5E1;font-size:12px;font-weight:500;">${e.partyName || '—'}</td>
+          <td style="padding:8px 10px;border:1px solid #CBD5E1;font-size:11px;color:#64748B;">${e.description || '—'}</td>
+          ${debitCell}
+          ${creditCell}
         </tr>`;
     }).join('');
 
@@ -144,66 +148,70 @@ export function ReportView() {
     ].join(';');
 
     container.innerHTML = `
-      <!-- Blue header -->
-      <div style="background:#004BA0;display:flex;justify-content:space-between;align-items:center;padding:12px 24px;color:#fff;font-size:14px;font-weight:bold;">
-        <div>${storeName}</div>
-        <div>Banglakhata</div>
+      <!-- 1. Top Royal Blue Header -->
+      <div style="background:#004B93;display:flex;justify-content:space-between;align-items:center;padding:14px 24px;color:#fff;font-size:15px;font-weight:bold;">
+        <span>${storeName}</span>
+        <span style="letter-spacing:0.5px;">📘 Banglakhata</span>
       </div>
 
-      <!-- Title -->
-      <div style="text-align:center;margin:24px 0 8px;">
-        <div style="font-size:20px;font-weight:bold;color:#1E293B;">${roleLabel} লেনদেনের রিপোর্ট</div>
-        <div style="font-size:13px;color:#64748B;margin-top:4px;">${periodLabel} | ${dateStr}</div>
-      </div>
-
-      <!-- Stats card -->
-      <div style="margin:0 24px 16px;border:1px solid #E2E8F0;border-radius:4px;display:table;width:calc(100% - 48px);border-collapse:collapse;">
-        <div style="display:table-row;">
-          <div style="display:table-cell;width:33.33%;text-align:center;padding:12px;border-right:1px solid #E2E8F0;">
-            <div style="font-size:11px;color:#94A3B8;margin-bottom:4px;">মোট এন্ট্রি</div>
-            <div style="font-size:16px;font-weight:bold;color:#0F172A;">${entries.length}</div>
-          </div>
-          <div style="display:table-cell;width:33.33%;text-align:center;padding:12px;border-right:1px solid #E2E8F0;">
-            <div style="font-size:11px;color:#94A3B8;margin-bottom:4px;">আপনি দিয়েছেন</div>
-            <div style="font-size:16px;font-weight:bold;color:#DC2626;">৳${totalDebit.toFixed(2)}</div>
-          </div>
-          <div style="display:table-cell;width:33.33%;text-align:center;padding:12px;">
-            <div style="font-size:11px;color:#94A3B8;margin-bottom:4px;">আপনি পেয়েছেন</div>
-            <div style="font-size:16px;font-weight:bold;color:#16A34A;">৳${totalCredit.toFixed(2)}</div>
-          </div>
+      <div style="padding:24px;">
+        <!-- 2. Title -->
+        <div style="text-align:center;margin-bottom:20px;">
+          <div style="font-size:22px;font-weight:700;color:#000;">${roleLabel} লেনদেনের স্টেটমেন্ট</div>
+          <div style="font-size:13px;color:#475569;margin-top:6px;">${periodLabel} | ${dateStr}</div>
         </div>
-      </div>
 
-      <!-- Net balance -->
-      <div style="margin:0 24px 16px;padding:10px 16px;border-radius:4px;background:${netBalance >= 0 ? '#F0FDF4' : '#FEF2F2'};display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:13px;font-weight:bold;color:#64748B;">মোট ব্যালেন্স</span>
-        <span style="font-size:18px;font-weight:bold;color:${netBalance >= 0 ? '#16A34A' : '#DC2626'};">
-          ৳${Math.abs(netBalance).toFixed(2)} ${netBalance >= 0 ? 'Cr' : 'Dr'}
-        </span>
-      </div>
-
-      <!-- Transaction table -->
-      <table style="width:calc(100% - 48px);margin:0 24px;border-collapse:collapse;font-size:12px;color:#334155;">
-        <thead>
-          <tr style="background:#F8FAFC;">
-            <th style="padding:10px;border:1px solid #E2E8F0;width:22%;text-align:left;">তারিখ ও সময়</th>
-            <th style="padding:10px;border:1px solid #E2E8F0;width:25%;text-align:left;">${isSupplier ? 'সরবরাহকারীর নাম' : 'গ্রাহকের নাম'}</th>
-            <th style="padding:10px;border:1px solid #E2E8F0;text-align:left;">বিবরণ</th>
-            <th style="padding:10px;border:1px solid #E2E8F0;width:16%;text-align:right;">পরিমাণ</th>
+        <!-- 3. Summary Cards -->
+        <table style="width:100%;border-collapse:collapse;margin-bottom:16px;text-align:center;">
+          <tr>
+            <td style="width:33.33%;padding:12px;border:1px solid #E2E8F0;background:#FAFAFA;">
+              <div style="font-size:12px;color:#64748B;margin-bottom:4px;">মোট খরচ(-)</div>
+              <div style="font-size:16px;font-weight:bold;color:#DC2626;">৳${totalDebit.toFixed(2)}</div>
+            </td>
+            <td style="width:33.33%;padding:12px;border:1px solid #E2E8F0;background:#FAFAFA;">
+              <div style="font-size:12px;color:#64748B;margin-bottom:4px;">মোট জমা(+)</div>
+              <div style="font-size:16px;font-weight:bold;color:#16A34A;">৳${totalCredit.toFixed(2)}</div>
+            </td>
+            <td style="width:33.33%;padding:12px;border:1px solid #E2E8F0;background:#FAFAFA;">
+              <div style="font-size:12px;color:#64748B;margin-bottom:4px;">মোট ব্যালেন্স</div>
+              <div style="font-size:16px;font-weight:bold;color:${netBalance >= 0 ? '#16A34A' : '#DC2626'};">
+                ৳${Math.abs(netBalance).toFixed(2)} ${netBalance >= 0 ? 'Cr' : 'Dr'}
+              </div>
+            </td>
           </tr>
-        </thead>
-        <tbody>
-          ${rowsHtml || `<tr><td colspan="4" style="padding:16px;text-align:center;color:#94A3B8;">কোনো এন্ট্রি নেই</td></tr>`}
-        </tbody>
-      </table>
+        </table>
 
-      <!-- Footer -->
-      <div style="margin:16px 24px 0;border-top:1px solid #E2E8F0;padding-top:10px;display:flex;justify-content:space-between;align-items:flex-end;">
-        <div style="font-size:11px;color:#94A3B8;">
-          ${footerAddress ? `<div style="margin-bottom:2px;">📍 ${footerAddress}</div>` : ''}
-          ${footerPhone   ? `<div>📞 ${footerPhone}</div>`   : ''}
+        <!-- Count label -->
+        <div style="font-size:13px;font-weight:600;color:#334155;margin-bottom:10px;">
+          এন্ট্রির সংখ্যা: ${entries.length} (${periodLabel})
         </div>
-        <div style="font-size:10px;color:#CBD5E1;text-align:right;">রিপোর্ট তৈরি: ${timeStr} | ${dateStr}</div>
+
+        <!-- 4. Transaction Table -->
+        <table style="width:100%;border-collapse:collapse;font-size:12px;color:#334155;">
+          <thead>
+            <tr style="background:#F8FAFC;font-weight:bold;border-top:1px solid #94A3B8;border-bottom:1px solid #94A3B8;">
+              <th style="padding:10px;border:1px solid #CBD5E1;width:18%;text-align:left;">তারিখ</th>
+              <th style="padding:10px;border:1px solid #CBD5E1;width:26%;text-align:left;">${isSupplier ? 'সরবরাহকারীর নাম' : 'গ্রাহকের নাম'}</th>
+              <th style="padding:10px;border:1px solid #CBD5E1;text-align:left;">ডিটেলস</th>
+              <th style="padding:10px;border:1px solid #CBD5E1;width:14%;text-align:right;background:#FEF2F2;">ডেবিট (-)</th>
+              <th style="padding:10px;border:1px solid #CBD5E1;width:14%;text-align:right;background:#F0FDF4;">ক্রেডিট (+)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml || `<tr><td colspan="5" style="padding:16px;text-align:center;color:#94A3B8;">কোনো এন্ট্রি নেই</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 5. Deep Blue Footer Strip -->
+      <div style="background:#004B93;color:#fff;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:32px;font-size:12px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span>এখনই Banglakhata ব্যবহার শুরু করুন</span>
+          <span style="background:#fff;color:#004B93;padding:3px 10px;font-weight:bold;border-radius:4px;">ইনস্টল করুন</span>
+        </div>
+        <div style="text-align:right;">
+          ${footerPhone ? `📞 ${footerPhone}` : 'সাহায্য: support@banglakhata.com'} | রিপোর্ট তৈরি: ${timeStr}
+        </div>
       </div>
     `;
 

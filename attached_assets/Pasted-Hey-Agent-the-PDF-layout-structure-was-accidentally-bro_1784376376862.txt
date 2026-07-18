@@ -1,0 +1,136 @@
+Hey Agent, the PDF layout structure was accidentally broken during the previous name changes. We need to strictly restore the original professional ledger layout exactly as shown in the provided image (photo_2026-07-18_18-05-31.jpg). 
+
+Maintain the exact margins, table grid lines, and summary block styles, but ensure all branding targets English "BanglaKhata".
+
+YOUR EXACT IMPLEMENTATION TASKS:
+
+1. TOP BLUE BRANDING HEADER:
+   - Background color: Deep Navy/Royal Blue (`#004B93` or `#0A59CD`).
+   - Left side: User's shop name/business name dynamic text.
+   - Right side: White accent text or logo badge that reads strictly "BanglaKhata" (replacing any legacy placeholders).
+
+2. SUB-HEADER & SUMMARY CARD MATRIX:
+   - Main Title centered below the bar: "অ্যাকাউন্টের স্টেটমেন্ট" followed by the selected dynamic date range in Bengali format.
+   - A clean 3-column financial card container block:
+     * Card 1 (Left): "মোট খরচ(-)" with the absolute expense total value.
+     * Card 2 (Center): "মোট জমা(+)" with the absolute credit total value.
+     * Card 3 (Right): "মোট ব্যালেন্স" with the resulting balance value and a conditional 'Cr' or 'Dr' tag in correct tracking colors.
+
+3. DATA LEDGER GRID TABLE:
+   - Column layout header configuration: | তারিখ | নাম | ডিটেলস | ডেবিট (-) | ক্রেডিট (+) |
+   - Light gray grid cell boundaries with clear padding.
+   - Alternating row background colors or exact shaded accent panel for Debit column (light reddish tint) and Credit column (light greenish tint) precisely matching the reference file layout.
+
+4. FOOTER COMPLIANCE STRIP:
+   - Deep blue bottom sticky background panel spanning full print width.
+   - Left side text: "এখনই BanglaKhata ব্যবহার শুরু করুন" alongside a stylized placeholder button element.
+   - Right side text: Support contact details in Bengali text alignment.
+
+Overwrite your current `generateAndSharePerfectReportPDF` html compiler method with this absolute replica boilerplate:
+
+```javascript
+export const generateAndSharePerfectReportPDF = (filteredEntries, currentContext) => {
+  const savedSettings = localStorage.getItem('user_settings_profile');
+  const userProfile = savedSettings ? JSON.parse(savedSettings) : {};
+  
+  const appBrandName = "BanglaKhata";
+  const displayShopName = userProfile.businessName || "হাজারি গোল্ড"; 
+  const contextLabel = currentContext === 'supplier' ? 'সরবরাহকারী রিপোর্ট' : 'গ্রাহক রিপোর্ট';
+
+  // Calculate strict ledger balances
+  let totalDebit = 0;
+  let totalCredit = 0;
+  filteredEntries.forEach(item => {
+    if (item.type === 'debit' || item.amount < 0) totalDebit += Math.abs(item.amount || 0);
+    else totalCredit += Math.abs(item.amount || 0);
+  });
+  const netBalance = totalCredit - totalDebit;
+
+  const pdfHtmlContent = `
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; background-color: #ffffff; color: #1E293B;">
+      
+      <!-- 1. Top Royal Blue Header Strip -->
+      <div style="background-color: #004B93; color: #ffffff; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 18px; font-weight: bold;">${displayShopName}</span>
+        <span style="font-size: 18px; font-weight: bold; letter-spacing: 0.5px;">📘 ${appBrandName}</span>
+      </div>
+
+      <div style="padding: 24px;">
+        <!-- 2. Main Document Subtitle -->
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h2 style="margin: 0; font-size: 22px; color: #000000; font-weight: 700;">অ্যাকাউন্টের স্টেটমেন্ট</h2>
+          <p style="margin: 6px 0 0 0; color: #475569; font-size: 14px;">(০১ জুলাই ২০২৬ - ১৮ জুলাই ২০২৬)</p>
+        </div>
+
+        <!-- 3. Metrics Grid Blocks -->
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; text-align: center;">
+          <tr>
+            <td style="width: 33.33%; padding: 12px; border: 1px solid #E2E8F0; background-color: #FAFAFA;">
+              <div style="font-size: 13px; color: #64748B; margin-bottom: 4px;">মোট খরচ(-)</div>
+              <div style="font-size: 16px; font-weight: bold; color: #000000;">₹${totalDebit.toLocaleString()}</div>
+            </td>
+            <td style="width: 33.33%; padding: 12px; border: 1px solid #E2E8F0; background-color: #FAFAFA;">
+              <div style="font-size: 13px; color: #64748B; margin-bottom: 4px;">মোট জমা(+)</div>
+              <div style="font-size: 16px; font-weight: bold; color: #000000;">₹${totalCredit.toLocaleString()}</div>
+            </td>
+            <td style="width: 33.33%; padding: 12px; border: 1px solid #E2E8F0; background-color: #FAFAFA;">
+              <div style="font-size: 13px; color: #64748B; margin-bottom: 4px;">মোট ব্যালেন্স</div>
+              <div style="font-size: 16px; font-weight: bold; color: ${netBalance >= 0 ? '#16A34A' : '#DC2626'};">
+                ₹${Math.abs(netBalance).toLocaleString()} ${netBalance >= 0 ? 'Cr' : 'Dr'}
+              </div>
+            </td>
+          </tr>
+        </table>
+
+        <div style="font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #334155;">
+          এন্ট্রির সংখ্যা: ${filteredEntries.length} (সব)
+        </div>
+
+        <!-- 4. Main Transaction Data Table Grid -->
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <thead>
+            <tr style="background-color: #F8FAFC; text-align: left; font-weight: bold; border-top: 1px solid #94A3B8; border-bottom: 1px solid #94A3B8;">
+              <th style="padding: 10px; border: 1px solid #CBD5E1; width: 12%;">তারিখ</th>
+              <th style="padding: 10px; border: 1px solid #CBD5E1; width: 30%;">নাম</th>
+              <th style="padding: 10px; border: 1px solid #CBD5E1; width: 28%;">ডিটেলস</th>
+              <th style="padding: 10px; border: 1px solid #CBD5E1; width: 15%; background-color: #FEF2F2; text-align: right;">ডেবিট (-)</th>
+              <th style="padding: 10px; border: 1px solid #CBD5E1; width: 15%; background-color: #F0FDF4; text-align: right;">ক্রেডিট (+)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filteredEntries.map(entry => `
+              <tr style="border-bottom: 1px solid #E2E8F0; vertical-align: top;">
+                <td style="padding: 10px; border: 1px solid #CBD5E1;">${entry.date || ''}</td>
+                <td style="padding: 10px; border: 1px solid #CBD5E1; font-weight: 500;">${entry.name || ''}</td>
+                <td style="padding: 10px; border: 1px solid #CBD5E1; color: #64748B;">${entry.details || ''}</td>
+                <td style="padding: 10px; border: 1px solid #CBD5E1; background-color: #FEF2F2; text-align: right; color: #DC2626; font-weight: 500;">
+                  ${entry.type === 'debit' ? entry.amount.toFixed(2) : ''}
+                </td>
+                <td style="padding: 10px; border: 1px solid #CBD5E1; background-color: #F0FDF4; text-align: right; color: #16A34A; font-weight: 500;">
+                  ${entry.type === 'credit' ? entry.amount.toFixed(2) : ''}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 5. Bottom Sticky Footer Strip Banner -->
+      <div style="background-color: #004B93; color: #ffffff; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; margin-top: 40px; font-size: 12px;">
+        <div>
+          <span>এখনই ${appBrandName} ব্যবহার শুরু করুন</span>
+          <span style="background-color: #ffffff; color: #004B93; padding: 4px 8px; font-weight: bold; border-radius: 4px; margin-left: 8px;">ইনস্টল করুন</span>
+        </div>
+        <div>
+          📞 সাহায্য: +৯১-৯৬০৬৮০০৮০০ | নিয়ম ও শর্তাবলী প্রযোজ্য
+        </div>
+      </div>
+
+    </div>
+  `;
+
+  const fileName = `${appBrandName}_Statement.pdf`;
+  if (window.ReplitPdfBridge) {
+    window.ReplitPdfBridge.download({ html: pdfHtmlContent, filename: fileName });
+  }
+};
