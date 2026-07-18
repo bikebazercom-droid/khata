@@ -1,0 +1,54 @@
+CRITICAL WARNING: The application is STILL displaying or rendering outdated placeholders like "খাতা" or "খাতাবুক" in certain UI layers, state initializers, or PDF bridges. This is UNACCEPTABLE for a production release. The ONLY official, absolute, and permanent name for this entire software ecosystem is "Banglakhata". You must perform a deep, comprehensive refactor across the entire repository immediately.
+
+YOUR ABSOLUTE COMPLIANCE TASKS:
+
+1. GLOBAL REPOSITORY STRING PURGE (ZERO TOLERANCE):
+   - Run a recursive find-and-replace sweep across ALL source files (`src/**/*.{js,jsx,ts,tsx,html,json}`).
+   - Completely wipe out any instances of "খাতা", "খাতাবুক", "Khatabook", or "Digital Khata" used as application branding names.
+   - Every single visible app header, navbar title, onboarding screen, sidebar element, footer tag, and console log MUST strictly read "Banglakhata".
+   - Set the application token abbreviation graphic text exclusively to "BK".
+
+2. HARDENING THE PDF & SHARING ENGINE ENFORCEMENT:
+   - Go directly into your HTML-to-PDF compiler and native share bridge methods (e.g., `generateAndSharePerfectReportPDF`).
+   - Hardcode the dynamic branding layer variables so they can NEVER fall back to generic terms.
+   - Force the final physical document download file name parameter to be strictly formatted as `Banglakhata_Report.pdf` (or `Banglakhata_Supplier_Report.pdf` / `Banglakhata_Customer_Report.pdf`).
+
+Overwrite the code configurations with this definitive absolute model setup now:
+
+---
+
+### HARD ENFORCED METADATA AND EXPORT PROFILE (`src/utils/pdfEngine.js`)
+```javascript
+export const generateAndSharePerfectReportPDF = (filteredEntries, currentContext) => {
+  const savedSettings = localStorage.getItem('user_settings_profile');
+  const userProfile = savedSettings ? JSON.parse(savedSettings) : {};
+  
+  // Strict, unalterable global core application name definition
+  const CORE_APP_NAME = "Banglakhata";
+  const displayShopName = userProfile.businessName || CORE_APP_NAME;
+  const contextLabel = currentContext === 'supplier' ? 'সরবরাহকারী রিপোর্ট' : 'গ্রাহক রিপোর্ট';
+
+  // Constructing pure sanitized document structure
+  const pdfHtmlContent = `
+    <div style="font-family: Arial, sans-serif; padding: 20px; line-height: 1.25;">
+      <div style="text-align: center; border-bottom: 3px solid #8B0000; padding-bottom: 12px; margin-bottom: 20px;">
+        <h1 style="margin: 0; color: #8B0000; font-size: 26px; font-weight: 800; letter-spacing: 0.5px;">${displayShopName}</h1>
+        <p style="margin: 6px 0 0 0; color: #475569; font-size: 13px; font-weight: bold; letter-spacing: 1px;">Powered by: ${CORE_APP_NAME}</p>
+      </div>
+      <!-- Core transaction tables data map blocks -->
+    </div>
+  `;
+
+  // Standardized naming structure compliant with international application store deployment
+  const fileTypeSegment = currentContext === 'supplier' ? 'Supplier_Report' : 'Customer_Report';
+  const strictlyEnforcedFilename = `${CORE_APP_NAME}_${fileTypeSegment}.pdf`;
+  
+  if (window.ReplitPdfBridge) {
+    window.ReplitPdfBridge.download({
+      html: pdfHtmlContent,
+      filename: strictlyEnforcedFilename
+    });
+  } else {
+    console.log(`[${CORE_APP_NAME} Engine] Successfully exported document asset: ${strictlyEnforcedFilename}`);
+  }
+};

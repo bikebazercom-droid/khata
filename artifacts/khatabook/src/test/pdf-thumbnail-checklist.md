@@ -4,7 +4,7 @@ Use this checklist whenever automated tests cannot substitute for a real
 browser rendering check (e.g. after changes to `ledger-report.tsx`,
 `billImageStorage.ts`, `party-view.tsx`, or any html2pdf/html2canvas upgrade).
 
-Run in a Chromium-based browser where the Khatabook web app is served.
+Run in a Chromium-based browser where the Banglakhata web app is served.
 
 ---
 
@@ -22,7 +22,7 @@ Run in a Chromium-based browser where the Khatabook web app is served.
 | # | Step | Expected |
 |---|------|----------|
 | A1 | Tap **রিপোর্ট** (FileDown icon) on the party view action bar. | Spinner appears; button is disabled during generation. |
-| A2 | Wait for the browser's download to trigger. | A `.pdf` file is saved (filename: `<PartyName>_হিসাব_খাতা.pdf`). |
+| A2 | Wait for the browser's download to trigger. | A `.pdf` file is saved (filename: `<PartyName>_Banglakhata_Ledger.pdf`). |
 | A3 | Open the downloaded PDF. | Each ledger row that had a bill photo shows a **48×48 px thumbnail** in the Details column. |
 | A4 | Rows without a bill photo show **no thumbnail** cell — just the description text. | ✓ |
 | A5 | The thumbnail is not blank, white, or a grey "?" placeholder. | ✓ (placeholder only appears when the image failed to fetch) |

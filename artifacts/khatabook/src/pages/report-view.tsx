@@ -147,7 +147,7 @@ export function ReportView() {
       <!-- Blue header -->
       <div style="background:#004BA0;display:flex;justify-content:space-between;align-items:center;padding:12px 24px;color:#fff;font-size:14px;font-weight:bold;">
         <div>${storeName}</div>
-        <div>Khatabook</div>
+        <div>Banglakhata</div>
       </div>
 
       <!-- Title -->

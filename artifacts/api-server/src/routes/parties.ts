@@ -505,7 +505,7 @@ router.post(
       maximumFractionDigits: 2,
     }).format(amount);
 
-    const message = `বকেয়া তাগাদা: ডিজিটাল খাতা-এর পক্ষ থেকে ${party.name}-কে ৳${formattedAmount} টাকা বকেয়া পরিশোধের জন্য অনুরোধ করা হচ্ছে।`;
+    const message = `বকেয়া তাগাদা: Banglakhata-এর পক্ষ থেকে ${party.name}-কে ৳${formattedAmount} টাকা বকেয়া পরিশোধের জন্য অনুরোধ করা হচ্ছে।`;
 
     res.json(
       SendPaymentReminderResponse.parse({
