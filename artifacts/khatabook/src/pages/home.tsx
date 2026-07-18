@@ -129,31 +129,36 @@ export function HomeView() {
         logging: false,
       });
 
-      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
-      const fileName = `Payment_Request_${Date.now()}.jpg`;
+      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.95);
 
-      // Force-download into device gallery immediately
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.href = jpgDataUrl;
-      downloadAnchor.download = fileName;
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      document.body.removeChild(downloadAnchor);
+      // Safety-net: force download to device gallery
+      const phantomAnchor = document.createElement('a');
+      phantomAnchor.href = jpgDataUrl;
+      phantomAnchor.download = `Banglakhata_Payment_${Date.now()}.jpg`;
+      document.body.appendChild(phantomAnchor);
+      phantomAnchor.click();
+      document.body.removeChild(phantomAnchor);
 
-      // Confirm save and open WhatsApp so the user can attach from gallery
-      setTimeout(() => {
-        alert('✅ পেমেন্ট রসিদটি আপনার গ্যালারিতে JPG ছবি হিসেবে সেভ হয়েছে!\n\nএখন আপনার ইমু বা হোয়াটসঅ্যাপ চ্যাটে গিয়ে গ্যালারি থেকে এটি সিলেক্ট করুন।');
-        window.open(
-          `https://api.whatsapp.com/send?text=${encodeURIComponent('পেমেন্ট অনুরোধের JPG রসিদটি আমার গ্যালারি থেকে পাঠানো হচ্ছে।')}`,
-          '_blank',
-        );
-      }, 200);
+      // Convert to binary File for native share sheet
+      const base64Fetch = await fetch(jpgDataUrl);
+      const imageBlob = await base64Fetch.blob();
+      const sharedFile = new File([imageBlob], 'Banglakhata_Payment.jpg', { type: 'image/jpeg' });
+
+      if (navigator.canShare && navigator.canShare({ files: [sharedFile] })) {
+        await navigator.share({
+          files: [sharedFile],
+          title: 'Banglakhata রশিদ',
+          text: 'Banglakhata অ্যাপ থেকে শেয়ার করা ডিজিটাল রসিদ।',
+        });
+        console.log('Native share overlay opened successfully.');
+      } else {
+        await navigator.share({
+          title: 'Banglakhata রশিদ',
+          text: 'রসিদটি আপনার ফোনের গ্যালারিতে JPG ছবি হিসেবে ডাউনলোড হয়েছে। অনুগ্রহ করে যেকোনো সোশ্যাল মিডিয়ায় পাঠিয়ে দিন।',
+        });
+      }
     } catch (err) {
-      console.error('Snapshot failure:', err);
-      window.open(
-        `https://api.whatsapp.com/send?text=${encodeURIComponent('রসিদটি গ্যালারি থেকে শেয়ার করুন।')}`,
-        '_blank',
-      );
+      console.error('System Native Share Pipeline Exception Intercepted:', err);
     } finally {
       setIsWhatsAppSharing(false);
     }
