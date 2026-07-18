@@ -88,6 +88,8 @@
     "@clerk/themes": "^2.4.57",
     "html2canvas": "^1.4.1",
     "html2pdf.js": "^0.14.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "sharp": "^0.35.3"
   }
 }

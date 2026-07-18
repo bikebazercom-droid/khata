@@ -1,0 +1,84 @@
+Hey Agent, look at the provided screenshot (Screenshot_18.jpg). I need to hook up the "PDF" action button next to the filter button so that it dynamically downloads a PDF report containing ONLY the current active filtered/sorted list of customers or suppliers.
+
+CRITICAL LOGIC:
+- Do NOT pull raw full database states inside the PDF logic. 
+- It must accept the currently calculated `filteredAndSortedData` array (the same array driving the on-screen list) along with the calculated top summary amounts ("আপনি দেবেন" and "আপনি পাবেন") for that specific view.
+- When the user changes the filter to "আপনি পাবেন", the PDF must only contain those people.
+
+YOUR TASK:
+Implement a client-side PDF export system using `jspdf` and `jspdf-autotable`. Add the functionality directly onto the existing PDF button click handler.
+
+Please inject or update the PDF compilation function with this structural roadmap:
+
+---
+
+### 1. DYNAMIC PDF EXPORT TRIGGER WITH TAB & FILTER META
+
+```javascript
+// Inside your primary ledger/dashboard screen component
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+
+const exportFilteredReportToPDF = () => {
+  const doc = new jsPDF();
+  
+  // 1. Get the current active filter data & tab metadata
+  // Assuming 'filteredAndSortedData' holds the list currently rendered on screen
+  // Assuming 'activeTab' is 'customer' or 'supplier'
+  const currentView = activeTab === 'customer' ? 'গ্রাহক (Customer)' : 'সরবরাহকারী (Supplier)';
+  const currentFilterTag = selectedFilter === 'all' ? 'সব' : selectedFilter === 'will_get' ? 'আপনি পাবেন' : 'আপনি দেবেন';
+
+  // 2. Setup PDF Title & Header Section
+  doc.setFont("Helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("Bike Bazer - Business Report", 14, 20);
+  
+  doc.setFontSize(10);
+  doc.setFont("Helvetica", "normal");
+  doc.text(`Report Type: ${currentView}`, 14, 28);
+  doc.text(`Applied Filter: ${currentFilterTag}`, 14, 34);
+  doc.text(`Date Generated: ${new Date().toLocaleDateString('bn-BD')}`, 14, 40);
+  
+  // 3. Add dynamic totals matching the active top summary cards
+  doc.setDrawColor(200, 200, 200);
+  doc.line(14, 44, 196, 44);
+  
+  doc.setFontSize(11);
+  doc.text(`Total You Will Give (আপনি দেবেন): BDT ${calculatedMetrics.totalYouWillGive}`, 14, 52);
+  doc.text(`Total You Will Get (আপনি পাবেন): BDT ${calculatedMetrics.totalYouWillGet}`, 110, 52);
+  
+  doc.line(14, 56, 196, 56);
+
+  // 4. Map only the active filtered data rows into the table format
+  const tableColumns = ["SL", "Name / Details", "Mobile", "Status / Direction", "Balance (BDT)"];
+  
+  const tableRows = filteredAndSortedData.map((item, index) => {
+    const status = item.balance > 0 ? "আপনি পাবেন (Get)" : "আপনি দেবেন (Give)";
+    return [
+      index + 1,
+      item.name || "N/A",
+      item.mobile || "N/A",
+      status,
+      Math.abs(item.balance).toLocaleString()
+    ];
+  });
+
+  // 5. Generate AutoTable Layout
+  doc.autoTable({
+    startY: 62,
+    head: [tableColumns],
+    body: tableRows,
+    theme: 'striped',
+    headStyles: { fillColor: [29, 78, 216], textColor: [255, 255, 255] }, // Tailored Blue header match
+    styles: { fontSize: 9 },
+    didDrawPage: (data) => {
+      // Footer page numbering
+      doc.setFontSize(8);
+      doc.text(`Page ${data.pageNumber}`, 14, doc.internal.pageSize.height - 10);
+    }
+  });
+
+  // 6. Trigger instant download download file
+  const filename = `Report_${activeTab}_${selectedFilter}_${new Date().toISOString().split('T')[0]}.pdf`;
+  doc.save(filename);
+};

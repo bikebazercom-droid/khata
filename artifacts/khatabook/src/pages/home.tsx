@@ -1,4 +1,6 @@
 import { useState, useCallback } from 'react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { Link, useLocation } from 'wouter';
 import {
   useListParties,
@@ -118,6 +120,95 @@ export function HomeView() {
     }
   }, [requestModalParty, settings?.storeName]);
 
+  const exportFilteredReportToPDF = useCallback(() => {
+    const doc = new jsPDF();
+    const storeName = settings?.storeName || 'Digital Khata';
+    const roleLabel  = role === PartyRole.CUSTOMER ? 'Customer' : 'Supplier';
+    const filterLabels: Record<string, string> = {
+      all:       'All',
+      will_get:  'You Will Get',
+      will_give: 'You Will Give',
+      today:     'Due Today',
+      upcoming:  'Upcoming',
+      permanent: 'Permanent',
+      no_date:   'No Due Date',
+    };
+    const sortLabels: Record<string, string> = {
+      recent:  'Most Recent',
+      highest: 'Highest Amount',
+      lowest:  'Lowest Amount',
+      name:    'Name A-Z',
+      oldest:  'Oldest First',
+    };
+    const filterTag = filterLabels[appliedFilter] ?? appliedFilter;
+    const sortTag   = sortLabels[appliedSort]   ?? appliedSort;
+    const dateStr   = new Date().toLocaleDateString('en-GB');
+
+    // Totals from the filtered list shown on screen (not the full tab total)
+    let filteredGet  = 0;
+    let filteredGive = 0;
+    for (const p of parties) {
+      if (p.balanceType === 'YOU_WILL_GET') filteredGet  += p.currentBalance;
+      else                                  filteredGive += p.currentBalance;
+    }
+
+    // ── Header ──────────────────────────────────────────────────────────────
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.text(`${storeName} — ${roleLabel} Report`, 14, 20);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`Type: ${roleLabel}`, 14, 29);
+    doc.text(`Filter: ${filterTag}`, 14, 35);
+    doc.text(`Sort: ${sortTag}`, 14, 41);
+    doc.text(`Generated: ${dateStr}`, 14, 47);
+
+    doc.setDrawColor(200, 200, 200);
+    doc.line(14, 51, 196, 51);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text(`You Will Get (BDT): ${filteredGet.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`, 14, 59);
+    doc.text(`You Will Give (BDT): ${filteredGive.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`, 110, 59);
+
+    doc.setDrawColor(200, 200, 200);
+    doc.line(14, 63, 196, 63);
+
+    // ── Table ────────────────────────────────────────────────────────────────
+    const head = [['#', 'Name', 'Mobile', 'Balance Direction', 'Balance (BDT)']];
+    const body = parties.map((p, i) => [
+      String(i + 1),
+      p.name || '—',
+      p.phone || '—',
+      p.balanceType === 'YOU_WILL_GET' ? 'You Will Get' : 'You Will Give',
+      p.currentBalance.toLocaleString('en-IN', { maximumFractionDigits: 2 }),
+    ]);
+
+    autoTable(doc, {
+      startY: 68,
+      head,
+      body,
+      theme: 'striped',
+      headStyles: { fillColor: [27, 58, 107], textColor: [255, 255, 255], fontStyle: 'bold' },
+      styles: { fontSize: 9, cellPadding: 3 },
+      columnStyles: { 0: { halign: 'center', cellWidth: 12 }, 4: { halign: 'right' } },
+      didDrawPage: (data) => {
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.text(
+          `Page ${data.pageNumber}`,
+          14,
+          doc.internal.pageSize.height - 8,
+        );
+      },
+    });
+
+    const filename = `${roleLabel}_${filterTag}_${new Date().toISOString().split('T')[0]}.pdf`
+      .replace(/\s+/g, '_');
+    doc.save(filename);
+  }, [parties, appliedFilter, appliedSort, role, settings?.storeName]);
+
   return (
     <div className="flex flex-col h-full w-full bg-white relative">
       {/* Fixed deep-blue top header */}
@@ -236,14 +327,15 @@ export function HomeView() {
             <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
           )}
         </button>
-        <Link
-          href="/reports"
+        <button
+          type="button"
+          onClick={exportFilteredReportToPDF}
           aria-label="PDF রিপোর্ট"
           className="w-14 h-11 shrink-0 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all"
         >
           <FileText className="w-4 h-4" />
           <span className="text-[9px] font-bold leading-none">PDF</span>
-        </Link>
+        </button>
       </div>
 
       {/* Active-filter summary strip — shown when any non-default filter is applied */}
