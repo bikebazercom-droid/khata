@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { banglaFontBase64 } from '@/utils/bengaliFont';
 import { Link, useLocation } from 'wouter';
 import {
   useListParties,
@@ -19,9 +20,6 @@ import { RenameStoreDialog } from '@/components/modals/rename-store-dialog';
 import { formatDistanceToNow } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { toast } from 'sonner';
-
-// Module-level cache — the Bengali font is ~200 KB; fetch once, reuse forever
-let _banglaFontB64: string | null = null;
 
 export function HomeView() {
   const [role, setRole] = useState<PartyRole>(PartyRole.CUSTOMER);
@@ -133,26 +131,14 @@ export function HomeView() {
       const storeName = settings?.storeName || 'ডিজিটাল খাতা';
       const roleLabel = role === PartyRole.CUSTOMER ? 'গ্রাহক' : 'সাপ্লায়ার';
 
-      // ── Bengali font (fetched once, cached in module scope) ──────────────
-      if (!_banglaFontB64) {
-        const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-        const res = await fetch(`${base}/fonts/NotoSansBengali-Regular.ttf`);
-        if (!res.ok) throw new Error(`Font fetch failed: ${res.status}`);
-        const buf = await res.arrayBuffer();
-        const bytes = new Uint8Array(buf);
-        let bin = '';
-        // Chunk-based btoa to avoid call-stack overflow on large buffers
-        for (let i = 0; i < bytes.length; i += 8192) {
-          bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
-        }
-        _banglaFontB64 = btoa(bin);
-      }
-      doc.addFileToVFS('NotoSansBengali.ttf', _banglaFontB64);
-      doc.addFont('NotoSansBengali.ttf', 'BN', 'normal');
-      // Register the same TTF for 'bold' so autoTable's header cells don't fall back
-      // to Helvetica (which cannot render Bengali) when fontStyle: 'bold' is applied.
-      doc.addFont('NotoSansBengali.ttf', 'BN', 'bold');
-      const BN = 'BN';
+      // ── Bengali font — pre-baked base64, no network fetch required ─────────
+      doc.addFileToVFS('SolaimanLipi.ttf', banglaFontBase64);
+      doc.addFont('SolaimanLipi.ttf', 'SolaimanLipi', 'normal');
+      // Register the same TTF for 'bold' so autoTable header cells never fall back
+      // to Helvetica (which cannot render Bengali glyphs).
+      doc.addFont('SolaimanLipi.ttf', 'SolaimanLipi', 'bold');
+      doc.setFont('SolaimanLipi');
+      const BN = 'SolaimanLipi';
 
       // ── Filtered totals (computed from same array driving the screen) ─────
       let filteredGet  = 0;
