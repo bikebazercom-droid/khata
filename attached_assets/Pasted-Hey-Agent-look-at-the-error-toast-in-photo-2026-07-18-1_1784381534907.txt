@@ -1,0 +1,67 @@
+Hey Agent, look at the error toast in photo_2026-07-18_19-31-32.jpg ("শেয়ার করতে সমস্যা হয়েছে। পুনরায় চেষ্টা করুন।"). The native Web Share API `navigator.share` is actively throwing an error because the current mobile browser/webview container blocks cross-app file stream sharing.
+
+WE MUST BYPASS THIS ERROR BY IMMEDIATELY SUPPRESSING THE TOAST AND SILENTLY DROPPING THE JPG FILE INTO DOWNLOADS:
+1. Wrap the entire `navigator.share` call inside a robust `try-catch` block.
+2. In the `catch` segment, DO NOT show an error toast or update an error state. 
+3. Instead, IMMEDIATELY call `forceLocalDownload(jpgDataUrl)` inside the catch block to quietly save the JPG to the device storage, so the user can then upload/attach it to Imo, WhatsApp, or any app manually from their gallery.
+
+Please update the sharing function component with this absolute bulletproof logic right now:
+
+```javascript
+const handleUniversalJpgShare = async () => {
+  if (!receiptRef.current) return;
+
+  try {
+    // 1. Generate clean high-resolution snapshot from the DOM box
+    const canvas = await html2canvas(receiptRef.current, {
+      backgroundColor: '#ffffff',
+      scale: 3, // Premium clarity for smaller screens
+      useCORS: true,
+      logging: false
+    });
+
+    // 2. Convert to optimized image/jpeg stream URL
+    const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
+    
+    // Core helper to quietly execute download without disturbing the user
+    const forceLocalDownload = (url) => {
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = url;
+      downloadAnchor.download = `Payment_Request_${customer?.name || 'Customer'}.jpg`;
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
+    };
+
+    // 3. Setup Binary Blob and File mapping
+    const base64Response = await fetch(jpgDataUrl);
+    const rawBlob = await base64Response.blob();
+    const systemImageFile = new File([rawBlob], 'payment_receipt.jpg', { type: 'image/jpeg' });
+
+    // 4. Multi-App Share Dialog Logic with Silent Failsafe
+    if (navigator.canShare && navigator.canShare({ files: [systemImageFile] })) {
+      try {
+        // Attempt native OS sharing
+        await navigator.share({
+          files: [systemImageFile],
+          title: 'পেমেন্ট রশিদ',
+          text: 'ডিভাইস থেকে রসিদ শেয়ার করা হচ্ছে।'
+        });
+      } catch (shareErr) {
+        // CRITICAL FIX: Browser blocked it or user cancelled. Bypass toast error state!
+        console.log("Native share dialogue failed/blocked. Silently falling back to immediate file download.");
+        
+        // Hide any active error state if your code has one (e.g., setShareError(false))
+        
+        // Silently download the file instead of breaking
+        forceLocalDownload(jpgDataUrl);
+      }
+    } else {
+      // Fallback if browser environment doesn't support file sharing at all
+      forceLocalDownload(jpgDataUrl);
+    }
+
+  } catch (error) {
+    console.error('Critical crash during element capture phase:', error);
+  }
+};

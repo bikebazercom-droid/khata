@@ -228,19 +228,18 @@ export function TransactionDetailPage() {
           await navigator.share({
             files: [systemImageFile],
             title: 'পেমেন্ট রশিদ',
-            text: 'ডিভাইস থেকে সরাসরি রসিদ শেয়ার করা হচ্ছে।',
+            text: 'ডিভাইস থেকে রসিদ শেয়ার করা হচ্ছে।',
           });
         } catch (shareErr: unknown) {
-          const e = shareErr as { name?: string };
-          if (e?.name === 'AbortError') return; // user dismissed — not an error
-          console.warn('Native OS share dialogue failed, reverting to automated download.');
+          // Browser blocked or user cancelled — no toast, no error state.
+          // Silently save the JPG to device storage so the user can share
+          // it manually from their gallery (Imo, WhatsApp, Messenger, etc.)
+          console.log('Native share dialogue failed/blocked. Silently falling back to immediate file download.');
           forceLocalDownload(jpgDataUrl);
-          toast.success('রসিদের JPG ছবিটি ডাউনলোড ফোল্ডারে সেভ হয়েছে। এখন এটি ইমু, হোয়াটসঅ্যাপ বা যেকোনো সোশ্যাল মিডিয়ায় গ্যালারি থেকে শেয়ার করতে পারবেন।');
         }
       } else {
-        // 4. Fallback: download locally + instruct user
+        // 4. Fallback: download locally (no share API support)
         forceLocalDownload(jpgDataUrl);
-        toast.success('আপনার সিস্টেমে সরাসরি শেয়ার সমর্থিত নয়। রসিদের JPG ছবিটি ফোনে ডাউনলোড করা হয়েছে, এটি যেকোনো সোশ্যাল মিডিয়ায় পাঠিয়ে দিন।');
       }
     } catch (err: unknown) {
       console.error('Failed to encode DOM elements into universal JPG asset package:', err);
