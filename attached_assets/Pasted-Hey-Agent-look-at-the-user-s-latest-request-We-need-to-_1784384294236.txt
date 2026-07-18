@@ -1,0 +1,56 @@
+Hey Agent, look at the user's latest request. We need to completely eliminate the manual browser `alert()` popups and the hardcoded WhatsApp redirects from all our share handlers. The user wants a seamless, native smartphone experience. 
+
+When any share button is clicked, it MUST dynamically capture the UI component as a crisp JPG, and immediately trigger the smartphone's **NATIVE OVERLAY SHARE SHEET** (allowing the user to select Imo, WhatsApp, Messenger, or Facebook directly from the OS popup).
+
+Please update `transaction-detail.tsx` (`handleShare`), `home.tsx` (`handleWhatsAppJpgShare`), and `party-view.tsx` (`handleEntryShare`) with this unified, robust Native File Stream Share engine right now:
+
+```javascript
+import html2canvas from 'html2canvas';
+
+const executeNativeJpgShare = async (elementRef, filenameLabel) => {
+  if (!elementRef.current) return;
+
+  try {
+    // 1. Capture the element view into a beautiful, sharp high-res image canvas
+    const canvas = await html2canvas(elementRef.current, {
+      backgroundColor: '#ffffff',
+      scale: 3, // Premium high-res scale for crisp fonts
+      useCORS: true,
+      logging: false
+    });
+
+    // 2. Convert canvas context directly to an absolute JPEG stream
+    const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+
+    // 3. Fallback: Force a silent download to the phone storage as a safety net
+    const phantomAnchor = document.createElement('a');
+    phantomAnchor.href = jpgDataUrl;
+    phantomAnchor.download = `${filenameLabel}_${new Date().getTime()}.jpg`;
+    document.body.appendChild(phantomAnchor);
+    phantomAnchor.click();
+    document.body.removeChild(phantomAnchor);
+
+    // 4. MODERN BASE64 TO BINARY FILE OBJECT STREAMING
+    const base64Fetch = await fetch(jpgDataUrl);
+    const imageBlob = await base64Fetch.blob();
+    const sharedFile = new File([imageBlob], `${filenameLabel}.jpg`, { type: 'image/jpeg' });
+
+    // 5. TRIGGER PHONE'S NATIVE OVERLAY SHARE SHEET INTERFACE
+    if (navigator.canShare && navigator.canShare({ files: [sharedFile] })) {
+      await navigator.share({
+        files: [sharedFile],
+        title: 'Banglakhata রশিদ',
+        text: 'Banglakhata অ্যাপ থেকে শেয়ার করা ডিজিটাল রসিদ।'
+      });
+      console.log('Native share overlay opened successfully.');
+    } else {
+      // If the mobile browser strictly denies file stream injection, use pure system text fallback
+      await navigator.share({
+        title: 'Banglakhata রশিদ',
+        text: `রসিদটি আপনার ফোনের গ্যালারিতে JPG ছবি হিসেবে ডাউনলোড হয়েছে। অনুগ্রহ করে যেকোনো সোশ্যাল মিডিয়ায় পাঠিয়ে দিন।`
+      });
+    }
+  } catch (error) {
+    console.error('System Native Share Pipeline Exception Intercepted:', error);
+  }
+};
