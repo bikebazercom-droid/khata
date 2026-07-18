@@ -238,7 +238,8 @@ export const PatchLedgerEntryResponse = zod.object({
 export const ListGlobalLedgerEntriesQueryParams = zod.object({
   "startDate": zod.date().optional(),
   "endDate": zod.date().optional(),
-  "search": zod.coerce.string().optional()
+  "search": zod.coerce.string().optional(),
+  "partyRole": zod.enum(["CUSTOMER", "SUPPLIER"]).optional()
 })
 
 export const ListGlobalLedgerEntriesResponseItem = zod.object({

@@ -397,12 +397,11 @@ export function HomeView() {
           </div>
           <button
             type="button"
-            onClick={() => exportFilteredReportToPDF()}
-            disabled={isExportingPdf}
-            className="px-1.5 py-3 flex flex-col items-center justify-center gap-1 active:scale-[0.95] transition-all min-w-0 disabled:opacity-50"
+            onClick={() => navigate(`/reports?role=${role === PartyRole.CUSTOMER ? 'customer' : 'supplier'}`)}
+            className="px-1.5 py-3 flex flex-col items-center justify-center gap-1 active:scale-[0.95] transition-all min-w-0"
           >
             <span className="flex items-center gap-1 text-[#075E9F] font-bold text-[12px] whitespace-nowrap">
-              {isExportingPdf ? '...' : 'রিপোর্ট দেখুন'}
+              রিপোর্ট দেখুন
               <ChevronRight className="w-3.5 h-3.5 shrink-0" />
             </span>
           </button>

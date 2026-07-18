@@ -1,0 +1,195 @@
+Hey Agent, look at Screenshot_22.jpg, Screenshot_23.jpg, and Screenshot_24.jpg. 
+Instead of instantly downloading the PDF when clicking "রিপোর্ট দেখুন >" from the main dashboard (Screenshot_22), we need to navigate to or render a dedicated interactive "রিপোর্ট দেখুন" (View Report) screen exactly as shown in Screenshot_23.jpg.
+
+YOUR IMPLEMENTATION TASKS:
+
+1. STATE & ROUTING HANDLING:
+   - Clicking "রিপোর্ট দেখুন >" must load this new `ReportView` screen.
+   - It must dynamically accept the current active tab context ('customer' or 'supplier') so it loads the correct transaction entries array.
+
+2. FILTER & TOP LAYOUT COMPONENTS (Screenshot_23.jpg):
+   - Header bar with back button arrow and title "রিপোর্ট দেখুন".
+   - Two parallel inline Date inputs: "आरম্ভের তারিখ (Start Date)" and "শেষের তারিখ (End Date)" with a decorative calendar icon.
+   - A search bar input text field: "এন্ট্রি অনুসন্ধান করুন".
+   - A dynamic quick-filter action button next to search (default labeled "সব" with a down arrow). Clicking this opens a Bottom Sheet Modal containing the options seen in Screenshot_24.jpg ("সব", "এই মাসে", "এক দিন", "গত সপ্তাহে", "গত মাসের", "তারিখের পরিসর").
+
+3. STATS SUMMARY MATRIX BOX:
+   - Feature a large dynamic text for "মোট ব্যালেন্স" (Net Balance) matching the filtered calculations.
+   - Underneath, standard container split into three responsive modules:
+     * মোট [X] এন্ট্রিগুলো (Total Count)
+     * আপনি দিয়েছেন (Total Given) in red color.
+     * আপনি পেয়েছেন (Total Received) in green color.
+
+4. TRANSACTION LIST ROWS:
+   - Map through the filtered entries. Each row must display the name/details, timestamp (e.g., "18 Jul 26 • 04:23 PM"), and the transaction amount inside a subtle highlighted block on the right (red background tint for Give, green text or blank for Get as per configuration).
+
+5. BOTTOM STICKY ACTION DOWNLOAD BUTTON:
+   - A full-width rich blue button fixed at the bottom labeled "📥 ডাউনলোড" (Download).
+   - When clicked, it passes the CURRENTLY FILTERED list data into our dynamic HTML-to-PDF engine (`generateAndSharePerfectReportPDF`), injecting the Shop name at the Top Header and Address/Phone at the Footer from localStorage settings.
+
+Please review and overwrite the Report View module using this fully functional layout code immediately:
+
+---
+
+### COMPLETE REPORT SCREEN COMPONENT (`src/screens/ReportView.jsx`)
+```javascript
+import React, { useState, useEffect } from 'react';
+
+export const ReportView = ({ currentContext = 'customer', dataSource = [], onBack }) => {
+  const [entries, setEntries] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [filterType, setFilterType] = useState('সব'); // 'সব' | 'this_month' | etc.
+  const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
+
+  // Sync profile language settings
+  const savedSettings = localStorage.getItem('user_settings_profile');
+  const userProfile = savedSettings ? JSON.parse(savedSettings) : { language: 'bn' };
+  const isBn = userProfile.language === 'bn';
+
+  useEffect(() => {
+    // Initialize or filter dataset based on inputs
+    let result = [...dataSource];
+    
+    if (searchTerm) {
+      result = result.filter(item => item.name?.toLowerCase().includes(searchTerm.toLowerCase()));
+    }
+    // Add custom date parsing logic here based on filterType...
+    setEntries(result);
+  }, [searchTerm, startDate, endDate, filterType, dataSource]);
+
+  // Calculations Matrix
+  let totalGiven = 0;
+  let totalReceived = 0;
+  entries.forEach(item => {
+    if (item.balance < 0) totalGiven += Math.abs(item.balance);
+    else totalReceived += item.balance;
+  });
+  const netBalance = totalReceived - totalGiven;
+
+  const handleDownloadClick = () => {
+    // Triggers our customized PDF canvas printer with filtered data array
+    if (typeof window.generateAndSharePerfectReportPDF === 'function') {
+      window.generateAndSharePerfectReportPDF(entries, currentContext);
+    } else {
+      console.log("PDF function call initiated with entries:", entries);
+    }
+  };
+
+  return (
+    <div style={{ width: '100%', maxWidth: '450px', margin: '0 auto', minHeight: '100vh', backgroundColor: '#F8FAFC', display: 'flex', flexDirection: 'column', position: 'relative', fontFamily: 'sans-serif', boxSizing: 'border-box', pb: '80px' }}>
+      
+      {/* SCREEN NAVIGATION HEADER */}
+      <div style={{ backgroundColor: '#0A59CD', color: '#ffffff', padding: '16px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#ffffff', fontSize: '20px', cursor: 'pointer' }}>◀</button>
+        <span style={{ fontSize: '18px', fontWeight: 'bold' }}>{isBn ? 'রিপোর্ট দেখুন' : 'View Report'}</span>
+      </div>
+
+      {/* FILTERING BAR PANEL BLOCK */}
+      <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px', backgroundColor: '#ffffff', borderBottom: '1px solid #E2E8F0' }}>
+        
+        {/* DATE PICKER FIELDS */}
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ flex: 1, border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px 12px', backgroundColor: '#F8FAFC' }}>
+            <div style={{ fontSize: '11px', color: '#94A3B8' }}>আরম্ভের তারিখ</div>
+            <div style={{ fontSize: '14px', fontWeight: '500', color: '#1E293B', marginTop: '2px' }}>📅 নির্বাচন করুন</div>
+          </div>
+          <div style={{ flex: 1, border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px 12px', backgroundColor: '#F8FAFC' }}>
+            <div style={{ fontSize: '11px', color: '#94A3B8' }}>শেষের তারিখ</div>
+            <div style={{ fontSize: '14px', fontWeight: '500', color: '#1E293B', marginTop: '2px' }}>📅 নির্বাচন করুন</div>
+          </div>
+        </div>
+
+        {/* SEARCH & QUICK TOGGLE MODULE ROW */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <span style={{ position: 'absolute', left: '10px', color: '#94A3B8' }}>🔍</span>
+            <input 
+              type="text" 
+              placeholder="এন্ট্রি অনুসন্ধান করুন" 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{ width: '100%', padding: '10px 10px 10px 32px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }} 
+            />
+          </div>
+          <button 
+            onClick={() => setIsBottomSheetOpen(true)}
+            style={{ backgroundColor: '#0A59CD', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '10px 16px', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <span>{filterType}</span> <span>▼</span>
+          </button>
+        </div>
+      </div>
+
+      {/* BALANCE MATRIX STATS SCORECARD CARD */}
+      <div style={{ padding: '14px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#64748B' }}>মোট ব্যালেন্স</span>
+          <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#16A34A' }}>৳ {Math.abs(netBalance).toLocaleString('bn-BD')}</span>
+        </div>
+
+        <div style={{ display: 'flex', border: '1px solid #E2E8F0', borderRadius: '8px', backgroundColor: '#ffffff', textAlign: 'center' }}>
+          <div style={{ flex: 1, padding: '10px', borderRight: '1px solid #E2E8F0' }}>
+            <div style={{ fontSize: '11px', color: '#64748B' }}>মোট</div>
+            <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#0F172A', marginTop: '4px' }}>{entries.length} এন্ট্রিগুলো</div>
+          </div>
+          <div style={{ flex: 1, padding: '10px', borderRight: '1px solid #E2E8F0' }}>
+            <div style={{ fontSize: '11px', color: '#64748B' }}>আপনি দিয়েছেন</div>
+            <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#DC2626', marginTop: '4px' }}>৳{totalGiven}</div>
+          </div>
+          <div style={{ flex: 1, padding: '10px' }}>
+            <div style={{ fontSize: '11px', color: '#64748B' }}>আপনি পেয়েছেন</div>
+            <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#16A34A', marginTop: '4px' }}>৳{totalReceived}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* TRANSACTION ITEMS ROWS VIEW SCROLL LIST */}
+      <div style={{ flex: 1, padding: '0 14px', display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', paddingBottom: '90px' }}>
+        {entries.map((item, idx) => (
+          <div key={idx} style={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontWeight: 'bold', color: '#1E293B', fontSize: '14px' }}>{item.name || 'rrrr'}</div>
+              <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '4px' }}>18 Jul 26 • 04:23 PM</div>
+            </div>
+            <div style={{ padding: '6px 14px', borderRadius: '4px', backgroundColor: item.balance < 0 ? '#FEF2F2' : '#F0FDF4', color: item.balance < 0 ? '#DC2626' : '#16A34A', fontWeight: 'bold', fontSize: '15px' }}>
+              ৳ {Math.abs(item.balance)}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* FIXED BOTTOM DOWNLOAD CONTAINER BAR ACTION BUTTON */}
+      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '450px', backgroundColor: '#ffffff', padding: '12px 14px', boxSizing: 'border-box', borderTop: '1px solid #E2E8F0', zIndex: 999 }}>
+        <button 
+          onClick={handleDownloadClick}
+          style={{ width: '100%', padding: '14px', backgroundColor: '#0A59CD', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
+        >
+          📄 ডাউনলোড (Download)
+        </button>
+      </div>
+
+      {/* FILTERS OVERLAY BOTTOM SHEET MODAL LAYOUT (Screenshot_24.jpg) */}
+      {isBottomSheetOpen && (
+        <>
+          <div onClick={() => setIsBottomSheetOpen(false)} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 10000 }} />
+          <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: '450px', backgroundColor: '#ffffff', borderRadius: '16px 16px 0 0', padding: '20px', zIndex: 10001, boxSizing: 'border-box' }}>
+            <div style={{ fontWeight: 'bold', fontSize: '15px', color: '#1E293B', marginBottom: '15px' }}>রিপোর্ট সময়কাল নির্বাচন করুন</div>
+            {['সব', 'এই মাসে', 'এক দিন', 'গত সপ্তাহে', 'গত মাসের', 'তারিখের পরিসর'].map((opt) => (
+              <div 
+                key={opt}
+                onClick={() => { setFilterType(opt); setIsBottomSheetOpen(false); }}
+                style={{ padding: '14px 0', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', fontSize: '14px', color: '#334155' }}
+              >
+                <span>{opt}</span>
+                <input type="radio" checked={filterType === opt} readOnly style={{ accentColor: '#0A59CD' }} />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+    </div>
+  );
+};

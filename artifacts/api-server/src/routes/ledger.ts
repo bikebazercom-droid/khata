@@ -12,6 +12,8 @@ function parseQuery(query: Record<string, unknown>) {
   const startDate = typeof query["startDate"] === "string" ? query["startDate"] : undefined;
   const endDate = typeof query["endDate"] === "string" ? query["endDate"] : undefined;
   const search = typeof query["search"] === "string" ? query["search"] : undefined;
+  const partyRoleRaw = typeof query["partyRole"] === "string" ? query["partyRole"] : undefined;
+  const partyRole = partyRoleRaw === "CUSTOMER" || partyRoleRaw === "SUPPLIER" ? partyRoleRaw : undefined;
 
   if (startDate !== undefined && !DATE_ONLY_PATTERN.test(startDate)) {
     return { error: "startDate must be a yyyy-MM-dd date string" } as const;
@@ -20,7 +22,7 @@ function parseQuery(query: Record<string, unknown>) {
     return { error: "endDate must be a yyyy-MM-dd date string" } as const;
   }
 
-  return { data: { startDate, endDate, search } } as const;
+  return { data: { startDate, endDate, search, partyRole } } as const;
 }
 
 router.get("/ledger-entries", async (req, res): Promise<void> => {
@@ -31,9 +33,12 @@ router.get("/ledger-entries", async (req, res): Promise<void> => {
     return;
   }
 
-  const { startDate, endDate, search } = parsed.data;
+  const { startDate, endDate, search, partyRole } = parsed.data;
   const conditions = [eq(partiesTable.businessId, businessId)];
 
+  if (partyRole) {
+    conditions.push(eq(partiesTable.role, partyRole) as any);
+  }
   if (startDate) {
     conditions.push(gte(ledgerEntriesTable.createdAt, new Date(`${startDate}T00:00:00.000Z`)) as any);
   }

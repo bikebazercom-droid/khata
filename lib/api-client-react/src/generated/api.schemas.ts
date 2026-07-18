@@ -198,5 +198,6 @@ export type ListGlobalLedgerEntriesParams = {
 startDate?: string;
 endDate?: string;
 search?: string;
+partyRole?: string;
 };
 
