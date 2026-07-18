@@ -10,6 +10,7 @@ import { MainLayout } from '@/components/layout/main-layout';
 import { ConnectionStateProvider, useConnectionState } from '@/context/connection-state';
 import { HomeView } from '@/pages/home';
 import { PartyView } from '@/pages/party-view';
+import { PartyProfileView } from '@/pages/party-profile';
 import { TransactionDetailPage } from '@/pages/transaction-detail';
 import { ReportView } from '@/pages/report-view';
 import { StaffDeploymentPage } from '@/pages/staff-deployment';
@@ -347,6 +348,13 @@ function AppRouter() {
               {() => (
                 <ProtectedLayout>
                   <TransactionDetailPage />
+                </ProtectedLayout>
+              )}
+            </Route>
+            <Route path="/party/:id/profile">
+              {() => (
+                <ProtectedLayout>
+                  <PartyProfileView />
                 </ProtectedLayout>
               )}
             </Route>

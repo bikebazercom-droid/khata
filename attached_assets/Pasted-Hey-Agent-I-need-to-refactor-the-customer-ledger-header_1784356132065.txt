@@ -1,0 +1,60 @@
+Hey Agent, I need to refactor the customer ledger header layout based on the two screenshots provided.
+
+THE REQUIREMENTS:
+1. Remove the "সেটিংস দেখুন" sub-text layer entirely under the customer name in the top header bar (Screenshot_14.jpg).
+2. Make the entire top profile info section (Avatar + Name area) clickable. When tapped, it must navigate directly to the "গ্রাহক প্রোফাইল" (Customer Profile) screen (photo_2026-07-18_12-27-45.jpg).
+3. On the Customer Profile screen, display the user details rows (Name, Mobile, Address, GSTIN, Bank, Convert to Supplier) and include a functional "গ্রাহক মুছুন" (Delete Customer) button layout at the absolute bottom with a confirmation alert.
+
+YOUR TASK:
+Refactor the Header JSX component to clear the sub-text, add an onClick/onPress navigation trigger to the row, and build/verify the Profile Details Screen layout featuring the delete data action.
+
+Please implement the following code adjustment:
+
+---
+
+### 1. REFACTORING THE TOP HEADER BAR COMPONENT
+
+```jsx
+// Inside your Customer Ledger/Details Top Header Component
+import { useNavigate } from 'react-router-dom'; // or your framework's navigation hook
+
+const CustomerHeader = ({ customer, onDeleteSuccess }) => {
+  const navigate = useNavigate();
+
+  return (
+    <div className="w-full bg-blue-600 text-white p-4 flex items-center justify-between shadow-md">
+      {/* LEFT AREA: BACK ARROW + CLICKABLE PROFILE INFO */}
+      <div className="flex items-center space-x-3 flex-grow">
+        <button onClick={() => navigate(-1)} className="text-white text-xl p-1 focus:outline-none">
+          ‹
+        </button>
+        
+        {/* ENTIRE INFO CONTAINER IS NOW CLICKABLE */}
+        <div 
+          onClick={() => navigate(`/customer-profile/${customer.id}`)}
+          className="flex items-center space-x-3 cursor-pointer active:opacity-80 transition flex-grow"
+        >
+          {/* Avatar circle with dynamic initials or plus badge icons */}
+          <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-blue-600 font-bold relative">
+            <span className="text-lg">+</span>
+          </div>
+          
+          <div>
+            <div className="flex items-center space-x-2">
+              <h2 className="font-bold text-lg leading-tight">{customer.name}</h2>
+              <span className="bg-blue-500 text-[10px] px-1.5 py-0.5 rounded font-medium border border-blue-400">
+                কাস্টমার
+              </span>
+            </div>
+            {/* "সেটিংস দেখুন" HAS BEEN COMPLETELY REMOVED FROM HERE */}
+          </div>
+        </div>
+      </div>
+
+      {/* RIGHT AREA: CALL ICON */}
+      <button className="text-white text-xl p-2 focus:outline-none">
+        📞
+      </button>
+    </div>
+  );
+};

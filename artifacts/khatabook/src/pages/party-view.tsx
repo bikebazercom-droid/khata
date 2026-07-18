@@ -1,20 +1,13 @@
 import { useMemo, useRef, useState } from 'react';
 import { useRoute, Link, useLocation } from 'wouter';
-import { useQueryClient } from '@tanstack/react-query';
 import {
   useGetParty,
   useListLedgerEntries,
-  useDeleteParty,
   useGetBusinessSettings,
   getGetPartyQueryKey,
   getListLedgerEntriesQueryKey,
-  getListPartiesQueryKey,
-  getGetDashboardSummaryQueryKey,
   LedgerEntryType,
-  type Party,
-  type DashboardSummary,
 } from '@workspace/api-client-react';
-import { shiftSummaryForPartyChange } from '@/lib/optimistic';
 import html2pdf from 'html2pdf.js';
 import {
   ChevronLeft,
@@ -22,7 +15,6 @@ import {
   FileText,
   Copy,
   Check,
-  Trash2,
   FileDown,
   MessageCircle,
   MessageSquareText,
@@ -32,21 +24,6 @@ import {
 import { formatCurrency, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-} from '@/components/ui/alert-dialog';
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from '@/components/ui/dropdown-menu';
 import { TransactionEntryScreen } from '@/components/modals/transaction-entry-screen';
 import { BillImageLightbox } from '@/components/modals/bill-image-lightbox';
 import {
@@ -92,56 +69,14 @@ export function PartyView() {
   const [, params] = useRoute('/party/:id');
   const id = params?.id;
   const [, navigate] = useLocation();
-  const queryClient = useQueryClient();
 
   const { data: party, isLoading: partyLoading } = useGetParty(id || '', { query: { enabled: !!id, queryKey: getGetPartyQueryKey(id || '') } });
   const { data: entries = [], isLoading: entriesLoading } = useListLedgerEntries(id || '', { query: { enabled: !!id, queryKey: getListLedgerEntriesQueryKey(id || '') } });
   const { data: settings } = useGetBusinessSettings();
-  // Optimistic delete: onMutate removes the party from the list/summary
-  // caches synchronously (the UI navigates away instantly, see
-  // `handleDelete`); onError restores the snapshot silently if the
-  // background request fails; onSettled reconciles in the background.
-  const deleteParty = useDeleteParty({
-    mutation: {
-      onMutate: async ({ partyId }) => {
-        const partiesKey = getListPartiesQueryKey();
-        const summaryKey = getGetDashboardSummaryQueryKey();
-        const previousParties = queryClient.getQueryData<Party[]>(partiesKey);
-        const previousSummary = queryClient.getQueryData<DashboardSummary>(summaryKey);
-        const removedParty = previousParties?.find((p) => p.id === partyId);
-
-        if (previousParties) {
-          queryClient.setQueryData<Party[]>(partiesKey, previousParties.filter((p) => p.id !== partyId));
-        }
-        if (previousSummary) {
-          let nextSummary = shiftSummaryForPartyChange(previousSummary, removedParty, undefined);
-          nextSummary = {
-            ...nextSummary,
-            customerCount: nextSummary.customerCount - (removedParty?.role === 'CUSTOMER' ? 1 : 0),
-            supplierCount: nextSummary.supplierCount - (removedParty?.role === 'SUPPLIER' ? 1 : 0),
-          };
-          queryClient.setQueryData<DashboardSummary>(summaryKey, nextSummary);
-        }
-
-        return { partiesKey, summaryKey, previousParties, previousSummary };
-      },
-      onError: (err, _vars, context) => {
-        console.error('কাস্টমার ডিলিট ব্যর্থ হয়েছে, পরিবর্তন ফিরিয়ে নেওয়া হচ্ছে:', err);
-        if (!context) return;
-        queryClient.setQueryData(context.partiesKey, context.previousParties);
-        queryClient.setQueryData(context.summaryKey, context.previousSummary);
-      },
-      onSettled: () => {
-        queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
-      },
-    },
-  });
 
   const [transactionType, setTransactionType] = useState<LedgerEntryType | null>(null);
   const [smsMessage, setSmsMessage] = useState<string | null>(null);
   const [copiedSms, setCopiedSms] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [isGeneratingReminder, setIsGeneratingReminder] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
@@ -182,16 +117,6 @@ export function PartyView() {
   const descendingEntries = useMemo(() => [...ascendingEntries].reverse(), [ascendingEntries]);
 
   const groupedEntries = useMemo(() => groupByDay(descendingEntries), [descendingEntries]);
-
-  const handleDelete = () => {
-    if (!id) return;
-    // Optimistic UI: close the confirm dialog and navigate home instantly —
-    // the party is already gone from the list/summary caches via onMutate
-    // above. The actual delete request runs silently in the background.
-    setShowDeleteConfirm(false);
-    navigate('/');
-    deleteParty.mutate({ partyId: id });
-  };
 
   /** Renders the hidden report DOM node into a jsPDF worker instance. */
   const buildReportPdf = () => {
@@ -381,35 +306,24 @@ export function PartyView() {
           >
             <ChevronLeft className="w-6 h-6" />
           </Link>
-          <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 text-[#0b57d0]">
-            <Plus className="w-5 h-5" strokeWidth={3} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h2 className="text-[15px] font-extrabold text-white leading-tight truncate">{party.name}</h2>
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/20 text-white uppercase tracking-wider shrink-0">
-                {party.role === 'CUSTOMER' ? 'কাস্টমার' : 'সাপ্লায়ার'}
-              </span>
+          {/* Avatar + name — tap to open the profile screen */}
+          <button
+            type="button"
+            onClick={() => navigate(`/party/${id}/profile`)}
+            className="flex items-center gap-3 flex-1 min-w-0 active:opacity-75 transition-all"
+          >
+            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 text-[#0b57d0]">
+              <Plus className="w-5 h-5" strokeWidth={3} />
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="flex items-center gap-1 text-xs font-semibold text-white/80 hover:text-white transition-colors"
-                >
-                  সেটিংস দেখুন
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem
-                  className="text-red-600 focus:text-red-600"
-                  onClick={() => setShowDeleteConfirm(true)}
-                >
-                  <Trash2 className="w-4 h-4 mr-2" /> কাস্টমার ডিলিট করুন
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+            <div className="min-w-0 flex-1 text-left">
+              <div className="flex items-center gap-2">
+                <h2 className="text-[15px] font-extrabold text-white leading-tight truncate">{party.name}</h2>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/20 text-white uppercase tracking-wider shrink-0">
+                  {party.role === 'CUSTOMER' ? 'কাস্টমার' : 'সাপ্লায়ার'}
+                </span>
+              </div>
+            </div>
+          </button>
           <a
             href={`tel:${party.phone}`}
             aria-label="কল করুন"
@@ -626,22 +540,6 @@ export function PartyView() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <AlertDialogContent className="max-w-sm rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>কাস্টমার ডিলিট করুন</AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-600">
-              আপনি কি নিশ্চিত যে এই কাস্টমারকে ডিলিট করতে চান? এর ফলে এই কাস্টমারের সমস্ত হিসাব মুছে যাবে।
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="font-bold">বাতিল করুন</AlertDialogCancel>
-            <Button variant="destructive" className="font-bold" onClick={handleDelete}>
-              ডিলিট করুন
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
