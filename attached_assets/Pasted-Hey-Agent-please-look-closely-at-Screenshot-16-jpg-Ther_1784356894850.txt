@@ -1,0 +1,156 @@
+Hey Agent, please look closely at Screenshot_16.jpg. There are two critical UI/UX fixes needed on the "গ্রাহক প্রোফাইল" (Customer Profile) screen:
+
+1. THE OVERLAP BUG:
+The top balance summary card ("আপনি পাবেন" / "আপনি দেবেন") is currently overlapping and slipping underneath the blue header bar. You need to push this card down visually by adding appropriate top spacing/margin (`marginTop` or `pt-24` depending on absolute header structures) so the balance and text are fully visible and readable.
+
+2. EDITABLE INPUT FIELDS:
+Right now, the fields for Name (নাম), Mobile (মোবাইল), Address (ঠিকানা), and Bank (ব্যাংক) are just static text views inside a non-editable list layout. The user wants to be able to directly TYPE/EDIT these values inside this screen. Convert these rows into fully functional controlled HTML/Tailwind input fields with a proper text state binder.
+
+Please update the Customer Profile component with the following structural layout and fixes:
+
+---
+
+### 1. COMPONENT REFACTOR WITH EDITABLE STATES & SCROLL FIX
+
+```jsx
+// Inside your CustomerProfileScreen Component
+import React, { useState } from 'react';
+
+const CustomerProfileScreen = ({ initialCustomerData }) => {
+  // Controlled States for direct text typing/editing
+  const [name, setName] = useState(initialCustomerData?.name || "Dhruva V Raghavan");
+  const [mobile, setMobile] = useState(initialCustomerData?.mobile || "9876500003");
+  const [address, setAddress] = useState(initialCustomerData?.address || "");
+  const [bank, setBank] = useState(initialCustomerData?.bank || "");
+
+  const handleUpdateProfile = async () => {
+    try {
+      // Logic payload to save updated profile fields to database
+      // await api.updateCustomerProfile({ name, mobile, address, bank });
+      alert("প্রোফাইল তথ্য সফলভাবে আপডেট করা হয়েছে!");
+    } catch (error) {
+      alert("আপডেট করতে সমস্যা হয়েছে।");
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-between relative pb-6">
+      
+      {/* FIXED BLUE HEADER */}
+      <div className="fixed top-0 left-0 right-0 h-48 bg-blue-600 text-white p-4 flex flex-col items-center z-40 shadow-md">
+        <div className="w-full flex items-center">
+          <button className="text-white text-xl mr-2">←</button>
+          <h1 className="font-bold text-base flex-grow text-center">কাস্তমার প্রোফাইল</h1>
+        </div>
+        
+        {/* Profile Avatar & Name Block */}
+        <div className="flex flex-col items-center mt-2">
+          <div className="w-14 h-14 bg-blue-400 rounded-full flex items-center justify-center text-white text-xl font-bold">
+            {name.charAt(0)}
+          </div>
+          <h2 className="font-bold text-lg mt-1">{name}</h2>
+          <span className="bg-blue-500/50 text-[10px] px-2 py-0.5 rounded mt-0.5 border border-blue-400">কাস্টমার</span>
+        </div>
+      </div>
+
+      {/* MAIN CONTAINER: FIXED SPACING TO RESOLVE OVERLAP */}
+      {/* pt-52 ensures the green balance card clears the 48px/h-48 fixed header completely */}
+      <div className="flex-grow pt-52 p-4 space-y-4 overflow-y-auto z-10">
+        
+        {/* GREEN BALANCE SUMMARY CARD - PUSHED DOWN & FULLY VISIBLE */}
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex justify-between items-center shadow-sm">
+          <span className="text-emerald-700 font-bold text-sm">আপনি পাবেন</span>
+          <span className="text-emerald-600 font-extrabold text-lg">৳১৩,৩০২</span>
+        </div>
+
+        {/* PROFILE INPUT FORM FIELDS - CONVERTED TO TYPABLE INPUT BOXES */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-4">
+          
+          {/* NAME FIELD INPUT */}
+          <div className="flex items-center space-x-3 border-b border-gray-100 pb-2">
+            <span className="text-gray-400 text-lg">👤</span>
+            <div className="flex-grow">
+              <label className="text-xs text-gray-400 block font-medium">নাম</label>
+              <input 
+                type="text" 
+                value={name} 
+                onChange={(e) => setName(e.target.value)}
+                className="w-full text-sm font-semibold text-gray-800 bg-transparent focus:outline-none focus:border-blue-500"
+                placeholder="নাম লিখুন"
+              />
+            </div>
+          </div>
+
+          {/* MOBILE FIELD INPUT */}
+          <div className="flex items-center space-x-3 border-b border-gray-100 pb-2">
+            <span className="text-gray-400 text-lg">📞</span>
+            <div className="flex-grow">
+              <label className="text-xs text-gray-400 block font-medium">মোবাইল</label>
+              <input 
+                type="text" 
+                value={mobile} 
+                onChange={(e) => setMobile(e.target.value)}
+                className="w-full text-sm font-semibold text-gray-800 bg-transparent focus:outline-none focus:border-blue-500"
+                placeholder="মোবাইল নম্বর লিখুন"
+              />
+            </div>
+          </div>
+
+          {/* ADDRESS FIELD INPUT */}
+          <div className="flex items-center space-x-3 border-b border-gray-100 pb-2">
+            <span className="text-gray-400 text-lg">📍</span>
+            <div className="flex-grow">
+              <label className="text-xs text-gray-400 block font-medium">ঠিকানা</label>
+              <input 
+                type="text" 
+                value={address} 
+                onChange={(e) => setAddress(e.target.value)}
+                className="w-full text-sm font-semibold text-gray-800 bg-transparent focus:outline-none focus:border-blue-500"
+                placeholder="যোগ করা হয়নি (টাইপ করুন)"
+              />
+            </div>
+          </div>
+
+          {/* BANK FIELD INPUT */}
+          <div className="flex items-center space-x-3 pb-2">
+            <span className="text-gray-400 text-lg">🏦</span>
+            <div className="flex-grow">
+              <label className="text-xs text-gray-400 block font-medium">ব্যাংক</label>
+              <input 
+                type="text" 
+                value={bank} 
+                onChange={(e) => setBank(e.target.value)}
+                className="w-full text-sm font-semibold text-gray-800 bg-transparent focus:outline-none focus:border-blue-500"
+                placeholder="যোগ করা হয়নি (টাইপ করুন)"
+              />
+            </div>
+          </div>
+
+        </div>
+
+        {/* CONVERT TO SUPPLIER BUTTON */}
+        <button className="w-full bg-white border border-gray-200 text-gray-700 font-semibold p-3 rounded-xl flex justify-between items-center text-sm shadow-sm">
+          <div className="flex items-center space-x-2">
+            <span>🔄</span> <span>সাপ্লায়ার-তে রূপান্তর করুন</span>
+          </div>
+          <span className="text-gray-400">›</span>
+        </button>
+
+        {/* OPTIONAL: PROFILE SAVE CHANGES BUTTON */}
+        <button 
+          onClick={handleUpdateProfile}
+          className="w-full bg-blue-600 text-white font-bold py-2.5 rounded-xl text-sm shadow-sm transition hover:bg-blue-700 mt-2"
+        >
+          তথ্য পরিবর্তন সেভ করুন
+        </button>
+      </div>
+
+      {/* STICKY DELETE BUTTON AT BOTTOM */}
+      <div className="px-4 w-full z-20">
+        <button className="w-full bg-red-50 border border-red-200 text-red-600 font-bold py-3 rounded-xl flex items-center justify-center space-x-2">
+          <span>🗑️</span> <span>কাস্তমার মুছুন</span>
+        </button>
+      </div>
+    </div>
+  );
+};

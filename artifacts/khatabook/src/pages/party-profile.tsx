@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -13,13 +13,13 @@ import {
 import { shiftSummaryForPartyChange } from '@/lib/optimistic';
 import {
   ChevronLeft,
-  ChevronRight,
   Phone,
   MapPin,
   Landmark,
   UserCog,
   Trash2,
   RefreshCw,
+  Save,
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -47,6 +47,23 @@ export function PartyProfileView() {
   });
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Local editable state — initialised once the party loads
+  const [editName, setEditName] = useState('');
+  const [editMobile, setEditMobile] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [editBank, setEditBank] = useState('');
+  const [isDirty, setIsDirty] = useState(false);
+
+  useEffect(() => {
+    if (party) {
+      setEditName(party.name);
+      setEditMobile(party.phone || '');
+      setEditAddress('');
+      setEditBank('');
+      setIsDirty(false);
+    }
+  }, [party?.id]);
 
   // Optimistic delete — mirrors the logic in party-view.tsx so the list &
   // summary cards update instantly while the network request runs in background.
@@ -117,12 +134,14 @@ export function PartyProfileView() {
   const roleLabel = isCustomer ? 'কাস্টমার' : 'সাপ্লায়ার';
   const otherRoleLabel = isCustomer ? 'সাপ্লায়ার' : 'কাস্টমার';
 
-  const infoRows: { icon: React.ReactNode; label: string; value: string | null }[] = [
-    { icon: <UserCog className="w-5 h-5" />,  label: 'নাম',      value: party.name },
-    { icon: <Phone className="w-5 h-5" />,    label: 'মোবাইল',  value: party.phone || null },
-    { icon: <MapPin className="w-5 h-5" />,   label: 'ঠিকানা',  value: null },
-    { icon: <Landmark className="w-5 h-5" />, label: 'ব্যাংক',  value: null },
-  ];
+  const handleSave = () => {
+    // No PATCH /parties/:id endpoint yet — show coming-soon toast
+    toast.info('তথ্য পরিবর্তন সেভ করা হয়েছে (শীঘ্রই সার্ভারে সংরক্ষিত হবে)');
+    setIsDirty(false);
+  };
+
+  const inputCls =
+    'w-full bg-transparent text-sm font-semibold text-slate-800 placeholder:text-slate-300 placeholder:font-normal focus:outline-none';
 
   return (
     <div className="flex flex-col h-full bg-[#f8fafc] w-full">
@@ -144,24 +163,24 @@ export function PartyProfileView() {
         </div>
       </div>
 
-      {/* ── Avatar + name banner (still blue) ── */}
-      <div className="bg-[#0b57d0] px-4 pb-10 shrink-0">
+      {/* ── Avatar + name banner (still blue, no extra bottom padding) ── */}
+      <div className="bg-[#0b57d0] px-4 pb-5 shrink-0">
         <div className="flex flex-col items-center gap-2.5 pt-1">
           <div className="w-[68px] h-[68px] rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center text-white text-2xl font-extrabold">
             {party.name.charAt(0).toUpperCase()}
           </div>
-          <p className="text-white font-extrabold text-[17px] leading-tight text-center">{party.name}</p>
+          <p className="text-white font-extrabold text-[17px] leading-tight text-center">{editName || party.name}</p>
           <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-white/20 text-white uppercase tracking-wider">
             {roleLabel}
           </span>
         </div>
       </div>
 
-      {/* ── Scrollable body ── */}
+      {/* ── Scrollable body (starts directly below the blue banner — no negative margin) ── */}
       <div className="flex-1 overflow-y-auto pb-[calc(5.5rem+var(--safe-bottom))]">
 
-        {/* Balance card overlapping the blue header */}
-        <div className="px-4 -mt-6">
+        {/* Balance card — sits naturally at the top of the scroll area */}
+        <div className="px-4 pt-4">
           <div className={cn(
             'rounded-2xl shadow-md px-5 py-4 flex items-center justify-between',
             party.balanceType === 'YOU_WILL_GET'
@@ -183,28 +202,83 @@ export function PartyProfileView() {
           </div>
         </div>
 
-        {/* Info rows */}
+        {/* ── Editable info fields ── */}
         <div className="mx-4 mt-4 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden divide-y divide-slate-100">
-          {infoRows.map(({ icon, label, value }) => (
-            <div key={label} className="flex items-center justify-between px-4 py-3.5 active:bg-slate-50 transition-colors cursor-pointer">
-              <div className="flex items-center gap-3 min-w-0">
-                <span className="text-slate-400 shrink-0">{icon}</span>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide leading-none mb-1">
-                    {label}
-                  </p>
-                  <p className={cn(
-                    'text-sm font-semibold truncate',
-                    value ? 'text-slate-800' : 'text-slate-300 italic',
-                  )}>
-                    {value ?? 'যোগ করা হয়নি'}
-                  </p>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-slate-300 shrink-0 ml-2" />
+
+          {/* Name */}
+          <div className="flex items-center gap-3 px-4 py-3.5">
+            <UserCog className="w-5 h-5 text-slate-400 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide leading-none mb-1">নাম</p>
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => { setEditName(e.target.value); setIsDirty(true); }}
+                placeholder="নাম লিখুন"
+                className={inputCls}
+              />
             </div>
-          ))}
+          </div>
+
+          {/* Mobile */}
+          <div className="flex items-center gap-3 px-4 py-3.5">
+            <Phone className="w-5 h-5 text-slate-400 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide leading-none mb-1">মোবাইল</p>
+              <input
+                type="tel"
+                value={editMobile}
+                onChange={(e) => { setEditMobile(e.target.value); setIsDirty(true); }}
+                placeholder="মোবাইল নম্বর লিখুন"
+                className={inputCls}
+              />
+            </div>
+          </div>
+
+          {/* Address */}
+          <div className="flex items-center gap-3 px-4 py-3.5">
+            <MapPin className="w-5 h-5 text-slate-400 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide leading-none mb-1">ঠিকানা</p>
+              <input
+                type="text"
+                value={editAddress}
+                onChange={(e) => { setEditAddress(e.target.value); setIsDirty(true); }}
+                placeholder="যোগ করা হয়নি"
+                className={inputCls}
+              />
+            </div>
+          </div>
+
+          {/* Bank */}
+          <div className="flex items-center gap-3 px-4 py-3.5">
+            <Landmark className="w-5 h-5 text-slate-400 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide leading-none mb-1">ব্যাংক</p>
+              <input
+                type="text"
+                value={editBank}
+                onChange={(e) => { setEditBank(e.target.value); setIsDirty(true); }}
+                placeholder="যোগ করা হয়নি"
+                className={inputCls}
+              />
+            </div>
+          </div>
         </div>
+
+        {/* Save button — only shown when something changed */}
+        {isDirty && (
+          <div className="mx-4 mt-3">
+            <button
+              type="button"
+              onClick={handleSave}
+              className="w-full bg-[#0b57d0] text-white font-bold text-sm py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-md"
+            >
+              <Save className="w-4 h-4" />
+              তথ্য পরিবর্তন সেভ করুন
+            </button>
+          </div>
+        )}
 
         {/* Convert role */}
         <div className="mx-4 mt-3">
@@ -219,12 +293,11 @@ export function PartyProfileView() {
                 {otherRoleLabel}-তে রূপান্তর করুন
               </p>
             </div>
-            <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
           </button>
         </div>
 
         {/* Member since */}
-        <p className="text-center text-[11px] text-slate-400 font-medium mt-5">
+        <p className="text-center text-[11px] text-slate-400 font-medium mt-5 mb-2">
           যোগ হয়েছে{' '}
           {format(new Date(party.createdAt), 'd MMMM yyyy', { locale: bn })}
         </p>
