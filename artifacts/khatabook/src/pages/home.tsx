@@ -123,45 +123,52 @@ export function HomeView() {
     try {
       const canvas = await html2canvas(receiptRef.current, {
         backgroundColor: '#ffffff',
-        scale: 2,
+        scale: 3,
         useCORS: true,
         logging: false,
       });
 
       const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.95);
-
-      // Blob → File so the Web Share API can attach it
-      const blobResponse = await fetch(jpgDataUrl);
-      const rawBlob = await blobResponse.blob();
       const ownerName = settings?.storeName || 'Banglakhata';
       const fileName = `Request_From_${ownerName.replace(/\s+/g, '_')}.jpg`;
+
+      // Always force-download the JPG to device storage first — unconditionally
+      const autoSave = (url: string) => {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      };
+      autoSave(jpgDataUrl);
+
+      // Then silently attempt the native share sheet
+      const blobResponse = await fetch(jpgDataUrl);
+      const rawBlob = await blobResponse.blob();
       const jpgFile = new File([rawBlob], fileName, { type: 'image/jpeg' });
 
-      if (
-        typeof navigator.share === 'function' &&
-        navigator.canShare &&
-        navigator.canShare({ files: [jpgFile] })
-      ) {
+      const waFallback = `https://api.whatsapp.com/send?text=${encodeURIComponent(
+        'আপনার পেমেন্ট রসিদের ছবিটি ফোনে ডাউনলোড হয়েছে। অনুগ্রহ করে সেটি গ্যালারি থেকে সেন্ড করে দিন।',
+      )}`;
+
+      if (navigator.canShare && navigator.canShare({ files: [jpgFile] })) {
+        // .catch(() => {}) silences any browser-level block without showing a toast
         await navigator.share({
           files: [jpgFile],
           title: 'পেমেন্ট অনুরোধ রসিদ',
           text: `আপনাকে অর্থ প্রদানের জন্য ${ownerName}-এর কাছে অনুরোধ করুন।`,
+        }).catch(() => {
+          console.log('Native share blocked/cancelled. Image already downloaded.');
+          window.open(waFallback, '_blank');
         });
       } else {
-        // Desktop / unsupported browser — trigger a direct JPEG download
-        const anchor = document.createElement('a');
-        anchor.href = jpgDataUrl;
-        anchor.download = fileName;
-        document.body.appendChild(anchor);
-        anchor.click();
-        document.body.removeChild(anchor);
-        toast.info(
-          'সরাসরি শেয়ার সমর্থিত নয়। JPG ছবি ডাউনলোড হয়েছে — হোয়াটসঅ্যাপে শেয়ার করুন।',
-        );
+        // No file-share support — redirect to WhatsApp with instruction text
+        window.open(waFallback, '_blank');
       }
     } catch (err) {
+      // Capture phase failed — log only, never show an error toast
       console.error('WhatsApp JPG share error:', err);
-      toast.error('শেয়ার করতে সমস্যা হয়েছে। পুনরায় চেষ্টা করুন।');
     } finally {
       setIsWhatsAppSharing(false);
     }

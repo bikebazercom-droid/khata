@@ -1,0 +1,157 @@
+Hey Agent, please completely restore the core bottom navigation, payment modal interaction, and sharing pipeline back to its original fully functional state. Clean up all recent code edits that introduced the red toast errors. 
+
+1. Ensure the customer list amount click successfully triggers the payment request popup.
+2. Remove any broken or sandboxed file-sharing state logic that triggers "শেয়ার করতে সমস্যা হয়েছে".
+3. Bring back the clean, stable canvas rendering flow. If browser native file sharing fails, it must instantly and silently drop the high-quality JPG into device downloads and open the web bridge without showing any toast error.
+
+Please replace the entire active interface file with this fully restored, rock-solid layout:
+
+```javascript
+import React, { useState, useRef } from 'react';
+import html2canvas from 'html2canvas';
+
+// --- MAIN CUSTOMER LIST CONTAINER ---
+export const CustomerDashboard = () => {
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentTab, setCurrentTab] = useState('parties');
+
+  const customers = [
+    { id: 1, name: 'Shakil', amount: '৮১,৯৫,২০২.৩২', type: 'debit', time: 'প্রায় ৩ ঘণ্টা আগে' },
+    { id: 2, name: 'YspUFt', amount: '৮১৫০', type: 'debit', time: '৩ দিন আগে' }
+  ];
+
+  return (
+    <div style={{ backgroundColor: '#F8FAFC', minHeight: '100vh', fontFamily: 'sans-serif', paddingBottom: '80px', position: 'relative' }}>
+      
+      {/* Top Banner */}
+      <div style={{ backgroundColor: '#004B93', color: '#ffffff', padding: '16px', borderBottomLeftRadius: '12px', borderBottomRightRadius: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', fontSize: '13px' }}>
+          <span>📊 Bike bazer</span>
+          <span>👤 স্টাফ যোগ করুন</span>
+        </div>
+        <div style={{ display: 'flex', background: 'rgba(255,255,255,0.1)', borderRadius: '8px', padding: '12px', textAlign: 'center' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '14px', color: '#E2E8F0' }}>৳২,৫১,৩৮,০৮৪.৩৪</div>
+            <div style={{ fontSize: '11px', color: '#CBD5E1' }}>আপনি দেবেন</div>
+          </div>
+          <div style={{ flex: 1, borderLeft: '1px solid rgba(255,255,255,0.2)' }}>
+            <div style={{ fontSize: '14px', color: '#F87171' }}>৳১৪,৬০৬</div>
+            <div style={{ fontSize: '11px', color: '#CBD5E1' }}>আপনি পাবেন</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Search Bar */}
+      <div style={{ padding: '12px 16px' }}>
+        <input type="text" placeholder="🔍 কাস্টমার অনুসন্ধান করুন" style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px', boxSizing: 'border-box' }} />
+      </div>
+
+      {/* Customer Rows */}
+      <div style={{ backgroundColor: '#ffffff', margin: '0 12px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+        {customers.map((cust) => (
+          <div key={cust.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderBottom: '1px solid #F1F5F9' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#FEE2E2', color: '#EF4444', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                {cust.name.charAt(0)}
+              </div>
+              <div>
+                <div style={{ fontWeight: 'bold', color: '#1E293B', fontSize: '15px' }}>{cust.name}</div>
+                <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '2px' }}>{cust.time}</div>
+              </div>
+            </div>
+
+            <div 
+              onClick={() => { setSelectedCustomer(cust); setIsModalOpen(true); }}
+              style={{ textAlign: 'right', cursor: 'pointer', padding: '6px 12px', borderRadius: '6px' }}
+            >
+              <div style={{ fontWeight: 'bold', color: '#DC2626', fontSize: '16px' }}>৳ {cust.amount}</div>
+              <div style={{ fontSize: '11px', color: '#94A3B8' }}>দেবেন</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Pop-up Dialog */}
+      {isModalOpen && selectedCustomer && (
+        <PaymentPopup customer="{selectedCustomer}" onClose="{()"> setIsModalOpen(false)} />
+      )}
+
+      {/* Bottom Navigation (Restored with Middle Space Empty) */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, width: '100%', backgroundColor: '#ffffff', borderTop: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '60px', zIndex: 999 }}>
+        <button onClick={() => setCurrentTab('parties')} style={{ flex: 1, background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', color: currentTab === 'parties' ? '#004B93' : '#64748B', cursor: 'pointer' }}>
+          <span style={{ fontSize: '18px' }}>👥</span>
+          <span style={{ fontSize: '11px', fontWeight: 'bold' }}>পার্টিস</span>
+        </button>
+        <div style={{ flex: 1 }}></div>
+        <button onClick={() => setCurrentTab('settings')} style={{ flex: 1, background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', color: currentTab === 'settings' ? '#004B93' : '#64748B', cursor: 'pointer' }}>
+          <span style={{ fontSize: '18px' }}>⚙️</span>
+          <span style={{ fontSize: '11px', fontWeight: 'bold' }}>সেটিংস</span>
+        </button>
+      </div>
+
+    </div>
+  );
+};
+
+// --- POPUP ENGINE WITH STABLE IMAGE GENERATION ---
+const PaymentPopup = ({ customer, onClose }) => {
+  const receiptRef = useRef(null);
+
+  const handleShareFlow = async () => {
+    if (!receiptRef.current) return;
+    try {
+      const canvas = await html2canvas(receiptRef.current, { backgroundColor: '#ffffff', scale: 3, useCORS: true });
+      const jpgUrl = canvas.toDataURL('image/jpeg', 0.95);
+
+      // Force Download Image to Device Gallery instantly
+      const link = document.createElement('a');
+      link.href = jpgUrl;
+      link.download = `Receipt_${customer.name}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Silently open native sharing sheet if supported without throwing UI alerts
+      const res = await fetch(jpgUrl);
+      const blob = await res.blob();
+      const file = new File([blob], 'receipt.jpg', { type: 'image/jpeg' });
+      
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'পেমেন্ট রশিদ' }).catch(() => {});
+      } else {
+        window.open(`[https://api.whatsapp.com/send?text=রস](https://api.whatsapp.com/send?text=রস)িদটি আপনার গ্যালারিতে JPG ফরম্যাটে সেভ হয়েছে।`, '_blank');
+      }
+    } catch (e) {
+      console.log("Execution bypassed smoothly.");
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 9999, display: 'flex', alignItems: 'flex-end' }}>
+      <div style={{ width: '100%', backgroundColor: '#ffffff', borderTopLeftRadius: '24px', borderTopRightRadius: '24px', padding: '20px', boxSizing: 'border-box' }}>
+        
+        <div style={{ width: '40px', height: '4px', backgroundColor: '#CBD5E1', borderRadius: '2px', margin: '0 auto 16px auto' }}></div>
+
+        <div ref={receiptRef} style={{ backgroundColor: '#ffffff', padding: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <h4 style={{ margin: 0, fontSize: '15px', color: '#334155' }}>আপনাকে অর্থ প্রদানের জন্য <b>Shakil</b>-এর কাছে অনুরোধ করুন</h4>
+            <button onClick={onClose} style={{ border: 'none', background: '#F1F5F9', width: '26px', height: '26px', borderRadius: '50%' }}>✕</button>
+          </div>
+          <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#DC2626', marginBottom: '4px' }}>৳ {customer.amount}</div>
+          <div style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '20px' }}>দেবেন</div>
+          <div style={{ backgroundColor: '#F0F7FF', borderRadius: '12px', padding: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: '#1E40AF', fontSize: '13px' }}>আপনার অ্যাকাউন্টে এই অর্থপ্রদান পেতে ব্যাংকের বিবরণ যোগ করুন</span>
+            <span style={{ color: '#1E40AF', fontWeight: 'bold' }}>&gt;</span>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+          <button style={{ flex: 1, backgroundColor: '#2563EB', color: '#ffffff', border: 'none', borderRadius: '30px', padding: '14px', fontWeight: 'bold', fontSize: '15px' }}>💬 SMS</button>
+          <button onClick={handleShareFlow} style={{ flex: 1, backgroundColor: '#00C853', color: '#ffffff', border: 'none', borderRadius: '30px', padding: '14px', fontWeight: 'bold', fontSize: '15px' }}>🟢 WhatsApp</button>
+        </div>
+
+      </div>
+    </div>
+  );
+};
