@@ -202,8 +202,21 @@ export function TransactionDetailPage() {
         logging: false,
       });
 
-      // 2. Convert to JPG data URL then binary Blob
-      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
+      // 2. Convert to JPG data URL
+      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+
+      // 3. Force-save to device gallery immediately — always, unconditionally
+      const autoSaveToGallery = (url: string) => {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Payment_Request_${party?.name || 'Customer'}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      };
+      autoSaveToGallery(jpgDataUrl);
+
+      // 4. Prepare file for native share sheet (best-effort, silent on failure)
       const base64Response = await fetch(jpgDataUrl);
       const rawBlob = await base64Response.blob();
       const systemImageFile = new File(
@@ -212,34 +225,26 @@ export function TransactionDetailPage() {
         { type: 'image/jpeg' },
       );
 
-      // Helper: stealth local download
-      const forceLocalDownload = (url: string) => {
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Payment_Request_${party?.name || 'Customer'}.jpg`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      };
+      const waFallbackUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(
+        'আপনার পেমেন্ট রসিদের ছবিটি ফোনে ডাউনলোড হয়েছে। অনুগ্রহ করে সেটি গ্যালারি থেকে সেন্ড করে দিন।',
+      )}`;
 
-      // 3. Try native OS multi-platform share sheet
       if (navigator.canShare && navigator.canShare({ files: [systemImageFile] })) {
         try {
           await navigator.share({
             files: [systemImageFile],
             title: 'পেমেন্ট রশিদ',
-            text: 'ডিভাইস থেকে রসিদ শেয়ার করা হচ্ছে।',
+            text: 'রসিদের JPG ফাইলটি নিচে দেওয়া হলো।',
           });
-        } catch (shareErr: unknown) {
-          // Browser blocked or user cancelled — no toast, no error state.
-          // Silently save the JPG to device storage so the user can share
-          // it manually from their gallery (Imo, WhatsApp, Messenger, etc.)
-          console.log('Native share dialogue failed/blocked. Silently falling back to immediate file download.');
-          forceLocalDownload(jpgDataUrl);
+        } catch {
+          // Browser blocked or user cancelled — image already downloaded above.
+          // Open WhatsApp so the user can attach it from their gallery.
+          console.log('Browser blocked direct file streaming sheet. Fallback handled via direct auto-download.');
+          window.open(waFallbackUrl, '_blank');
         }
       } else {
-        // 4. Fallback: download locally (no share API support)
-        forceLocalDownload(jpgDataUrl);
+        // No file-share support — redirect to WhatsApp with instruction text
+        window.open(waFallbackUrl, '_blank');
       }
     } catch (err: unknown) {
       console.error('Failed to encode DOM elements into universal JPG asset package:', err);

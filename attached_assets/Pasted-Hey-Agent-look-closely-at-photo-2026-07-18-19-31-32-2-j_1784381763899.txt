@@ -1,0 +1,66 @@
+Hey Agent, look closely at photo_2026-07-18_19-31-32_2.jpg. The Web Share API is failing on the 'replit.dev' domain because mobile browsers strongly restrict modern file object sharing from standalone webviews. We need a 100% BULLETPROOF solution that never fails and never shows the red error toast.
+
+YOUR ULTIMATE IMPLEMENTATION WORKFLOW:
+1. Render the HTML target component (`ref={receiptRef}`) into a high-res image via `html2canvas` using `{ scale: 3, useCORS: true }`.
+2. Convert the output canvas explicitly into a JPEG string: `canvas.toDataURL('image/jpeg', 0.95)`.
+3. SILENT EXCLUSION OF TOAST ERROR: Remove any state variables triggering the "শেয়ার করতে সমস্যা হয়েছে" UI block entirely.
+4. AUTOMATIC TELEPORT DOWNLOAD: When the user clicks the Share/WhatsApp button, the app must immediately force-download the generated JPG directly to the user's mobile device gallery storage using a clean proxy anchor click link (`download` attribute).
+5. LAUNCH CORRESPONDING PLATFORM: Right after initiating the download, open the application bridge via URL fallback scheme, ensuring the user can immediately attach the freshly saved image from their mobile device to Imo, WhatsApp, or any other app.
+
+Please completely replace the current sharing button click logic block with this bulletproof integration script right now:
+
+```javascript
+const handleUniversalJpgShare = async () => {
+  if (!receiptRef.current) return;
+
+  try {
+    // 1. Snapshot the complete view layout wrapper box cleanly
+    const canvas = await html2canvas(receiptRef.current, {
+      backgroundColor: '#ffffff',
+      scale: 3, // Ultra-sharp resolution mapping
+      useCORS: true,
+      logging: false
+    });
+
+    // 2. Generate a clean JPG image URI data reference
+    const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+
+    // 3. Failsafe Direct System Anchor File Downloader
+    const autoSaveToGallery = (url) => {
+      const ghostAnchor = document.createElement('a');
+      ghostAnchor.href = url;
+      ghostAnchor.download = `Payment_Request_${customer?.name || 'Customer'}.jpg`;
+      document.body.appendChild(ghostAnchor);
+      ghostAnchor.click();
+      document.body.removeChild(ghostAnchor);
+    };
+
+    // 4. Force save the image directly to the phone's local storage
+    autoSaveToGallery(jpgDataUrl);
+
+    // 5. Attempt multi-app system share sheet dialog silently
+    const base64Response = await fetch(jpgDataUrl);
+    const rawBlob = await base64Response.blob();
+    const systemImageFile = new File([rawBlob], 'payment_receipt.jpg', { type: 'image/jpeg' });
+
+    if (navigator.canShare && navigator.canShare({ files: [systemImageFile] })) {
+      try {
+        await navigator.share({
+          files: [systemImageFile],
+          title: 'পেমেন্ট রশিদ',
+          text: 'রসিদের JPG ফাইলটি নিচে দেওয়া হলো।'
+        });
+      } catch (nativeShareErr) {
+        console.log("Browser blocked direct file streaming sheet. Fallback handled via direct auto-download.");
+        // We already forced the download above, so we redirect the user directly to choose their platform
+        window.open(`[https://api.whatsapp.com/send?text=আপন](https://api.whatsapp.com/send?text=আপন)ার পেমেন্ট রসিদের ছবিটি ফোনে ডাউনলোড হয়েছে। অনুগ্রহ করে সেটি গ্যালারি থেকে সেন্ড করে দিন।`, '_blank');
+      }
+    } else {
+      // Direct routing link trigger for standard web environments
+      window.open(`[https://api.whatsapp.com/send?text=রস](https://api.whatsapp.com/send?text=রস)িদের JPG ছবিটি ফোনে সেভ হয়েছে। অনুগ্রহ করে গ্যালারি থেকে এটি এটাচ করুন।`, '_blank');
+    }
+
+  } catch (error) {
+    console.error('Critical failure during execution of canvas print engine:', error);
+  }
+};
