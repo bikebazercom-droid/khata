@@ -245,9 +245,10 @@ export function HomeView() {
         theme: 'grid',
         styles: { font: BN, fontSize: 8.5, textColor: [51, 65, 85], cellPadding: 3 },
         headStyles: {
+          font: BN,
+          fontStyle: 'normal',
           fillColor: [248, 250, 252],
           textColor: [15, 23, 42],
-          fontStyle: 'bold',
           lineWidth: 0.1,
           lineColor: [226, 232, 240],
         },
