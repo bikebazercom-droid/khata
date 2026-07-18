@@ -1,0 +1,138 @@
+Hey Agent, we need to implement an entry details view called "বিস্তারিত প্রবেশিকা" exactly as shown in photo_2026-07-18_18-20-24.jpg. When a user clicks on any specific transaction/entry row, it should open this beautiful, well-structured screen.
+
+YOUR IMPLEMENTATION REQUIREMENTS:
+
+1. TOP HEADER NAVIGATION BAR:
+   - Deep blue background with a white back-arrow (`←`) and the centered dynamic title: "বিস্তারিত প্রবেশিকা".
+
+2. PRE-ACCENTED TRANSACTION SUMMARY CARD (TOP WHITE BOX):
+   - Round profile initials icon on the left (e.g., "MW").
+   - Customer name and the exact, unchanged original transaction timestamp underneath (e.g., "15 Jul 26 • 06:00 PM").
+   - Large amount badge on the top-right in correct tracking color (e.g., "₹ 50 আপনি পেয়েছেন" or "আপনি দিয়েছেন").
+   - A row below inside the same box showing "বর্তমান ব্যালেন্স" with the updated status value.
+   - A highly prominent center action link button: `🖋️ এন্ট্রি এডিট করুন`. When clicked, it must open the edit form modal/drawer, pre-populating all existing data fields while STRICTLY retaining the exact original creation date.
+
+3. LOWER METRICS INFO GRID CARDS:
+   - Card 1: `💬 SMS পাঠানো হয়নি` status container with entry message snippets and clean URL links (`https://banglakhata.com/...`).
+   - Card 2: `☁️ এন্ট্রি ব্যাক আপ করা হয়েছে` verification status box.
+   - Badge 3: A polished center security assurance tag stating `🛡️ 100% নিরাপদ ও সুরক্ষিত` styled with a desaturated green shield icon.
+
+4. FOOTER ACTION BANNER STRIP:
+   - Left side: A clean outline button with a dark red border reading `🗑️ মুছে ফেলুন` (which triggers a 100% hard storage delete).
+   - Right side: A solid filled royal blue action button reading `📢 শেয়ার করুন`.
+
+Please overwrite or integrate this precise UI component architecture into the active router layout immediately:
+
+```javascript
+import React, { useState } from 'react';
+
+export const EntryDetailsScreen = ({ entry, currentCustomer, onBack, onUpdateEntry, onDeleteEntry }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [amount, setAmount] = useState(entry.amount);
+  const [details, setDetails] = useState(entry.details);
+
+  const handleSaveChanges = () => {
+    // Crucial: Keep the exact same original entry date and time during edits
+    const updatedData = {
+      ...entry,
+      amount: parseFloat(amount),
+      details: details,
+      date: entry.date // Retaining the absolute timestamp
+    };
+    onUpdateEntry(updatedData);
+    setIsEditing(false);
+  };
+
+  return (
+    <div style={{ backgroundColor: '#F1F5F9', minHeight: '100vh', fontFamily: 'sans-serif', margin: 0, padding: 0 }}>
+      {/* 1. Header Navigation */}
+      <div style={{ backgroundColor: '#004B93', color: '#ffffff', padding: '16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#ffffff', fontSize: '24px', cursor: 'pointer' }}>←</button>
+        <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>বিস্তারিত প্রবেশিকা</h2>
+      </div>
+
+      <div style={{ padding: '16px' }}>
+        {/* 2. Top Metric Summary Card Group */}
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #E2E8F0', paddingBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '46px', height: '46px', backgroundColor: '#3B82F6', color: '#ffffff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '16px' }}>
+                {currentCustomer.name ? currentCustomer.name.substring(0, 2).toUpperCase() : 'MW'}
+              </div>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '16px', color: '#1E293B' }}>{currentCustomer.name}</h4>
+                <span style={{ fontSize: '12px', color: '#64748B', display: 'block', marginTop: '2px' }}>{entry.date || '15 Jul 26 • 06:00 PM'}</span>
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '20px', fontSpread: 'tight', fontWeight: 'bold', color: entry.type === 'credit' ? '#16A34A' : '#DC2626' }}>
+                ₹ {Math.abs(entry.amount)}
+              </div>
+              <span style={{ fontSize: '12px', color: '#64748B' }}>{entry.type === 'credit' ? 'আপনি পেয়েছেন' : 'আপনি দিয়েছেন'}</span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', fontSize: '14px' }}>
+            <span style={{ color: '#475569' }}>বর্তমান ব্যালেন্স</span>
+            <span style={{ fontWeight: 'bold', color: '#DC2626' }}>₹ {currentCustomer.balance || '561'}</span>
+          </div>
+
+          {/* CRITICAL: Trigger Edit Panel Row */}
+          <button 
+            onClick={() => setIsEditing(true)} 
+            style={{ width: '100%', border: 'none', background: 'none', color: '#004B93', fontWeight: 'bold', fontSize: '15px', paddingTop: '12px', borderTop: '1px solid #F1F5F9', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+          >
+            🖋️ এন্ট্রি এডিট করুন
+          </button>
+        </div>
+
+        {/* 3. Midsection Details Cards Mapping */}
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '16px', border: '1px solid #E2E8F0', marginBottom: '12px' }}>
+          <div style={{ color: '#DC2626', fontWeight: 'bold', fontSize: '14px', marginBottom: '8px' }}>📕 SMS পাঠানো হয়নি</div>
+          <p style={{ margin: 0, fontSize: '13px', color: '#475569', lineHeight: '1.5' }}>
+            আপনি দিয়েছেন: ₹ {Math.abs(entry.amount)}<br />
+            ব্যালেন্স: -(₹ {currentCustomer.balance})<br />
+            <span style={{ color: '#004B93' }}>[https://banglakhata.com/a2/LCwGHOdIFp](https://banglakhata.com/a2/LCwGHOdIFp)</span>
+          </p>
+        </div>
+
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '14px', border: '1px solid #E2E8F0', color: '#64748B', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
+          ☁️ এন্ট্রি ব্যাক আপ করা হয়েছে
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', color: '#16A34A', fontSize: '14px', fontWeight: '500' }}>
+          🛡️ <span style={{ color: '#16A34A' }}>100% নিরাপদ ও সুরক্ষিত</span>
+        </div>
+      </div>
+
+      {/* 4. Core Bottom Action Bar Sticky Placement */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, width: '100%', backgroundColor: '#ffffff', padding: '12px 16px', borderTop: '1px solid #E2E8F0', display: 'flex', gap: '12px', boxSizing: 'border-box' }}>
+        <button onClick={() => onDeleteEntry(entry.id)} style={{ flex: 1, padding: '12px', backgroundColor: '#ffffff', color: '#DC2626', border: '1px solid #DC2626', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
+          🗑️ মুছে ফেলে দিন
+        </button>
+        <button style={{ flex: 1, padding: '12px', backgroundColor: '#004B93', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
+          📢 শেয়ার করুন
+        </button>
+      </div>
+
+      {/* Inline Edit Form Overlay Trigger Box */}
+      {isEditing && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 999 }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '20px', width: '100%', maxWidth: '400px' }}>
+            <h3 style={{ margin: '0 0 16px 0' }}>এন্ট্রি সংশোধন করুন</h3>
+            <label style={{ display: 'block', fontSize: '12px', color: '#64748B', marginBottom: '4px' }}>টাকার পরিমাণ (₹)</label>
+            <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} style={{ width: '100%', padding: '10px', border: '1px solid #CBD5E1', borderRadius: '6px', marginBottom: '16px' }} />
+            
+            <label style={{ display: 'block', fontSize: '12px', color: '#64748B', marginBottom: '4px' }}>বিবরণ / ডিটেলস</label>
+            <input type="text" value={details} onChange={(e) => setDetails(e.target.value)} style={{ width: '100%', padding: '10px', border: '1px solid #CBD5E1', borderRadius: '6px', marginBottom: '20px' }} />
+            
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setIsEditing(false)} style={{ padding: '8px 16px', border: '1px solid #CBD5E1', background: 'none', borderRadius: '4px', cursor: 'pointer' }}>বাতিল</button>
+              <button onClick={handleSaveChanges} style={{ padding: '8px 16px', backgroundColor: '#004B93', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>সংরক্ষণ করুন</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

@@ -88,6 +88,19 @@ export interface LedgerEntry {
   createdAt: string;
 }
 
+export interface PatchLedgerEntryBody {
+  /** Cloud storage object path. Pass null to remove the image; omit to leave unchanged. */
+  billImage?: string | null;
+  /** Updated transaction amount (must be > 0). */
+  amount?: number;
+  /** Updated transaction direction. */
+  type?: LedgerEntryType;
+  /** Updated note / description. */
+  description?: string;
+  /** Updated due date as YYYY-MM-DD string. */
+  dueDate?: string | null;
+}
+
 export interface LedgerEntryInput {
   type: LedgerEntryType;
   /** @exclusiveMinimum 0 */

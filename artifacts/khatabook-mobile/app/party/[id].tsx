@@ -15,6 +15,7 @@ import {
   RefreshControl,
   Image,
   Linking,
+  Share,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -27,8 +28,10 @@ import {
   useListLedgerEntries,
   useCreateLedgerEntry,
   useSendPaymentReminder,
+  usePatchLedgerEntry,
+  useDeleteLedgerEntry,
 } from '@workspace/api-client-react';
-import type { LedgerEntry } from '@workspace/api-client-react';
+import type { LedgerEntry, Party } from '@workspace/api-client-react';
 import { useColors } from '@/hooks/useColors';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -612,9 +615,10 @@ function ReminderSheet({ visible, partyId, partyName, partyPhone, onClose }: Rem
 interface LedgerRowProps {
   entry: LedgerEntry;
   colors: ReturnType<typeof useColors>;
+  onPress?: () => void;
 }
 
-function LedgerRow({ entry, colors }: LedgerRowProps) {
+function LedgerRow({ entry, colors, onPress }: LedgerRowProps) {
   const { getToken } = useAuth();
   const isGave = entry.type === 'YOU_GAVE';
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -670,7 +674,7 @@ function LedgerRow({ entry, colors }: LedgerRowProps) {
 
   return (
     <>
-      <View style={s.row}>
+      <TouchableOpacity style={s.row} onPress={onPress} activeOpacity={onPress ? 0.7 : 1}>
         <View style={s.dot} />
         <View style={{ flex: 1 }}>
           <Text style={s.desc} numberOfLines={2}>
@@ -689,7 +693,7 @@ function LedgerRow({ entry, colors }: LedgerRowProps) {
         <Text style={[s.amount, { color: isGave ? colors.willGet : colors.willGive }]}>
           {isGave ? '+' : '-'}{formatAmount(entry.amount)}
         </Text>
-      </View>
+      </TouchableOpacity>
 
       {/* Full-screen bill image lightbox */}
       {imageSource ? (
@@ -719,6 +723,455 @@ function LedgerRow({ entry, colors }: LedgerRowProps) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// EntryDetailSheet — full-screen modal matching বিস্তারিত প্রবেশিকা design
+// ---------------------------------------------------------------------------
+
+interface EntryDetailSheetProps {
+  entry: LedgerEntry;
+  party: Party;
+  visible: boolean;
+  onClose: () => void;
+  onDeleted: () => void;
+  onUpdated: (updated: LedgerEntry) => void;
+}
+
+function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDeleted, onUpdated }: EntryDetailSheetProps) {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const qc = useQueryClient();
+
+  const [entry, setEntry] = useState(initialEntry);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editAmount, setEditAmount] = useState(String(initialEntry.amount));
+  const [editDesc, setEditDesc]   = useState(initialEntry.description || '');
+  const [editType, setEditType]   = useState<'YOU_GAVE' | 'YOU_GOT'>(initialEntry.type);
+
+  // Re-sync when the parent re-opens with a different entry
+  useEffect(() => {
+    if (visible) {
+      setEntry(initialEntry);
+      setEditAmount(String(initialEntry.amount));
+      setEditDesc(initialEntry.description || '');
+      setEditType(initialEntry.type);
+      setIsEditing(false);
+    }
+  }, [visible, initialEntry.id]);
+
+  const patchEntry  = usePatchLedgerEntry();
+  const deleteEntry = useDeleteLedgerEntry();
+
+  const isGave    = entry.type === 'YOU_GAVE';
+  const amtColor  = isGave ? colors.willGet : colors.willGive;
+  const initials  = party.name.slice(0, 2).toUpperCase();
+  const isBalGet  = party.balanceType === 'YOU_WILL_GET';
+  const balColor  = isBalGet ? colors.willGet : colors.willGive;
+  const balSign   = isBalGet ? '+' : '-';
+
+  const dateLabel = `${formatDate(entry.createdAt)} • ${formatTime(entry.createdAt)}`;
+
+  async function handleSave() {
+    const parsed = parseFloat(editAmount);
+    if (!editAmount || isNaN(parsed) || parsed <= 0) {
+      Alert.alert('Invalid amount', 'Please enter a valid amount > 0.');
+      return;
+    }
+    try {
+      const updated = await patchEntry.mutateAsync({
+        partyId: entry.partyId,
+        entryId: entry.id,
+        data: { amount: parsed, description: editDesc.trim() || undefined, type: editType },
+      });
+      setEntry(updated);
+      setEditAmount(String(updated.amount));
+      setEditDesc(updated.description || '');
+      setEditType(updated.type);
+      qc.invalidateQueries({ queryKey: [`/api/parties/${entry.partyId}/ledger-entries`] });
+      qc.invalidateQueries({ queryKey: [`/api/parties/${entry.partyId}`] });
+      qc.invalidateQueries({ queryKey: ['/api/dashboard/summary'] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setIsEditing(false);
+      onUpdated(updated);
+    } catch {
+      Alert.alert('Error', 'Could not update entry. Please try again.');
+    }
+  }
+
+  function handleDelete() {
+    Alert.alert(
+      'এন্ট্রি মুছুন',
+      'এই এন্ট্রিটি স্থায়ীভাবে মুছে যাবে। আপনি কি নিশ্চিত?',
+      [
+        { text: 'বাতিল', style: 'cancel' },
+        {
+          text: 'মুছুন',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteEntry.mutateAsync({ partyId: entry.partyId, entryId: entry.id });
+              qc.invalidateQueries({ queryKey: [`/api/parties/${entry.partyId}/ledger-entries`] });
+              qc.invalidateQueries({ queryKey: [`/api/parties/${entry.partyId}`] });
+              qc.invalidateQueries({ queryKey: ['/api/dashboard/summary'] });
+              qc.invalidateQueries({ queryKey: ['/api/parties'] });
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              onDeleted();
+            } catch {
+              Alert.alert('Error', 'Could not delete entry. Please try again.');
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  async function handleShare() {
+    const dirLabel = isGave ? 'দিয়েছেন' : 'পেয়েছেন';
+    const balStr   = `${balSign}(৳ ${party.currentBalance.toFixed(0)})`;
+    const msg =
+      `আপনি ${dirLabel}: ৳ ${entry.amount}\nব্যালেন্স: ${balStr}\nhttps://banglakhata.com/p/${entry.partyId}`;
+    try {
+      await Share.share({ message: msg });
+    } catch { /* ignore */ }
+  }
+
+  const s = StyleSheet.create({
+    overlay:   { flex: 1, backgroundColor: colors.background },
+    header: {
+      paddingTop: Platform.OS === 'web' ? 16 : insets.top + 8,
+      paddingBottom: 16,
+      paddingHorizontal: 16,
+      backgroundColor: colors.primary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+    },
+    headerTitle: { flex: 1, fontSize: 18, fontFamily: 'Inter_700Bold', color: '#fff', textAlign: 'center', marginRight: 34 },
+    body:      { flex: 1, backgroundColor: '#F1F5F9' },
+    card: {
+      backgroundColor: '#fff',
+      borderRadius: 12,
+      marginHorizontal: 16,
+      marginTop: 16,
+      padding: 18,
+      shadowColor: '#000',
+      shadowOpacity: 0.06,
+      shadowOffset: { width: 0, height: 2 },
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    cardSeparator: { height: 1, backgroundColor: '#F1F5F9', marginVertical: 12 },
+    initials: {
+      width: 46,
+      height: 46,
+      borderRadius: 23,
+      backgroundColor: '#3B82F6',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    initialsText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 16 },
+    partyName:  { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: '#1E293B' },
+    dateText:   { fontSize: 12, color: '#64748B', fontFamily: 'Inter_400Regular', marginTop: 2 },
+    amountBig:  { fontSize: 22, fontFamily: 'Inter_700Bold', textAlign: 'right' },
+    dirLabel:   { fontSize: 12, color: '#64748B', fontFamily: 'Inter_400Regular', textAlign: 'right', marginTop: 2 },
+    balLabel:   { fontSize: 14, color: '#475569', fontFamily: 'Inter_500Medium' },
+    balValue:   { fontSize: 16, fontFamily: 'Inter_700Bold' },
+    editBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: '#F1F5F9',
+    },
+    editBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: colors.primary },
+    infoCard: {
+      backgroundColor: '#fff',
+      borderRadius: 12,
+      marginHorizontal: 16,
+      marginTop: 12,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: '#E2E8F0',
+    },
+    smsHeading: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#DC2626', marginBottom: 8 },
+    smsBody:    { fontSize: 13, color: '#475569', fontFamily: 'Inter_400Regular', lineHeight: 20 },
+    smsLink:    { color: '#004B93', fontFamily: 'Inter_500Medium' },
+    backupText: { fontSize: 13, color: '#64748B', fontFamily: 'Inter_400Regular' },
+    secBadge:   {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      marginTop: 20,
+      marginBottom: 8,
+    },
+    secText: { fontSize: 14, color: '#16A34A', fontFamily: 'Inter_600SemiBold' },
+    bottomBar: {
+      flexDirection: 'row',
+      gap: 12,
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 16,
+      backgroundColor: '#fff',
+      borderTopWidth: 1,
+      borderTopColor: '#E2E8F0',
+    },
+    deleteBtn: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: 8,
+      borderWidth: 1.5,
+      borderColor: '#DC2626',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: 6,
+    },
+    deleteBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#DC2626' },
+    shareBtn: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: 8,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: 6,
+    },
+    shareBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
+    // Edit overlay
+    editOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 20,
+    },
+    editCard: {
+      backgroundColor: '#fff',
+      borderRadius: 16,
+      padding: 24,
+      width: '100%',
+      maxWidth: 400,
+    },
+    editTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#1E293B', marginBottom: 20 },
+    editTypeRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
+    editTypeBtn: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 8,
+      alignItems: 'center',
+      borderWidth: 2,
+    },
+    editTypeBtnText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
+    editLabel: { fontSize: 12, color: '#64748B', fontFamily: 'Inter_500Medium', marginBottom: 6 },
+    editInput: {
+      borderWidth: 1.5,
+      borderColor: '#CBD5E1',
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 15,
+      fontFamily: 'Inter_400Regular',
+      color: '#1E293B',
+      marginBottom: 16,
+    },
+    editActions: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end', marginTop: 4 },
+    cancelBtn: {
+      paddingVertical: 10,
+      paddingHorizontal: 18,
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: '#CBD5E1',
+    },
+    cancelBtnText: { fontSize: 14, fontFamily: 'Inter_500Medium', color: '#64748B' },
+    saveBtn: {
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      borderRadius: 6,
+      backgroundColor: colors.primary,
+    },
+    saveBtnText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
+  });
+
+  const balanceLabel = isGave ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন';
+  const smsBody =
+    `আপনি ${isGave ? 'দিয়েছেন' : 'পেয়েছেন'}: ৳ ${entry.amount}\n` +
+    `ব্যালেন্স: ${balSign}(৳ ${party.currentBalance.toFixed(0)})\n` +
+    `https://banglakhata.com/p/${entry.partyId}`;
+
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <View style={s.overlay}>
+        {/* 1. Header */}
+        <View style={s.header}>
+          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Feather name="arrow-left" size={22} color="#fff" />
+          </TouchableOpacity>
+          <Text style={s.headerTitle}>বিস্তারিত প্রবেশিকা</Text>
+        </View>
+
+        <ScrollView style={s.body} contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
+          {/* 2. Transaction summary card */}
+          <View style={s.card}>
+            {/* Party + amount row */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                <View style={s.initials}>
+                  <Text style={s.initialsText}>{initials}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.partyName} numberOfLines={1}>{party.name}</Text>
+                  <Text style={s.dateText}>{dateLabel}</Text>
+                </View>
+              </View>
+              <View style={{ marginLeft: 12 }}>
+                <Text style={[s.amountBig, { color: amtColor }]}>৳ {formatAmount(entry.amount).replace('৳', '')}</Text>
+                <Text style={s.dirLabel}>{balanceLabel}</Text>
+              </View>
+            </View>
+
+            {/* Balance row */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+              <Text style={s.balLabel}>বর্তমান ব্যালেন্স</Text>
+              <Text style={[s.balValue, { color: balColor }]}>
+                ৳ {formatAmount(party.currentBalance).replace('৳', '')}
+              </Text>
+            </View>
+
+            {/* Edit button */}
+            <TouchableOpacity style={s.editBtn} onPress={() => setIsEditing(true)} activeOpacity={0.7}>
+              <Feather name="edit-2" size={15} color={colors.primary} />
+              <Text style={s.editBtnText}>এন্ট্রি এডিট করুন</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* 3a. SMS card */}
+          <View style={s.infoCard}>
+            <Text style={s.smsHeading}>💬 SMS পাঠানো হয়নি</Text>
+            <Text style={s.smsBody}>
+              {smsBody.split('\n').map((line, i) =>
+                line.startsWith('https://') ? (
+                  <Text key={i} style={s.smsLink} onPress={() => Linking.openURL(line)}>{line}</Text>
+                ) : (
+                  <Text key={i}>{line}{i < 2 ? '\n' : ''}</Text>
+                )
+              )}
+            </Text>
+          </View>
+
+          {/* 3b. Backup card */}
+          <View style={s.infoCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Feather name="cloud" size={16} color="#94A3B8" />
+              <Text style={s.backupText}>এন্ট্রি ব্যাক আপ করা হয়েছে</Text>
+            </View>
+          </View>
+
+          {/* 3c. Security badge */}
+          <View style={s.secBadge}>
+            <Feather name="shield" size={16} color="#16A34A" />
+            <Text style={s.secText}>100% নিরাপদ ও সুরক্ষিত</Text>
+          </View>
+        </ScrollView>
+
+        {/* 4. Bottom action bar */}
+        <View style={s.bottomBar}>
+          <TouchableOpacity
+            style={s.deleteBtn}
+            onPress={handleDelete}
+            disabled={deleteEntry.isPending}
+            activeOpacity={0.8}
+          >
+            <Feather name="trash-2" size={16} color="#DC2626" />
+            <Text style={s.deleteBtnText}>মুছে ফেলুন</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.shareBtn} onPress={handleShare} activeOpacity={0.8}>
+            <Feather name="share-2" size={16} color="#fff" />
+            <Text style={s.shareBtnText}>শেয়ার করুন</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Edit overlay — separate Modal so it appears above the detail sheet */}
+      <Modal visible={isEditing} transparent animationType="fade" onRequestClose={() => setIsEditing(false)}>
+        <KeyboardAvoidingView style={s.editOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={s.editCard}>
+            <Text style={s.editTitle}>এন্ট্রি সংশোধন করুন</Text>
+
+            {/* Type toggle */}
+            <View style={s.editTypeRow}>
+              <TouchableOpacity
+                style={[s.editTypeBtn, {
+                  backgroundColor: editType === 'YOU_GAVE' ? colors.willGetBg : colors.card,
+                  borderColor: editType === 'YOU_GAVE' ? colors.willGet : colors.border,
+                }]}
+                onPress={() => setEditType('YOU_GAVE')}
+                activeOpacity={0.8}
+              >
+                <Feather name="arrow-up-right" size={16} color={editType === 'YOU_GAVE' ? colors.willGet : colors.mutedForeground} />
+                <Text style={[s.editTypeBtnText, { color: editType === 'YOU_GAVE' ? colors.willGet : colors.mutedForeground, marginTop: 2 }]}>
+                  You Gave
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.editTypeBtn, {
+                  backgroundColor: editType === 'YOU_GOT' ? colors.willGiveBg : colors.card,
+                  borderColor: editType === 'YOU_GOT' ? colors.willGive : colors.border,
+                }]}
+                onPress={() => setEditType('YOU_GOT')}
+                activeOpacity={0.8}
+              >
+                <Feather name="arrow-down-left" size={16} color={editType === 'YOU_GOT' ? colors.willGive : colors.mutedForeground} />
+                <Text style={[s.editTypeBtnText, { color: editType === 'YOU_GOT' ? colors.willGive : colors.mutedForeground, marginTop: 2 }]}>
+                  You Got
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Amount */}
+            <Text style={s.editLabel}>টাকার পরিমাণ (৳)</Text>
+            <TextInput
+              style={s.editInput}
+              value={editAmount}
+              onChangeText={setEditAmount}
+              keyboardType="decimal-pad"
+              placeholder="0"
+              placeholderTextColor="#CBD5E1"
+              autoFocus
+            />
+
+            {/* Description */}
+            <Text style={s.editLabel}>বিবরণ / ডিটেলস</Text>
+            <TextInput
+              style={s.editInput}
+              value={editDesc}
+              onChangeText={setEditDesc}
+              placeholder="নোট (ঐচ্ছিক)"
+              placeholderTextColor="#CBD5E1"
+              returnKeyType="done"
+            />
+
+            {/* Actions */}
+            <View style={s.editActions}>
+              <TouchableOpacity style={s.cancelBtn} onPress={() => setIsEditing(false)}>
+                <Text style={s.cancelBtnText}>বাতিল</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.saveBtn, { opacity: patchEntry.isPending ? 0.6 : 1 }]}
+                onPress={handleSave}
+                disabled={patchEntry.isPending}
+              >
+                <Text style={s.saveBtnText}>{patchEntry.isPending ? 'সংরক্ষণ হচ্ছে…' : 'সংরক্ষণ করুন'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+    </Modal>
+  );
+}
+
 export default function PartyDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
@@ -728,6 +1181,7 @@ export default function PartyDetailScreen() {
   const [pendingType, setPendingType] = useState<'YOU_GAVE' | 'YOU_GOT'>('YOU_GAVE');
   const [showReminderSheet, setShowReminderSheet] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<LedgerEntry | null>(null);
 
   const { data: party, isLoading: partyLoading, refetch: refetchParty } = useGetParty(id!);
   const { data: entries = [], isLoading: entriesLoading, refetch: refetchEntries } = useListLedgerEntries(id!);
@@ -952,7 +1406,12 @@ export default function PartyDetailScreen() {
           </View>
         ) : (
           entries.map(entry => (
-            <LedgerRow key={entry.id} entry={entry} colors={colors} />
+            <LedgerRow
+              key={entry.id}
+              entry={entry}
+              colors={colors}
+              onPress={() => setSelectedEntry(entry)}
+            />
           ))
         )}
 
@@ -978,6 +1437,25 @@ export default function PartyDetailScreen() {
         partyPhone={party.phone ?? ''}
         onClose={() => setShowReminderSheet(false)}
       />
+
+      {selectedEntry && party && (
+        <EntryDetailSheet
+          entry={selectedEntry}
+          party={party}
+          visible={!!selectedEntry}
+          onClose={() => setSelectedEntry(null)}
+          onDeleted={() => {
+            setSelectedEntry(null);
+            refetchParty();
+            refetchEntries();
+          }}
+          onUpdated={(updated) => {
+            setSelectedEntry(updated);
+            refetchParty();
+            refetchEntries();
+          }}
+        />
+      )}
     </View>
   );
 }
