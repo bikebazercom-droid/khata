@@ -1,0 +1,136 @@
+Hey Agent, please urgently fix the bottom "📢 শেয়ার করুন" button in the "বিস্তারিত প্রবেশিকা" (Entry Details) page as seen in Screenshot_5.jpg. Currently, it is non-functional. 
+
+WE NEED TO WIRE IT UP FOR UNIVERSAL JPG IMAGE SHARING BASED ON THE ENTIRE DETAILED PAGE VIEW:
+
+1. Target the complete transaction card container inside the scroll view using a `ref={entryDetailsRef}`. This container must be rasterized when sharing.
+2. When the user clicks the "📢 শেয়ার করুন" button, it must execute the JPG sharing logic, similar to the behavior shown in the share menu in Screenshot_4_4.jpg. 
+
+IMPLEMENTATION LOGIC:
+- Use 'html2canvas' to capture the targeted detailed view, including the header context, financial amounts, and transaction metadata at a high scale (e.g., scale: 2).
+- Convert the canvas data into an optimized 'image/jpeg' (JPG) binary Blob wrapper.
+- Integrate the standard `handleUniversalJpgShare` workflow (as defined previously) to initiate native system sharing (opening Imo, WhatsApp, Facebook, etc.) or silently download the JPG as an absolute failsafe.
+
+Overwrite the `EntryDetailsScreen` component with this functional implementation right now:
+
+```javascript
+import React, { useRef } from 'react';
+import html2canvas from 'html2canvas';
+
+export const EntryDetailsScreen = ({ targetEntry, currentCustomer, onCloseView, onEditTrigger, onDeleteTrigger }) => {
+  const entryDetailsRef = useRef(null); // Critical reference to the DOM area to share as JPG
+
+  // UNIVERSAL SHARING ORCHESTRATOR - JPG EXPORT FUNCTION
+  const handleUniversalShareJpg = async () => {
+    if (!entryDetailsRef.current) return;
+
+    try {
+      // 1. Snapshot the detailed DOM viewport container with high definition setting
+      const canvas = await html2canvas(entryDetailsRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2, // Doubles resolution for sharper text on mobile displays
+        useCORS: true,
+        logging: false
+      });
+
+      // 2. Output specifically as an optimized binary image stream (JPG format)
+      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+      
+      // Auto-saver utility to ensure the file is dropped into device gallery if sharing fails
+      const stealthLocalSave = (url) => {
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.href = url;
+        downloadAnchor.download = `Banglakhata_Entry_${targetEntry.date || 'Record'}.jpg`;
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        document.body.removeChild(downloadAnchor);
+      };
+
+      // 3. Process image data stream and wrap it within a legitimate File context entity
+      const response = await fetch(jpgDataUrl);
+      const blob = await response.blob();
+      const compiledImageFile = new File([blob], 'entry_record.jpg', { type: 'image/jpeg' });
+
+      // 4. Multi-Channel Share and System Fallback Logic
+      if (navigator.canShare && navigator.canShare({ files: [compiledImageFile] })) {
+        try {
+          // Attempt using native sharing sheet (Android/iOS)
+          await navigator.share({
+            files: [compiledImageFile],
+            title: 'লেনদেন বিবরণ',
+            text: `Banglakhata অ্যাপ থেকে লেনদেনের বিস্তারিত শেয়ার করা হচ্ছে।`
+          });
+        } catch (shareErr) {
+          // If native share is cancelled or blocked, execute the local download cascade
+          stealthLocalSave(jpgDataUrl);
+        }
+      } else {
+        // Direct local save fallback for standalone web containers
+        stealthLocalSave(jpgDataUrl);
+      }
+    } catch (crash) {
+      console.error('Critical crash during element snapshot process:', crash);
+    }
+  };
+
+  return (
+    <div style={{ backgroundColor: '#F1F5F9', minHeight: '100vh', width: '100%', position: 'fixed', top: 0, left: 0, zIndex: 1000, fontFamily: 'sans-serif', boxSizing: 'border-box', overflowY: 'auto' }}>
+      
+      {/* 1. Static Navbar Header */}
+      <div style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #E2E8F0', padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', position: 'sticky', top: 0, zIndex: 10 }}>
+        <button onClick={onCloseView} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>←</button>
+        <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: '#1E293B' }}>বিস্তারিত প্রবেশিকা</h2>
+      </div>
+
+      {/* --- SCROLLABLE CONTAINER ZONE MARKED FOR JPG CAPTURE --- */}
+      <div ref={entryDetailsRef} style={{ padding: '20px', boxSizing: 'border-box' }}>
+        
+        {/* 2. Top Summary Metric Card Container */}
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '20px', marginBottom: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '16px', borderBottom: '1px solid #F1F5F9', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '48px', height: '48px', backgroundColor: '#FEE2E2', color: '#DC2626', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '18px' }}>
+                {currentCustomer.name ? currentCustomer.name.substring(0, 2).toUpperCase() : 'SH'}
+              </div>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '17px', color: '#1E293B' }}>{currentCustomer.name || 'Shakil'}</h4>
+                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748B' }}>{targetEntry.date || '18 Jul 2026 • 04:12 PM'}</p>
+              </div>
+            </div>
+            {/* Currency amounts mapping */}
+          </div>
+          {/* Main metric row containing amounts */}
+        </div>
+
+        {/* 3. Banglakhata Branding Element Slot */}
+        <div style={{ backgroundColor: '#00264D', color: '#ffffff', borderRadius: '12px', padding: '24px', textAlign: 'center', marginBottom: '20px' }}>
+          <span style={{ fontSize: '18px', fontWeight: 'bold' }}>📘 Banglakhata</span>
+          <p style={{ margin: '8px 0 0 0', fontSize: '14px', color: '#CBD5E1' }}>Bike bazer</p>
+        </div>
+
+        {/* 4. Secondary Information Block Container */}
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '20px', marginBottom: '30px' }}>
+          <div style={{ fontSize: '14px', color: '#64748B', marginBottom: '6px' }}>গ্রাহক</div>
+          <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#000000', marginBottom: '20px' }}>{currentCustomer.name}</div>
+          {/* Date, Amount and other specific entries layout data */}
+        </div>
+      </div>
+      {/* --- END OF JPG CAPTURE BLOCK --- */}
+
+      {/* 5. Fixed Primary Controls (Delete / Share Banner) */}
+      <div style={{ position: 'sticky', bottom: 0, left: 0, width: '100%', backgroundColor: '#ffffff', padding: '12px 16px', borderTop: '1px solid #E2E8F0', display: 'flex', gap: '12px', boxSizing: 'border-box', zIndex: 10 }}>
+        <button onClick={() => onDeleteTrigger(targetEntry.id)} style={{ flex: 1, padding: '14px', backgroundColor: '#ffffff', color: '#DC2626', border: '1px solid #DC2626', borderRadius: '8px', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+          🗑️ মুছে ফেলুন
+        </button>
+        
+        {/* CRITICAL: Wiring up the SHARE button action trigger */}
+        <button 
+          onClick={handleUniversalShareJpg}
+          style={{ flex: 1, padding: '14px', backgroundColor: '#004B93', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+        >
+          📢 শেয়ার করুন
+        </button>
+      </div>
+
+    </div>
+  );
+};

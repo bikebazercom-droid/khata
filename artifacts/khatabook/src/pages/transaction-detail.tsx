@@ -70,7 +70,7 @@ export function TransactionDetailPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
-  const receiptRef = useRef<HTMLDivElement>(null);
+  const entryDetailsRef = useRef<HTMLDivElement>(null);
 
   const entry = entries.find((e) => e.id === entryId);
   const storeName = settings?.storeName || 'Banglakhata';
@@ -191,13 +191,13 @@ export function TransactionDetailPage() {
    *     manually from their gallery.
    */
   async function handleShare() {
-    if (!receiptRef.current) return;
+    if (!entryDetailsRef.current) return;
     setIsSharing(true);
     try {
       // 1. High-resolution DOM snapshot
-      const canvas = await html2canvas(receiptRef.current, {
+      const canvas = await html2canvas(entryDetailsRef.current, {
         backgroundColor: '#ffffff',
-        scale: 3,
+        scale: 2,
         useCORS: true,
         logging: false,
       });
@@ -297,7 +297,7 @@ export function TransactionDetailPage() {
       </header>
 
       {/* ── Scrollable body ─────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 pb-28 space-y-3">
+      <div ref={entryDetailsRef} className="flex-1 overflow-y-auto px-4 py-4 pb-28 space-y-3">
 
         {/* Main transaction card */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
@@ -399,8 +399,8 @@ export function TransactionDetailPage() {
           </div>
         )}
 
-        {/* Digital receipt preview card — receiptRef is the capture target */}
-        <div ref={receiptRef} className="rounded-2xl overflow-hidden shadow-sm border border-slate-100">
+        {/* Digital receipt preview card */}
+        <div className="rounded-2xl overflow-hidden shadow-sm border border-slate-100">
           {/* Header */}
           <div className="bg-[#1B3A6B] px-5 py-4 flex flex-col items-center gap-1">
             <img
