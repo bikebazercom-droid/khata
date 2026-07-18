@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -43,7 +43,7 @@ import { toWhatsAppNumber } from '@/lib/ledger-report';
 import { BillImageLightbox } from '@/components/modals/bill-image-lightbox';
 import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic';
 import { toast } from 'sonner';
-import { generateReceiptBlob } from '@/lib/receiptCanvas';
+import html2canvas from 'html2canvas';
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -70,6 +70,7 @@ export function TransactionDetailPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const receiptRef = useRef<HTMLDivElement>(null);
 
   const entry = entries.find((e) => e.id === entryId);
   const storeName = settings?.storeName || 'Banglakhata';
@@ -182,91 +183,67 @@ export function TransactionDetailPage() {
   }
 
   /**
-   * Share pipeline:
-   *  1. Render receipt to PNG via Canvas.
-   *  2. Try Web Share API with files (WhatsApp, Imo, Messenger, SMS, etc.)
-   *  3. Fallback: Web Share API text-only (opens share sheet without image).
-   *  4. Fallback: trigger browser download of the PNG.
+   * Universal JPG share pipeline:
+   *  1. Render the receipt card to a high-res canvas snapshot (scale 3).
+   *  2. Convert to a JPG Blob and wrap in a File object.
+   *  3. Launch the native OS multi-app share sheet via navigator.share({ files }).
+   *  4. Fallback: force a local JPG download + toast so the user can share
+   *     manually from their gallery.
    */
   async function handleShare() {
-    if (!party || !entry) return;
+    if (!receiptRef.current) return;
     setIsSharing(true);
     try {
-      const blob = await generateReceiptBlob({
-        storeName:      storeName,
-        partyName:      party.name,
-        date:           transactionDate,
-        time:           transactionTime,
-        amount:         entry.amount,
-        isGave:         isGave,
-        balance:        party.currentBalance,
-        balanceIsGet:   party.balanceType === 'YOU_WILL_GET',
-        description:    entry.description ?? undefined,
-        billReference:  entry.billReference ?? undefined,
-        base:           BASE,
+      // 1. High-resolution DOM snapshot
+      const canvas = await html2canvas(receiptRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 3,
+        useCORS: true,
+        logging: false,
       });
 
-      const file = new File([blob], 'digital-khata-receipt.png', { type: 'image/png' });
+      // 2. Convert to JPG data URL then binary Blob
+      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
+      const base64Response = await fetch(jpgDataUrl);
+      const rawBlob = await base64Response.blob();
+      const systemImageFile = new File(
+        [rawBlob],
+        'payment_receipt.jpg',
+        { type: 'image/jpeg' },
+      );
 
-      // ── tier 1: native share WITH image file ─────────────────────────────
-      if (
-        typeof navigator.share === 'function' &&
-        typeof navigator.canShare === 'function' &&
-        navigator.canShare({ files: [file] })
-      ) {
+      // Helper: stealth local download
+      const forceLocalDownload = (url: string) => {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Payment_Request_${party?.name || 'Customer'}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      };
+
+      // 3. Try native OS multi-platform share sheet
+      if (navigator.canShare && navigator.canShare({ files: [systemImageFile] })) {
         try {
           await navigator.share({
-            files: [file],
-            title: `${storeName} — লেনদেন স্লিপ`,
-            text:  `${party.name} — ${formatCurrency(entry.amount)}`,
+            files: [systemImageFile],
+            title: 'পেমেন্ট রশিদ',
+            text: 'ডিভাইস থেকে সরাসরি রসিদ শেয়ার করা হচ্ছে।',
           });
-          return;
         } catch (shareErr: unknown) {
           const e = shareErr as { name?: string };
-          if (e?.name === 'AbortError') return; // user dismissed — don't fall through
-          // other error → try next tier
+          if (e?.name === 'AbortError') return; // user dismissed — not an error
+          console.warn('Native OS share dialogue failed, reverting to automated download.');
+          forceLocalDownload(jpgDataUrl);
+          toast.success('রসিদের JPG ছবিটি ডাউনলোড ফোল্ডারে সেভ হয়েছে। এখন এটি ইমু, হোয়াটসঅ্যাপ বা যেকোনো সোশ্যাল মিডিয়ায় গ্যালারি থেকে শেয়ার করতে পারবেন।');
         }
+      } else {
+        // 4. Fallback: download locally + instruct user
+        forceLocalDownload(jpgDataUrl);
+        toast.success('আপনার সিস্টেমে সরাসরি শেয়ার সমর্থিত নয়। রসিদের JPG ছবিটি ফোনে ডাউনলোড করা হয়েছে, এটি যেকোনো সোশ্যাল মিডিয়ায় পাঠিয়ে দিন।');
       }
-
-      // ── tier 2: native share WITHOUT files (text + object URL) ───────────
-      if (typeof navigator.share === 'function') {
-        const objUrl = URL.createObjectURL(blob);
-        try {
-          await navigator.share({
-            title: `${storeName} — লেনদেন স্লিপ`,
-            text:  buildReceiptText(),
-            url:   objUrl,
-          });
-          return;
-        } catch (shareErr: unknown) {
-          const e = shareErr as { name?: string };
-          if (e?.name === 'AbortError') return;
-          // fall through to download
-        } finally {
-          URL.revokeObjectURL(objUrl);
-        }
-      }
-
-      // ── tier 3: download the PNG (desktop / unsupported browsers) ────────
-      const objUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = objUrl;
-      a.download = 'digital-khata-receipt.png';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(objUrl);
-      toast.success('রসিদ ডাউনলোড হয়েছে');
     } catch (err: unknown) {
-      console.error('Receipt generation failed:', err);
-      // ── final fallback: WhatsApp text link ────────────────────────────────
-      const text     = buildReceiptText();
-      const waNumber = party.phone ? toWhatsAppNumber(party.phone) : '';
-      const encoded  = encodeURIComponent(text);
-      const url = waNumber
-        ? `https://wa.me/${waNumber}?text=${encoded}`
-        : `https://wa.me/?text=${encoded}`;
-      window.open(url, '_blank', 'noopener,noreferrer');
+      console.error('Failed to encode DOM elements into universal JPG asset package:', err);
     } finally {
       setIsSharing(false);
     }
@@ -418,8 +395,8 @@ export function TransactionDetailPage() {
           </div>
         )}
 
-        {/* Digital receipt preview card */}
-        <div className="rounded-2xl overflow-hidden shadow-sm border border-slate-100">
+        {/* Digital receipt preview card — receiptRef is the capture target */}
+        <div ref={receiptRef} className="rounded-2xl overflow-hidden shadow-sm border border-slate-100">
           {/* Header */}
           <div className="bg-[#1B3A6B] px-5 py-4 flex flex-col items-center gap-1">
             <img
@@ -496,8 +473,8 @@ export function TransactionDetailPage() {
             </p>
           </div>
 
-          {/* Share hint */}
-          <div className="bg-white px-5 py-3 flex items-center gap-2 border-t border-slate-100">
+          {/* Share hint — excluded from html2canvas capture */}
+          <div data-html2canvas-ignore className="bg-white px-5 py-3 flex items-center gap-2 border-t border-slate-100">
             <ImageIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             <p className="text-[11px] text-slate-400 font-medium">
               "শেয়ার করুন" বাটনে ট্যাপ করলে এই রসিদটি ছবি হিসেবে তৈরি হবে

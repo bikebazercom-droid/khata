@@ -1,0 +1,66 @@
+Hey Agent, the user wants the ability to share the payment request slip as a proper .jpg image file to ANY platform (including Imo, WhatsApp, Facebook, Messenger, etc.). 
+
+WE NEED TO UPGRADE THE SHARING ENGINE TO USE THE NATIVE OS MULTI-PLATFORM SHARE DIALOG:
+1. Target the visual invoice container (`ref={receiptRef}`) and render it using `html2canvas` at high resolution (`scale: 3`).
+2. Convert the canvas payload into a clean, standalone binary Blob (`image/jpeg`).
+3. Wrap it into a standard system File object: `new File([blob], 'payment_receipt.jpg', { type: 'image/jpeg' })`.
+4. LAUNCH SYSTEM SHARE: Use the universal `navigator.share({ files: [file] })` method. This dynamically triggers the native Android/iOS or Desktop sharing sheet, allowing the user to select Imo, WhatsApp, Messenger, or any social app instantly.
+5. SOLID SYSTEM FALLBACK: If the browser context restricts file sharing, immediately execute a stealth local device download of the JPG file, and show a clean toast notification so the user can easily grab it from their recent gallery and send it anywhere.
+
+Please rewrite the action handler with this production-grade universal sharing workflow now:
+
+```javascript
+const handleUniversalJpgShare = async () => {
+  if (!receiptRef.current) return;
+
+  try {
+    // 1. Generate high-resolution canvas snapshot of the receipt card
+    const canvas = await html2canvas(receiptRef.current, {
+      backgroundColor: '#ffffff',
+      scale: 3, // Premium clarity for small text blocks
+      useCORS: true,
+      logging: false
+    });
+
+    // 2. Convert to raw JPG data stream
+    const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
+    
+    // Fallback down-loader helper function
+    const forceLocalDownload = (url) => {
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = url;
+      downloadAnchor.download = `Payment_Request_${customer?.name || 'Customer'}.jpg`;
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
+    };
+
+    // 3. Prepare Binary Blob and Javascript File Entity
+    const base64Response = await fetch(jpgDataUrl);
+    const rawBlob = await base64Response.blob();
+    const systemImageFile = new File([rawBlob], 'payment_receipt.jpg', { type: 'image/jpeg' });
+
+    // 4. Trigger Native OS Multi-App Sharing Dialog Sheet
+    if (navigator.canShare && navigator.canShare({ files: [systemImageFile] })) {
+      try {
+        await navigator.share({
+          files: [systemImageFile],
+          title: 'পেমেন্ট রশিদ',
+          text: 'ডিভাইস থেকে সরাসরি রসিদ শেয়ার করা হচ্ছে।'
+        });
+      } catch (shareErr) {
+        // Fallback: If share dialogue is canceled or system crashes, save locally
+        console.warn("Native OS share dialogue failed, reverting to automated download.");
+        forceLocalDownload(jpgDataUrl);
+        alert('রসিদের JPG ছবিটি ডাউনলোড ফোল্ডারে সেভ হয়েছে। এখন এটি ইমু, হোয়াটসঅ্যাপ বা যেকোনো সোশ্যাল মিডিয়ায় গ্যালারি থেকে শেয়ার করতে পারবেন।');
+      }
+    } else {
+      // Direct asset download injection for unsupported standalone web containers
+      forceLocalDownload(jpgDataUrl);
+      alert('আপনার সিস্টেমে সরাসরি শেয়ার সমর্থিত নয়। রসিদের JPG ছবিটি ফোনে ডাউনলোড করা হয়েছে, এটি যেকোনো সোশ্যাল মিডিয়ায় পাঠিয়ে দিন।');
+    }
+
+  } catch (error) {
+    console.error('Failed to encode DOM elements into universal JPG asset package:', error);
+  }
+};
