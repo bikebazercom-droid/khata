@@ -169,52 +169,52 @@ export function HomeView() {
       const dateCell = p.lastTransactionAt
         ? new Date(p.lastTransactionAt).toLocaleDateString('en-GB')
         : '—';
-      // ডেবিট (-) col: money YOU owe this party (YOU_WILL_GIVE) — red
+      // ডেবিট (-) col: money YOU owe this party (YOU_WILL_GIVE) — red tint
       const debitCell = p.balanceType === 'YOU_WILL_GIVE'
-        ? `<td style="padding:10px;border:1px solid #CBD5E1;text-align:right;background:#FEF2F2;color:#DC2626;font-weight:bold;">৳${p.currentBalance.toFixed(2)}</td>`
-        : `<td style="padding:10px;border:1px solid #CBD5E1;background:#FEF2F2;"></td>`;
-      // ক্রেডিট (+) col: money this party owes YOU (YOU_WILL_GET) — green
+        ? `<td style="padding:10px;border:1px solid #000;text-align:right;background:#FEF2F2;color:#000;font-weight:500;">৳${p.currentBalance.toFixed(2)}</td>`
+        : `<td style="padding:10px;border:1px solid #000;background:#FEF2F2;"></td>`;
+      // ক্রেডিট (+) col: money this party owes YOU (YOU_WILL_GET) — green tint
       const creditCell = p.balanceType === 'YOU_WILL_GET'
-        ? `<td style="padding:10px;border:1px solid #CBD5E1;text-align:right;background:#F0FDF4;color:#16A34A;font-weight:bold;">৳${p.currentBalance.toFixed(2)}</td>`
-        : `<td style="padding:10px;border:1px solid #CBD5E1;background:#F0FDF4;"></td>`;
+        ? `<td style="padding:10px;border:1px solid #000;text-align:right;background:#F0FDF4;color:#000;font-weight:500;">৳${p.currentBalance.toFixed(2)}</td>`
+        : `<td style="padding:10px;border:1px solid #000;background:#F0FDF4;"></td>`;
       return `
-        <tr style="border-bottom:1px solid #E2E8F0;vertical-align:top;">
-          <td style="padding:10px;border:1px solid #CBD5E1;font-weight:500;">${p.name  || '—'}</td>
-          <td style="padding:10px;border:1px solid #CBD5E1;color:#64748B;">${p.phone || '—'}</td>
+        <tr style="vertical-align:top;">
+          <td style="padding:10px;border:1px solid #000;font-weight:500;word-break:break-word;">${p.name  || '—'}</td>
+          <td style="padding:10px;border:1px solid #000;">${p.phone || '—'}</td>
           ${debitCell}
           ${creditCell}
-          <td style="padding:10px;border:1px solid #CBD5E1;text-align:center;color:#64748B;">${dateCell}</td>
+          <td style="padding:10px;border:1px solid #000;text-align:center;">${dateCell}</td>
         </tr>`;
     }).join('');
 
     container.innerHTML = `
-      <!-- 1. Top Royal Blue Header -->
-      <div style="background:#004B93;display:flex;justify-content:space-between;align-items:center;padding:14px 24px;color:#fff;font-size:15px;font-weight:bold;">
+      <!-- 1. Top Navy Header -->
+      <div style="background:#003366;display:flex;justify-content:space-between;align-items:center;padding:16px 24px;color:#fff;font-size:20px;font-weight:bold;box-sizing:border-box;">
         <span>${storeName}</span>
         <span style="letter-spacing:0.5px;">📘 Banglakhata</span>
       </div>
 
-      <div style="padding:24px;">
+      <div style="padding:30px;box-sizing:border-box;">
         <!-- 2. Title -->
-        <div style="text-align:center;margin-bottom:20px;">
-          <div style="font-size:22px;font-weight:700;color:#000;">${roleLabel} তালিকার স্টেটমেন্ট</div>
-          <div style="font-size:13px;color:#475569;margin-top:6px;">(আজ পর্যন্ত — ${dateStr})</div>
+        <div style="text-align:center;margin-bottom:25px;">
+          <div style="font-size:24px;font-weight:bold;color:#000;letter-spacing:0.5px;">${roleLabel} তালিকার স্টেটমেন্ট</div>
+          <div style="font-size:15px;color:#555;font-weight:500;margin-top:6px;">(আজ পর্যন্ত — ${dateStr})</div>
         </div>
 
         <!-- 3. Summary Cards -->
-        <table style="width:100%;border-collapse:collapse;margin-bottom:16px;text-align:center;">
+        <table style="width:100%;border-collapse:collapse;margin-bottom:25px;text-align:center;border:1px solid #E5E7EB;">
           <tr>
-            <td style="width:33.33%;padding:12px;border:1px solid #E2E8F0;background:#FAFAFA;">
-              <div style="font-size:12px;color:#64748B;margin-bottom:4px;">মোট খরচ(-)</div>
-              <div style="font-size:16px;font-weight:bold;color:#DC2626;">৳${filteredGive.toFixed(2)}</div>
+            <td style="width:33.33%;padding:16px;border-right:1px solid #E5E7EB;">
+              <div style="font-size:14px;color:#666;margin-bottom:6px;">মোট খরচ(-)</div>
+              <div style="font-size:18px;font-weight:bold;color:#DC2626;">৳${filteredGive.toFixed(2)}</div>
             </td>
-            <td style="width:33.33%;padding:12px;border:1px solid #E2E8F0;background:#FAFAFA;">
-              <div style="font-size:12px;color:#64748B;margin-bottom:4px;">মোট জমা(+)</div>
-              <div style="font-size:16px;font-weight:bold;color:#16A34A;">৳${filteredGet.toFixed(2)}</div>
+            <td style="width:33.33%;padding:16px;border-right:1px solid #E5E7EB;">
+              <div style="font-size:14px;color:#666;margin-bottom:6px;">মোট জমা(+)</div>
+              <div style="font-size:18px;font-weight:bold;color:#16A34A;">৳${filteredGet.toFixed(2)}</div>
             </td>
-            <td style="width:33.33%;padding:12px;border:1px solid #E2E8F0;background:#FAFAFA;">
-              <div style="font-size:12px;color:#64748B;margin-bottom:4px;">মোট ব্যালেন্স</div>
-              <div style="font-size:16px;font-weight:bold;color:${netBalance >= 0 ? '#16A34A' : '#DC2626'};">
+            <td style="width:33.33%;padding:16px;">
+              <div style="font-size:14px;color:#666;margin-bottom:6px;">মোট ব্যালেন্স</div>
+              <div style="font-size:18px;font-weight:bold;color:${netBalance >= 0 ? '#16A34A' : '#DC2626'};">
                 ৳${Math.abs(netBalance).toFixed(2)} ${netBalance >= 0 ? 'Cr' : 'Dr'}
               </div>
             </td>
@@ -222,42 +222,42 @@ export function HomeView() {
         </table>
 
         <!-- Count label -->
-        <div style="font-size:13px;font-weight:600;color:#334155;margin-bottom:10px;">
+        <div style="font-size:15px;font-weight:bold;color:#000;margin-bottom:12px;">
           ${roleLabel} সংখ্যা: ${parties.length} (${countTag})
         </div>
 
         <!-- 4. Party Table -->
-        <table style="width:100%;border-collapse:collapse;font-size:12px;text-align:left;color:#334155;">
+        <table style="width:100%;border-collapse:collapse;font-size:14px;color:#000;">
           <thead>
-            <tr style="background:#F8FAFC;font-weight:bold;border-top:1px solid #94A3B8;border-bottom:1px solid #94A3B8;">
-              <th style="padding:10px;border:1px solid #CBD5E1;width:22%;">${nameColHeader}</th>
-              <th style="padding:10px;border:1px solid #CBD5E1;width:20%;">ফোন</th>
-              <th style="padding:10px;border:1px solid #CBD5E1;width:18%;text-align:right;background:#FEF2F2;">ডেবিট (-)</th>
-              <th style="padding:10px;border:1px solid #CBD5E1;width:18%;text-align:right;background:#F0FDF4;">ক্রেডিট (+)</th>
-              <th style="padding:10px;border:1px solid #CBD5E1;width:22%;text-align:center;">সর্বশেষ লেনদেন</th>
+            <tr style="background:#F8FAFC;font-weight:bold;">
+              <th style="padding:10px;border:1px solid #000;width:22%;text-align:left;">${nameColHeader}</th>
+              <th style="padding:10px;border:1px solid #000;width:20%;text-align:left;">ফোন</th>
+              <th style="padding:10px;border:1px solid #000;width:18%;text-align:right;background:#FEF2F2;">ডেবিট (-)</th>
+              <th style="padding:10px;border:1px solid #000;width:18%;text-align:right;background:#F0FDF4;">ক্রেডিট (+)</th>
+              <th style="padding:10px;border:1px solid #000;width:22%;text-align:center;">সর্বশেষ লেনদেন</th>
             </tr>
           </thead>
           <tbody>
             ${rowsHtml}
-            <tr style="background:#F1F5F9;font-weight:bold;border-top:2px solid #CBD5E1;">
-              <td style="padding:12px 10px;border:1px solid #CBD5E1;">সর্বমোট</td>
-              <td style="padding:12px 10px;border:1px solid #CBD5E1;"></td>
-              <td style="padding:12px 10px;border:1px solid #CBD5E1;text-align:right;color:#DC2626;">৳${filteredGive.toFixed(2)}</td>
-              <td style="padding:12px 10px;border:1px solid #CBD5E1;text-align:right;color:#16A34A;">৳${filteredGet.toFixed(2)}</td>
-              <td style="padding:12px 10px;border:1px solid #CBD5E1;"></td>
+            <tr style="background:#F1F5F9;font-weight:bold;">
+              <td style="padding:12px 10px;border:1px solid #000;">সর্বমোট</td>
+              <td style="padding:12px 10px;border:1px solid #000;"></td>
+              <td style="padding:12px 10px;border:1px solid #000;text-align:right;background:#FEF2F2;color:#DC2626;">৳${filteredGive.toFixed(2)}</td>
+              <td style="padding:12px 10px;border:1px solid #000;text-align:right;background:#F0FDF4;color:#16A34A;">৳${filteredGet.toFixed(2)}</td>
+              <td style="padding:12px 10px;border:1px solid #000;"></td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <!-- 5. Deep Blue Footer Strip -->
-      <div style="background:#004B93;color:#fff;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:32px;font-size:12px;">
+      <!-- 5. Deep Navy Footer Strip -->
+      <div style="background:#003366;color:#fff;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:40px;font-size:13px;box-sizing:border-box;">
         <div style="display:flex;align-items:center;gap:10px;">
           <span>এখনই Banglakhata ব্যবহার শুরু করুন</span>
-          <span style="background:#fff;color:#004B93;padding:3px 10px;font-weight:bold;border-radius:4px;">ইনস্টল করুন</span>
+          <span style="background:#fff;color:#003366;padding:4px 10px;font-weight:bold;border-radius:4px;">ইনস্টল করুন</span>
         </div>
-        <div style="text-align:right;">
-          ${footerPhone ? `📞 ${footerPhone}` : 'সাহায্য: support@banglakhata.com'} | রিপোর্ট তৈরি: ${timeStr}
+        <div>
+          ${footerPhone ? `📞 ${footerPhone}` : 'সাহায্য: support@banglakhata.com'} | নিয়ম ও শর্তাবলী প্রযোজ্য
         </div>
       </div>
     `;
