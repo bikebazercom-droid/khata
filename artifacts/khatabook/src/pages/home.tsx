@@ -386,15 +386,17 @@ export function HomeView() {
             </p>
             <p className="text-[9.5px] font-semibold text-slate-400 mt-1 whitespace-nowrap">আপনি পাবেন</p>
           </div>
-          <Link
-            href="/reports"
-            className="px-1.5 py-3 flex flex-col items-center justify-center gap-1 active:scale-[0.95] transition-all min-w-0"
+          <button
+            type="button"
+            onClick={() => exportFilteredReportToPDF()}
+            disabled={isExportingPdf}
+            className="px-1.5 py-3 flex flex-col items-center justify-center gap-1 active:scale-[0.95] transition-all min-w-0 disabled:opacity-50"
           >
             <span className="flex items-center gap-1 text-[#075E9F] font-bold text-[12px] whitespace-nowrap">
-              রিপোর্ট দেখুন
+              {isExportingPdf ? '...' : 'রিপোর্ট দেখুন'}
               <ChevronRight className="w-3.5 h-3.5 shrink-0" />
             </span>
-          </Link>
+          </button>
         </div>
       </div>
 

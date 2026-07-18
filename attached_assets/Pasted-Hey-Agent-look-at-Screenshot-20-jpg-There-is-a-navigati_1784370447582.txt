@@ -1,0 +1,47 @@
+Hey Agent, look at Screenshot_20.jpg. There is a navigation/state switching bug on the dashboard view. 
+
+CURRENT BUG:
+When the user has selected the "সরবরাহকারী" (Supplier) tab, clicking either the top "রিপোর্ট দেখুন >" card link or the bottom right "PDF" floating action icon mistakenly triggers the click handler or router path meant for the "গ্রাহক" (Customer) view instead of rendering the Supplier-specific report view.
+
+FIX REQUIRED:
+1. Locate the click event handlers (`onClick`) for the "রিপোর্ট দেখুন >" button and the "PDF" button on this main ledger dashboard component.
+2. Check the active tab state variable (e.g., `activeTab === 'supplier'` or `viewMode === 'supplier'`).
+3. Make the action context-aware:
+   - If the active tab is 'customer', navigate to the Customer Report Screen or invoke `generateAndSharePerfectReportPDF(customerData, 'customer')`.
+   - If the active tab is 'supplier', navigate to the Supplier Report Screen or invoke `generateAndSharePerfectReportPDF(supplierData, 'supplier')`.
+
+Please look at this clean conditional implementation for your dashboard layout file:
+
+---
+
+### FIXED TEMPLATE EVENT HANDLERS
+
+```javascript
+// 1. Identify your active state indicator (e.g., currentTab)
+// 2. Refactor the Click Handlers inside the Dashboard layout:
+
+const handleViewReportClick = () => {
+  if (activeTab === 'supplier') {
+    // If you are using a router navigation system (e.g., react-router-dom or Next.js router)
+    // router.push('/reports/supplier'); 
+    
+    // Or if you are opening a modal/triggering direct sharing:
+    generateAndSharePerfectReportPDF(filteredSuppliersData, 'supplier');
+  } else {
+    // Default fallback to Customer Context
+    // router.push('/reports/customer');
+    generateAndSharePerfectReportPDF(filteredCustomersData, 'customer');
+  }
+};
+
+const handlePdfIconClick = () => {
+  if (activeTab === 'supplier') {
+    generateAndSharePerfectReportPDF(filteredSuppliersData, 'supplier');
+  } else {
+    generateAndSharePerfectReportPDF(filteredCustomersData, 'customer');
+  }
+};
+
+// 3. Bind these updated context-aware handlers directly to the buttons shown in Screenshot_20.jpg:
+// <div className="report-see-button" onClick={handleViewReportClick}>রিপোর্ট দেখুন &gt;</div>
+// <button className="pdf-button" onClick={handlePdfIconClick}>...</button>
