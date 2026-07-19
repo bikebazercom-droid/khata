@@ -1,0 +1,88 @@
+Hey Agent, listen carefully. The delete confirmation modal is STILL COMPLETELY BROKEN. Clicking "না" does absolutely nothing (it doesn't close), and clicking "হ্যাঁ, ডিলিট করুন" does not trigger any deletion or backend API call at all. This is an unacceptable blocker. 
+
+I need you to fix the `onClick` event listeners on BOTH buttons right now so they behave exactly as specified:
+1. When clicking "না", it MUST instantly close the modal and exit without any side effects.
+2. When clicking "হ্যাঁ, ডিলিট করুন", it MUST instantly hit the database DELETE route, clear the cache, alert the user, and reload.
+
+Go to the file where this confirmation modal is rendered (likely `business-switcher-drawer.tsx` or similar component) and replace the modal action buttons JSX with this exact tested code block:
+
+```javascript
+{/* ==================== EXACT MODAL BUTTONS INTEGRATION ==================== */}
+<div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+  
+  {/* "না" BUTTON: MUST CLOSE THE MODAL IMMEDIATELY */}
+  <button 
+    type="button"
+    onClick={(e) => {
+      e.stopPropagation();
+      setConfirmDeleteId(null); // OR setBusinessToDelete(null) depending on your local state name
+      // If there's an explicit state tracking modal visibility like setIsModalOpen(false), trigger it here.
+    }}
+    style={{ 
+      flex: 1, 
+      backgroundColor: '#F3F4F6', 
+      color: '#1F2937', 
+      border: 'none', 
+      padding: '14px 0', 
+      borderRadius: '8px', 
+      fontWeight: 'bold',
+      cursor: 'pointer' 
+    }}
+  >
+    না
+  </button>
+
+  {/* "হ্যাঁ, ডিলিট করুন" BUTTON: MUST EXECUTE ABSOLUTE DATABASE DELETION IMMEDIATELY */}
+  <button 
+    type="button"
+    onClick={async (e) => {
+      e.stopPropagation();
+      const targetId = confirmDeleteId; // Adjust state name if using businessToDelete
+      if (!targetId) return;
+
+      try {
+        // Force absolute API execution
+        const response = await fetch(`/api/businesses/${targetId}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+          const errMsg = await response.text();
+          throw new Error(errMsg);
+        }
+
+        alert("খাতাটি ডাটাবেজ থেকে সম্পূর্ণ ডিলিট করা হয়েছে।");
+        
+        // Context pointer fallback safety
+        const remaining = businesses.filter(b => b.id !== targetId);
+        if (targetId === activeBusinessId && remaining.length > 0) {
+          localStorage.setItem('selectedBusinessId', remaining[0].id);
+        } else if (remaining.length === 0) {
+          localStorage.removeItem('selectedBusinessId');
+        }
+
+        // Wipe query caches and enforce hard context reset
+        queryClient.clear();
+        setConfirmDeleteId(null);
+        window.location.reload();
+
+      } catch (error) {
+        console.error("FATAL CRASH DURING DELETION:", error);
+        alert("ডিলিট করা যায়নি! আবার চেষ্টা করুন।");
+      }
+    }}
+    style={{ 
+      flex: 1, 
+      backgroundColor: '#DC2626', 
+      color: '#ffffff', 
+      border: 'none', 
+      padding: '14px 0', 
+      borderRadius: '8px', 
+      fontWeight: 'bold',
+      cursor: 'pointer' 
+    }}
+  >
+    হ্যাঁ, ডিলিট করুন
+  </button>
+</div>
