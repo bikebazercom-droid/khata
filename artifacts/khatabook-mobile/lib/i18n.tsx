@@ -200,18 +200,28 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     const t = (key: TKey): string =>
       ((dict[lang] as Record<string, string>)[key] ?? dict.bn[key] ?? key);
 
-    const formatNumEn = (amount: number): string => {
-      const hasDecimal = !Number.isInteger(amount);
-      return new Intl.NumberFormat('en-IN', {
-        minimumFractionDigits: hasDecimal ? 2 : 0,
-        maximumFractionDigits: 2,
-      }).format(amount);
+    // formatNumber — plain digit conversion, no grouping (matches user's formatNumber spec).
+    const formatNumber = (amount: number): string => {
+      if (isEnglish) return amount.toString();
+      const bn: Record<string, string> = {
+        '0': '০', '1': '১', '2': '২', '3': '৩', '4': '৪',
+        '5': '৫', '6': '৬', '7': '৭', '8': '৮', '9': '৯',
+      };
+      return amount.toString().split('').map(d => bn[d] ?? d).join('');
     };
 
-    const formatNumber = (amount: number): string =>
-      isEnglish ? formatNumEn(amount) : formatBengaliNumber(amount);
-
-    const formatCurrency = (amount: number): string => `৳${formatNumber(amount)}`;
+    // formatCurrency — keeps Indian comma grouping for both modes; prefixes ৳.
+    const formatCurrency = (amount: number): string => {
+      if (isEnglish) {
+        const hasDecimal = !Number.isInteger(amount);
+        const grouped = new Intl.NumberFormat('en-IN', {
+          minimumFractionDigits: hasDecimal ? 2 : 0,
+          maximumFractionDigits: 2,
+        }).format(amount);
+        return `৳${grouped}`;
+      }
+      return `৳${formatBengaliNumber(amount)}`;
+    };
 
     return { lang, isEnglish, t, formatCurrency, formatNumber };
   }, [lang]);
