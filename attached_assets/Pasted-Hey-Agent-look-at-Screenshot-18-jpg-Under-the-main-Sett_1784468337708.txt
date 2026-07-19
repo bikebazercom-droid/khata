@@ -1,0 +1,54 @@
+Hey Agent, look at Screenshot_18.jpg. Under the main Settings screen, there is a red section: "🗑️ খাতা ডিলিট করুন" ( समस्त লেনদেন ও ক্যাশ মুছে যাবে — এটি পূর্বাবস্থায় ফেরানো যাবে না ). 
+
+The user wants this button to execute a total user account purge from the database, NOT just a single business deletion. If a user triggers this, it must completely wipe out their entire identity, all associated businesses, all parties/customers, and all ledger logs from the database. When they log back in using their same Gmail/phone via Clerk or the auth service, they must land into a completely brand-new, freshly-provisioned blank account with zero legacy data.
+
+PLEASE IMPLEMENT THIS DELETION ROUTE AND INTERFACE IN PARALLEL IMMEDIATELY:
+
+1. CREATE TOTAL ACCOUNT NUKE ROUTE ON BACKEND (`api-server`):
+Inside your authentication or user routes, add a new global account delete endpoint. It must trace all content belonging to the authenticated `req.user.id` and delete everything inside a single atomic database transaction:
+
+```typescript
+router.delete('/api/user/account/nuke', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    await db.transaction(async (tx) => {
+      // 1. Get all business IDs owned by this user via the userBusinessesTable
+      const userBiz = await tx.select({ businessId: userBusinessesTable.businessId })
+        .from(userBusinessesTable)
+        .where(eq(userBusinessesTable.userId, userId));
+      
+      const bizIds = userBiz.map(b => b.businessId);
+
+      if (bizIds.length > 0) {
+        // 2. Fetch all party/customer IDs linked to any of these businesses
+        const parties = await tx.select({ id: partiesTable.id })
+          .from(partiesTable)
+          .where(inArray(partiesTable.businessId, bizIds));
+        
+        const partyIds = parties.map(p => p.id);
+
+        // 3. Delete all ledger entries / transactions if parties exist
+        if (partyIds.length > 0) {
+          await tx.delete(ledgerEntriesTable).where(inArray(ledgerEntriesTable.partyId, partyIds));
+        }
+
+        // 4. Delete all child references for these businesses
+        await tx.delete(partiesTable).where(inArray(partiesTable.businessId, bizIds));
+        await tx.delete(businessSettingsTable).where(inArray(businessSettingsTable.businessId, bizIds));
+        await tx.delete(userBusinessesTable).where(inArray(userBusinessesTable.businessId, bizIds));
+        
+        // 5. Delete the primary business records themselves
+        await tx.delete(businessesTable).where(inArray(businessesTable.id, bizIds));
+      }
+
+      // 6. Finally, purge the main user identity record from the users table completely
+      await tx.delete(usersTable).where(eq(usersTable.id, userId));
+    });
+
+    return res.status(200).json({ success: true, message: "Account completely erased." });
+  } catch (error) {
+    console.error("TOTAL ACCOUNT NUKE FAILED:", error);
+    return res.status(500).json({ error: "Failed to fully wipe out the account records." });
+  }
+});

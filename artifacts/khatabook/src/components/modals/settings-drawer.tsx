@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import { useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { useClerk, useAuth } from '@clerk/react';
@@ -72,6 +73,7 @@ export function SettingsDrawer({
   const [, navigate] = useLocation();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Which accordion row is currently expanded (only one at a time)
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>(null);
@@ -117,15 +119,53 @@ export function SettingsDrawer({
     },
   });
 
-  // ── Delete all data (খাতা ডিলিট) ─────────────────────────────────────────
-  function handleConfirmDelete() {
-    queryClient.clear();
-    clearAllPendingUploads();
-    localStorage.clear();
-    setShowDeleteConfirm(false);
-    onOpenChange(false);
-    window.location.reload();
-  }
+  // ── Total account nuke (খাতা ডিলিট) ──────────────────────────────────────
+  const handleConfirmDelete = useCallback(async () => {
+    if (isDeleting) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch('/api/user/account', {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(err);
+      }
+
+      // Wipe all local state before signing out.
+      queryClient.clear();
+      clearAllPendingUploads();
+      localStorage.clear();
+      setShowDeleteConfirm(false);
+      onOpenChange(false);
+
+      toast.success('🗑️ বাংলা খাতা: আপনার সমস্ত তথ্য সফলভাবে মুছে ফেলা হয়েছে!', {
+        duration: 2500,
+        style: {
+          background: '#1E3A8A',
+          color: '#ffffff',
+          fontWeight: '600',
+          padding: '16px',
+          borderRadius: '12px',
+          fontSize: '15px',
+        },
+      });
+
+      // Sign out of all sessions then redirect to fresh sign-in.
+      setTimeout(async () => {
+        try {
+          if (isSignedIn) await signOut();
+          await phoneLogout().catch(() => {});
+        } catch {}
+        navigate('/sign-in');
+      }, 1500);
+    } catch (err) {
+      console.error('[account-nuke] failed:', err);
+      toast.error('অ্যাকাউন্ট ডিলিট করা যায়নি। আবার চেষ্টা করুন।');
+      setIsDeleting(false);
+    }
+  }, [isDeleting, isSignedIn, queryClient, onOpenChange, navigate, signOut]);
 
   // ── Logout ────────────────────────────────────────────────────────────────
   async function handleLogout() {
@@ -313,25 +353,28 @@ export function SettingsDrawer({
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent className="max-w-sm rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-center text-[17px]">খাতা ডিলিট করবেন?</AlertDialogTitle>
+            <AlertDialogTitle className="text-center text-[17px]">সম্পূর্ণ অ্যাকাউন্ট ডিলিট করবেন?</AlertDialogTitle>
             <AlertDialogDescription className="text-center text-slate-600 text-[14px] leading-relaxed">
-              ডিলিট করতে চাইলে হ্যাঁ অথবা না চাপুন
+              আপনার সমস্ত খাতা, গ্রাহক, লেনদেন ও ডেটা চিরতরে মুছে যাবে।{'\n'}
+              পরে একই Gmail/ফোন দিয়ে লগইন করলে নতুন ফাঁকা অ্যাকাউন্ট পাবেন।
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-row gap-3 mt-2">
             <button
               type="button"
               onClick={() => setShowDeleteConfirm(false)}
-              className="flex-1 py-3 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 font-bold text-[15px] active:scale-95 transition-transform"
+              disabled={isDeleting}
+              className="flex-1 py-3 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 font-bold text-[15px] active:scale-95 transition-transform disabled:opacity-50"
             >
               না
             </button>
             <button
               type="button"
-              onClick={handleConfirmDelete}
-              className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold text-[15px] active:scale-95 transition-transform"
+              onClick={() => { void handleConfirmDelete(); }}
+              disabled={isDeleting}
+              className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold text-[15px] active:scale-95 transition-transform disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              হ্যাঁ
+              {isDeleting ? 'মুছছে…' : 'হ্যাঁ, ডিলিট করুন'}
             </button>
           </AlertDialogFooter>
         </AlertDialogContent>
