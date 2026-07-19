@@ -1,0 +1,48 @@
+Hey Agent, even after your recent updates, clicking the "হ্যাঁ, ডিলিট করুন" button still fails to successfully delete the record and close the modal. This is likely caused by either an API base URL path mismatch (e.g., `/api/businesses/:id` vs `/businesses/:id` under the router prefix) or a foreign key constraint violation causing the database transaction to rollback silently.
+
+Please investigate and apply this robust fallback correction across the backend and frontend simultaneously:
+
+1. BACKEND ROUTE & PRE-FETCH PURGE AUDIT (`src/routes/businesses.ts`):
+Ensure the DELETE route handles the prefix correctly and aggressively clears all tables associated with the business ID sequentially without throwing constraint errors. Wrap it strictly like this:
+
+```typescript
+router.delete('/:id', requireAuth, async (req, res) => {
+  const businessId = req.params.id;
+  const userId = req.user.id;
+
+  try {
+    // 1. Verify ownership directly
+    const ownership = await db.select().from(userBusinessesTable)
+      .where(and(eq(userBusinessesTable.userId, userId), eq(userBusinessesTable.businessId, businessId)))
+      .limit(1);
+
+    if (ownership.length === 0) {
+      return res.status(403).json({ error: "Unauthorized operation" });
+    }
+
+    // 2. Execute aggressive sequential deletion to bypass strict cascade fails
+    await db.transaction(async (tx) => {
+      // Clear out ledger entries/transactions first
+      const parties = await tx.select({ id: partiesTable.id }).from(partiesTable).where(eq(partiesTable.businessId, businessId));
+      const partyIds = parties.map(p => p.id);
+      
+      if (partyIds.length > 0) {
+        // Delete all ledger logs linked to these parties
+        await tx.delete(ledgerEntriesTable).where(inArray(ledgerEntriesTable.partyId, partyIds));
+      }
+      
+      // Delete child reference tables
+      await tx.delete(partiesTable).where(eq(partiesTable.businessId, businessId));
+      await tx.delete(businessSettingsTable).where(eq(businessSettingsTable.businessId, businessId));
+      await tx.delete(userBusinessesTable).where(eq(userBusinessesTable.businessId, businessId));
+      
+      // Finally delete primary business block
+      await tx.delete(businessesTable).where(eq(businessesTable.id, businessId));
+    });
+
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error("CRITICAL DELETE TRANSACTION FAILED:", error);
+    return res.status(500).json({ error: error.message });
+  }
+});

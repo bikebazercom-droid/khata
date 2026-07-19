@@ -7,6 +7,9 @@ import {
   partiesTable,
   ledgerEntriesTable,
   userBusinessesTable,
+  staffPersonnelTable,
+  staffDeploymentLogsTable,
+  staffDestinationsTable,
 } from "@workspace/db";
 import type { AuthenticatedRequest } from "../middlewares/requireAuth";
 
@@ -152,6 +155,20 @@ router.delete("/businesses/:id", async (req, res) => {
       await tx
         .delete(businessSettingsTable)
         .where(eq(businessSettingsTable.businessId, businessId));
+
+      // Staff tables also hold business_id FKs — must be cleared before
+      // deleting the business row or Postgres throws a constraint violation.
+      await tx
+        .delete(staffDeploymentLogsTable)
+        .where(eq(staffDeploymentLogsTable.businessId, businessId));
+
+      await tx
+        .delete(staffPersonnelTable)
+        .where(eq(staffPersonnelTable.businessId, businessId));
+
+      await tx
+        .delete(staffDestinationsTable)
+        .where(eq(staffDestinationsTable.businessId, businessId));
 
       await tx
         .delete(userBusinessesTable)
