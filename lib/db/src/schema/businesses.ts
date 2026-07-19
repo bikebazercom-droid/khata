@@ -4,7 +4,7 @@ import { z } from "zod/v4";
 
 export const businessesTable = pgTable("businesses", {
   id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull().default("My Business"),
+  name: text("name").notNull().default("আমার ব্যবসা"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

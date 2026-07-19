@@ -496,7 +496,7 @@ router.post(
       return;
     }
 
-    await getOrCreateBusinessSettings(businessId);
+    const settings = await getOrCreateBusinessSettings(businessId);
     const amount = Number(party.currentBalance);
     // minimumFractionDigits:0  → whole numbers stay clean (no trailing ".00")
     // maximumFractionDigits:2  → decimal balances are shown exactly (2332.82, not 2333)
@@ -505,7 +505,8 @@ router.post(
       maximumFractionDigits: 2,
     }).format(amount);
 
-    const message = `বকেয়া তাগাদা: Banglakhata-এর পক্ষ থেকে ${party.name}-কে ৳${formattedAmount} টাকা বকেয়া পরিশোধের জন্য অনুরোধ করা হচ্ছে।`;
+    const senderName = settings.storeName || "আমার ব্যবসা";
+    const message = `বকেয়া তাগাদা: ${senderName}-এর পক্ষ থেকে ${party.name}-কে ৳${formattedAmount} টাকা বকেয়া পরিশোধের জন্য অনুরোধ করা হচ্ছে।`;
 
     res.json(
       SendPaymentReminderResponse.parse({
