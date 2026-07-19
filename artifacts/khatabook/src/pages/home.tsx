@@ -832,20 +832,6 @@ export function HomeView() {
                 </p>
               </div>
 
-              {/* Bank details nudge — tapping opens Settings */}
-              <button
-                type="button"
-                onClick={() => {
-                  setRequestModalParty(null);
-                  setIsSettingsOpen(true);
-                }}
-                className="w-full bg-blue-50 border border-blue-100 rounded-2xl p-4 flex items-center justify-between active:scale-[0.98] transition-all"
-              >
-                <span className="text-xs font-medium text-blue-800 leading-relaxed text-left pr-2">
-                  আপনার অ্যাকাউন্টে এই অর্থপ্রদান পেতে ব্যাংকের বিবরণ যোগ করুন
-                </span>
-                <ChevronRight className="w-4 h-4 text-blue-500 shrink-0" />
-              </button>
             </div>
             {/* ── END RECEIPT CAPTURE TARGET ─────────────────────────────── */}
 
