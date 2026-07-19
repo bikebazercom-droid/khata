@@ -15,6 +15,14 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from '@/components/ui/drawer';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+} from '@/components/ui/alert-dialog';
 import { phoneLogout } from '@/lib/phoneAuth';
 import { clearAllPendingUploads } from '@/lib/pendingUploads';
 
@@ -63,6 +71,7 @@ export function SettingsDrawer({
   const { isSignedIn } = useAuth();
   const [, navigate] = useLocation();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Which accordion row is currently expanded (only one at a time)
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>(null);
@@ -107,6 +116,16 @@ export function SettingsDrawer({
       },
     },
   });
+
+  // ── Delete all data (খাতা ডিলিট) ─────────────────────────────────────────
+  function handleConfirmDelete() {
+    queryClient.clear();
+    clearAllPendingUploads();
+    localStorage.clear();
+    setShowDeleteConfirm(false);
+    onOpenChange(false);
+    window.location.reload();
+  }
 
   // ── Logout ────────────────────────────────────────────────────────────────
   async function handleLogout() {
@@ -272,8 +291,52 @@ export function SettingsDrawer({
             )}
           </div>
 
+          {/* ── Row 4: Delete Khata ─────────────────────────────────── */}
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-red-200 bg-red-50 text-red-600 font-bold text-sm transition-all active:scale-[0.98] hover:bg-red-100"
+            >
+              <span className="text-base">🗑️</span>
+              খাতা ডিলিট করুন
+            </button>
+            <p className="text-[10px] text-slate-400 mt-1.5 px-1">
+              সমস্ত লেনদেন ও ক্যাশ মুছে যাবে — এটি পূর্বাবস্থায় ফেরানো যাবে না
+            </p>
+          </div>
+
         </div>
       </DrawerContent>
+
+      {/* ── Confirmation dialog ──────────────────────────────────── */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent className="max-w-sm rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-center text-[17px]">খাতা ডিলিট করবেন?</AlertDialogTitle>
+            <AlertDialogDescription className="text-center text-slate-600 text-[14px] leading-relaxed">
+              ডিলিট করতে চাইলে হ্যাঁ অথবা না চাপুন
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row gap-3 mt-2">
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(false)}
+              className="flex-1 py-3 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 font-bold text-[15px] active:scale-95 transition-transform"
+            >
+              না
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDelete}
+              className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold text-[15px] active:scale-95 transition-transform"
+            >
+              হ্যাঁ
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </Drawer>
   );
 }
