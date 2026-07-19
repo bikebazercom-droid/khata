@@ -19,12 +19,14 @@ import { useColors } from '@/hooks/useColors';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth, useClerk } from '@clerk/expo';
 import { useRouter } from 'expo-router';
+import { useLanguage } from '@/lib/i18n';
 
 export default function SettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
   const router = useRouter();
+  const { isEnglish, t } = useLanguage();
 
   const { isSignedIn } = useAuth();
   const { signOut } = useClerk();
@@ -54,14 +56,23 @@ export default function SettingsScreen() {
     }
   }
 
+  async function handleLanguageChange(lang: 'বাংলা' | 'English') {
+    try {
+      await updateSettings.mutateAsync({ data: { language: lang } });
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      // silent — optimistic update via LanguageProvider
+    }
+  }
+
   async function handleLogout() {
     Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
+      t('signOutLabel'),
+      isEnglish ? 'Are you sure you want to sign out?' : 'আপনি কি সাইন আউট করতে চান?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: isEnglish ? 'Cancel' : 'বাতিল', style: 'cancel' },
         {
-          text: 'Sign Out',
+          text: t('signOutLabel'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -69,9 +80,7 @@ export default function SettingsScreen() {
               if (isSignedIn) {
                 await signOut();
               }
-              // Also clear phone session token if present
               await SecureStore.deleteItemAsync('phone_session_token').catch(() => {});
-              // Clear auth token getter
               const { setAuthTokenGetter } = await import('@workspace/api-client-react');
               setAuthTokenGetter(null);
               router.replace('/(auth)/sign-in' as any);
@@ -83,6 +92,8 @@ export default function SettingsScreen() {
       ],
     );
   }
+
+  const currentLang = settings?.language ?? 'বাংলা';
 
   const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -127,6 +138,27 @@ export default function SettingsScreen() {
       color: colors.foreground,
       padding: 0,
     },
+    langToggleRow: {
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    langToggleLabel: {
+      fontSize: 15,
+      fontFamily: 'Inter_500Medium',
+      color: colors.foreground,
+      marginBottom: 10,
+    },
+    langBtnRow: { flexDirection: 'row', gap: 10 },
+    langBtn: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: 10,
+      borderWidth: 2,
+      alignItems: 'center',
+    },
+    langBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
     saveBtn: {
       backgroundColor: colors.primary,
       borderRadius: colors.radius,
@@ -162,13 +194,16 @@ export default function SettingsScreen() {
   return (
     <View style={s.container}>
       <View style={s.header}>
-        <Text style={s.title}>Settings</Text>
+        <Text style={s.title}>{t('mobileSettingsTitle')}</Text>
       </View>
       <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={[s.sectionLabel, { marginTop: 4 }]}>BUSINESS</Text>
+
+        {/* BUSINESS section */}
+        <Text style={[s.sectionLabel, { marginTop: 4 }]}>{t('businessSection')}</Text>
         <View style={s.card}>
+          {/* Store name row */}
           <View style={s.row}>
-            <Text style={s.rowLabel}>Store Name</Text>
+            <Text style={s.rowLabel}>{t('storeNameLabel')}</Text>
             {!editing && (
               <>
                 {isLoading ? (
@@ -193,9 +228,38 @@ export default function SettingsScreen() {
               />
             )}
           </View>
-          <View style={[s.row, s.rowBorder]}>
-            <Text style={s.rowLabel}>Language</Text>
-            <Text style={s.rowValue}>{settings?.language ?? 'EN'}</Text>
+
+          {/* Language toggle row */}
+          <View style={s.langToggleRow}>
+            <Text style={s.langToggleLabel}>{t('languageLabel')}</Text>
+            <View style={s.langBtnRow}>
+              {(['বাংলা', 'English'] as const).map((lang) => {
+                const active = currentLang === lang;
+                return (
+                  <TouchableOpacity
+                    key={lang}
+                    style={[
+                      s.langBtn,
+                      {
+                        borderColor: active ? colors.primary : colors.border,
+                        backgroundColor: active ? colors.primary : colors.card,
+                      },
+                    ]}
+                    onPress={() => handleLanguageChange(lang)}
+                    activeOpacity={0.75}
+                  >
+                    <Text
+                      style={[
+                        s.langBtnText,
+                        { color: active ? colors.primaryForeground : colors.mutedForeground },
+                      ]}
+                    >
+                      {lang}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
         </View>
 
@@ -207,27 +271,34 @@ export default function SettingsScreen() {
               disabled={updateSettings.isPending}
               activeOpacity={0.8}
             >
-              <Text style={s.saveBtnText}>{updateSettings.isPending ? 'Saving…' : 'Save Changes'}</Text>
+              <Text style={s.saveBtnText}>
+                {updateSettings.isPending ? t('savingLabel') : t('saveChanges')}
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.cancelBtn} onPress={() => { setEditing(false); setStoreName(settings?.storeName ?? ''); }}>
-              <Text style={s.cancelText}>Cancel</Text>
+            <TouchableOpacity
+              style={s.cancelBtn}
+              onPress={() => { setEditing(false); setStoreName(settings?.storeName ?? ''); }}
+            >
+              <Text style={s.cancelText}>{t('cancel')}</Text>
             </TouchableOpacity>
           </>
         )}
 
-        <Text style={s.sectionLabel}>ACCOUNT</Text>
+        {/* ACCOUNT section */}
+        <Text style={s.sectionLabel}>{t('accountSection')}</Text>
         <View style={s.card}>
           <TouchableOpacity style={s.row} onPress={handleLogout} activeOpacity={0.7}>
-            <Text style={[s.rowLabel, { color: '#ef4444' }]}>Sign Out</Text>
+            <Text style={[s.rowLabel, { color: '#ef4444' }]}>{t('signOutLabel')}</Text>
             <Feather name="log-out" size={18} color="#ef4444" />
           </TouchableOpacity>
         </View>
 
-        <Text style={s.sectionLabel}>ABOUT</Text>
+        {/* ABOUT section */}
+        <Text style={s.sectionLabel}>{t('aboutSection')}</Text>
         <View style={s.aboutCard}>
           <Feather name="book-open" size={32} color={colors.primary} />
-          <Text style={s.appName}>ডিজিটাল খাতা</Text>
-          <Text style={s.appVersion}>Digital Khata Mobile · v1.0</Text>
+          <Text style={s.appName}>{t('appNameMobile')}</Text>
+          <Text style={s.appVersion}>BanglaKhata Mobile · v1.0</Text>
         </View>
 
         <View style={s.bottomPad} />

@@ -14,28 +14,25 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useGetDashboardSummary, useGetBusinessSettings, useListParties } from '@workspace/api-client-react';
 import { useColors } from '@/hooks/useColors';
+import { useLanguage } from '@/lib/i18n';
 
-function formatAmount(n: number): string {
-  return '৳' + new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n);
-}
-
-function formatRelativeTime(dateStr: string | null): string {
+function formatRelativeTime(dateStr: string | null, isEnglish: boolean): string {
   if (!dateStr) return '';
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return isEnglish ? 'Just now' : 'এইমাত্র';
+  if (mins < 60) return isEnglish ? `${mins}m ago` : `${mins} মিনিট আগে`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return isEnglish ? `${hrs}h ago` : `${hrs} ঘণ্টা আগে`;
   const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
+  return isEnglish ? `${days}d ago` : `${days} দিন আগে`;
 }
 
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [refreshKey, setRefreshKey] = useState(0);
+  const { isEnglish, t, formatCurrency } = useLanguage();
 
   const { data: summary, isLoading: summaryLoading, refetch: refetchSummary } = useGetDashboardSummary();
   const { data: settings, isLoading: settingsLoading } = useGetBusinessSettings();
@@ -149,6 +146,12 @@ export default function HomeScreen() {
     );
   }
 
+  const customerCount = summary?.customerCount ?? 0;
+  const supplierCount = summary?.supplierCount ?? 0;
+  const subtitleText = isEnglish
+    ? `${customerCount} customers · ${supplierCount} suppliers`
+    : `${customerCount} গ্রাহক · ${supplierCount} সরবরাহকারী`;
+
   return (
     <View style={s.container}>
       <ScrollView
@@ -158,39 +161,47 @@ export default function HomeScreen() {
       >
         {/* Header */}
         <View style={s.header}>
-          <Text style={s.storeName}>{settingsLoading ? 'Loading…' : (settings?.storeName || 'My Shop')}</Text>
-          <Text style={s.subtitle}>
-            {(summary?.customerCount ?? 0)} customers · {(summary?.supplierCount ?? 0)} suppliers
+          <Text style={s.storeName}>
+            {settingsLoading ? t('loadingStore') : (settings?.storeName || t('myShop'))}
           </Text>
+          <Text style={s.subtitle}>{subtitleText}</Text>
         </View>
 
         {/* Net balance card */}
         <View style={s.netCard}>
-          <Text style={s.netLabel}>NET BALANCE</Text>
-          <Text style={s.netAmount}>{formatAmount(Math.abs(net))}</Text>
+          <Text style={s.netLabel}>{t('netBalance').toUpperCase()}</Text>
+          <Text style={s.netAmount}>{formatCurrency(Math.abs(net))}</Text>
           <Text style={s.netSubtitle}>
-            {netPositive ? 'Overall you will receive' : 'Overall you must pay'}
+            {netPositive ? t('overallReceive') : t('overallPay')}
           </Text>
         </View>
 
         {/* YOU WILL GET / YOU WILL GIVE */}
         <View style={s.balanceRow}>
           <View style={[s.balanceCard, { backgroundColor: colors.willGetBg }]}>
-            <Text style={[s.balanceLabel, { color: colors.willGet }]}>YOU WILL GET</Text>
+            <Text style={[s.balanceLabel, { color: colors.willGet }]}>
+              {t('youWillGet').toUpperCase()}
+            </Text>
             <Text style={[s.balanceAmount, { color: colors.willGet }]}>
-              {formatAmount(summary?.youWillGet ?? 0)}
+              {formatCurrency(summary?.youWillGet ?? 0)}
             </Text>
             <Text style={[s.balanceCount, { color: colors.willGet }]}>
-              {summary?.customerCount ?? 0} customers
+              {isEnglish
+                ? `${customerCount} customers`
+                : `${customerCount} ${t('customerLabel')}`}
             </Text>
           </View>
           <View style={[s.balanceCard, { backgroundColor: colors.willGiveBg }]}>
-            <Text style={[s.balanceLabel, { color: colors.willGive }]}>YOU WILL GIVE</Text>
+            <Text style={[s.balanceLabel, { color: colors.willGive }]}>
+              {t('youWillGive').toUpperCase()}
+            </Text>
             <Text style={[s.balanceAmount, { color: colors.willGive }]}>
-              {formatAmount(summary?.youWillGive ?? 0)}
+              {formatCurrency(summary?.youWillGive ?? 0)}
             </Text>
             <Text style={[s.balanceCount, { color: colors.willGive }]}>
-              {summary?.supplierCount ?? 0} suppliers
+              {isEnglish
+                ? `${supplierCount} suppliers`
+                : `${supplierCount} ${t('supplierLabel')}`}
             </Text>
           </View>
         </View>
@@ -198,20 +209,22 @@ export default function HomeScreen() {
         {/* Recent parties */}
         <View style={s.section}>
           <View style={s.sectionHeader}>
-            <Text style={s.sectionTitle}>Recent</Text>
+            <Text style={s.sectionTitle}>{t('recent')}</Text>
             <TouchableOpacity onPress={() => router.push('/(tabs)/parties')}>
-              <Text style={s.seeAll}>See all</Text>
+              <Text style={s.seeAll}>{t('seeAll')}</Text>
             </TouchableOpacity>
           </View>
 
           {recentParties.length === 0 ? (
-            <Text style={s.emptyText}>No recent transactions</Text>
+            <Text style={s.emptyText}>{t('noRecent')}</Text>
           ) : (
             recentParties.map(party => {
               const isGet = party.balanceType === 'YOU_WILL_GET';
               const initials = party.name.slice(0, 2).toUpperCase();
               const avatarBg = party.role === 'CUSTOMER' ? colors.willGetBg : colors.willGiveBg;
               const avatarColor = party.role === 'CUSTOMER' ? colors.willGet : colors.willGive;
+              const roleStr = party.role === 'CUSTOMER' ? t('customerLabel') : t('supplierLabel');
+              const relTime = formatRelativeTime(party.lastTransactionAt, isEnglish);
               return (
                 <TouchableOpacity
                   key={party.id}
@@ -225,11 +238,11 @@ export default function HomeScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={s.partyName} numberOfLines={1}>{party.name}</Text>
                     <Text style={s.partyMeta}>
-                      {party.role === 'CUSTOMER' ? 'Customer' : 'Supplier'} · {formatRelativeTime(party.lastTransactionAt)}
+                      {roleStr}{relTime ? ` · ${relTime}` : ''}
                     </Text>
                   </View>
                   <Text style={[s.partyBalance, { color: isGet ? colors.willGet : colors.willGive }]}>
-                    {formatAmount(party.currentBalance)}
+                    {formatCurrency(party.currentBalance)}
                   </Text>
                 </TouchableOpacity>
               );

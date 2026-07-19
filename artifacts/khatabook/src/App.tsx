@@ -25,6 +25,7 @@ import { readAuthCache, writeAuthCache, clearAuthCache } from '@/lib/authCache';
 import { restoreCache, persistCache, clearPersistedCache } from '@/lib/queryPersister';
 import { BusinessContextProvider } from '@/lib/businessContext';
 import { BusinessSwitcherDrawer } from '@/components/modals/business-switcher-drawer';
+import { LanguageProvider } from '@/lib/i18n';
 
 // ─── Clerk setup ──────────────────────────────────────────────────────────────
 
@@ -334,6 +335,7 @@ function AppRouter() {
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
       <QueryClientProvider client={queryClient}>
+        <LanguageProvider>
         <ConnectionStateProvider>
         <ClerkCacheInvalidator />
         <RealtimeSyncManager />
@@ -382,6 +384,7 @@ function AppRouter() {
         <Toaster position="bottom-right" richColors />
         <BusinessSwitcherDrawer />
         </ConnectionStateProvider>
+        </LanguageProvider>
       </QueryClientProvider>
     </ClerkProvider>
   );

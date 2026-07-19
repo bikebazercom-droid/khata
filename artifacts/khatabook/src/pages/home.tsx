@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { Link, useLocation } from 'wouter';
+import { useLocation } from 'wouter';
 import { useBusinessContext } from '@/lib/businessContext';
 import {
   useListParties,
@@ -11,15 +11,16 @@ import {
 } from '@workspace/api-client-react';
 import { useMemo } from 'react';
 import { Search, Plus, Settings, User, ChevronRight, UserPlus2, SlidersHorizontal, FileText, Users, Pencil, FolderOpen, X } from 'lucide-react';
-import { formatCurrency, cn } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { AddPartyModal } from '@/components/modals/add-party-modal';
 import { SettingsDrawer, loadShopProfile } from '@/components/modals/settings-drawer';
 import { AddStaffDialog } from '@/components/modals/add-staff-dialog';
 import { RenameStoreDialog } from '@/components/modals/rename-store-dialog';
 import { formatDistanceToNow } from 'date-fns';
-import { bn } from 'date-fns/locale';
+import { bn as bnLocale } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { useLanguage } from '@/lib/i18n';
 
 export function HomeView() {
   const { openSwitcher, businesses, selectedBusinessId } = useBusinessContext();
@@ -28,9 +29,9 @@ export function HomeView() {
   const [search, setSearch] = useState('');
   const [location, navigate] = useLocation();
 
+  const { isEnglish, t, formatCurrency } = useLanguage();
+
   // ── Advanced filter / sort sheet ────────────────────────────────────────
-  // "pending" = draft state while the sheet is open
-  // "applied" = committed state that drives the query + client sort
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [pendingFilter, setPendingFilter] = useState('all');
   const [pendingSort,   setPendingSort]   = useState('recent');
@@ -51,7 +52,6 @@ export function HomeView() {
     setIsFilterSheetOpen(false);
   };
 
-  // Map the selected filter pill → DueFilter for the API call
   const apiDueFilter: DueFilter = (() => {
     switch (appliedFilter) {
       case 'today':     return DueFilter.DUE_TODAY;
@@ -61,26 +61,21 @@ export function HomeView() {
       default:          return DueFilter.ALL;
     }
   })();
+
   const [isAddPartyOpen, setIsAddPartyOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
   const [isRenameStoreOpen, setIsRenameStoreOpen] = useState(false);
-
   const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   const { data: settings } = useGetBusinessSettings();
-  // Role-only parties (no search/dueFilter) — used purely for the summary card so
-  // the totals reflect the active tab, not the current search query.
   const { data: summaryParties = [] } = useListParties({ role });
   const { data: rawParties = [] } = useListParties({ role, search, dueFilter: apiDueFilter });
 
-  // Client-side balance-type filter + sort applied on top of the server response.
   const parties = useMemo(() => {
     let result = rawParties;
-    // Balance-type filter (will_get / will_give) has no server-side equivalent
     if (appliedFilter === 'will_get') result = result.filter(p => p.balanceType === 'YOU_WILL_GET');
     if (appliedFilter === 'will_give') result = result.filter(p => p.balanceType === 'YOU_WILL_GIVE');
-    // Sort
     switch (appliedSort) {
       case 'highest': return [...result].sort((a, b) => b.currentBalance - a.currentBalance);
       case 'lowest':  return [...result].sort((a, b) => a.currentBalance - b.currentBalance);
@@ -90,11 +85,10 @@ export function HomeView() {
         const bT = b.lastTransactionAt ? new Date(b.lastTransactionAt).getTime() : 0;
         return aT - bT;
       });
-      default: return result; // 'recent' — API already returns newest-first
+      default: return result;
     }
   }, [rawParties, appliedFilter, appliedSort]);
 
-  // Compute summary totals from the role-filtered list.
   const roleSummary = useMemo(() => {
     let youWillGet = 0;
     let youWillGive = 0;
@@ -105,22 +99,22 @@ export function HomeView() {
     return { youWillGet, youWillGive };
   }, [summaryParties]);
 
-  /** Tap the balance chip → build a hidden receipt, capture as JPG, open native share sheet. */
   const handleInstantShare = useCallback(async (
     e: React.MouseEvent,
     party: { name: string; phone?: string | null; currentBalance: number; balanceType: string; lastTransactionAt?: string | Date | null }
   ) => {
     e.stopPropagation();
-    const isGet = party.balanceType === 'YOU_WILL_GET';
+    const isGet       = party.balanceType === 'YOU_WILL_GET';
     const balanceColor = isGet ? '#065F46' : '#991B1B';
-    const amountLabel  = isGet ? 'আপনি পেয়েছেন' : 'আপনি দিয়েছেন';
+    const amountLabel  = isGet ? t('receiptGot') : t('receiptGave');
     const formatted    = formatCurrency(party.currentBalance);
+    const dateLocale   = isEnglish ? 'en-GB' : 'bn-BD';
 
     const dateStr = party.lastTransactionAt
       ? (() => {
           const d = new Date(party.lastTransactionAt as string);
-          const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
-          const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+          const date = d.toLocaleDateString(dateLocale, { day: 'numeric', month: 'short', year: '2-digit' });
+          const time = d.toLocaleTimeString(isEnglish ? 'en-US' : 'bn-BD', { hour: '2-digit', minute: '2-digit', hour12: true });
           return `${date} • ${time}`;
         })()
       : '';
@@ -143,7 +137,7 @@ export function HomeView() {
       </div>
       <hr style="border:0;border-top:1px solid #E5E7EB;margin:18px 0;" />
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <div style="font-size:18px;color:#111827;font-weight:500;">বর্তমান ব্যালেন্স</div>
+        <div style="font-size:18px;color:#111827;font-weight:500;">${t('receiptBalance')}</div>
         <div style="font-size:22px;font-weight:800;color:${balanceColor};">৳ ${formatted}</div>
       </div>
     `;
@@ -165,13 +159,12 @@ export function HomeView() {
 
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
-          await navigator.share({ files: [file], title: 'ব্যালেন্স রসিদ', text: `${party.name} — ${formatted}` });
+          await navigator.share({ files: [file], title: 'Balance Receipt', text: `${party.name} — ${formatted}` });
           return;
         } catch (shareErr: unknown) {
           if (shareErr instanceof Error && shareErr.name === 'AbortError') return;
         }
       }
-      // Fallback: trigger download
       const a = document.createElement('a');
       a.href = jpgDataUrl; a.download = filename;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
@@ -179,17 +172,18 @@ export function HomeView() {
       if (document.body.contains(el)) document.body.removeChild(el);
       console.error('Instant share error:', err);
     }
-  }, []);
+  }, [isEnglish, t, formatCurrency]);
 
   const exportFilteredReportToPDF = useCallback(async () => {
     setIsExportingPdf(true);
 
-    const shopProfile = loadShopProfile();
-    const storeName  = shopProfile.businessName || settings?.storeName || 'Banglakhata';
-    const roleLabel  = role === PartyRole.CUSTOMER ? 'গ্রাহক' : 'সরবরাহকারী';
-    const nameColHeader = role === PartyRole.CUSTOMER ? 'নাম' : 'সরবরাহকারীর নাম';
-    const dateStr    = new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
-    const timeStr    = new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' });
+    const shopProfile   = loadShopProfile();
+    const storeName     = shopProfile.businessName || settings?.storeName || 'Banglakhata';
+    const dateLocale    = isEnglish ? 'en-GB' : 'bn-BD';
+    const roleLabel     = role === PartyRole.CUSTOMER ? t('customer') : t('supplier');
+    const nameColHeader = role === PartyRole.CUSTOMER ? t('pdfName') : t('pdfSupplierNameCol');
+    const statementTitle = role === PartyRole.CUSTOMER ? t('pdfCustomerStatement') : t('pdfSupplierStatement');
+    const dateStr       = new Date().toLocaleDateString(dateLocale, { day: 'numeric', month: 'long', year: 'numeric' });
     const footerAddress = shopProfile.address || '';
     const footerPhone   = shopProfile.phone   || '';
 
@@ -202,17 +196,19 @@ export function HomeView() {
     const netBalance = filteredGet - filteredGive;
 
     const filterDisplayLabel: Record<string, string> = {
-      all:       'সব',
-      will_get:  'আপনি পাবেন',
-      will_give: 'আপনি দেবেন',
-      today:     'আজকের বাকি',
-      upcoming:  'আপকামিং',
-      permanent: 'স্থায়ী',
-      no_date:   'তারিখ নেই',
+      all:       t('all'),
+      will_get:  t('youWillGet'),
+      will_give: t('youWillGive'),
+      today:     t('dueToday'),
+      upcoming:  t('upcoming'),
+      permanent: t('permanent'),
+      no_date:   t('noDate'),
     };
-    const countTag = filterDisplayLabel[appliedFilter] ?? 'সব';
+    const countTag = filterDisplayLabel[appliedFilter] ?? t('all');
+    const asOfLabel = isEnglish
+      ? `(${t('pdfAsOfToday')} — ${dateStr})`
+      : `(${t('pdfAsOfToday')} — ${dateStr})`;
 
-    // ── Build an off-screen DOM node — the browser shapes Bengali perfectly ──
     const container = document.createElement('div');
     container.style.cssText = [
       'position:absolute',
@@ -228,11 +224,9 @@ export function HomeView() {
       const dateCell = p.lastTransactionAt
         ? new Date(p.lastTransactionAt).toLocaleDateString('en-GB')
         : '—';
-      // ডেবিট (-) col: money YOU owe this party (YOU_WILL_GIVE) — red tint
       const debitCell = p.balanceType === 'YOU_WILL_GIVE'
         ? `<td style="padding:10px;border:1px solid #000;text-align:right;background:#FEF2F2;color:#000;font-weight:500;">৳${p.currentBalance.toFixed(2)}</td>`
         : `<td style="padding:10px;border:1px solid #000;background:#FEF2F2;"></td>`;
-      // ক্রেডিট (+) col: money this party owes YOU (YOU_WILL_GET) — green tint
       const creditCell = p.balanceType === 'YOU_WILL_GET'
         ? `<td style="padding:10px;border:1px solid #000;text-align:right;background:#F0FDF4;color:#000;font-weight:500;">৳${p.currentBalance.toFixed(2)}</td>`
         : `<td style="padding:10px;border:1px solid #000;background:#F0FDF4;"></td>`;
@@ -256,23 +250,23 @@ export function HomeView() {
       <div style="padding:30px;box-sizing:border-box;">
         <!-- 2. Title -->
         <div style="text-align:center;margin-bottom:25px;">
-          <div style="font-size:24px;font-weight:bold;color:#000;letter-spacing:0.5px;">${roleLabel} তালিকার স্টেটমেন্ট</div>
-          <div style="font-size:15px;color:#555;font-weight:500;margin-top:6px;">(আজ পর্যন্ত — ${dateStr})</div>
+          <div style="font-size:24px;font-weight:bold;color:#000;letter-spacing:0.5px;">${statementTitle}</div>
+          <div style="font-size:15px;color:#555;font-weight:500;margin-top:6px;">${asOfLabel}</div>
         </div>
 
         <!-- 3. Summary Cards -->
         <table style="width:100%;border-collapse:collapse;margin-bottom:25px;text-align:center;border:1px solid #E5E7EB;">
           <tr>
             <td style="width:33.33%;padding:16px;border-right:1px solid #E5E7EB;">
-              <div style="font-size:14px;color:#666;margin-bottom:6px;">মোট খরচ(-)</div>
+              <div style="font-size:14px;color:#666;margin-bottom:6px;">${t('pdfTotalExpense')}</div>
               <div style="font-size:18px;font-weight:bold;color:#DC2626;">৳${filteredGive.toFixed(2)}</div>
             </td>
             <td style="width:33.33%;padding:16px;border-right:1px solid #E5E7EB;">
-              <div style="font-size:14px;color:#666;margin-bottom:6px;">মোট জমা(+)</div>
+              <div style="font-size:14px;color:#666;margin-bottom:6px;">${t('pdfTotalCredit')}</div>
               <div style="font-size:18px;font-weight:bold;color:#16A34A;">৳${filteredGet.toFixed(2)}</div>
             </td>
             <td style="width:33.33%;padding:16px;">
-              <div style="font-size:14px;color:#666;margin-bottom:6px;">মোট ব্যালেন্স</div>
+              <div style="font-size:14px;color:#666;margin-bottom:6px;">${t('pdfTotalBalance')}</div>
               <div style="font-size:18px;font-weight:bold;color:${netBalance >= 0 ? '#16A34A' : '#DC2626'};">
                 ৳${Math.abs(netBalance).toFixed(2)} ${netBalance >= 0 ? 'Cr' : 'Dr'}
               </div>
@@ -282,7 +276,7 @@ export function HomeView() {
 
         <!-- Count label -->
         <div style="font-size:15px;font-weight:bold;color:#000;margin-bottom:12px;">
-          ${roleLabel} সংখ্যা: ${parties.length} (${countTag})
+          ${roleLabel}: ${parties.length} (${countTag})
         </div>
 
         <!-- 4. Party Table -->
@@ -290,16 +284,16 @@ export function HomeView() {
           <thead>
             <tr style="background:#F8FAFC;font-weight:bold;">
               <th style="padding:10px;border:1px solid #000;width:22%;text-align:left;">${nameColHeader}</th>
-              <th style="padding:10px;border:1px solid #000;width:20%;text-align:left;">ফোন</th>
-              <th style="padding:10px;border:1px solid #000;width:18%;text-align:right;background:#FEF2F2;">ডেবিট (-)</th>
-              <th style="padding:10px;border:1px solid #000;width:18%;text-align:right;background:#F0FDF4;">ক্রেডিট (+)</th>
-              <th style="padding:10px;border:1px solid #000;width:22%;text-align:center;">সর্বশেষ লেনদেন</th>
+              <th style="padding:10px;border:1px solid #000;width:20%;text-align:left;">${t('pdfPhone')}</th>
+              <th style="padding:10px;border:1px solid #000;width:18%;text-align:right;background:#FEF2F2;">${t('pdfDebit')}</th>
+              <th style="padding:10px;border:1px solid #000;width:18%;text-align:right;background:#F0FDF4;">${t('pdfCredit')}</th>
+              <th style="padding:10px;border:1px solid #000;width:22%;text-align:center;">${t('pdfLastTx')}</th>
             </tr>
           </thead>
           <tbody>
             ${rowsHtml}
             <tr style="background:#F1F5F9;font-weight:bold;">
-              <td style="padding:12px 10px;border:1px solid #000;">সর্বমোট</td>
+              <td style="padding:12px 10px;border:1px solid #000;">${t('pdfGrandTotal')}</td>
               <td style="padding:12px 10px;border:1px solid #000;"></td>
               <td style="padding:12px 10px;border:1px solid #000;text-align:right;background:#FEF2F2;color:#DC2626;">৳${filteredGive.toFixed(2)}</td>
               <td style="padding:12px 10px;border:1px solid #000;text-align:right;background:#F0FDF4;color:#16A34A;">৳${filteredGet.toFixed(2)}</td>
@@ -312,11 +306,11 @@ export function HomeView() {
       <!-- 5. Deep Navy Footer Strip -->
       <div style="background:#003366;color:#fff;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:40px;font-size:13px;box-sizing:border-box;">
         <div style="display:flex;align-items:center;gap:10px;">
-          <span>এখনই Banglakhata ব্যবহার শুরু করুন</span>
-          <span style="background:#fff;color:#003366;padding:4px 10px;font-weight:bold;border-radius:4px;">ইনস্টল করুন</span>
+          <span>${t('pdfFooterCta')}</span>
+          <span style="background:#fff;color:#003366;padding:4px 10px;font-weight:bold;border-radius:4px;">${t('pdfInstall')}</span>
         </div>
         <div>
-          ${footerPhone ? `📞 ${footerPhone}` : 'সাহায্য: support@banglakhata.com'} | নিয়ম ও শর্তাবলী প্রযোজ্য
+          ${footerPhone ? `📞 ${footerPhone}` : t('pdfFooterSupport')} | ${t('pdfFooterTerms')}
         </div>
       </div>
     `;
@@ -324,7 +318,6 @@ export function HomeView() {
     document.body.appendChild(container);
 
     try {
-      // html2canvas — browser renders & shapes Bengali natively
       const canvas = await html2canvas(container, {
         scale: 2,
         useCORS: true,
@@ -336,11 +329,10 @@ export function HomeView() {
 
       const imgData   = canvas.toDataURL('image/jpeg', 0.95);
       const pdf       = new jsPDF('p', 'mm', 'a4');
-      const pdfW      = 210;           // A4 width mm
-      const pdfH      = 297;           // A4 height mm
+      const pdfW      = 210;
+      const pdfH      = 297;
       const imgH      = (canvas.height * pdfW) / canvas.width;
 
-      // Slice tall canvases across multiple pages
       let yOffset = 0;
       let firstPage = true;
       while (yOffset < imgH) {
@@ -357,11 +349,7 @@ export function HomeView() {
 
       if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
         try {
-          await navigator.share({
-            files: [pdfFile],
-            title: `${roleLabel} তালিকার রিপোর্ট`,
-            text: `${storeName} এর ফিল্টার করা ${roleLabel} তালিকার রিপোর্ট`,
-          });
+          await navigator.share({ files: [pdfFile], title: `${statementTitle}`, text: `${storeName}` });
         } catch (shareErr) {
           if ((shareErr as DOMException).name !== 'AbortError') pdf.save(filename);
         }
@@ -371,11 +359,11 @@ export function HomeView() {
     } catch (err) {
       if (document.body.contains(container)) document.body.removeChild(container);
       console.error('PDF export failed:', err);
-      toast.error('PDF তৈরি করতে সমস্যা হয়েছে।');
+      toast.error(t('pdfError'));
     } finally {
       setIsExportingPdf(false);
     }
-  }, [parties, role, appliedFilter, settings?.storeName]);
+  }, [parties, role, appliedFilter, settings?.storeName, isEnglish, t]);
 
   return (
     <div className="flex flex-col h-full w-full bg-white relative">
@@ -395,7 +383,7 @@ export function HomeView() {
               aria-label="বাংলা খাতা পরিবর্তন করুন"
             >
               <h1 className="font-extrabold tracking-tight text-[15px] text-white truncate max-w-[120px]">
-                {activeBusiness?.name || settings?.storeName || 'লোড হচ্ছে...'}
+                {activeBusiness?.name || settings?.storeName || t('loading')}
               </h1>
               <ChevronRight className="w-3.5 h-3.5 text-white/60 shrink-0 rotate-90" />
             </button>
@@ -414,7 +402,7 @@ export function HomeView() {
               className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-2 rounded-xl active:scale-95 transition-all"
             >
               <UserPlus2 className="w-3.5 h-3.5" />
-              স্টাফ যোগ করুন
+              {t('addStaff')}
             </button>
             <button
               onClick={() => navigate('/staff-deployment')}
@@ -436,7 +424,7 @@ export function HomeView() {
                 role === PartyRole.CUSTOMER ? 'text-white border-white' : 'text-white/60 border-transparent'
               )}
             >
-              গ্রাহক
+              {t('customer')}
             </button>
             <button
               onClick={() => setRole(PartyRole.SUPPLIER)}
@@ -445,7 +433,7 @@ export function HomeView() {
                 role === PartyRole.SUPPLIER ? 'text-white border-white' : 'text-white/60 border-transparent'
               )}
             >
-              সরবরাহকারী
+              {t('supplier')}
             </button>
           </div>
         </div>
@@ -458,13 +446,13 @@ export function HomeView() {
             <p className="text-emerald-700 font-extrabold text-[13px] tracking-tight truncate">
               {formatCurrency(roleSummary.youWillGive)}
             </p>
-            <p className="text-[9.5px] font-semibold text-slate-400 mt-1 whitespace-nowrap">আপনি দেবেন</p>
+            <p className="text-[9.5px] font-semibold text-slate-400 mt-1 whitespace-nowrap">{t('youWillGive')}</p>
           </div>
           <div className="px-1.5 py-3 text-center min-w-0">
             <p className="text-red-600 font-extrabold text-[13px] tracking-tight truncate">
               {formatCurrency(roleSummary.youWillGet)}
             </p>
-            <p className="text-[9.5px] font-semibold text-slate-400 mt-1 whitespace-nowrap">আপনি পাবেন</p>
+            <p className="text-[9.5px] font-semibold text-slate-400 mt-1 whitespace-nowrap">{t('youWillGet')}</p>
           </div>
           <button
             type="button"
@@ -472,7 +460,7 @@ export function HomeView() {
             className="px-1.5 py-3 flex flex-col items-center justify-center gap-1 active:scale-[0.95] transition-all min-w-0"
           >
             <span className="flex items-center gap-1 text-[#075E9F] font-bold text-[12px] whitespace-nowrap">
-              রিপোর্ট দেখুন
+              {t('viewReport')}
               <ChevronRight className="w-3.5 h-3.5 shrink-0" />
             </span>
           </button>
@@ -484,7 +472,7 @@ export function HomeView() {
         <div className="relative flex-1">
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <Input
-            placeholder={role === PartyRole.CUSTOMER ? 'কাস্টমার অনুসন্ধান করুন' : 'সাপ্লায়ার অনুসন্ধান করুন'}
+            placeholder={role === PartyRole.CUSTOMER ? t('searchCustomer') : t('searchSupplier')}
             className="pl-10 h-11 bg-slate-50 border-slate-200 rounded-xl font-medium focus-visible:ring-primary/20"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -492,14 +480,14 @@ export function HomeView() {
         </div>
         <button
           onClick={openFilterSheet}
-          aria-label="ফিল্টার"
+          aria-label={t('filter')}
           className={cn(
             'w-14 h-11 shrink-0 rounded-xl flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all relative',
             isFiltered ? 'bg-primary text-primary-foreground' : 'bg-slate-50 text-slate-500 border border-slate-200'
           )}
         >
           <SlidersHorizontal className="w-4 h-4" />
-          <span className="text-[9px] font-bold leading-none">ফিল্টার</span>
+          <span className="text-[9px] font-bold leading-none">{t('filter')}</span>
           {isFiltered && (
             <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
           )}
@@ -508,7 +496,7 @@ export function HomeView() {
           type="button"
           onClick={() => { exportFilteredReportToPDF(); }}
           disabled={isExportingPdf}
-          aria-label="PDF রিপোর্ট"
+          aria-label="PDF"
           className="w-14 h-11 shrink-0 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
         >
           <FileText className={cn('w-4 h-4', isExportingPdf && 'animate-pulse')} />
@@ -516,18 +504,18 @@ export function HomeView() {
         </button>
       </div>
 
-      {/* Active-filter summary strip — shown when any non-default filter is applied */}
+      {/* Active-filter summary strip */}
       {isFiltered && (
         <div className="shrink-0 flex items-center gap-2 px-4 pb-2">
           <span className="text-[10px] font-semibold text-primary bg-primary/10 rounded-full px-2.5 py-0.5">
             {[
-              { id: 'all', label: 'সব' },
-              { id: 'will_get', label: 'আপনি পাবেন' },
-              { id: 'will_give', label: 'আপনি দেবেন' },
-              { id: 'permanent', label: 'স্থায়ী' },
-              { id: 'today', label: 'আজকের বাকি' },
-              { id: 'upcoming', label: 'আপকামিং' },
-              { id: 'no_date', label: 'তারিখ নেই' },
+              { id: 'all',       label: t('all') },
+              { id: 'will_get',  label: t('youWillGet') },
+              { id: 'will_give', label: t('youWillGive') },
+              { id: 'permanent', label: t('permanent') },
+              { id: 'today',     label: t('dueToday') },
+              { id: 'upcoming',  label: t('upcoming') },
+              { id: 'no_date',   label: t('noDate') },
             ].find(f => f.id === appliedFilter)?.label}
           </span>
           <button
@@ -535,12 +523,12 @@ export function HomeView() {
             onClick={() => { setAppliedFilter('all'); setAppliedSort('recent'); }}
             className="ml-auto text-[10px] font-bold text-slate-400 active:text-slate-700"
           >
-            রিসেট
+            {t('reset')}
           </button>
         </div>
       )}
 
-      {/* Contact feed list — the only scrollable section */}
+      {/* Contact feed list */}
       <div className="flex-1 min-h-0 overflow-y-auto bg-white pb-24">
         {parties.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-slate-400 px-8 text-center">
@@ -548,16 +536,12 @@ export function HomeView() {
               <User className="w-8 h-8 opacity-40" />
             </div>
             <p className="text-sm font-medium">
-              {role === PartyRole.CUSTOMER
-                ? 'কাস্টমার যোগ করুন এবং দ্রুত বকেয়া কালেকশন করুন'
-                : 'সাপ্লায়ার যোগ করুন এবং আপনার হিসাব পরিষ্কার রাখুন'}
+              {role === PartyRole.CUSTOMER ? t('emptyCustomer') : t('emptySupplier')}
             </p>
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
             {parties.map((party, i) => (
-              /* Row is a div+onClick so the right-side amount can be a
-                 separate tappable button (avoids invalid <button> inside <a>). */
               <div
                 key={party.id}
                 role="button"
@@ -584,7 +568,10 @@ export function HomeView() {
                     <p className="font-bold text-slate-900 truncate text-[15px]">{party.name}</p>
                     {party.lastTransactionAt && (
                       <span className="text-[10px] font-medium text-slate-400 shrink-0 ml-2">
-                        {formatDistanceToNow(new Date(party.lastTransactionAt), { addSuffix: true, locale: bn })}
+                        {formatDistanceToNow(new Date(party.lastTransactionAt), {
+                          addSuffix: true,
+                          locale: isEnglish ? undefined : bnLocale,
+                        })}
                       </span>
                     )}
                   </div>
@@ -595,7 +582,7 @@ export function HomeView() {
                     type="button"
                     onClick={(e) => handleInstantShare(e, party)}
                     className="text-right active:scale-95 transition-transform"
-                    aria-label={`${party.name}-এর ব্যালেন্স শেয়ার করুন`}
+                    aria-label={`${party.name} balance`}
                   >
                     <p
                       className={cn(
@@ -606,7 +593,7 @@ export function HomeView() {
                       {formatCurrency(party.currentBalance)}
                     </p>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 text-right">
-                      {party.balanceType === 'YOU_WILL_GET' ? 'পাবেন' : 'দেবেন'}
+                      {party.balanceType === 'YOU_WILL_GET' ? t('get') : t('give')}
                     </p>
                   </button>
                   <ChevronRight className="w-4 h-4 text-slate-300" />
@@ -624,21 +611,21 @@ export function HomeView() {
         className="absolute right-4 bottom-[76px] z-20 flex items-center gap-2 bg-[#F5A623] text-white font-bold text-sm pl-4 pr-5 py-3.5 rounded-full shadow-[0_8px_24px_-6px_rgba(245,166,35,0.55)] active:scale-95 transition-all"
       >
         <Plus className="w-4 h-4" />
-        {role === PartyRole.CUSTOMER ? 'কাস্টমার যোগ করুন' : 'সাপ্লায়ার যোগ করুন'}
+        {role === PartyRole.CUSTOMER ? t('addCustomer') : t('addSupplier')}
       </button>
 
       {/* Sticky bottom nav */}
       <div className="shrink-0 flex items-stretch border-t border-slate-100 bg-white z-10 pb-[var(--safe-bottom)]">
         <button className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[#1B3A6B]">
           <Users className="w-5 h-5" />
-          <span className="text-[10px] font-bold">পার্টিস</span>
+          <span className="text-[10px] font-bold">{t('parties')}</span>
         </button>
         <button
           onClick={() => setIsSettingsOpen(true)}
           className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-slate-400 active:text-slate-600 transition-colors"
         >
           <Settings className="w-5 h-5" />
-          <span className="text-[10px] font-bold">সেটিংস</span>
+          <span className="text-[10px] font-bold">{t('settings')}</span>
         </button>
       </div>
 
@@ -647,9 +634,7 @@ export function HomeView() {
       <AddStaffDialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen} />
       <RenameStoreDialog open={isRenameStoreOpen} onOpenChange={setIsRenameStoreOpen} />
 
-      {/* ── Advanced filter & sort bottom sheet ─────────────────────────
-          Opens when the user taps the ফিল্টার button in the utility bar.
-          Pending state is drafted while open; committed on "ফলাফল দেখুন". */}
+      {/* ── Advanced filter & sort bottom sheet ── */}
       {isFilterSheetOpen && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end">
           <div className="absolute inset-0 bg-black/50" onClick={() => setIsFilterSheetOpen(false)} />
@@ -658,7 +643,7 @@ export function HomeView() {
             <div className="sticky top-0 bg-white pt-4 pb-1 px-5 z-10">
               <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3" />
               <div className="flex items-center justify-between mb-1">
-                <p className="font-extrabold text-slate-900 text-base">ফিল্টার ও বাছাই</p>
+                <p className="font-extrabold text-slate-900 text-base">{t('filterAndSort')}</p>
                 <button
                   type="button"
                   onClick={() => setIsFilterSheetOpen(false)}
@@ -672,16 +657,16 @@ export function HomeView() {
             <div className="px-5 pb-[calc(1.5rem+var(--safe-bottom))]">
               {/* ── Section 1: Filter pills ── */}
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 mt-2">
-                মাধ্যমে ফিল্টার
+                {t('filterBy')}
               </p>
               <div className="grid grid-cols-3 gap-2 mb-2">
                 {[
-                  { id: 'all',      label: 'সব' },
-                  { id: 'will_get', label: 'আপনি পাবেন' },
-                  { id: 'will_give',label: 'আপনি দেবেন' },
-                  { id: 'permanent',label: 'স্থায়ী' },
-                  { id: 'today',    label: 'আজকের বাকি' },
-                  { id: 'upcoming', label: 'আপকামিং' },
+                  { id: 'all',       label: t('all') },
+                  { id: 'will_get',  label: t('youWillGet') },
+                  { id: 'will_give', label: t('youWillGive') },
+                  { id: 'permanent', label: t('permanent') },
+                  { id: 'today',     label: t('dueToday') },
+                  { id: 'upcoming',  label: t('upcoming') },
                 ].map((pill) => (
                   <button
                     key={pill.id}
@@ -709,21 +694,21 @@ export function HomeView() {
                     : 'bg-white text-slate-600 border-slate-200'
                 )}
               >
-                কোনো নির্দিষ্ট তারিখ নেই
+                {t('noSpecificDate')}
               </button>
 
               {/* ── Section 2: Sort radio list ── */}
               <div className="border-t border-slate-100 mt-5 pt-4">
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
-                  মাধ্যমে বাছাই
+                  {t('sortBy')}
                 </p>
                 <div className="space-y-1">
                   {[
-                    { id: 'recent',  label: 'সর্বাধিক সাম্প্রতিক' },
-                    { id: 'highest', label: 'সর্বোচ্চ পরিমাণ' },
-                    { id: 'name',    label: 'নামের দ্বারা (A–Z)' },
-                    { id: 'oldest',  label: 'সব থেকে পুরোনো' },
-                    { id: 'lowest',  label: 'সর্বনিম্ন রাশি' },
+                    { id: 'recent',  label: t('mostRecent') },
+                    { id: 'highest', label: t('highestAmount') },
+                    { id: 'name',    label: t('byName') },
+                    { id: 'oldest',  label: t('oldest') },
+                    { id: 'lowest',  label: t('lowestAmount') },
                   ].map((opt) => (
                     <label
                       key={opt.id}
@@ -754,7 +739,7 @@ export function HomeView() {
                 onClick={applyFilter}
                 className="w-full mt-6 bg-[#1B3A6B] active:bg-[#142d55] text-white font-bold py-4 rounded-2xl text-sm active:scale-[0.98] transition-all shadow-lg"
               >
-                ফলাফল দেখুন
+                {t('showResults')}
               </button>
             </div>
           </div>

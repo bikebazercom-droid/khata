@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import { useBusinessContext, type BusinessInfo } from '@/lib/businessContext';
 import { setExtraHeaders } from '@workspace/api-client-react';
+import { useLanguage } from '@/lib/i18n';
 
 function initials(name: string): string {
   return name
@@ -17,6 +18,8 @@ function initials(name: string): string {
 const AVATAR_COLORS = ['#1B3A6B', '#0052B4', '#065F46', '#7C3AED', '#B45309', '#DC2626'];
 
 export function BusinessSwitcherDrawer() {
+  const { t } = useLanguage();
+
   const {
     selectedBusinessId,
     setSelectedBusiness,
@@ -31,11 +34,9 @@ export function BusinessSwitcherDrawer() {
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [newName, setNewName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
-  // When set to a business ID, show the delete confirmation panel instead of the list
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // ── Fetch business list whenever the drawer opens ──────────────────────────
   const fetchBusinesses = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -62,7 +63,6 @@ export function BusinessSwitcherDrawer() {
     }
   }, [isSwitcherOpen, fetchBusinesses]);
 
-  // ── Switch active business ─────────────────────────────────────────────────
   async function handleSwitch(id: string) {
     if (id === selectedBusinessId) { closeSwitcher(); return; }
     setSelectedBusiness(id);
@@ -73,7 +73,6 @@ export function BusinessSwitcherDrawer() {
     closeSwitcher();
   }
 
-  // ── Create new business ────────────────────────────────────────────────────
   async function handleCreate() {
     if (!newName.trim() || isCreating) return;
     setIsCreating(true);
@@ -92,13 +91,12 @@ export function BusinessSwitcherDrawer() {
       await handleSwitch(created.id);
     } catch (err) {
       console.error('Failed to create business:', err);
-      alert('নতুন ব্যবসা প্রতিষ্ঠান যোগ করা যায়নি। আবার চেষ্টা করুন।');
+      alert(t('createFailed'));
     } finally {
       setIsCreating(false);
     }
   }
 
-  // ── Confirm delete ─────────────────────────────────────────────────────────
   async function handleConfirmDelete() {
     const targetId = confirmDeleteId;
     if (!targetId || isDeleting) return;
@@ -114,7 +112,6 @@ export function BusinessSwitcherDrawer() {
         throw new Error(errMsg);
       }
 
-      // Sync localStorage / header before reload
       if (targetId === selectedBusinessId) {
         const remaining = businesses.filter((b) => b.id !== targetId);
         if (remaining.length > 0) {
@@ -127,7 +124,7 @@ export function BusinessSwitcherDrawer() {
       }
 
       queryClient.clear();
-      toast.success('🎉 বাংলা খাতা: আপনার খাতাটি সফলভাবে এবং চিরতরে মুছে ফেলা হয়েছে!', {
+      toast.success(t('khataDeleteSuccess'), {
         duration: 2500,
         style: {
           background: '#1E3A8A',
@@ -141,31 +138,29 @@ export function BusinessSwitcherDrawer() {
       setTimeout(() => { window.location.reload(); }, 1500);
     } catch (err) {
       console.error('FATAL CRASH DURING DELETION:', err);
-      toast.error('ডিলিট করা যায়নি! আবার চেষ্টা করুন।');
+      toast.error(t('khataDeleteError'));
       setIsDeleting(false);
     }
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <Drawer open={isSwitcherOpen} onOpenChange={(open) => { if (!open) closeSwitcher(); }}>
       <DrawerContent>
 
-        {/* ── Delete confirmation (replaces list entirely) ── */}
+        {/* ── Delete confirmation ── */}
         {confirmDeleteId ? (
           <div className="px-5 pt-6 pb-8 flex flex-col items-center text-center gap-4">
             <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center text-3xl">
               🗑️
             </div>
-            <p className="text-[18px] font-bold text-slate-800">খাতা ডিলিট করুন?</p>
+            <p className="text-[18px] font-bold text-slate-800">{t('confirmDeleteKhataTitle')}</p>
             <p className="text-[14px] text-slate-500 leading-snug">
-              এই খাতার সব গ্রাহক এবং লেনদেনের তথ্য চিরতরে মুছে যাবে।
+              {t('confirmDeleteKhataBody')}
               <br />
-              <span className="font-semibold text-red-600">এটি পূর্বাবস্থায় ফেরানো যাবে না।</span>
+              <span className="font-semibold text-red-600">{t('cannotUndo')}</span>
             </p>
 
             <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
-              {/* না — cancel */}
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(null); }}
@@ -183,10 +178,9 @@ export function BusinessSwitcherDrawer() {
                   opacity: isDeleting ? 0.6 : 1,
                 }}
               >
-                না
+                {t('no')}
               </button>
 
-              {/* হ্যাঁ, ডিলিট করুন — confirm */}
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); void handleConfirmDelete(); }}
@@ -204,7 +198,7 @@ export function BusinessSwitcherDrawer() {
                   opacity: isDeleting ? 0.6 : 1,
                 }}
               >
-                {isDeleting ? 'মুছছে…' : 'হ্যাঁ, ডিলিট করুন'}
+                {isDeleting ? t('deleting') : t('yesDelete2')}
               </button>
             </div>
           </div>
@@ -215,7 +209,7 @@ export function BusinessSwitcherDrawer() {
           <div className="px-4 pb-6 pt-2 space-y-3 max-h-[80vh] overflow-y-auto">
 
             <p className="text-[13px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-              আপনার বাংলা খাতাগুলো
+              {t('yourKhatas')}
             </p>
 
             {isLoading ? (
@@ -239,7 +233,6 @@ export function BusinessSwitcherDrawer() {
                       className="rounded-xl border-2 p-4 cursor-pointer transition-all active:scale-[0.98]"
                       style={{ borderColor: isActive ? '#0052B4' : '#E5E7EB' }}
                     >
-                      {/* Top row: avatar + name + radio */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div
@@ -250,7 +243,7 @@ export function BusinessSwitcherDrawer() {
                           </div>
                           <div>
                             <p className="text-[17px] font-bold text-slate-800 leading-tight">{biz.name}</p>
-                            <p className="text-[13px] text-slate-400 mt-0.5">{biz.partyCount} গ্রাহক</p>
+                            <p className="text-[13px] text-slate-400 mt-0.5">{biz.partyCount} {t('khataCustomers')}</p>
                           </div>
                         </div>
                         <div
@@ -264,7 +257,6 @@ export function BusinessSwitcherDrawer() {
                         </div>
                       </div>
 
-                      {/* Bottom action row — active card only */}
                       {isActive && (
                         <div
                           className="mt-3 flex gap-2"
@@ -274,7 +266,7 @@ export function BusinessSwitcherDrawer() {
                             className="flex-1 flex items-center justify-between rounded-lg px-3 py-2.5 text-[14px] font-bold"
                             style={{ backgroundColor: '#F0F4FF', color: '#0052B4', border: '1px solid #DBEAFE' }}
                           >
-                            <span>🛡️ বিসনেস স্ট্যাম্প তৈরি করুন</span>
+                            <span>{t('businessStamp')}</span>
                             <span>&gt;&gt;</span>
                           </div>
                           <button
@@ -290,7 +282,7 @@ export function BusinessSwitcherDrawer() {
                               border: '1px solid #FECACA',
                             }}
                           >
-                            🗑️ ডিলিট
+                            {t('deleteKhata')}
                           </button>
                         </div>
                       )}
@@ -306,7 +298,7 @@ export function BusinessSwitcherDrawer() {
                 <input
                   type="text"
                   autoFocus
-                  placeholder="নতুন খাতা বা ব্যবসার নাম লিখুন"
+                  placeholder={t('newKhataPlaceholder')}
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && void handleCreate()}
@@ -320,14 +312,14 @@ export function BusinessSwitcherDrawer() {
                     className="flex-1 py-2.5 rounded-xl text-white font-bold text-[14px] disabled:opacity-60"
                     style={{ backgroundColor: '#0052B4' }}
                   >
-                    {isCreating ? 'তৈরি হচ্ছে…' : 'যোগ করুন'}
+                    {isCreating ? t('creatingKhata') : t('addKhata')}
                   </button>
                   <button
                     type="button"
                     onClick={() => { setIsAddingNew(false); setNewName(''); }}
                     className="flex-1 py-2.5 rounded-xl bg-slate-200 text-slate-700 font-bold text-[14px]"
                   >
-                    বাতিল
+                    {t('cancelKhata')}
                   </button>
                 </div>
               </div>
@@ -338,7 +330,7 @@ export function BusinessSwitcherDrawer() {
                 className="w-full py-3.5 rounded-xl text-white font-bold text-[15px] flex items-center justify-center gap-2 active:scale-[0.97] transition-transform"
                 style={{ backgroundColor: '#0052B4' }}
               >
-                + নতুন বাংলা খাতা
+                {t('newKhataBtn')}
               </button>
             )}
 

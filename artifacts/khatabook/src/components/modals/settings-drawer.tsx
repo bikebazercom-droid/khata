@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { phoneLogout } from '@/lib/phoneAuth';
 import { clearAllPendingUploads } from '@/lib/pendingUploads';
+import { useLanguage } from '@/lib/i18n';
 
 /** Shape stored in localStorage under PROFILE_KEY */
 export interface ShopProfile {
@@ -55,9 +56,9 @@ type ActiveMenu = 'profile' | 'language' | 'auth' | null;
 
 /**
  * Settings drawer — three collapsible accordion rows (one open at a time):
- *   1. 👤 প্রোফাইল তথ্য  — shop/user info stored in localStorage; feeds the PDF engine
- *   2. 🌐 ভাষা পরিবর্তন  — system language saved to the server (optimistic)
- *   3. 🔐 লগইন / লগআউট  — full logout sequence (cache wipe → Clerk → cookie → /sign-in)
+ *   1. 👤 Profile info  — shop/user info stored in localStorage; feeds the PDF engine
+ *   2. 🌐 Language      — system language saved to the server (optimistic)
+ *   3. 🔐 Login/Logout  — full logout sequence (cache wipe → Clerk → cookie → /sign-in)
  */
 export function SettingsDrawer({
   open,
@@ -66,6 +67,7 @@ export function SettingsDrawer({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { isEnglish, t } = useLanguage();
   const { data: settings } = useGetBusinessSettings();
   const queryClient = useQueryClient();
   const { signOut } = useClerk();
@@ -75,16 +77,12 @@ export function SettingsDrawer({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Which accordion row is currently expanded (only one at a time)
   const [activeMenu, setActiveMenu] = useState<ActiveMenu>(null);
-
   const toggleMenu = (menu: ActiveMenu) =>
     setActiveMenu(prev => (prev === menu ? null : menu));
 
-  // ── Shop profile (localStorage) ───────────────────────────────────────────
   const [profile, setProfile] = useState<ShopProfile>(loadShopProfile);
 
-  // Reload from storage and collapse all rows whenever the drawer opens
   useEffect(() => {
     if (open) {
       setProfile(loadShopProfile());
@@ -98,7 +96,6 @@ export function SettingsDrawer({
     saveShopProfile(updated);
   };
 
-  // ── Language update (optimistic, server-persisted) ────────────────────────
   const updateSettings = useUpdateBusinessSettings({
     mutation: {
       onMutate: async ({ data }) => {
@@ -110,7 +107,7 @@ export function SettingsDrawer({
         return { settingsKey, previousSettings };
       },
       onError: (err, _vars, context) => {
-        console.error('ভাষা পরিবর্তন ব্যর্থ হয়েছে:', err);
+        console.error('Language change failed:', err);
         if (context) queryClient.setQueryData(context.settingsKey, context.previousSettings);
       },
       onSettled: () => {
@@ -119,7 +116,6 @@ export function SettingsDrawer({
     },
   });
 
-  // ── Total account nuke (খাতা ডিলিট) ──────────────────────────────────────
   const handleConfirmDelete = useCallback(async () => {
     if (isDeleting) return;
     setIsDeleting(true);
@@ -133,14 +129,13 @@ export function SettingsDrawer({
         throw new Error(err);
       }
 
-      // Wipe all local state before signing out.
       queryClient.clear();
       clearAllPendingUploads();
       localStorage.clear();
       setShowDeleteConfirm(false);
       onOpenChange(false);
 
-      toast.success('🎉 বাংলা খাতা: আপনার সম্পূর্ণ বাংলা খাতা (BanglaKhata) অ্যাকাউন্টটি সফলভাবে এবং চিরতরে মুছে ফেলা হয়েছে!', {
+      toast.success(t('deleteSuccess'), {
         duration: 2500,
         style: {
           background: '#1E3A8A',
@@ -152,7 +147,6 @@ export function SettingsDrawer({
         },
       });
 
-      // Sign out of all sessions then redirect to fresh sign-in.
       setTimeout(async () => {
         try {
           if (isSignedIn) await signOut();
@@ -162,12 +156,11 @@ export function SettingsDrawer({
       }, 1500);
     } catch (err) {
       console.error('[account-nuke] failed:', err);
-      toast.error('অ্যাকাউন্ট ডিলিট করা যায়নি। আবার চেষ্টা করুন।');
+      toast.error(t('deleteError'));
       setIsDeleting(false);
     }
-  }, [isDeleting, isSignedIn, queryClient, onOpenChange, navigate, signOut]);
+  }, [isDeleting, isSignedIn, queryClient, onOpenChange, navigate, signOut, t]);
 
-  // ── Logout ────────────────────────────────────────────────────────────────
   async function handleLogout() {
     if (isLoggingOut) return;
     setIsLoggingOut(true);
@@ -179,14 +172,13 @@ export function SettingsDrawer({
       onOpenChange(false);
       navigate('/sign-in');
     } catch (err) {
-      console.error('লগআউট ব্যর্থ হয়েছে:', err);
+      console.error('Logout failed:', err);
       setIsLoggingOut(false);
     }
   }
 
   const currentLang = settings?.language ?? 'বাংলা';
 
-  // ── Shared accordion row styles ───────────────────────────────────────────
   const rowHeader = (menu: ActiveMenu) =>
     `w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border text-sm font-semibold text-slate-700 transition-all active:scale-[0.98] ${
       activeMenu === menu
@@ -196,11 +188,28 @@ export function SettingsDrawer({
 
   const rowBody = 'mt-1 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 space-y-3';
 
+  // Language-aware profile field labels / placeholders
+  const profileFields = isEnglish
+    ? [
+        { field: 'userName'    as const, label: t('fieldUserName'),  placeholder: 'e.g. Sakil Ahmed',    type: 'text'  },
+        { field: 'businessName'as const, label: t('fieldShopName'),  placeholder: 'e.g. Hazari Gold',    type: 'text'  },
+        { field: 'phone'       as const, label: t('fieldPhone'),     placeholder: 'e.g. 017XXXXXXXX',    type: 'text'  },
+        { field: 'email'       as const, label: t('fieldEmail'),     placeholder: 'example@gmail.com',   type: 'email' },
+        { field: 'address'     as const, label: t('fieldAddress'),   placeholder: 'e.g. Dhaka, BD',      type: 'text'  },
+      ]
+    : [
+        { field: 'userName'    as const, label: t('fieldUserName'),  placeholder: 'উদা: সাকিল আহমেদ',   type: 'text'  },
+        { field: 'businessName'as const, label: t('fieldShopName'),  placeholder: 'উদা: হাজারি গোল্ড',  type: 'text'  },
+        { field: 'phone'       as const, label: t('fieldPhone'),     placeholder: 'উদা: 017XXXXXXXX',    type: 'text'  },
+        { field: 'email'       as const, label: t('fieldEmail'),     placeholder: 'example@gmail.com',   type: 'email' },
+        { field: 'address'     as const, label: t('fieldAddress'),   placeholder: 'উদা: চকবাজার, ঢাকা', type: 'text'  },
+      ];
+
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent>
         <DrawerHeader className="text-left">
-          <DrawerTitle className="text-slate-800">সেটিংস</DrawerTitle>
+          <DrawerTitle className="text-slate-800">{t('settingsTitle')}</DrawerTitle>
         </DrawerHeader>
 
         <div className="px-4 pb-10 space-y-2 overflow-y-auto max-h-[75vh]">
@@ -211,7 +220,7 @@ export function SettingsDrawer({
               <span className="flex items-center gap-2">
                 <span>👤</span>
                 <span className={activeMenu === 'profile' ? 'text-white' : 'text-slate-700'}>
-                  প্রোফাইল তথ্য ও নাম যোগ
+                  {t('profileInfo')}
                 </span>
               </span>
               {activeMenu === 'profile'
@@ -221,13 +230,7 @@ export function SettingsDrawer({
 
             {activeMenu === 'profile' && (
               <div className={rowBody}>
-                {([
-                  { field: 'userName',     label: 'ব্যবহারকারীর নাম',                  placeholder: 'উদা: সাকিল আহমেদ',   type: 'text'  },
-                  { field: 'businessName', label: 'দোকান / বিজনেসের নাম (PDF হেডার)', placeholder: 'উদা: হাজারি গোল্ড',  type: 'text'  },
-                  { field: 'phone',        label: 'মোবাইল নাম্বার (PDF ফুটার)',         placeholder: 'উদা: 017XXXXXXXX',   type: 'text'  },
-                  { field: 'email',        label: 'জিমেইল এড্রেস',                     placeholder: 'example@gmail.com',  type: 'email' },
-                  { field: 'address',      label: 'ঠিকানা (PDF ফুটার)',                 placeholder: 'উদা: চকবাজার, ঢাকা', type: 'text'  },
-                ] as const).map(({ field, label, placeholder, type }) => (
+                {profileFields.map(({ field, label, placeholder, type }) => (
                   <div key={field}>
                     <label className="block text-[11px] font-semibold text-slate-500 mb-1">{label}</label>
                     <input
@@ -240,7 +243,7 @@ export function SettingsDrawer({
                   </div>
                 ))}
                 <p className="text-[10px] text-slate-400 pt-1">
-                  এই তথ্যগুলো শুধুমাত্র আপনার ডিভাইসে সংরক্ষিত হয়
+                  {t('deviceOnly')}
                 </p>
               </div>
             )}
@@ -252,7 +255,7 @@ export function SettingsDrawer({
               <span className="flex items-center gap-2">
                 <span>🌐</span>
                 <span className={activeMenu === 'language' ? 'text-white' : 'text-slate-700'}>
-                  ভাষা পরিবর্তন
+                  {t('changeLanguage')}
                 </span>
               </span>
               {activeMenu === 'language'
@@ -282,7 +285,7 @@ export function SettingsDrawer({
                   })}
                 </div>
                 <p className="text-[11px] text-slate-400 text-center">
-                  বিল ও ইন্টারফেসের জন্য পছন্দের ভাষা বেছে নিন
+                  {t('langHint')}
                 </p>
               </div>
             )}
@@ -294,7 +297,7 @@ export function SettingsDrawer({
               <span className="flex items-center gap-2">
                 <span>🔐</span>
                 <span className={activeMenu === 'auth' ? 'text-white' : 'text-slate-700'}>
-                  লগইন / লগআউট
+                  {t('loginLogout')}
                 </span>
               </span>
               {activeMenu === 'auth'
@@ -312,10 +315,10 @@ export function SettingsDrawer({
                       disabled={isLoggingOut}
                       className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border-2 border-red-100 bg-red-50 text-red-600 font-bold text-[15px] transition-all active:scale-95 hover:border-red-200 hover:bg-red-100 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                      {isLoggingOut ? 'লগআউট হচ্ছে…' : '🚪 লগআউট করুন'}
+                      {isLoggingOut ? t('loggingOut') : t('logoutBtn')}
                     </button>
                     <p className="text-[11px] text-slate-400 text-center">
-                      লগআউট করলে সব ডিভাইসে সংযোগ বিচ্ছিন্ন হবে
+                      {t('logoutHint')}
                     </p>
                   </>
                 ) : (
@@ -324,14 +327,14 @@ export function SettingsDrawer({
                     onClick={() => { onOpenChange(false); navigate('/sign-in'); }}
                     className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border-2 border-emerald-100 bg-emerald-50 text-emerald-700 font-bold text-[15px] transition-all active:scale-95"
                   >
-                    লগইন করুন
+                    {t('loginBtn')}
                   </button>
                 )}
               </div>
             )}
           </div>
 
-          {/* ── Row 4: Delete Khata ─────────────────────────────────── */}
+          {/* ── Row 4: Delete Account ───────────────────────────────────── */}
           <div className="pt-2">
             <button
               type="button"
@@ -339,10 +342,10 @@ export function SettingsDrawer({
               className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-red-200 bg-red-50 text-red-600 font-bold text-sm transition-all active:scale-[0.98] hover:bg-red-100"
             >
               <span className="text-base">🗑️</span>
-              খাতা ডিলিট করুন
+              {t('deleteAccount')}
             </button>
             <p className="text-[10px] text-slate-400 mt-1.5 px-1">
-              সমস্ত লেনদেন ও ক্যাশ মুছে যাবে — এটি পূর্বাবস্থায় ফেরানো যাবে না
+              {t('deleteAccountHint')}
             </p>
           </div>
 
@@ -353,10 +356,10 @@ export function SettingsDrawer({
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent className="max-w-sm rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-center text-[17px]">সম্পূর্ণ অ্যাকাউন্ট ডিলিট করবেন?</AlertDialogTitle>
+            <AlertDialogTitle className="text-center text-[17px]">{t('confirmDeleteTitle')}</AlertDialogTitle>
             <AlertDialogDescription className="text-center text-slate-600 text-[14px] leading-relaxed">
-              আপনার সমস্ত খাতা, গ্রাহক, লেনদেন ও ডেটা চিরতরে মুছে যাবে।{'\n'}
-              পরে একই Gmail/ফোন দিয়ে লগইন করলে নতুন ফাঁকা অ্যাকাউন্ট পাবেন।
+              {t('confirmDeleteLine1')}{'\n'}
+              {t('confirmDeleteLine2')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-row gap-3 mt-2">
@@ -366,7 +369,7 @@ export function SettingsDrawer({
               disabled={isDeleting}
               className="flex-1 py-3 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 font-bold text-[15px] active:scale-95 transition-transform disabled:opacity-50"
             >
-              না
+              {t('no')}
             </button>
             <button
               type="button"
@@ -374,7 +377,7 @@ export function SettingsDrawer({
               disabled={isDeleting}
               className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold text-[15px] active:scale-95 transition-transform disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {isDeleting ? 'মুছছে…' : 'হ্যাঁ, ডিলিট করুন'}
+              {isDeleting ? t('deleting') : t('yesDelete')}
             </button>
           </AlertDialogFooter>
         </AlertDialogContent>

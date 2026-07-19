@@ -33,6 +33,7 @@ import {
 } from '@workspace/api-client-react';
 import type { LedgerEntry, Party } from '@workspace/api-client-react';
 import { useColors } from '@/hooks/useColors';
+import { useLanguage } from '@/lib/i18n';
 import { useQueryClient } from '@tanstack/react-query';
 
 // ---------------------------------------------------------------------------
@@ -738,6 +739,7 @@ interface EntryDetailSheetProps {
 
 function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDeleted, onUpdated }: EntryDetailSheetProps) {
   const colors = useColors();
+  const { isEnglish, t } = useLanguage();
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
 
@@ -796,12 +798,12 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
 
   function handleDelete() {
     Alert.alert(
-      'এন্ট্রি মুছুন',
-      'এই এন্ট্রিটি স্থায়ীভাবে মুছে যাবে। আপনি কি নিশ্চিত?',
+      t('deleteEntryTitle'),
+      t('deleteEntryMsg'),
       [
-        { text: 'বাতিল', style: 'cancel' },
+        { text: t('cancelAlert'), style: 'cancel' },
         {
-          text: 'মুছুন',
+          text: t('deleteAlert'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -822,10 +824,12 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
   }
 
   async function handleShare() {
-    const dirLabel = isGave ? 'দিয়েছেন' : 'পেয়েছেন';
+    const dirLabel = isGave ? t('shareGave') : t('shareGot');
     const balStr   = `${balSign}(৳ ${party.currentBalance.toFixed(0)})`;
+    const youLabel = isEnglish ? 'You' : 'আপনি';
+    const balLabel = isEnglish ? 'Balance' : 'ব্যালেন্স';
     const msg =
-      `আপনি ${dirLabel}: ৳ ${entry.amount}\nব্যালেন্স: ${balStr}\nhttps://banglakhata.com/p/${entry.partyId}`;
+      `${youLabel} ${dirLabel}: ৳ ${entry.amount}\n${balLabel}: ${balStr}\nhttps://banglakhata.com/p/${entry.partyId}`;
     try {
       await Share.share({ message: msg });
     } catch { /* ignore */ }
@@ -993,11 +997,10 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
     saveBtnText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
   });
 
-  const balanceLabel = isGave ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন';
-  const smsBody =
-    `আপনি ${isGave ? 'দিয়েছেন' : 'পেয়েছেন'}: ৳ ${entry.amount}\n` +
-    `ব্যালেন্স: ${balSign}(৳ ${party.currentBalance.toFixed(0)})\n` +
-    `https://banglakhata.com/p/${entry.partyId}`;
+  const balanceLabel = isGave ? t('balGave') : t('balGot');
+  const smsBody = isEnglish
+    ? `You ${isGave ? 'gave' : 'received'}: ৳ ${entry.amount}\nBalance: ${balSign}(৳ ${party.currentBalance.toFixed(0)})\nhttps://banglakhata.com/p/${entry.partyId}`
+    : `আপনি ${isGave ? 'দিয়েছেন' : 'পেয়েছেন'}: ৳ ${entry.amount}\nব্যালেন্স: ${balSign}(৳ ${party.currentBalance.toFixed(0)})\nhttps://banglakhata.com/p/${entry.partyId}`;
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -1007,7 +1010,7 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Feather name="arrow-left" size={22} color="#fff" />
           </TouchableOpacity>
-          <Text style={s.headerTitle}>বিস্তারিত প্রবেশিকা</Text>
+          <Text style={s.headerTitle}>{t('entryDetails')}</Text>
         </View>
 
         <ScrollView style={s.body} contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
@@ -1032,7 +1035,7 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
 
             {/* Row 2: Balance */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', backgroundColor: '#fff' }}>
-              <Text style={s.balLabel}>বর্তমান ব্যালেন্স</Text>
+              <Text style={s.balLabel}>{t('currentBalance')}</Text>
               <Text style={[s.balValue, { color: balColor }]}>
                 ৳ {Math.abs(party.currentBalance)}
               </Text>
@@ -1041,15 +1044,17 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
             {/* Row 3: Edit button */}
             <TouchableOpacity style={s.editBtn} onPress={() => setIsEditing(true)} activeOpacity={0.7}>
               <Text style={{ fontSize: 15 }}>🖊️</Text>
-              <Text style={s.editBtnText}>এন্ট্রি এডিট করুন</Text>
+              <Text style={s.editBtnText}>{t('editEntry')}</Text>
             </TouchableOpacity>
           </View>
 
           {/* 3a. SMS card */}
           <View style={s.infoCard}>
-            <Text style={s.smsHeading}>📋 SMS পাঠানো হয়নি</Text>
+            <Text style={s.smsHeading}>{t('smsNotSent')}</Text>
             <Text style={s.smsBody}>
-              {`আপনি ${isGave ? 'দিয়েছেন' : 'পেয়েছেন'}: ৳ ${Math.abs(entry.amount)}\nব্যালেন্স: -(৳ ${Math.abs(party.currentBalance)})\n`}
+              {isEnglish
+                ? `You ${isGave ? 'gave' : 'received'}: ৳ ${Math.abs(entry.amount)}\nBalance: -(৳ ${Math.abs(party.currentBalance)})\n`
+                : `আপনি ${isGave ? 'দিয়েছেন' : 'পেয়েছেন'}: ৳ ${Math.abs(entry.amount)}\nব্যালেন্স: -(৳ ${Math.abs(party.currentBalance)})\n`}
               <Text style={s.smsLink} onPress={() => Linking.openURL(`https://banglakhata.com/p/${entry.partyId}`)}>
                 {`https://banglakhata.com/p/${entry.partyId}`}
               </Text>
@@ -1058,12 +1063,12 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
 
           {/* 3b. Backup card */}
           <View style={s.infoCard}>
-            <Text style={s.backupText}>☁️ এন্ট্রি ব্যাক আপ করা হয়েছে</Text>
+            <Text style={s.backupText}>{t('entryBackedUp')}</Text>
           </View>
 
           {/* 3c. Security badge */}
           <View style={s.secBadge}>
-            <Text style={s.secText}>✔️ 100% নিরাপদ ও সুরক্ষিত</Text>
+            <Text style={s.secText}>{t('secureLabel')}</Text>
           </View>
         </ScrollView>
 
@@ -1076,11 +1081,11 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
             activeOpacity={0.8}
           >
             <Text style={{ fontSize: 16 }}>🗑️</Text>
-            <Text style={s.deleteBtnText}>মুছে ফেলুন</Text>
+            <Text style={s.deleteBtnText}>{t('deleteEntryBtn')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.shareBtn} onPress={handleShare} activeOpacity={0.8}>
             <Text style={{ fontSize: 16 }}>📬</Text>
-            <Text style={s.shareBtnText}>শেয়ার করুন</Text>
+            <Text style={s.shareBtnText}>{t('shareEntryBtn')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -1089,10 +1094,10 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
       <Modal visible={isEditing} transparent animationType="fade" onRequestClose={() => setIsEditing(false)}>
         <KeyboardAvoidingView style={s.editOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={s.editCard}>
-            <Text style={s.editTitle}>এন্ট্রি সংশোধন (Re-entry)</Text>
+            <Text style={s.editTitle}>{t('reentry')}</Text>
 
             {/* Amount */}
-            <Text style={s.editLabel}>টাকার পরিমাণ (৳)</Text>
+            <Text style={s.editLabel}>{t('amountLabel')}</Text>
             <TextInput
               style={s.editInput}
               value={editAmount}
@@ -1104,12 +1109,12 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
             />
 
             {/* Description */}
-            <Text style={s.editLabel}>বিবরণ / ডিটেলস</Text>
+            <Text style={s.editLabel}>{t('descLabel')}</Text>
             <TextInput
               style={s.editInput}
               value={editDesc}
               onChangeText={setEditDesc}
-              placeholder="নোট (ঐচ্ছিক)"
+              placeholder={t('notePlaceholder')}
               placeholderTextColor="#CBD5E1"
               returnKeyType="done"
             />
@@ -1117,14 +1122,14 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
             {/* Actions */}
             <View style={s.editActions}>
               <TouchableOpacity style={s.cancelBtn} onPress={() => setIsEditing(false)}>
-                <Text style={s.cancelBtnText}>বাতিল</Text>
+                <Text style={s.cancelBtnText}>{t('cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[s.saveBtn, { opacity: patchEntry.isPending ? 0.6 : 1 }]}
                 onPress={handleSave}
                 disabled={patchEntry.isPending}
               >
-                <Text style={s.saveBtnText}>{patchEntry.isPending ? 'সংরক্ষণ হচ্ছে…' : 'সংরক্ষণ করুন'}</Text>
+                <Text style={s.saveBtnText}>{patchEntry.isPending ? t('saving') : t('save')}</Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -9,26 +9,29 @@ import { Icon, Label, NativeTabs } from 'expo-router/unstable-native-tabs';
 import { SymbolView } from 'expo-symbols';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
+import { useLanguage } from '@/lib/i18n';
 import { setAuthTokenGetter } from '@workspace/api-client-react';
 import * as SecureStore from 'expo-secure-store';
 
 // iOS 26+: NativeTabs with liquid glass (system-level, no custom tokens)
 function NativeTabLayout() {
+  const { t } = useLanguage();
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
         <Icon sf={{ default: 'person.2', selected: 'person.2.fill' }} />
-        <Label>পার্টিস</Label>
+        <Label>{t('parties')}</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="settings">
         <Icon sf={{ default: 'gear', selected: 'gear' }} />
-        <Label>সেটিংস</Label>
+        <Label>{t('settings')}</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
 
 function ClassicTabLayout() {
+  const { t } = useLanguage();
   const colors = useColors();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -66,11 +69,11 @@ function ClassicTabLayout() {
           ) : null,
       }}
     >
-      {/* Left tab: পার্টিস (home/dashboard) */}
+      {/* Left tab: Parties / পার্টিস (home/dashboard) */}
       <Tabs.Screen
         name="index"
         options={{
-          title: 'পার্টিস',
+          title: t('parties'),
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="person.2" tintColor={color} size={24} />
@@ -87,11 +90,11 @@ function ClassicTabLayout() {
           tabBarButton: () => <View style={{ flex: 1 }} />,
         }}
       />
-      {/* Right tab: সেটিংস */}
+      {/* Right tab: Settings / সেটিংস */}
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'সেটিংস',
+          title: t('settings'),
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="gear" tintColor={color} size={24} />
