@@ -196,31 +196,36 @@ export function PartyView() {
 
       const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.95);
 
-      // Safety-net: force download to device gallery
-      const phantomAnchor = document.createElement('a');
-      phantomAnchor.href = jpgDataUrl;
-      phantomAnchor.download = `Banglakhata_Receipt_${Date.now()}.jpg`;
-      document.body.appendChild(phantomAnchor);
-      phantomAnchor.click();
-      document.body.removeChild(phantomAnchor);
+      // Convert Base64 → ArrayBuffer → Blob (byte-identical to what the PDF pipeline produces)
+      const byteString = atob(jpgDataUrl.split(',')[1]);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+      const imageBlob = new Blob([ab], { type: 'image/jpeg' });
+      const timestamp = new Date().toISOString().split('T')[0];
+      const systemPhotoFile = new File([imageBlob], `Banglakhata_Receipt_${timestamp}.jpg`, {
+        type: 'image/jpeg',
+        lastModified: Date.now(),
+      });
 
-      // Gallery save done. Now notify + open share sheet after a short breath.
-      setTimeout(() => {
-        alert('✅ রসিদের ছবিটি আপনার ফোনের গ্যালারি/ডাউনলোডে সেভ হয়েছে।\n\nএখন আপনার পছন্দের চ্যাট অ্যাপ (ইমু/হোয়াটসঅ্যাপ) ওপেন হলে গ্যালারি থেকে ছবিটি সিলেক্ট করে পাঠিয়ে দিন।');
-        if (navigator.share) {
-          navigator.share({
-            title: 'Banglakhata রশিদ',
-            text: 'Banglakhata রসিদের JPG ছবিটি গ্যালারিতে সেভ করা হয়েছে। অনুগ্রহ করে চ্যাটে এটি এটাচ করুন।',
-          }).catch(() => {
-            window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent('লেনদেনের JPG রসিদটি আমার গ্যালারি থেকে পাঠানো হচ্ছে।'), '_blank');
-          });
-        } else {
-          window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent('লেনদেনের JPG রসিদটি আমার গ্যালারি থেকে পাঠানো হচ্ছে।'), '_blank');
-        }
-      }, 300);
+      if (navigator.canShare && navigator.canShare({ files: [systemPhotoFile] })) {
+        await navigator.share({
+          files: [systemPhotoFile],
+          title: 'Banglakhata রশিদ ফটো',
+          text: 'Banglakhata অ্যাপ থেকে পাঠানো রসিদ।',
+        });
+      } else {
+        // Fallback: download to gallery + inform user
+        const fallbackAnchor = document.createElement('a');
+        fallbackAnchor.href = jpgDataUrl;
+        fallbackAnchor.download = `Banglakhata_Receipt_${timestamp}.jpg`;
+        document.body.appendChild(fallbackAnchor);
+        fallbackAnchor.click();
+        document.body.removeChild(fallbackAnchor);
+        alert('⚠️ ব্রাউজার ব্লকের কারণে সরাসরি শেয়ার প্যানেল ওপেন করা যায়নি। রসিদটি আপনার গ্যালারিতে JPG ছবি হিসেবে ডাউনলোড হয়েছে!');
+      }
     } catch (err) {
       console.error('System Native Share Pipeline Exception Intercepted:', err);
-      window.open('https://api.whatsapp.com/send', '_blank');
     }
   };
 

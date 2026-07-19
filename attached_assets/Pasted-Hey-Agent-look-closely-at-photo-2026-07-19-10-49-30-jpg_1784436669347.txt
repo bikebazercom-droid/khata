@@ -1,0 +1,66 @@
+Hey Agent, look closely at photo_2026-07-19_10-49-30.jpg. The native OS system share overlay/popup works perfectly for PDFs, but when attempting to share images (JPGs), the system panel fails to pop up or load because the image file format structure isn't complying with the browser's shared binary validation pipeline.
+
+WE MUST FIX THIS BY SYNCHRONIZING THE JPG FILE FORMAT GENERATION WITH THE WORKING NATIVE FILE STREAM LAYER:
+1. Instead of passing raw canvas data URLs directly, convert the Base64 JPG string into an ArrayBuffer Blob structure, explicitly enforcing the `image/jpeg` content type header.
+2. Force the shared array array stream into a proper sequential array inside the modern `File` constructor payload so that mobile webviews treat it identically to the functioning PDF layout layer.
+
+Please replace your active image generation handlers across `transaction-detail.tsx`, `home.tsx`, and `party-view.tsx` with this bulletproof image array stream pipeline right now:
+
+```javascript
+import html2canvas from 'html2canvas';
+
+const handleNativePhotoShareOverlay = async (elementRef, baseFileName) => {
+  if (!elementRef.current) return;
+
+  try {
+    // 1. Snapshot the target layout view perfectly
+    const canvas = await html2canvas(elementRef.current, {
+      backgroundColor: '#ffffff',
+      scale: 3, 
+      useCORS: true,
+      logging: false
+    });
+
+    const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+
+    // 2. CONVERT BASE64 DATA URL DIRECTLY TO A CLEAN BINARY ARRAYSTREAM
+    const byteString = atob(jpgDataUrl.split(',')[1]);
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    
+    // Create clean binary Blob representation
+    const imageBlob = new Blob([ab], { type: 'image/jpeg' });
+    
+    // 3. COMPILE INTO NATIVE FILE OBJECT (Matching the working PDF parameters)
+    const timestamp = new Date().toISOString().split('T')[0];
+    const systemPhotoFile = new File([imageBlob], `${baseFileName}_${timestamp}.jpg`, { 
+      type: 'image/jpeg',
+      lastModified: Date.now()
+    });
+
+    // 4. INVOKE SYSTEM NATIVE SHARING OVERLAY DIRECTLY
+    if (navigator.canShare && navigator.canShare({ files: [systemPhotoFile] })) {
+      await navigator.share({
+        files: [systemPhotoFile],
+        title: 'Banglakhata রশিদ ফটো',
+        text: 'Banglakhata অ্যাপ থেকে পাঠানো রসিদ।'
+      });
+      console.log('Native overlay invoked successfully.');
+    } else {
+      // Direct physical anchor download fallback if browser strictly denies binary injection
+      const fallbackAnchor = document.createElement('a');
+      fallbackAnchor.href = jpgDataUrl;
+      fallbackAnchor.download = `${baseFileName}_${timestamp}.jpg`;
+      document.body.appendChild(fallbackAnchor);
+      fallbackAnchor.click();
+      document.body.removeChild(fallbackAnchor);
+      alert("⚠️ ব্রাউজার ব্লকের কারণে সরাসরি শেয়ার প্যানেল ওপেন করা যায়নি। রসিদটি আপনার গ্যালারিতে JPG ছবি হিসেবে ডাউনলোড হয়েছে!");
+    }
+  } catch (error) {
+    console.error('Fatal crash inside image share overlay lifecycle:', error);
+  }
+};
