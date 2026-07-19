@@ -622,13 +622,6 @@ export function HomeView() {
           <Users className="w-5 h-5" />
           <span className="text-[10px] font-bold">পার্টিস</span>
         </button>
-        <Link
-          href="/reports"
-          className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-slate-400 active:text-slate-600 transition-colors"
-        >
-          <FileText className="w-5 h-5" />
-          <span className="text-[10px] font-bold">রিপোর্ট</span>
-        </Link>
         <button
           onClick={() => setIsSettingsOpen(true)}
           className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-slate-400 active:text-slate-600 transition-colors"

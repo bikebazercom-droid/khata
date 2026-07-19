@@ -1,0 +1,39 @@
+Hey Agent, look closely at Screenshot_12.jpg. The user wants to COMPLETELY REMOVE the middle "রিপোর্ট" (Report) option/tab from the bottom navigation bar.
+
+CURRENT UI CONFIGURATION:
+- Left: "পার্টিস" (Parties)
+- Center: "রিপোর্ট" (Report) <-- REMOVE THIS ENTIRELY
+- Right: "সেটিংস" (Settings)
+
+NEW REQUIRED UI CONFIGURATION:
+- Only two tabs should remain: "পার্টিস" (Parties) on the left and "সেটিংস" (Settings) on the right. 
+- The grid/flex layout must balance automatically so these two items occupy the remaining space cleanly.
+
+CRITICAL INSTRUCTIONS:
+1. Locate the bottom navigation layout component (e.g., `BottomNavigation.tsx`, `Navbar.tsx`, or `Tabs.tsx`).
+2. Delete the item block, icon, and text code representing the "রিপোর্ট" button.
+3. Clean up any state routers or view changers tied to the report page inside this bar component.
+4. Adjust the styling classes (if using Tailwind, change from `grid-cols-3` to `grid-cols-2` or let the flex wrapper distribute space equally for the two remaining items).
+
+Please refactor the JSX structure immediately to look like this clean template:
+
+```javascript
+// BEFORE refactoring:
+<div className="fixed bottom-0 left-0 right-0 bg-white border-t grid grid-cols-3 py-2">
+  <button onClick={() => setTab('parties')}>...</button>
+  <button onClick={() => setTab('reports')}>...</button>  {/* <-- DELETE THIS */}
+  <button onClick={() => setTab('settings')}>...</button>
+</div>
+
+// AFTER refactoring (Clean 2-column distribution):
+<div className="fixed bottom-0 left-0 right-0 bg-white border-t grid grid-cols-2 py-2">
+  <button onClick={() => setTab('parties')} className="flex flex-col items-center justify-center">
+    {/* Parties Icon */}
+    <span className="text-sm font-semibold text-gray-700">পার্টিস</span>
+  </button>
+  
+  <button onClick={() => setTab('settings')} className="flex flex-col items-center justify-center">
+    {/* Settings Icon */}
+    <span className="text-sm font-semibold text-gray-700">সেটিংস</span>
+  </button>
+</div>
