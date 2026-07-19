@@ -22,7 +22,8 @@ import { bn } from 'date-fns/locale';
 import { toast } from 'sonner';
 
 export function HomeView() {
-  const { openSwitcher } = useBusinessContext();
+  const { openSwitcher, businesses, selectedBusinessId } = useBusinessContext();
+  const activeBusiness = businesses.find((b) => b.id === selectedBusinessId);
   const [role, setRole] = useState<PartyRole>(PartyRole.CUSTOMER);
   const [search, setSearch] = useState('');
   const [location, navigate] = useLocation();
@@ -394,7 +395,7 @@ export function HomeView() {
               aria-label="খাতাবুক পরিবর্তন করুন"
             >
               <h1 className="font-extrabold tracking-tight text-[15px] text-white truncate max-w-[120px]">
-                {settings?.storeName || 'Banglakhata'}
+                {activeBusiness?.name || settings?.storeName || 'লোড হচ্ছে...'}
               </h1>
               <ChevronRight className="w-3.5 h-3.5 text-white/60 shrink-0 rotate-90" />
             </button>
