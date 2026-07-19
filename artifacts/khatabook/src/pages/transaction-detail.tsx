@@ -201,38 +201,39 @@ export function TransactionDetailPage() {
         logging: false,
       });
 
-      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
 
-      // Convert Base64 → ArrayBuffer → Blob (byte-identical to what the PDF pipeline produces)
-      const byteString = atob(jpgDataUrl.split(',')[1]);
-      const ab = new ArrayBuffer(byteString.length);
-      const ia = new Uint8Array(ab);
-      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-      const imageBlob = new Blob([ab], { type: 'image/jpeg' });
+      // Fetch blob from data URL (mirrors the PDF pipeline's blob source)
+      const binaryFetch = await fetch(jpgDataUrl);
+      const imageBinaryBlob = await binaryFetch.blob();
       const timestamp = new Date().toISOString().split('T')[0];
-      const systemPhotoFile = new File([imageBlob], `Banglakhata_Entry_${timestamp}.jpg`, {
+      const sharedPhotoFile = new File([imageBinaryBlob], `Payment_Request_${timestamp}.jpg`, {
         type: 'image/jpeg',
         lastModified: Date.now(),
       });
 
-      if (navigator.canShare && navigator.canShare({ files: [systemPhotoFile] })) {
-        await navigator.share({
-          files: [systemPhotoFile],
-          title: 'Banglakhata রশিদ ফটো',
-          text: 'Banglakhata অ্যাপ থেকে পাঠানো রসিদ।',
-        });
-      } else {
-        // Fallback: download to gallery + inform user
-        const fallbackAnchor = document.createElement('a');
-        fallbackAnchor.href = jpgDataUrl;
-        fallbackAnchor.download = `Banglakhata_Entry_${timestamp}.jpg`;
-        document.body.appendChild(fallbackAnchor);
-        fallbackAnchor.click();
-        document.body.removeChild(fallbackAnchor);
-        alert('⚠️ ব্রাউজার ব্লকের কারণে সরাসরি শেয়ার প্যানেল ওপেন করা যায়নি। রসিদটি আপনার গ্যালারিতে JPG ছবি হিসেবে ডাউনলোড হয়েছে!');
+      if (navigator.canShare && navigator.canShare({ files: [sharedPhotoFile] })) {
+        try {
+          await navigator.share({
+            files: [sharedPhotoFile],
+            title: 'পেমেন্ট রসিদ ফটো',
+            text: 'Banglakhata থেকে পাঠানো লেনদেনের ছবি।',
+          });
+          return;
+        } catch (e) {
+          if (e instanceof DOMException && (e as DOMException).name === 'AbortError') return;
+          // fall through to WhatsApp link
+        }
       }
+
+      window.open(
+        'https://api.whatsapp.com/send?text=' +
+          encodeURIComponent('রসিদটি আপনার ফোনে JPG ছবি আকারে ডাউনলোড হয়েছে। ইমু বা হোয়াটসঅ্যাপ গ্যালারি থেকে সেন্ড করুন।'),
+        '_blank',
+      );
     } catch (err: unknown) {
-      console.error('System Native Share Pipeline Exception Intercepted:', err);
+      console.error('Snapshot or file streaming pipeline crash:', err);
+      window.open('https://api.whatsapp.com/send', '_blank');
     } finally {
       setIsSharing(false);
     }
