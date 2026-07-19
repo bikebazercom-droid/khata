@@ -2,6 +2,7 @@ import { Router } from "express";
 import { eq, and, count, inArray } from "drizzle-orm";
 import {
   db,
+  appUsersTable,
   businessesTable,
   businessSettingsTable,
   partiesTable,
@@ -133,8 +134,39 @@ router.delete("/businesses/:id", async (req, res) => {
       return;
     }
 
-    // 2. Cascade delete inside a transaction
+    // 2. Find another business to redirect the user's default pointer.
+    //    app_users.business_id is NOT NULL, so we must re-point it before
+    //    deleting the target business or Postgres will reject with a FK violation.
+    const otherMembership = await db
+      .select({ businessId: userBusinessesTable.businessId })
+      .from(userBusinessesTable)
+      .where(eq(userBusinessesTable.userId, userId))
+      .limit(10);
+
+    const fallbackId = otherMembership
+      .map((r) => r.businessId)
+      .find((id) => id !== businessId);
+
+    if (!fallbackId) {
+      res
+        .status(400)
+        .json({ error: "আপনার শেষ খাতাটি ডিলিট করা যাবে না।" });
+      return;
+    }
+
+    // 3. Cascade delete inside a transaction
     await db.transaction(async (tx) => {
+      // Redirect app_users.business_id away from the target BEFORE deletion
+      await tx
+        .update(appUsersTable)
+        .set({ businessId: fallbackId })
+        .where(
+          and(
+            eq(appUsersTable.id, userId),
+            eq(appUsersTable.businessId, businessId),
+          ),
+        );
+
       // Ledger entries only have a partyId FK, so resolve party IDs first
       const partyRows = await tx
         .select({ id: partiesTable.id })
