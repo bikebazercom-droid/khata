@@ -76,10 +76,6 @@ async function uploadBillImage(
   }
 }
 
-function formatAmount(n: number): string {
-  return '৳' + new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n);
-}
-
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
@@ -103,7 +99,7 @@ interface TransactionSheetProps {
 
 function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyName, onClose, onSuccess }: TransactionSheetProps) {
   const colors = useColors();
-  const { isEnglish, t } = useLanguage();
+  const { isEnglish, t, formatNumber } = useLanguage();
   const qc = useQueryClient();
   const { getToken } = useAuth();
   const [type, setType] = useState<'YOU_GAVE' | 'YOU_GOT'>(initialType);
@@ -262,8 +258,15 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
       <KeyboardAvoidingView style={s.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={s.sheet}>
           <View style={s.handle} />
-          <Text style={s.title}>{t('recordTransaction')}</Text>
-          <Text style={s.subtitle}>{partyName}</Text>
+          <Text style={s.title} numberOfLines={2}>
+            {type === 'YOU_GAVE'
+              ? (isEnglish
+                  ? `You gave ৳${amount || '0'} to ${partyName}`
+                  : `আপনি দিয়েছেন ৳${formatNumber(parseFloat(amount) || 0)} ${partyName}-কে`)
+              : (isEnglish
+                  ? `You received ৳${amount || '0'} from ${partyName}`
+                  : `আপনি পেয়েছেন ৳${formatNumber(parseFloat(amount) || 0)} ${partyName}-এর থেকে`)}
+          </Text>
 
           {/* Type toggle */}
           <View style={s.typeRow}>
@@ -342,7 +345,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
             activeOpacity={0.85}
           >
             <Text style={s.submitText}>
-              {createEntry.isPending ? t('saving') : isGave ? t('recordYouGave') : t('recordYouGot')}
+              {createEntry.isPending ? t('saving') : t('confirmEntry')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.cancelBtn} onPress={() => { reset(); onClose(); }}>
@@ -500,6 +503,7 @@ interface LedgerRowProps {
 
 function LedgerRow({ entry, colors, isEnglish, onPress }: LedgerRowProps) {
   const { getToken } = useAuth();
+  const { formatCurrency } = useLanguage();
   const isGave = entry.type === 'YOU_GAVE';
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
@@ -552,7 +556,7 @@ function LedgerRow({ entry, colors, isEnglish, onPress }: LedgerRowProps) {
           ) : null}
         </View>
         <Text style={[s.amount, { color: isGave ? colors.willGet : colors.willGive }]}>
-          {isGave ? '+' : '-'}{formatAmount(entry.amount)}
+          {isGave ? '+' : '-'}{formatCurrency(entry.amount)}
         </Text>
       </TouchableOpacity>
 
@@ -589,7 +593,7 @@ interface EntryDetailSheetProps {
 
 function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDeleted, onUpdated }: EntryDetailSheetProps) {
   const colors = useColors();
-  const { isEnglish, t } = useLanguage();
+  const { isEnglish, t, formatCurrency } = useLanguage();
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
 
@@ -747,7 +751,7 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
                 </View>
               </View>
               <View style={{ marginLeft: 12, alignItems: 'flex-end' }}>
-                <Text style={[s.amountBig, { color: amtColor }]}>৳ {Math.abs(entry.amount)}</Text>
+                <Text style={[s.amountBig, { color: amtColor }]}>{formatCurrency(Math.abs(entry.amount))}</Text>
                 <Text style={s.dirLabel}>{balanceLabel}</Text>
               </View>
             </View>
@@ -855,7 +859,7 @@ export default function PartyDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { isEnglish, t } = useLanguage();
+  const { isEnglish, t, formatCurrency } = useLanguage();
   const [showSheet, setShowSheet] = useState(false);
   const [pendingType, setPendingType] = useState<'YOU_GAVE' | 'YOU_GOT'>('YOU_GAVE');
   const [showReminderSheet, setShowReminderSheet] = useState(false);
@@ -947,7 +951,7 @@ export default function PartyDetailScreen() {
           <View style={s.balanceLeft}>
             <Text style={s.balanceLabel}>{t('currentBalanceLabel')}</Text>
             <Text style={[s.balanceAmount, { color: isGet ? colors.willGet : colors.willGive }]}>
-              {formatAmount(party.currentBalance)}
+              {formatCurrency(party.currentBalance)}
             </Text>
             <Text style={[s.balanceType, { color: isGet ? colors.willGet : colors.willGive }]}>
               {isGet ? t('youWillGetArrow') : t('youWillGiveArrow')}
@@ -963,7 +967,7 @@ export default function PartyDetailScreen() {
           )}
         </View>
 
-        {/* Action buttons */}
+        {/* Primary action buttons: You Gave / You Received */}
         <View style={s.actionRow}>
           <TouchableOpacity
             style={[s.actionBtn, { backgroundColor: colors.willGetBg }]}
@@ -983,18 +987,44 @@ export default function PartyDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Send Reminder */}
-        <View style={{ paddingHorizontal: 16, marginBottom: 4 }}>
-          <TouchableOpacity
-            style={[s.actionBtn, { backgroundColor: colors.card, borderWidth: 1.5, borderColor: colors.border }]}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowReminderSheet(true); }}
-            activeOpacity={0.8}
-          >
-            <Feather name="bell" size={16} color={colors.mutedForeground} />
-            <Text style={[s.actionBtnText, { color: colors.mutedForeground, fontSize: 14 }]}>
-              {t('sendReminderBtn')}
-            </Text>
-          </TouchableOpacity>
+        {/* Quick-action row: Report · Reminder · SMS · Entry */}
+        <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 4 }}>
+          {[
+            { key: 'report' as const,   icon: 'file-text' as const },
+            { key: 'reminder' as const, icon: 'bell'      as const },
+            { key: 'sms'      as const, icon: 'message-square' as const },
+            { key: 'entry'    as const, icon: 'edit-3'   as const },
+          ].map(({ key, icon }) => (
+            <TouchableOpacity
+              key={key}
+              style={{
+                flex: 1,
+                paddingVertical: 10,
+                borderRadius: colors.radius,
+                alignItems: 'center',
+                gap: 4,
+                backgroundColor: colors.card,
+                borderWidth: 1,
+                borderColor: colors.border,
+              }}
+              onPress={() => {
+                if (key === 'reminder' || key === 'sms') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setShowReminderSheet(true);
+                } else if (key === 'entry') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  setPendingType('YOU_GAVE');
+                  setShowSheet(true);
+                }
+              }}
+              activeOpacity={0.75}
+            >
+              <Feather name={icon} size={16} color={colors.primary} />
+              <Text style={{ fontSize: 11, fontFamily: 'Inter_600SemiBold', color: colors.primary }}>
+                {t(key)}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         {/* Transaction history header */}

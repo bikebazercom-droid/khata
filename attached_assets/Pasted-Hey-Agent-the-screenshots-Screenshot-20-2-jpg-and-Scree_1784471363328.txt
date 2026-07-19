@@ -1,0 +1,24 @@
+Hey Agent, the screenshots (Screenshot_20_2.jpg and Screenshot_21_2.jpg) clearly show that despite compiling fine, the Party Detail screen and the Calculator input screen are STILL completely displaying in Bengali text and Bengali numbers when the app is in English mode. 
+
+This means you either forgot to actually use the extracted dictionary variables inside the JSX nodes, or you are not passing the raw transaction balances and calculation digits through the locale digit formatter! 
+
+PLEASE CORRECT THIS IMMEDIATELY IN BOTH TARGET FILES:
+
+1. FORCE LOCALIZATION ON `party/[id].tsx` (Customer Detail Screen):
+- Ensure `const { currentLanguage, t } = useLanguage();` is active at the top of the component.
+- The top balance card must evaluate dynamically:
+  `<span>{currentLanguage === 'en' ? 'You Will Give' : 'আপনি দেবেন'}</span>`
+- The center row options must use the mapping keys: `{t('report')}`, `{t('reminder')}`, `{t('sms')}`.
+- All numbers inside `LedgerRow` (e.g., `৳৯৫,৯০২.৩২`, `৳৫০০`) MUST be wrapped with your language dynamic formatter:
+  `{formatNumber(entry.amount, currentLanguage)}` or `{toLocaleDigits(entry.amount, currentLanguage)}`. Do not render raw Bengali number blocks when the app language is set to English!
+
+2. FORCE LOCALIZATION ON THE TRANSACTION INPUT SCREEN (Calculator View):
+- The dynamic top title must check the language condition:
+  `{currentLanguage === 'en' ? `You received ৳${formatNumber(amount, 'en')} from ${party.name}` : `আপনি পেয়েছেন ৳${formatNumber(amount, 'bn')} ${party.name}-এর থেকে`}`
+- The big custom calculator green confirmation button must instantly dynamically swap text:
+  `{currentLanguage === 'en' ? 'Confirm Entry' : 'এন্ট্রি নিশ্চিত করুন'}`
+- The text placeholder inside the billing detail info card must map correctly:
+  `placeholder={currentLanguage === 'en' ? 'Enter details (item, bill no, quantity etc.)' : 'বিস্তারিত লিখুন (পণ্য, বিল নং, পরিমাণ ইত্যাদি)'}`
+- Replace `"বিল সংযুক্ত করুন"` text node with `{currentLanguage === 'en' ? 'Attach Bill' : 'বিল সংযুক্ত করুন'}`.
+
+Apply these explicit inline string evaluations directly to the template DOM nodes now, rebuild the distribution artifacts, and make sure the interface reflects English correctly. No half-measures this time!
