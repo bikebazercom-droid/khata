@@ -15,7 +15,7 @@ const router = Router();
  * GET /api/businesses
  * Returns all businesses the current user has access to, with party counts.
  */
-router.get("/api/businesses", async (req, res) => {
+router.get("/businesses", async (req, res) => {
   const { userId } = req as AuthenticatedRequest;
   try {
     // Join user_businesses → businesses, count parties per business
@@ -63,7 +63,7 @@ router.get("/api/businesses", async (req, res) => {
  * POST /api/businesses
  * Creates a new business and links it to the current user.
  */
-router.post("/api/businesses", async (req, res) => {
+router.post("/businesses", async (req, res) => {
   const { userId } = req as AuthenticatedRequest;
   const { name } = req.body as { name?: string };
 

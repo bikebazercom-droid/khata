@@ -4,8 +4,6 @@ import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import { useBusinessContext, type BusinessInfo } from '@/lib/businessContext';
 import { setExtraHeaders } from '@workspace/api-client-react';
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
-
 function initials(name: string): string {
   return name
     .split(/\s+/)
@@ -28,7 +26,7 @@ export function BusinessSwitcherDrawer() {
   const fetchBusinesses = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${BASE}/api/businesses`, { credentials: 'include' });
+      const res = await fetch('/api/businesses', { credentials: 'include' });
       if (!res.ok) return;
       const data: BusinessInfo[] = await res.json();
       setBusinesses(data);
@@ -75,7 +73,7 @@ export function BusinessSwitcherDrawer() {
     if (!newName.trim() || isCreating) return;
     setIsCreating(true);
     try {
-      const res = await fetch(`${BASE}/api/businesses`, {
+      const res = await fetch('/api/businesses', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -83,10 +81,19 @@ export function BusinessSwitcherDrawer() {
       });
       if (!res.ok) throw new Error('create failed');
       const created: BusinessInfo = await res.json();
-      setBusinesses([...businesses, created]);
-      handleSwitch(created.id);
+
+      // 1. Reset form before switching so it's gone when the drawer re-opens
+      setNewName('');
+      setIsAddingNew(false);
+
+      // 2. Append to list via functional updater (avoids stale closure over businesses)
+      setBusinesses((prev) => [...prev, created]);
+
+      // 3. Fully await the switch so cache flush + header change complete before returning
+      await handleSwitch(created.id);
     } catch (err) {
       console.error('Failed to create business:', err);
+      alert('নতুন ব্যবসা প্রতিষ্ঠান যোগ করা যায়নি। আবার চেষ্টা করুন।');
     } finally {
       setIsCreating(false);
     }
