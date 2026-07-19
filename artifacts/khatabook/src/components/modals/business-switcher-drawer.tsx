@@ -21,6 +21,8 @@ export function BusinessSwitcherDrawer() {
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [newName, setNewName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch business list whenever the drawer opens
   const fetchBusinesses = useCallback(async () => {
@@ -47,6 +49,7 @@ export function BusinessSwitcherDrawer() {
       void fetchBusinesses();
       setIsAddingNew(false);
       setNewName('');
+      setConfirmDeleteId(null);
     }
   }, [isSwitcherOpen, fetchBusinesses]);
 
@@ -99,125 +102,217 @@ export function BusinessSwitcherDrawer() {
     }
   }
 
+  async function handleConfirmDelete() {
+    if (!confirmDeleteId || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/businesses/${confirmDeleteId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('delete failed');
+
+      const remaining = businesses.filter((b) => b.id !== confirmDeleteId);
+      setBusinesses(remaining);
+      setConfirmDeleteId(null);
+
+      if (confirmDeleteId === selectedBusinessId) {
+        if (remaining.length > 0) {
+          // Switch to first remaining business
+          await handleSwitch(remaining[0]!.id);
+        } else {
+          // No businesses left — clear everything and close
+          setSelectedBusiness('');
+          localStorage.removeItem('selected_business_id');
+          setExtraHeaders({});
+          queryClient.clear();
+          closeSwitcher();
+        }
+      }
+    } catch (err) {
+      console.error('Failed to delete business:', err);
+      alert('খাতা মুছে ফেলা যায়নি। আবার চেষ্টা করুন।');
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   const AVATAR_COLORS = ['#1B3A6B', '#0052B4', '#065F46', '#7C3AED', '#B45309', '#DC2626'];
 
   return (
-    <Drawer open={isSwitcherOpen} onOpenChange={(open) => !open && closeSwitcher()}>
-      <DrawerContent>
-        <div className="px-4 pb-6 pt-2 space-y-3 max-h-[80vh] overflow-y-auto">
+    <>
+      <Drawer open={isSwitcherOpen} onOpenChange={(open) => !open && closeSwitcher()}>
+        <DrawerContent>
+          <div className="px-4 pb-6 pt-2 space-y-3 max-h-[80vh] overflow-y-auto">
 
-          {/* Title */}
-          <p className="text-[13px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-            আপনার খাতাবুকগুলো
-          </p>
+            {/* Title */}
+            <p className="text-[13px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+              আপনার খাতাবুকগুলো
+            </p>
 
-          {isLoading ? (
-            <div className="space-y-3">
-              {[0, 1].map((i) => (
-                <div key={i} className="h-20 rounded-xl bg-slate-100 animate-pulse" />
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {businesses.map((biz, idx) => {
-                const isActive = biz.id === selectedBusinessId;
-                const color = AVATAR_COLORS[idx % AVATAR_COLORS.length]!;
-                return (
-                  <div
-                    key={biz.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handleSwitch(biz.id)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSwitch(biz.id)}
-                    className="rounded-xl border-2 p-4 cursor-pointer transition-all active:scale-[0.98]"
-                    style={{ borderColor: isActive ? '#0052B4' : '#E5E7EB' }}
-                  >
-                    {/* Top row: avatar + name + radio */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-[15px] shrink-0"
-                          style={{ backgroundColor: color }}
-                        >
-                          {initials(biz.name)}
-                        </div>
-                        <div>
-                          <p className="text-[17px] font-bold text-slate-800 leading-tight">{biz.name}</p>
-                          <p className="text-[13px] text-slate-400 mt-0.5">{biz.partyCount} গ্রাহক</p>
-                        </div>
-                      </div>
-                      {/* Radio indicator */}
-                      <div
-                        className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
-                        style={{
-                          backgroundColor: isActive ? '#0052B4' : 'transparent',
-                          border: isActive ? 'none' : '2px solid #9CA3AF',
-                        }}
-                      >
-                        {isActive && <span className="text-white text-xs font-bold">✓</span>}
-                      </div>
-                    </div>
-
-                    {/* Business stamp CTA — only for active */}
-                    {isActive && (
-                      <div
-                        className="mt-3 flex items-center justify-between rounded-lg px-3 py-2.5 text-[14px] font-bold"
-                        style={{ backgroundColor: '#F0F4FF', color: '#0052B4', border: '1px solid #DBEAFE' }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <span>🛡️ বিসনেস স্ট্যাম্প তৈরি করুন</span>
-                        <span>&gt;&gt;</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Inline "add new" form */}
-          {isAddingNew ? (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-              <input
-                type="text"
-                autoFocus
-                placeholder="নতুন খাতা বা ব্যবসার নাম লিখুন"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-                className="w-full px-3 py-2.5 text-[14px] border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#0052B4]/30"
-              />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleCreate}
-                  disabled={isCreating || !newName.trim()}
-                  className="flex-1 py-2.5 rounded-xl text-white font-bold text-[14px] disabled:opacity-60"
-                  style={{ backgroundColor: '#0052B4' }}
-                >
-                  {isCreating ? 'তৈরি হচ্ছে…' : 'যোগ করুন'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setIsAddingNew(false); setNewName(''); }}
-                  className="flex-1 py-2.5 rounded-xl bg-slate-200 text-slate-700 font-bold text-[14px]"
-                >
-                  বাতিল
-                </button>
+            {isLoading ? (
+              <div className="space-y-3">
+                {[0, 1].map((i) => (
+                  <div key={i} className="h-20 rounded-xl bg-slate-100 animate-pulse" />
+                ))}
               </div>
+            ) : (
+              <div className="space-y-3">
+                {businesses.map((biz, idx) => {
+                  const isActive = biz.id === selectedBusinessId;
+                  const color = AVATAR_COLORS[idx % AVATAR_COLORS.length]!;
+                  return (
+                    <div
+                      key={biz.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleSwitch(biz.id)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSwitch(biz.id)}
+                      className="rounded-xl border-2 p-4 cursor-pointer transition-all active:scale-[0.98]"
+                      style={{ borderColor: isActive ? '#0052B4' : '#E5E7EB' }}
+                    >
+                      {/* Top row: avatar + name + radio */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-[15px] shrink-0"
+                            style={{ backgroundColor: color }}
+                          >
+                            {initials(biz.name)}
+                          </div>
+                          <div>
+                            <p className="text-[17px] font-bold text-slate-800 leading-tight">{biz.name}</p>
+                            <p className="text-[13px] text-slate-400 mt-0.5">{biz.partyCount} গ্রাহক</p>
+                          </div>
+                        </div>
+                        {/* Radio indicator */}
+                        <div
+                          className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
+                          style={{
+                            backgroundColor: isActive ? '#0052B4' : 'transparent',
+                            border: isActive ? 'none' : '2px solid #9CA3AF',
+                          }}
+                        >
+                          {isActive && <span className="text-white text-xs font-bold">✓</span>}
+                        </div>
+                      </div>
+
+                      {/* Bottom action row — only for active */}
+                      {isActive && (
+                        <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
+                          <div
+                            className="flex-1 flex items-center justify-between rounded-lg px-3 py-2.5 text-[14px] font-bold"
+                            style={{ backgroundColor: '#F0F4FF', color: '#0052B4', border: '1px solid #DBEAFE' }}
+                          >
+                            <span>🛡️ বিসনেস স্ট্যাম্প তৈরি করুন</span>
+                            <span>&gt;&gt;</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(biz.id)}
+                            className="rounded-lg px-3 py-2.5 text-[13px] font-bold transition-colors"
+                            style={{ backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA' }}
+                            title="খাতা ডিলিট করুন"
+                          >
+                            🗑️ ডিলিট
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Inline "add new" form */}
+            {isAddingNew ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="নতুন খাতা বা ব্যবসার নাম লিখুন"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                  className="w-full px-3 py-2.5 text-[14px] border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#0052B4]/30"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCreate}
+                    disabled={isCreating || !newName.trim()}
+                    className="flex-1 py-2.5 rounded-xl text-white font-bold text-[14px] disabled:opacity-60"
+                    style={{ backgroundColor: '#0052B4' }}
+                  >
+                    {isCreating ? 'তৈরি হচ্ছে…' : 'যোগ করুন'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setIsAddingNew(false); setNewName(''); }}
+                    className="flex-1 py-2.5 rounded-xl bg-slate-200 text-slate-700 font-bold text-[14px]"
+                  >
+                    বাতিল
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsAddingNew(true)}
+                className="w-full py-3.5 rounded-xl text-white font-bold text-[15px] flex items-center justify-center gap-2 active:scale-[0.97] transition-transform"
+                style={{ backgroundColor: '#0052B4' }}
+              >
+                + নতুন বাংলা খাতা
+              </button>
+            )}
+          </div>
+        </DrawerContent>
+      </Drawer>
+
+      {/* Delete confirmation overlay */}
+      {confirmDeleteId && (
+        <div
+          className="fixed inset-0 z-[200] flex items-end justify-center"
+          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onClick={() => !isDeleting && setConfirmDeleteId(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-t-2xl bg-white px-5 pt-5 pb-8 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col items-center text-center gap-2">
+              <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center text-3xl">
+                🗑️
+              </div>
+              <p className="text-[18px] font-bold text-slate-800">খাতা ডিলিট করুন?</p>
+              <p className="text-[14px] text-slate-500 leading-snug">
+                এই খাতার সব গ্রাহক এবং লেনদেনের তথ্য চিরতরে মুছে যাবে।
+                <br />
+                <span className="font-semibold text-red-600">এটি পূর্বাবস্থায় ফেরানো যাবে না।</span>
+              </p>
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setIsAddingNew(true)}
-              className="w-full py-3.5 rounded-xl text-white font-bold text-[15px] flex items-center justify-center gap-2 active:scale-[0.97] transition-transform"
-              style={{ backgroundColor: '#0052B4' }}
-            >
-              + নতুন বাংলা খাতা
-            </button>
-          )}
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteId(null)}
+                disabled={isDeleting}
+                className="flex-1 py-3.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-[15px] disabled:opacity-60"
+              >
+                না
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="flex-1 py-3.5 rounded-xl text-white font-bold text-[15px] disabled:opacity-60"
+                style={{ backgroundColor: '#DC2626' }}
+              >
+                {isDeleting ? 'মুছছে…' : 'হ্যাঁ, ডিলিট করুন'}
+              </button>
+            </div>
+          </div>
         </div>
-      </DrawerContent>
-    </Drawer>
+      )}
+    </>
   );
 }

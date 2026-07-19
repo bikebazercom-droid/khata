@@ -1,10 +1,11 @@
 import { Router } from "express";
-import { eq, and, count } from "drizzle-orm";
+import { eq, and, count, inArray } from "drizzle-orm";
 import {
   db,
   businessesTable,
   businessSettingsTable,
   partiesTable,
+  ledgerEntriesTable,
   userBusinessesTable,
 } from "@workspace/db";
 import type { AuthenticatedRequest } from "../middlewares/requireAuth";
@@ -98,6 +99,72 @@ router.post("/businesses", async (req, res) => {
     });
   } catch (err) {
     console.error("POST /api/businesses error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * DELETE /api/businesses/:id
+ * Completely wipes a business the user owns — all ledger entries, parties,
+ * settings, and the business record itself are deleted in one transaction.
+ */
+router.delete("/businesses/:id", async (req, res) => {
+  const { userId } = req as AuthenticatedRequest;
+  const { id: businessId } = req.params;
+
+  try {
+    // 1. Verify ownership
+    const [ownership] = await db
+      .select()
+      .from(userBusinessesTable)
+      .where(
+        and(
+          eq(userBusinessesTable.userId, userId),
+          eq(userBusinessesTable.businessId, businessId),
+        ),
+      )
+      .limit(1);
+
+    if (!ownership) {
+      res.status(403).json({ error: "You do not own this business khata" });
+      return;
+    }
+
+    // 2. Cascade delete inside a transaction
+    await db.transaction(async (tx) => {
+      // Ledger entries only have a partyId FK, so resolve party IDs first
+      const partyRows = await tx
+        .select({ id: partiesTable.id })
+        .from(partiesTable)
+        .where(eq(partiesTable.businessId, businessId));
+
+      if (partyRows.length > 0) {
+        const partyIds = partyRows.map((p) => p.id);
+        await tx
+          .delete(ledgerEntriesTable)
+          .where(inArray(ledgerEntriesTable.partyId, partyIds));
+      }
+
+      await tx
+        .delete(partiesTable)
+        .where(eq(partiesTable.businessId, businessId));
+
+      await tx
+        .delete(businessSettingsTable)
+        .where(eq(businessSettingsTable.businessId, businessId));
+
+      await tx
+        .delete(userBusinessesTable)
+        .where(eq(userBusinessesTable.businessId, businessId));
+
+      await tx
+        .delete(businessesTable)
+        .where(eq(businessesTable.id, businessId));
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("DELETE /api/businesses/:id error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

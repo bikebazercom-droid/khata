@@ -1,0 +1,42 @@
+Hey Agent, the user is experiencing an issue where clicking "হ্যাঁ" in the "খাতা ডিলিট" confirmation dialog does NOT actually delete the active business khata from the backend database. We need a 100% complete cascade deletion so that the active business, its customers, and all associated transaction entries are completely wiped from the live database and never persist.
+
+Please implement the backend API endpoint and frontend execution in parallel:
+
+1. STEP 1: CREATE BACKEND DELETE ROUTE (`api-server`)
+Inside your businesses router backend (`/api/businesses`), add a DELETE route for the active business ID. It must perform a database cascade delete or explicitly delete transactions, customers, and the business link:
+
+```typescript
+// Add this inside your authenticated business routes
+router.delete('/api/businesses/:id', requireAuth, async (req, res) => {
+  const businessId = req.params.id;
+  const userId = req.user.id; // From requireAuth
+
+  try {
+    // 1. Verify ownership first via userBusinessesTable
+    const ownership = await db.select().from(userBusinessesTable)
+      .where(and(eq(userBusinessesTable.userId, userId), eq(userBusinessesTable.businessId, businessId)))
+      .limit(1);
+
+    if (ownership.length === 0) {
+      return res.status(403).json({ error: "You do not own this business khata" });
+    }
+
+    // 2. Perform Clean Database Wipe for this business inside a transaction
+    await db.transaction(async (tx) => {
+      // Delete all transactions linked to customers of this business
+      // Delete all customers linked to this business
+      // Delete user_businesses join table record
+      // Finally, delete the business record from businesses table
+      
+      await tx.delete(transactionsTable).where(eq(transactionsTable.businessId, businessId));
+      await tx.delete(customersTable).where(eq(customersTable.businessId, businessId));
+      await tx.delete(userBusinessesTable).where(eq(userBusinessesTable.businessId, businessId));
+      await tx.delete(businessesTable).where(eq(businessesTable.id, businessId));
+    });
+
+    return res.status(200).json({ success: true, message: "Khata completely wiped out from database" });
+  } catch (error) {
+    console.error("Failed to delete khata:", error);
+    return res.status(500).json({ error: "Internal server error during deletion" });
+  }
+});
