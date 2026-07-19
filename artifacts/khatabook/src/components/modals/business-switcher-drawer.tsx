@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import { useBusinessContext, type BusinessInfo } from '@/lib/businessContext';
+import { setExtraHeaders } from '@workspace/api-client-react';
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -51,10 +52,22 @@ export function BusinessSwitcherDrawer() {
     }
   }, [isSwitcherOpen, fetchBusinesses]);
 
-  function handleSwitch(id: string) {
+  async function handleSwitch(id: string) {
     if (id === selectedBusinessId) { closeSwitcher(); return; }
+
+    // 1. Update state + localStorage immediately
     setSelectedBusiness(id);
-    queryClient.invalidateQueries();   // flush all cached data for new business scope
+    localStorage.setItem('selected_business_id', id);
+
+    // 2. Push header to the API client right now (before any re-fetch fires)
+    setExtraHeaders({ 'x-business-id': id });
+
+    // 3. Hard-clear the entire query cache so stale data from the old
+    //    business is never served to the next render, then re-fetch everything
+    queryClient.clear();
+    await queryClient.invalidateQueries();
+
+    // 4. Close the panel
     closeSwitcher();
   }
 
@@ -193,7 +206,7 @@ export function BusinessSwitcherDrawer() {
               className="w-full py-3.5 rounded-xl text-white font-bold text-[15px] flex items-center justify-center gap-2 active:scale-[0.97] transition-transform"
               style={{ backgroundColor: '#0052B4' }}
             >
-              ➕ নতুন KHATABOOK তৈরি করুন
+              + নতুন বাংলা খাতা
             </button>
           )}
         </div>
