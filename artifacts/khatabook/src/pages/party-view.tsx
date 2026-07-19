@@ -424,7 +424,11 @@ export function PartyView() {
                       <div
                         key={entry.id}
                         data-entry-card
-                        className="bg-white rounded-xl shadow-sm grid grid-cols-[1fr_auto_auto] gap-3 items-center overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => navigate(`/party/${id}/entry/${entry.id}`)}
+                        onKeyDown={(e) => e.key === 'Enter' && navigate(`/party/${id}/entry/${entry.id}`)}
+                        className="bg-white rounded-xl shadow-sm grid grid-cols-[1fr_auto_auto] gap-3 items-center overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both cursor-pointer active:bg-slate-50 transition-colors"
                         style={{ animationDelay: `${i * 30}ms` }}
                       >
                         <div className="min-w-0 py-3 pl-4">

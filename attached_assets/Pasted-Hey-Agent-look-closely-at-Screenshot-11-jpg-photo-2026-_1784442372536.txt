@@ -1,0 +1,22 @@
+Hey Agent, look closely at Screenshot_11.jpg, photo_2026-07-19_12-12-40_2.jpg, and photo_2026-07-18_10-33-06.jpg. The user wants to restore the natural full-featured navigation flow for viewing, editing, updating, and deleting transaction entries cleanly without breaking the snapshot mechanism.
+
+Here is the exact step-by-step user interaction flow that must be completely functional:
+
+1. STEP 1: ENTRY CLICK TRIGGER (Screenshot_11.jpg)
+- Inside the customer ledger/history view, when the user clicks/taps on any specific transaction entry amount (e.g., the green "৳১৫০"), it must trigger a screen transition to the Transaction Details Screen ("বিস্তারিত প্রবেশিকা"). No sudden sharing sheets or intermediate popups here!
+
+2. STEP 2: DETAILS SCREEN ACTIONS (photo_2026-07-19_12-12-40_2.jpg)
+- Render the full "বিস্তারিত প্রবেশিকা" screen matching the exact styling layout we built earlier.
+- The "📢 শেয়ার করুন" button at the bottom handles the background html2canvas image compilation and brings up the mobile phone's native share drawer (WhatsApp, Imo, etc.).
+- Clicking the "🗑️ মুছে ফেলুন" button should trigger the `onDelete` function callback, prompt a confirmation, remove the entry from state, and safely route the user back to the ledger screen.
+- Clicking the middle "🖊️ এন্ট্রি এডিট করুন" button text link must transit/route the user into the Edit Entry Form interface.
+
+3. STEP 3: TRANSACTION ENTRY EDIT SCREEN (photo_2026-07-18_10-33-06.jpg)
+- Render the standard transaction entry form containing:
+  - Top editable balance amount field (pre-filled with the current entry value, e.g., ৳ 50).
+  - Details note input text box ("ডিটেলস প্রবেশ করুন...").
+  - Custom custom keyboard/calculator alignment structure at the bottom.
+  - A prominent green "সংরক্ষণ করুন" (Save/Update) button.
+- Tapping "সংরক্ষণ করুন" must update that transaction object's array indexes inside the client state, recalculate the global balances, and successfully return the UI stack back to the ledger view.
+
+Please verify the callback pipeline inside your global layout router (e.g., handling state like `currentView === 'DETAILS'` or `currentView === 'EDIT_ENTRY'`) and wire up these click handlers so the user has full operational control over correcting, deleting, or re-entering transactions instantly. Update the routing state engine now.
