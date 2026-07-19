@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import { useBusinessContext, type BusinessInfo } from '@/lib/businessContext';
 import { setExtraHeaders } from '@workspace/api-client-react';
@@ -126,11 +127,21 @@ export function BusinessSwitcherDrawer() {
       }
 
       queryClient.clear();
-      alert('খাতাটি ডাটাবেজ থেকে সম্পূর্ণ ডিলিট করা হয়েছে।');
-      window.location.reload();
+      toast.success('🎉 বাংলা খাতা: আপনার খাতাটি সফলভাবে এবং চিরতরে মুছে ফেলা হয়েছে!', {
+        duration: 2500,
+        style: {
+          background: '#1E3A8A',
+          color: '#ffffff',
+          fontWeight: '600',
+          padding: '16px',
+          borderRadius: '12px',
+          fontSize: '15px',
+        },
+      });
+      setTimeout(() => { window.location.reload(); }, 1500);
     } catch (err) {
       console.error('FATAL CRASH DURING DELETION:', err);
-      alert('ডিলিট করা যায়নি! আবার চেষ্টা করুন।');
+      toast.error('ডিলিট করা যায়নি! আবার চেষ্টা করুন।');
       setIsDeleting(false);
     }
   }
