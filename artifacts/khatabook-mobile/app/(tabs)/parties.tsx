@@ -10,7 +10,6 @@ import {
   RefreshControl,
   Modal,
   KeyboardAvoidingView,
-  ScrollView,
   Alert,
   ActivityIndicator,
 } from 'react-native';
@@ -25,6 +24,7 @@ import {
 import type { Party } from '@workspace/api-client-react';
 import { useColors } from '@/hooks/useColors';
 import { useQueryClient } from '@tanstack/react-query';
+import { useLanguage } from '@/lib/i18n';
 
 type Tab = 'CUSTOMER' | 'SUPPLIER';
 
@@ -32,25 +32,26 @@ function formatAmount(n: number): string {
   return '৳' + new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n);
 }
 
-function formatRelativeTime(dateStr: string | null): string {
-  if (!dateStr) return 'No transactions';
+function formatRelativeTime(dateStr: string | null, isEnglish: boolean): string {
+  if (!dateStr) return isEnglish ? 'No transactions' : 'কোনো লেনদেন নেই';
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return isEnglish ? 'Just now' : 'এইমাত্র';
+  if (mins < 60) return isEnglish ? `${mins}m ago` : `${mins} মিনিট আগে`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return isEnglish ? `${hrs}h ago` : `${hrs} ঘণ্টা আগে`;
   const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
+  return isEnglish ? `${days}d ago` : `${days} দিন আগে`;
 }
 
 interface PartyCardProps {
   party: Party;
   onPress: () => void;
   colors: ReturnType<typeof useColors>;
+  isEnglish: boolean;
 }
 
-function PartyCard({ party, onPress, colors }: PartyCardProps) {
+function PartyCard({ party, onPress, colors, isEnglish }: PartyCardProps) {
   const isGet = party.balanceType === 'YOU_WILL_GET';
   const initials = party.name.slice(0, 2).toUpperCase();
   const avatarBg = isGet ? colors.willGetBg : colors.willGiveBg;
@@ -89,12 +90,12 @@ function PartyCard({ party, onPress, colors }: PartyCardProps) {
       <View style={{ flex: 1 }}>
         <Text style={s.name} numberOfLines={1}>{party.name}</Text>
         <Text style={s.meta}>
-          {party.phone ? party.phone + ' · ' : ''}{formatRelativeTime(party.lastTransactionAt)}
+          {party.phone ? party.phone + ' · ' : ''}{formatRelativeTime(party.lastTransactionAt, isEnglish)}
         </Text>
       </View>
       <View style={{ alignItems: 'flex-end' }}>
         <Text style={s.balance}>{formatAmount(party.currentBalance)}</Text>
-        <Text style={s.balanceLabel}>{isGet ? 'will get' : 'will give'}</Text>
+        <Text style={s.balanceLabel}>{isGet ? (isEnglish ? 'will get' : 'পাবেন') : (isEnglish ? 'will give' : 'দেবেন')}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -109,6 +110,7 @@ interface AddPartySheetProps {
 
 function AddPartySheet({ visible, role, onClose, onSuccess }: AddPartySheetProps) {
   const colors = useColors();
+  const { isEnglish, t } = useLanguage();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [openingBalance, setOpeningBalance] = useState('');
@@ -124,7 +126,7 @@ function AddPartySheet({ visible, role, onClose, onSuccess }: AddPartySheetProps
 
   async function handleSubmit() {
     if (!name.trim()) {
-      Alert.alert('Name required', 'Please enter a name.');
+      Alert.alert(isEnglish ? 'Name required' : 'নাম প্রয়োজন', isEnglish ? 'Please enter a name.' : 'একটি নাম লিখুন।');
       return;
     }
     try {
@@ -142,7 +144,7 @@ function AddPartySheet({ visible, role, onClose, onSuccess }: AddPartySheetProps
       onSuccess();
       onClose();
     } catch {
-      Alert.alert('Error', 'Could not add party. Please try again.');
+      Alert.alert('Error', isEnglish ? 'Could not add party. Please try again.' : 'পার্টি যোগ করা যায়নি। আবার চেষ্টা করুন।');
     }
   }
 
@@ -197,22 +199,26 @@ function AddPartySheet({ visible, role, onClose, onSuccess }: AddPartySheetProps
     cancelText: { color: colors.mutedForeground, fontSize: 15, fontFamily: 'Inter_500Medium' },
   });
 
+  const roleLabel = role === 'CUSTOMER' ? t('customer') : t('supplier');
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView style={s.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={s.sheet}>
           <View style={s.handle} />
-          <Text style={s.title}>Add {role === 'CUSTOMER' ? 'Customer' : 'Supplier'}</Text>
-          <Text style={s.label}>Name *</Text>
+          <Text style={s.title}>{isEnglish ? `Add ${roleLabel}` : `${roleLabel} যোগ করুন`}</Text>
+
+          <Text style={s.label}>{t('nameLabel')}</Text>
           <TextInput
             style={s.input}
             value={name}
             onChangeText={setName}
-            placeholder="Enter name"
+            placeholder={t('enterNamePlaceholder')}
             placeholderTextColor={colors.mutedForeground}
             autoFocus
           />
-          <Text style={s.label}>Phone (optional)</Text>
+
+          <Text style={s.label}>{t('phoneOptional')}</Text>
           <TextInput
             style={s.input}
             value={phone}
@@ -221,7 +227,8 @@ function AddPartySheet({ visible, role, onClose, onSuccess }: AddPartySheetProps
             placeholderTextColor={colors.mutedForeground}
             keyboardType="phone-pad"
           />
-          <Text style={s.label}>Opening balance (optional)</Text>
+
+          <Text style={s.label}>{t('openingBalanceOptional')}</Text>
           <TextInput
             style={s.input}
             value={openingBalance}
@@ -230,9 +237,10 @@ function AddPartySheet({ visible, role, onClose, onSuccess }: AddPartySheetProps
             placeholderTextColor={colors.mutedForeground}
             keyboardType="decimal-pad"
           />
+
           {openingBalance ? (
             <>
-              <Text style={s.label}>Balance type</Text>
+              <Text style={s.label}>{t('balanceTypeLabel')}</Text>
               <View style={s.row}>
                 <TouchableOpacity
                   style={[s.toggle, {
@@ -242,7 +250,7 @@ function AddPartySheet({ visible, role, onClose, onSuccess }: AddPartySheetProps
                   onPress={() => setBalanceType('YOU_WILL_GET')}
                 >
                   <Text style={[s.toggleText, { color: balanceType === 'YOU_WILL_GET' ? colors.willGet : colors.mutedForeground }]}>
-                    You Will Get
+                    {t('youWillGet')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -253,22 +261,23 @@ function AddPartySheet({ visible, role, onClose, onSuccess }: AddPartySheetProps
                   onPress={() => setBalanceType('YOU_WILL_GIVE')}
                 >
                   <Text style={[s.toggleText, { color: balanceType === 'YOU_WILL_GIVE' ? colors.willGive : colors.mutedForeground }]}>
-                    You Will Give
+                    {t('youWillGive')}
                   </Text>
                 </TouchableOpacity>
               </View>
             </>
           ) : null}
+
           <TouchableOpacity
             style={[s.btn, createParty.isPending && { opacity: 0.6 }]}
             onPress={handleSubmit}
             disabled={createParty.isPending}
             activeOpacity={0.8}
           >
-            <Text style={s.btnText}>{createParty.isPending ? 'Adding…' : 'Add'}</Text>
+            <Text style={s.btnText}>{createParty.isPending ? t('adding') : t('add')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.cancelBtn} onPress={onClose}>
-            <Text style={s.cancelText}>Cancel</Text>
+            <Text style={s.cancelText}>{t('cancel')}</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -281,6 +290,7 @@ export default function PartiesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const qc = useQueryClient();
+  const { isEnglish, t } = useLanguage();
   const [activeTab, setActiveTab] = useState<Tab>('CUSTOMER');
   const [search, setSearch] = useState('');
   const [showAddSheet, setShowAddSheet] = useState(false);
@@ -360,17 +370,30 @@ export default function PartiesScreen() {
     <PartyCard
       party={item}
       colors={colors}
+      isEnglish={isEnglish}
       onPress={() => router.push(`/party/${item.id}` as any)}
     />
-  ), [colors, router]);
+  ), [colors, router, isEnglish]);
 
   const keyExtractor = useCallback((item: Party) => item.id, []);
+
+  const isCustomer = activeTab === 'CUSTOMER';
+  const noResultsTitle = search
+    ? t('noResults')
+    : isCustomer
+      ? (isEnglish ? 'No customers yet' : 'এখনো কোনো গ্রাহক নেই')
+      : (isEnglish ? 'No suppliers yet' : 'এখনো কোনো সরবরাহকারী নেই');
+  const noResultsBody = search
+    ? t('tryDifferentSearch')
+    : isCustomer
+      ? (isEnglish ? 'Tap + to add your first customer' : '+ চাপুন প্রথম গ্রাহক যোগ করতে')
+      : (isEnglish ? 'Tap + to add your first supplier' : '+ চাপুন প্রথম সরবরাহকারী যোগ করতে');
 
   return (
     <View style={s.container}>
       <View style={s.header}>
         <View style={s.titleRow}>
-          <Text style={s.title}>Parties</Text>
+          <Text style={s.title}>{t('partiesTitle')}</Text>
           <TouchableOpacity
             style={s.addBtn}
             onPress={() => {
@@ -387,18 +410,12 @@ export default function PartiesScreen() {
           {(['CUSTOMER', 'SUPPLIER'] as Tab[]).map(tab => (
             <TouchableOpacity
               key={tab}
-              style={[
-                s.segment,
-                activeTab === tab && { backgroundColor: colors.card },
-              ]}
+              style={[s.segment, activeTab === tab && { backgroundColor: colors.card }]}
               onPress={() => { setActiveTab(tab); setSearch(''); }}
               activeOpacity={0.8}
             >
-              <Text style={[
-                s.segmentText,
-                { color: activeTab === tab ? colors.foreground : colors.mutedForeground },
-              ]}>
-                {tab === 'CUSTOMER' ? 'Customers' : 'Suppliers'}
+              <Text style={[s.segmentText, { color: activeTab === tab ? colors.foreground : colors.mutedForeground }]}>
+                {tab === 'CUSTOMER' ? t('customersTab') : t('suppliersTab')}
               </Text>
             </TouchableOpacity>
           ))}
@@ -411,7 +428,7 @@ export default function PartiesScreen() {
             style={s.searchInput}
             value={search}
             onChangeText={setSearch}
-            placeholder={`Search ${activeTab === 'CUSTOMER' ? 'customers' : 'suppliers'}…`}
+            placeholder={isCustomer ? t('searchCustomersPlaceholder') : t('searchSuppliersPlaceholder')}
             placeholderTextColor={colors.mutedForeground}
             clearButtonMode="while-editing"
           />
@@ -434,12 +451,8 @@ export default function PartiesScreen() {
             ) : (
               <>
                 <Feather name="users" size={40} color={colors.border} />
-                <Text style={s.emptyTitle}>
-                  {search ? 'No results' : `No ${activeTab === 'CUSTOMER' ? 'customers' : 'suppliers'} yet`}
-                </Text>
-                <Text style={s.emptyText}>
-                  {search ? 'Try a different search term' : `Tap + to add your first ${activeTab === 'CUSTOMER' ? 'customer' : 'supplier'}`}
-                </Text>
+                <Text style={s.emptyTitle}>{noResultsTitle}</Text>
+                <Text style={s.emptyText}>{noResultsBody}</Text>
               </>
             )}
           </View>

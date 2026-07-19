@@ -44,63 +44,33 @@ const API_BASE = process.env.EXPO_PUBLIC_DOMAIN
   ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
   : '';
 
-/**
- * Resolve a stored billImage value to a displayable URI for React Native's
- * Image component.
- * - base64 data URLs → returned as-is (renderable without auth)
- * - /objects/… paths → full URL to our storage API endpoint
- * - anything else   → null
- */
-function billImageSrc(
-  billImage: string | null | undefined,
-): string | null {
+function billImageSrc(billImage: string | null | undefined): string | null {
   if (!billImage) return null;
   if (billImage.startsWith('data:')) return billImage;
   if (billImage.startsWith('/objects/')) return `${API_BASE}/api/storage${billImage}`;
   return null;
 }
 
-/**
- * Upload a bill image to cloud storage using the two-step presigned URL flow.
- * Returns the objectPath (e.g. "/objects/uploads/uuid") or null on failure.
- */
 async function uploadBillImage(
   localUri: string,
   getToken: () => Promise<string | null>,
 ): Promise<string | null> {
   try {
-    // Fetch the local image as a Blob.
     const fetchRes = await fetch(localUri);
     const blob = await fetchRes.blob();
     const mimeType = blob.type || 'image/jpeg';
-
     const token = await getToken();
-    const authHeaders: Record<string, string> = token
-      ? { Authorization: `Bearer ${token}` }
-      : {};
-
-    // Step 1: request a presigned upload URL from the API.
+    const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
     const metaRes = await fetch(`${API_BASE}/api/storage/uploads/request-url`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify({ name: 'bill.jpg', size: blob.size, contentType: mimeType }),
     });
     if (!metaRes.ok) return null;
-
-    const { uploadURL, objectPath } = (await metaRes.json()) as {
-      uploadURL: string;
-      objectPath: string;
-    };
-
-    // Step 2: upload image bytes directly to GCS via the presigned URL.
-    const uploadRes = await fetch(uploadURL, {
-      method: 'PUT',
-      body: blob,
-      headers: { 'Content-Type': mimeType },
-    });
+    const { uploadURL, objectPath } = (await metaRes.json()) as { uploadURL: string; objectPath: string };
+    const uploadRes = await fetch(uploadURL, { method: 'PUT', body: blob, headers: { 'Content-Type': mimeType } });
     if (!uploadRes.ok) return null;
-
-    return objectPath; // e.g. "/objects/uploads/some-uuid"
+    return objectPath;
   } catch {
     return null;
   }
@@ -111,14 +81,16 @@ function formatAmount(n: number): string {
 }
 
 function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function formatTime(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  return new Date(dateStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
+
+// ---------------------------------------------------------------------------
+// TransactionSheet
+// ---------------------------------------------------------------------------
 
 interface TransactionSheetProps {
   visible: boolean;
@@ -131,6 +103,7 @@ interface TransactionSheetProps {
 
 function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyName, onClose, onSuccess }: TransactionSheetProps) {
   const colors = useColors();
+  const { isEnglish, t } = useLanguage();
   const qc = useQueryClient();
   const { getToken } = useAuth();
   const [type, setType] = useState<'YOU_GAVE' | 'YOU_GOT'>(initialType);
@@ -140,7 +113,6 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
   const uploadPromiseRef = useRef<Promise<string | null> | null>(null);
   const createEntry = useCreateLedgerEntry();
 
-  // Sync the preselected type every time the sheet opens
   useEffect(() => {
     if (visible) setType(initialType);
   }, [visible, initialType]);
@@ -155,21 +127,21 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
 
   async function pickImage() {
     Alert.alert(
-      'Attach Bill Photo',
-      'Choose a source',
+      t('attachBill'),
+      isEnglish ? 'Choose a source' : 'উৎস বেছে নিন',
       [
         {
-          text: 'Camera',
+          text: t('camera'),
           onPress: async () => {
             const perm = await ImagePicker.requestCameraPermissionsAsync();
             if (perm.status !== 'granted') {
-              Alert.alert('Permission required', 'Please allow camera access to take a photo.');
+              Alert.alert(
+                isEnglish ? 'Permission required' : 'অনুমতি প্রয়োজন',
+                isEnglish ? 'Please allow camera access to take a photo.' : 'ছবি তুলতে ক্যামেরার অনুমতি দিন।',
+              );
               return;
             }
-            const result = await ImagePicker.launchCameraAsync({
-              mediaTypes: ['images'],
-              quality: 0.6,
-            });
+            const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.6 });
             if (!result.canceled && result.assets[0]) {
               const uri = result.assets[0].uri;
               setBillImageUri(uri);
@@ -178,17 +150,17 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
           },
         },
         {
-          text: 'Photo Library',
+          text: t('photoLibrary'),
           onPress: async () => {
             const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (perm.status !== 'granted') {
-              Alert.alert('Permission required', 'Please allow access to your photo library.');
+              Alert.alert(
+                isEnglish ? 'Permission required' : 'অনুমতি প্রয়োজন',
+                isEnglish ? 'Please allow access to your photo library.' : 'ফটো লাইব্রেরির অনুমতি দিন।',
+              );
               return;
             }
-            const result = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ['images'],
-              quality: 0.6,
-            });
+            const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6 });
             if (!result.canceled && result.assets[0]) {
               const uri = result.assets[0].uri;
               setBillImageUri(uri);
@@ -196,7 +168,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
             }
           },
         },
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('cancel'), style: 'cancel' },
       ],
     );
   }
@@ -204,24 +176,19 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
   async function handleSubmit() {
     const parsed = parseFloat(amount);
     if (!amount || isNaN(parsed) || parsed <= 0) {
-      Alert.alert('Invalid amount', 'Please enter a valid amount greater than 0.');
+      Alert.alert(
+        isEnglish ? 'Invalid amount' : 'ভুল পরিমাণ',
+        isEnglish ? 'Please enter a valid amount greater than 0.' : 'শূন্যের বেশি একটি বৈধ পরিমাণ লিখুন।',
+      );
       return;
     }
     try {
-      // If an image was attached, wait for the background upload to finish
-      // before submitting — in most cases it's already done.
       const pendingUpload = uploadPromiseRef.current;
       uploadPromiseRef.current = null;
       const objectPath = pendingUpload ? await pendingUpload : null;
-
       await createEntry.mutateAsync({
         partyId,
-        data: {
-          type,
-          amount: parsed,
-          description: description.trim() || undefined,
-          billImage: objectPath ?? undefined,
-        },
+        data: { type, amount: parsed, description: description.trim() || undefined, billImage: objectPath ?? undefined },
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       qc.invalidateQueries({ queryKey: [`/api/parties/${partyId}/ledger-entries`] });
@@ -232,7 +199,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
       onSuccess();
       onClose();
     } catch {
-      Alert.alert('Error', 'Could not record transaction. Please try again.');
+      Alert.alert('Error', isEnglish ? 'Could not record transaction. Please try again.' : 'লেনদেন রেকর্ড করা যায়নি। আবার চেষ্টা করুন।');
     }
   }
 
@@ -248,24 +215,11 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
       paddingTop: 12,
       paddingBottom: Platform.OS === 'ios' ? 44 : 24,
     },
-    handle: {
-      width: 36,
-      height: 4,
-      backgroundColor: colors.border,
-      borderRadius: 2,
-      alignSelf: 'center',
-      marginBottom: 20,
-    },
+    handle: { width: 36, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
     title: { fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.foreground, marginBottom: 4 },
     subtitle: { fontSize: 13, color: colors.mutedForeground, fontFamily: 'Inter_400Regular', marginBottom: 20 },
     typeRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
-    typeBtn: {
-      flex: 1,
-      paddingVertical: 14,
-      borderRadius: colors.radius,
-      alignItems: 'center',
-      borderWidth: 2,
-    },
+    typeBtn: { flex: 1, paddingVertical: 14, borderRadius: colors.radius, alignItems: 'center', borderWidth: 2 },
     typeBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold' },
     amountWrapper: {
       backgroundColor: colors.card,
@@ -278,19 +232,8 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
       alignItems: 'center',
       marginBottom: 14,
     },
-    currency: {
-      fontSize: 22,
-      fontFamily: 'Inter_700Bold',
-      color: isGave ? colors.willGet : colors.willGive,
-      marginRight: 6,
-    },
-    amountInput: {
-      flex: 1,
-      fontSize: 28,
-      fontFamily: 'Inter_700Bold',
-      color: isGave ? colors.willGet : colors.willGive,
-      padding: 0,
-    },
+    currency: { fontSize: 22, fontFamily: 'Inter_700Bold', color: isGave ? colors.willGet : colors.willGive, marginRight: 6 },
+    amountInput: { flex: 1, fontSize: 28, fontFamily: 'Inter_700Bold', color: isGave ? colors.willGet : colors.willGive, padding: 0 },
     descInput: {
       backgroundColor: colors.card,
       borderRadius: colors.radius,
@@ -302,53 +245,13 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
       color: colors.foreground,
       marginBottom: 12,
     },
-    attachRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      marginBottom: 20,
-    },
-    attachBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      paddingVertical: 8,
-      paddingHorizontal: 14,
-      borderRadius: colors.radius,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-      borderStyle: 'dashed',
-    },
-    attachBtnText: {
-      fontSize: 13,
-      fontFamily: 'Inter_500Medium',
-      color: colors.mutedForeground,
-    },
-    thumbWrapper: {
-      position: 'relative',
-    },
-    thumb: {
-      width: 56,
-      height: 56,
-      borderRadius: 8,
-      backgroundColor: colors.card,
-    },
-    thumbRemove: {
-      position: 'absolute',
-      top: -6,
-      right: -6,
-      width: 18,
-      height: 18,
-      borderRadius: 9,
-      backgroundColor: colors.destructive,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    submitBtn: {
-      borderRadius: colors.radius,
-      padding: 16,
-      alignItems: 'center',
-    },
+    attachRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
+    attachBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 14, borderRadius: colors.radius, borderWidth: 1.5, borderColor: colors.border, borderStyle: 'dashed' },
+    attachBtnText: { fontSize: 13, fontFamily: 'Inter_500Medium', color: colors.mutedForeground },
+    thumbWrapper: { position: 'relative' },
+    thumb: { width: 56, height: 56, borderRadius: 8, backgroundColor: colors.card },
+    thumbRemove: { position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: 9, backgroundColor: colors.destructive, alignItems: 'center', justifyContent: 'center' },
+    submitBtn: { borderRadius: colors.radius, padding: 16, alignItems: 'center' },
     submitText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#fff' },
     cancelBtn: { padding: 12, alignItems: 'center', marginTop: 6 },
     cancelText: { color: colors.mutedForeground, fontSize: 15, fontFamily: 'Inter_500Medium' },
@@ -359,35 +262,29 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
       <KeyboardAvoidingView style={s.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={s.sheet}>
           <View style={s.handle} />
-          <Text style={s.title}>Record Transaction</Text>
+          <Text style={s.title}>{t('recordTransaction')}</Text>
           <Text style={s.subtitle}>{partyName}</Text>
 
           {/* Type toggle */}
           <View style={s.typeRow}>
             <TouchableOpacity
-              style={[s.typeBtn, {
-                backgroundColor: type === 'YOU_GAVE' ? colors.willGetBg : colors.card,
-                borderColor: type === 'YOU_GAVE' ? colors.willGet : colors.border,
-              }]}
+              style={[s.typeBtn, { backgroundColor: type === 'YOU_GAVE' ? colors.willGetBg : colors.card, borderColor: type === 'YOU_GAVE' ? colors.willGet : colors.border }]}
               onPress={() => setType('YOU_GAVE')}
               activeOpacity={0.8}
             >
               <Feather name="arrow-up-right" size={18} color={type === 'YOU_GAVE' ? colors.willGet : colors.mutedForeground} />
               <Text style={[s.typeBtnText, { color: type === 'YOU_GAVE' ? colors.willGet : colors.mutedForeground, marginTop: 4 }]}>
-                You Gave
+                {t('youGave')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[s.typeBtn, {
-                backgroundColor: type === 'YOU_GOT' ? colors.willGiveBg : colors.card,
-                borderColor: type === 'YOU_GOT' ? colors.willGive : colors.border,
-              }]}
+              style={[s.typeBtn, { backgroundColor: type === 'YOU_GOT' ? colors.willGiveBg : colors.card, borderColor: type === 'YOU_GOT' ? colors.willGive : colors.border }]}
               onPress={() => setType('YOU_GOT')}
               activeOpacity={0.8}
             >
               <Feather name="arrow-down-left" size={18} color={type === 'YOU_GOT' ? colors.willGive : colors.mutedForeground} />
               <Text style={[s.typeBtnText, { color: type === 'YOU_GOT' ? colors.willGive : colors.mutedForeground, marginTop: 4 }]}>
-                You Got
+                {t('youReceived')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -411,7 +308,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
             style={s.descInput}
             value={description}
             onChangeText={setDescription}
-            placeholder="Note (optional)"
+            placeholder={t('placeholderDetails')}
             placeholderTextColor={colors.mutedForeground}
             returnKeyType="done"
           />
@@ -433,26 +330,23 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
             <TouchableOpacity style={s.attachBtn} onPress={pickImage} activeOpacity={0.7}>
               <Feather name="camera" size={16} color={colors.mutedForeground} />
               <Text style={s.attachBtnText}>
-                {billImageUri ? 'Change photo' : 'Attach bill photo'}
+                {billImageUri ? t('changePhoto') : t('attachBillPhoto')}
               </Text>
             </TouchableOpacity>
           </View>
 
           <TouchableOpacity
-            style={[s.submitBtn, {
-              backgroundColor: isGave ? colors.willGet : colors.willGive,
-              opacity: createEntry.isPending ? 0.6 : 1,
-            }]}
+            style={[s.submitBtn, { backgroundColor: isGave ? colors.willGet : colors.willGive, opacity: createEntry.isPending ? 0.6 : 1 }]}
             onPress={handleSubmit}
             disabled={createEntry.isPending}
             activeOpacity={0.85}
           >
             <Text style={s.submitText}>
-              {createEntry.isPending ? 'Saving…' : isGave ? 'Record You Gave' : 'Record You Got'}
+              {createEntry.isPending ? t('saving') : isGave ? t('recordYouGave') : t('recordYouGot')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.cancelBtn} onPress={() => { reset(); onClose(); }}>
-            <Text style={s.cancelText}>Cancel</Text>
+            <Text style={s.cancelText}>{t('cancel')}</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -474,12 +368,12 @@ interface ReminderSheetProps {
 
 function ReminderSheet({ visible, partyId, partyName, partyPhone, onClose }: ReminderSheetProps) {
   const colors = useColors();
+  const { isEnglish, t } = useLanguage();
   const sendReminder = useSendPaymentReminder();
   const [message, setMessage] = useState('');
   const [fetching, setFetching] = useState(false);
   const [sending, setSending] = useState(false);
 
-  // Fetch the pre-filled message whenever the sheet opens
   useEffect(() => {
     if (!visible) return;
     setMessage('');
@@ -496,12 +390,10 @@ function ReminderSheet({ visible, partyId, partyName, partyPhone, onClose }: Rem
     setSending(true);
     try {
       if (partyPhone) {
-        // Open native SMS app pre-filled with the message
         const encoded = encodeURIComponent(message.trim());
-        const smsUrl =
-          Platform.OS === 'ios'
-            ? `sms:${partyPhone}&body=${encoded}`
-            : `sms:${partyPhone}?body=${encoded}`;
+        const smsUrl = Platform.OS === 'ios'
+          ? `sms:${partyPhone}&body=${encoded}`
+          : `sms:${partyPhone}?body=${encoded}`;
         const supported = await Linking.canOpenURL(smsUrl);
         if (supported) {
           await Linking.openURL(smsUrl);
@@ -509,16 +401,13 @@ function ReminderSheet({ visible, partyId, partyName, partyPhone, onClose }: Rem
           return;
         }
       }
-      // Fallback: show the message in an alert so the owner can copy it
       Alert.alert(
-        'Reminder message',
+        isEnglish ? 'Reminder message' : 'রিমাইন্ডার বার্তা',
         message.trim(),
-        [
-          { text: 'Close', style: 'cancel', onPress: onClose },
-        ],
+        [{ text: isEnglish ? 'Close' : 'বন্ধ করুন', style: 'cancel', onPress: onClose }],
       );
     } catch {
-      Alert.alert('Error', 'Could not open SMS. Please try again.');
+      Alert.alert('Error', isEnglish ? 'Could not open SMS. Please try again.' : 'SMS খোলা যায়নি। আবার চেষ্টা করুন।');
     } finally {
       setSending(false);
     }
@@ -534,14 +423,7 @@ function ReminderSheet({ visible, partyId, partyName, partyPhone, onClose }: Rem
       paddingTop: 12,
       paddingBottom: Platform.OS === 'ios' ? 44 : 24,
     },
-    handle: {
-      width: 36,
-      height: 4,
-      backgroundColor: colors.border,
-      borderRadius: 2,
-      alignSelf: 'center',
-      marginBottom: 20,
-    },
+    handle: { width: 36, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
     title: { fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.foreground, marginBottom: 4 },
     subtitle: { fontSize: 13, color: colors.mutedForeground, fontFamily: 'Inter_400Regular', marginBottom: 20 },
     messageBox: {
@@ -557,15 +439,7 @@ function ReminderSheet({ visible, partyId, partyName, partyPhone, onClose }: Rem
       textAlignVertical: 'top',
       marginBottom: 20,
     },
-    sendBtn: {
-      borderRadius: colors.radius,
-      padding: 16,
-      alignItems: 'center',
-      backgroundColor: colors.primary,
-      flexDirection: 'row',
-      justifyContent: 'center',
-      gap: 8,
-    },
+    sendBtn: { borderRadius: colors.radius, padding: 16, alignItems: 'center', backgroundColor: colors.primary, flexDirection: 'row', justifyContent: 'center', gap: 8 },
     sendBtnText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#fff' },
     cancelBtn: { padding: 12, alignItems: 'center', marginTop: 6 },
     cancelText: { color: colors.mutedForeground, fontSize: 15, fontFamily: 'Inter_500Medium' },
@@ -576,7 +450,7 @@ function ReminderSheet({ visible, partyId, partyName, partyPhone, onClose }: Rem
       <KeyboardAvoidingView style={s.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={s.sheet}>
           <View style={s.handle} />
-          <Text style={s.title}>Send Reminder</Text>
+          <Text style={s.title}>{t('sendReminderBtn')}</Text>
           <Text style={s.subtitle}>{partyName}</Text>
 
           {fetching ? (
@@ -589,7 +463,7 @@ function ReminderSheet({ visible, partyId, partyName, partyPhone, onClose }: Rem
               value={message}
               onChangeText={setMessage}
               multiline
-              placeholder="Reminder message…"
+              placeholder={t('reminderMsgPlaceholder')}
               placeholderTextColor={colors.mutedForeground}
             />
           )}
@@ -601,11 +475,11 @@ function ReminderSheet({ visible, partyId, partyName, partyPhone, onClose }: Rem
             activeOpacity={0.85}
           >
             <Feather name="send" size={16} color="#fff" />
-            <Text style={s.sendBtnText}>{sending ? 'Opening…' : 'Send'}</Text>
+            <Text style={s.sendBtnText}>{sending ? t('sendingOpen') : t('send')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={s.cancelBtn} onPress={onClose}>
-            <Text style={s.cancelText}>Cancel</Text>
+            <Text style={s.cancelText}>{t('cancel')}</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -613,20 +487,22 @@ function ReminderSheet({ visible, partyId, partyName, partyPhone, onClose }: Rem
   );
 }
 
+// ---------------------------------------------------------------------------
+// LedgerRow
+// ---------------------------------------------------------------------------
+
 interface LedgerRowProps {
   entry: LedgerEntry;
   colors: ReturnType<typeof useColors>;
+  isEnglish: boolean;
   onPress?: () => void;
 }
 
-function LedgerRow({ entry, colors, onPress }: LedgerRowProps) {
+function LedgerRow({ entry, colors, isEnglish, onPress }: LedgerRowProps) {
   const { getToken } = useAuth();
   const isGave = entry.type === 'YOU_GAVE';
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
-  // Resolve the bill image URI. For object paths (/objects/…) we need
-  // auth headers, so we use the Image source.headers prop. For base64
-  // data URLs no headers are needed.
   const rawSrc = billImageSrc(entry.billImage);
   const [authToken, setAuthToken] = useState<string | null>(null);
 
@@ -637,41 +513,25 @@ function LedgerRow({ entry, colors, onPress }: LedgerRowProps) {
   }, [rawSrc, entry.billImage, getToken]);
 
   const imageSource = rawSrc
-    ? {
-        uri: rawSrc,
-        ...(authToken ? { headers: { Authorization: `Bearer ${authToken}` } } : {}),
-      }
+    ? { uri: rawSrc, ...(authToken ? { headers: { Authorization: `Bearer ${authToken}` } } : {}) }
     : null;
 
   const s = StyleSheet.create({
-    row: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      paddingVertical: 14,
-      paddingHorizontal: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    dot: {
-      width: 10,
-      height: 10,
-      borderRadius: 5,
-      marginTop: 5,
-      marginRight: 12,
-      backgroundColor: isGave ? colors.willGet : colors.willGive,
-    },
+    row: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
+    dot: { width: 10, height: 10, borderRadius: 5, marginTop: 5, marginRight: 12, backgroundColor: isGave ? colors.willGet : colors.willGive },
     desc: { fontSize: 14, fontFamily: 'Inter_500Medium', color: colors.foreground, flex: 1 },
     meta: { fontSize: 12, color: colors.mutedForeground, fontFamily: 'Inter_400Regular', marginTop: 2 },
     type: { fontSize: 11, fontFamily: 'Inter_600SemiBold', marginTop: 3 },
     amount: { fontSize: 16, fontFamily: 'Inter_700Bold', textAlign: 'right' },
-    billThumb: {
-      width: 44,
-      height: 44,
-      borderRadius: 6,
-      marginTop: 6,
-      backgroundColor: colors.card,
-    },
+    billThumb: { width: 44, height: 44, borderRadius: 6, marginTop: 6, backgroundColor: colors.card },
   });
+
+  const descFallback = isGave
+    ? (isEnglish ? 'You gave' : 'আপনি দিয়েছেন')
+    : (isEnglish ? 'You got' : 'আপনি পেয়েছেন');
+  const typeLabel = isGave
+    ? (isEnglish ? '▲ YOU GAVE' : '▲ আপনি দিয়েছেন')
+    : (isEnglish ? '▼ YOU GOT' : '▼ আপনি পেয়েছেন');
 
   return (
     <>
@@ -679,11 +539,11 @@ function LedgerRow({ entry, colors, onPress }: LedgerRowProps) {
         <View style={s.dot} />
         <View style={{ flex: 1 }}>
           <Text style={s.desc} numberOfLines={2}>
-            {entry.description || (isGave ? 'You gave' : 'You got')}
+            {entry.description || descFallback}
           </Text>
           <Text style={s.meta}>{formatDate(entry.createdAt)} · {formatTime(entry.createdAt)}</Text>
           <Text style={[s.type, { color: isGave ? colors.willGet : colors.willGive }]}>
-            {isGave ? '▲ YOU GAVE' : '▼ YOU GOT'}
+            {typeLabel}
           </Text>
           {imageSource ? (
             <TouchableOpacity onPress={() => setLightboxOpen(true)} activeOpacity={0.85}>
@@ -696,26 +556,16 @@ function LedgerRow({ entry, colors, onPress }: LedgerRowProps) {
         </Text>
       </TouchableOpacity>
 
-      {/* Full-screen bill image lightbox */}
       {imageSource ? (
-        <Modal
-          visible={lightboxOpen}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setLightboxOpen(false)}
-        >
+        <Modal visible={lightboxOpen} transparent animationType="fade" onRequestClose={() => setLightboxOpen(false)}>
           <TouchableOpacity
             style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center' }}
             activeOpacity={1}
             onPress={() => setLightboxOpen(false)}
           >
-            <Image
-              source={imageSource}
-              style={{ width: '92%', height: '70%' }}
-              resizeMode="contain"
-            />
+            <Image source={imageSource} style={{ width: '92%', height: '70%' }} resizeMode="contain" />
             <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 16 }}>
-              Tap to close
+              {isEnglish ? 'Tap to close' : 'বন্ধ করতে চাপুন'}
             </Text>
           </TouchableOpacity>
         </Modal>
@@ -725,7 +575,7 @@ function LedgerRow({ entry, colors, onPress }: LedgerRowProps) {
 }
 
 // ---------------------------------------------------------------------------
-// EntryDetailSheet — full-screen modal matching বিস্তারিত প্রবেশিকা design
+// EntryDetailSheet
 // ---------------------------------------------------------------------------
 
 interface EntryDetailSheetProps {
@@ -746,9 +596,8 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
   const [entry, setEntry] = useState(initialEntry);
   const [isEditing, setIsEditing] = useState(false);
   const [editAmount, setEditAmount] = useState(String(initialEntry.amount));
-  const [editDesc, setEditDesc]   = useState(initialEntry.description || '');
+  const [editDesc, setEditDesc] = useState(initialEntry.description || '');
 
-  // Re-sync when the parent re-opens with a different entry
   useEffect(() => {
     if (visible) {
       setEntry(initialEntry);
@@ -761,19 +610,18 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
   const patchEntry  = usePatchLedgerEntry();
   const deleteEntry = useDeleteLedgerEntry();
 
-  const isGave    = entry.type === 'YOU_GAVE';
-  const amtColor  = isGave ? colors.willGet : colors.willGive;
-  const initials  = party.name.slice(0, 2).toUpperCase();
-  const isBalGet  = party.balanceType === 'YOU_WILL_GET';
-  const balColor  = isBalGet ? colors.willGet : colors.willGive;
-  const balSign   = isBalGet ? '+' : '-';
-
+  const isGave   = entry.type === 'YOU_GAVE';
+  const amtColor = isGave ? colors.willGet : colors.willGive;
+  const initials = party.name.slice(0, 2).toUpperCase();
+  const isBalGet = party.balanceType === 'YOU_WILL_GET';
+  const balColor = isBalGet ? colors.willGet : colors.willGive;
+  const balSign  = isBalGet ? '+' : '-';
   const dateLabel = `${formatDate(entry.createdAt)} • ${formatTime(entry.createdAt)}`;
 
   async function handleSave() {
     const parsed = parseFloat(editAmount);
     if (!editAmount || isNaN(parsed) || parsed <= 0) {
-      Alert.alert('Invalid amount', 'Please enter a valid amount > 0.');
+      Alert.alert(isEnglish ? 'Invalid amount' : 'ভুল পরিমাণ', isEnglish ? 'Please enter a valid amount > 0.' : 'শূন্যের বেশি একটি বৈধ পরিমাণ লিখুন।');
       return;
     }
     try {
@@ -792,7 +640,7 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
       setIsEditing(false);
       onUpdated(updated);
     } catch {
-      Alert.alert('Error', 'Could not update entry. Please try again.');
+      Alert.alert('Error', isEnglish ? 'Could not update entry. Please try again.' : 'এন্ট্রি আপডেট করা যায়নি।');
     }
   }
 
@@ -815,7 +663,7 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               onDeleted();
             } catch {
-              Alert.alert('Error', 'Could not delete entry. Please try again.');
+              Alert.alert('Error', isEnglish ? 'Could not delete entry. Please try again.' : 'এন্ট্রি মুছে ফেলা যায়নি।');
             }
           },
         },
@@ -828,49 +676,17 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
     const balStr   = `${balSign}(৳ ${party.currentBalance.toFixed(0)})`;
     const youLabel = isEnglish ? 'You' : 'আপনি';
     const balLabel = isEnglish ? 'Balance' : 'ব্যালেন্স';
-    const msg =
-      `${youLabel} ${dirLabel}: ৳ ${entry.amount}\n${balLabel}: ${balStr}\nhttps://banglakhata.com/p/${entry.partyId}`;
-    try {
-      await Share.share({ message: msg });
-    } catch { /* ignore */ }
+    const msg = `${youLabel} ${dirLabel}: ৳ ${entry.amount}\n${balLabel}: ${balStr}\nhttps://banglakhata.com/p/${entry.partyId}`;
+    try { await Share.share({ message: msg }); } catch { /* ignore */ }
   }
 
   const s = StyleSheet.create({
     overlay:   { flex: 1, backgroundColor: '#F4F6F9' },
-    header: {
-      paddingTop: Platform.OS === 'web' ? 16 : insets.top + 8,
-      paddingBottom: 16,
-      paddingHorizontal: 20,
-      backgroundColor: '#004B93',
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 20,
-    },
+    header: { paddingTop: Platform.OS === 'web' ? 16 : insets.top + 8, paddingBottom: 16, paddingHorizontal: 20, backgroundColor: '#004B93', flexDirection: 'row', alignItems: 'center', gap: 20 },
     headerTitle: { flex: 1, fontSize: 18, fontFamily: 'Inter_700Bold', color: '#fff' },
     body:      { flex: 1 },
-    card: {
-      backgroundColor: '#fff',
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: '#E2E8F0',
-      marginHorizontal: 16,
-      marginTop: 16,
-      overflow: 'hidden',
-      shadowColor: '#000',
-      shadowOpacity: 0.06,
-      shadowOffset: { width: 0, height: 2 },
-      shadowRadius: 6,
-      elevation: 3,
-      padding: 0,
-    },
-    initials: {
-      width: 46,
-      height: 46,
-      borderRadius: 23,
-      backgroundColor: '#3B82F6',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
+    card: { backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0', marginHorizontal: 16, marginTop: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.06, shadowOffset: { width: 0, height: 2 }, shadowRadius: 6, elevation: 3, padding: 0 },
+    initials: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#3B82F6', alignItems: 'center', justifyContent: 'center' },
     initialsText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 16 },
     partyName:  { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: '#1E293B' },
     dateText:   { fontSize: 12, color: '#64748B', fontFamily: 'Inter_400Regular', marginTop: 2 },
@@ -878,122 +694,29 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
     dirLabel:   { fontSize: 12, color: '#64748B', fontFamily: 'Inter_400Regular', textAlign: 'right', marginTop: 2 },
     balLabel:   { fontSize: 14, color: '#475569', fontFamily: 'Inter_500Medium' },
     balValue:   { fontSize: 16, fontFamily: 'Inter_700Bold' },
-    editBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
-      paddingTop: 12,
-      borderTopWidth: 1,
-      borderTopColor: '#F1F5F9',
-    },
+    editBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
     editBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#004B93' },
-    infoCard: {
-      backgroundColor: '#fff',
-      borderRadius: 8,
-      marginHorizontal: 16,
-      marginTop: 12,
-      padding: 16,
-      borderWidth: 1,
-      borderColor: '#E2E8F0',
-    },
+    infoCard: { backgroundColor: '#fff', borderRadius: 8, marginHorizontal: 16, marginTop: 12, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' },
     smsHeading: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#B91C1C', marginBottom: 8 },
     smsBody:    { fontSize: 13, color: '#475569', fontFamily: 'Inter_400Regular', lineHeight: 20 },
     smsLink:    { color: '#004B93', fontFamily: 'Inter_500Medium' },
     backupText: { fontSize: 13, color: '#64748B', fontFamily: 'Inter_400Regular' },
-    secBadge:   {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
-      marginTop: 20,
-      marginBottom: 8,
-    },
+    secBadge:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 20, marginBottom: 8 },
     secText: { fontSize: 14, color: '#16A34A', fontFamily: 'Inter_600SemiBold' },
-    bottomBar: {
-      flexDirection: 'row',
-      gap: 12,
-      paddingHorizontal: 16,
-      paddingTop: 12,
-      paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 16,
-      backgroundColor: '#fff',
-      borderTopWidth: 1,
-      borderTopColor: '#E2E8F0',
-    },
-    deleteBtn: {
-      flex: 1,
-      paddingVertical: 14,
-      borderRadius: 6,
-      borderWidth: 1,
-      borderColor: '#DC2626',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexDirection: 'row',
-      gap: 6,
-    },
+    bottomBar: { flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingTop: 12, paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 16, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#E2E8F0' },
+    deleteBtn: { flex: 1, paddingVertical: 14, borderRadius: 6, borderWidth: 1, borderColor: '#DC2626', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 },
     deleteBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#DC2626' },
-    shareBtn: {
-      flex: 1,
-      paddingVertical: 14,
-      borderRadius: 6,
-      backgroundColor: '#004B93',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexDirection: 'row',
-      gap: 6,
-    },
+    shareBtn: { flex: 1, paddingVertical: 14, borderRadius: 6, backgroundColor: '#004B93', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 },
     shareBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#fff' },
-    // Edit overlay
-    editOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 20,
-    },
-    editCard: {
-      backgroundColor: '#fff',
-      borderRadius: 16,
-      padding: 24,
-      width: '100%',
-      maxWidth: 400,
-    },
+    editOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 20 },
+    editCard: { backgroundColor: '#fff', borderRadius: 16, padding: 24, width: '100%', maxWidth: 400 },
     editTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#1E293B', marginBottom: 20 },
-    editTypeRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-    editTypeBtn: {
-      flex: 1,
-      paddingVertical: 12,
-      borderRadius: 8,
-      alignItems: 'center',
-      borderWidth: 2,
-    },
-    editTypeBtnText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
     editLabel: { fontSize: 12, color: '#64748B', fontFamily: 'Inter_500Medium', marginBottom: 6 },
-    editInput: {
-      borderWidth: 1.5,
-      borderColor: '#CBD5E1',
-      borderRadius: 8,
-      padding: 12,
-      fontSize: 15,
-      fontFamily: 'Inter_400Regular',
-      color: '#1E293B',
-      marginBottom: 16,
-    },
+    editInput: { borderWidth: 1.5, borderColor: '#CBD5E1', borderRadius: 8, padding: 12, fontSize: 15, fontFamily: 'Inter_400Regular', color: '#1E293B', marginBottom: 16 },
     editActions: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end', marginTop: 4 },
-    cancelBtn: {
-      paddingVertical: 10,
-      paddingHorizontal: 18,
-      borderRadius: 6,
-      borderWidth: 1,
-      borderColor: '#CBD5E1',
-    },
+    cancelBtn: { paddingVertical: 10, paddingHorizontal: 18, borderRadius: 6, borderWidth: 1, borderColor: '#CBD5E1' },
     cancelBtnText: { fontSize: 14, fontFamily: 'Inter_500Medium', color: '#64748B' },
-    saveBtn: {
-      paddingVertical: 10,
-      paddingHorizontal: 20,
-      borderRadius: 4,
-      backgroundColor: '#004B93',
-    },
+    saveBtn: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 4, backgroundColor: '#004B93' },
     saveBtnText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
   });
 
@@ -1005,7 +728,6 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={s.overlay}>
-        {/* 1. Header */}
         <View style={s.header}>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Feather name="arrow-left" size={22} color="#fff" />
@@ -1014,14 +736,11 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
         </View>
 
         <ScrollView style={s.body} contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
-          {/* 2. Transaction summary card */}
+          {/* Transaction summary card */}
           <View style={s.card}>
-            {/* Row 1: Party + amount */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 }}>
-                <View style={s.initials}>
-                  <Text style={s.initialsText}>{initials}</Text>
-                </View>
+                <View style={s.initials}><Text style={s.initialsText}>{initials}</Text></View>
                 <View style={{ flex: 1 }}>
                   <Text style={s.partyName} numberOfLines={1}>{party.name}</Text>
                   <Text style={s.dateText}>{dateLabel}</Text>
@@ -1033,22 +752,18 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
               </View>
             </View>
 
-            {/* Row 2: Balance */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', backgroundColor: '#fff' }}>
               <Text style={s.balLabel}>{t('currentBalance')}</Text>
-              <Text style={[s.balValue, { color: balColor }]}>
-                ৳ {Math.abs(party.currentBalance)}
-              </Text>
+              <Text style={[s.balValue, { color: balColor }]}>৳ {Math.abs(party.currentBalance)}</Text>
             </View>
 
-            {/* Row 3: Edit button */}
             <TouchableOpacity style={s.editBtn} onPress={() => setIsEditing(true)} activeOpacity={0.7}>
               <Text style={{ fontSize: 15 }}>🖊️</Text>
               <Text style={s.editBtnText}>{t('editEntry')}</Text>
             </TouchableOpacity>
           </View>
 
-          {/* 3a. SMS card */}
+          {/* SMS card */}
           <View style={s.infoCard}>
             <Text style={s.smsHeading}>{t('smsNotSent')}</Text>
             <Text style={s.smsBody}>
@@ -1061,25 +776,20 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
             </Text>
           </View>
 
-          {/* 3b. Backup card */}
+          {/* Backup card */}
           <View style={s.infoCard}>
             <Text style={s.backupText}>{t('entryBackedUp')}</Text>
           </View>
 
-          {/* 3c. Security badge */}
+          {/* Security badge */}
           <View style={s.secBadge}>
             <Text style={s.secText}>{t('secureLabel')}</Text>
           </View>
         </ScrollView>
 
-        {/* 4. Bottom action bar */}
+        {/* Bottom action bar */}
         <View style={s.bottomBar}>
-          <TouchableOpacity
-            style={s.deleteBtn}
-            onPress={handleDelete}
-            disabled={deleteEntry.isPending}
-            activeOpacity={0.8}
-          >
+          <TouchableOpacity style={s.deleteBtn} onPress={handleDelete} disabled={deleteEntry.isPending} activeOpacity={0.8}>
             <Text style={{ fontSize: 16 }}>🗑️</Text>
             <Text style={s.deleteBtnText}>{t('deleteEntryBtn')}</Text>
           </TouchableOpacity>
@@ -1090,13 +800,12 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
         </View>
       </View>
 
-      {/* Edit overlay — separate Modal so it appears above the detail sheet */}
+      {/* Edit overlay */}
       <Modal visible={isEditing} transparent animationType="fade" onRequestClose={() => setIsEditing(false)}>
         <KeyboardAvoidingView style={s.editOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={s.editCard}>
             <Text style={s.editTitle}>{t('reentry')}</Text>
 
-            {/* Amount */}
             <Text style={s.editLabel}>{t('amountLabel')}</Text>
             <TextInput
               style={s.editInput}
@@ -1108,7 +817,6 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
               autoFocus
             />
 
-            {/* Description */}
             <Text style={s.editLabel}>{t('descLabel')}</Text>
             <TextInput
               style={s.editInput}
@@ -1119,7 +827,6 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
               returnKeyType="done"
             />
 
-            {/* Actions */}
             <View style={s.editActions}>
               <TouchableOpacity style={s.cancelBtn} onPress={() => setIsEditing(false)}>
                 <Text style={s.cancelBtnText}>{t('cancel')}</Text>
@@ -1139,11 +846,16 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
   );
 }
 
+// ---------------------------------------------------------------------------
+// PartyDetailScreen
+// ---------------------------------------------------------------------------
+
 export default function PartyDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { isEnglish, t } = useLanguage();
   const [showSheet, setShowSheet] = useState(false);
   const [pendingType, setPendingType] = useState<'YOU_GAVE' | 'YOU_GOT'>('YOU_GAVE');
   const [showReminderSheet, setShowReminderSheet] = useState(false);
@@ -1163,73 +875,22 @@ export default function PartyDetailScreen() {
 
   const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
-    header: {
-      paddingTop: Platform.OS === 'web' ? 67 : insets.top + 8,
-      paddingHorizontal: 16,
-      paddingBottom: 16,
-      backgroundColor: colors.primary,
-    },
-    backBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 12,
-    },
+    header: { paddingTop: Platform.OS === 'web' ? 67 : insets.top + 8, paddingHorizontal: 16, paddingBottom: 16, backgroundColor: colors.primary },
+    backBtn: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
     backText: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontFamily: 'Inter_500Medium', marginLeft: 4 },
-    partyInitials: {
-      width: 52,
-      height: 52,
-      borderRadius: 26,
-      backgroundColor: 'rgba(255,255,255,0.15)',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 10,
-    },
+    partyInitials: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
     partyInitialsText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 20 },
     partyName: { fontSize: 22, fontFamily: 'Inter_700Bold', color: '#fff' },
     partyPhone: { fontSize: 13, color: 'rgba(255,255,255,0.65)', fontFamily: 'Inter_400Regular', marginTop: 2 },
-    balanceCard: {
-      backgroundColor: colors.card,
-      marginHorizontal: 16,
-      marginTop: -1,
-      borderRadius: colors.radius,
-      padding: 20,
-      flexDirection: 'row',
-      alignItems: 'center',
-      shadowColor: '#000',
-      shadowOpacity: 0.06,
-      shadowOffset: { width: 0, height: 2 },
-      shadowRadius: 8,
-      elevation: 3,
-    },
+    balanceCard: { backgroundColor: colors.card, marginHorizontal: 16, marginTop: -1, borderRadius: colors.radius, padding: 20, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.06, shadowOffset: { width: 0, height: 2 }, shadowRadius: 8, elevation: 3 },
     balanceLeft: { flex: 1 },
     balanceLabel: { fontSize: 12, color: colors.mutedForeground, fontFamily: 'Inter_500Medium', marginBottom: 4 },
     balanceAmount: { fontSize: 32, fontFamily: 'Inter_700Bold' },
     balanceType: { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginTop: 4 },
-    actionRow: {
-      flexDirection: 'row',
-      gap: 12,
-      paddingHorizontal: 16,
-      marginTop: 14,
-      marginBottom: 8,
-    },
-    actionBtn: {
-      flex: 1,
-      paddingVertical: 14,
-      borderRadius: colors.radius,
-      alignItems: 'center',
-      flexDirection: 'row',
-      justifyContent: 'center',
-      gap: 6,
-    },
+    actionRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 16, marginTop: 14, marginBottom: 8 },
+    actionBtn: { flex: 1, paddingVertical: 14, borderRadius: colors.radius, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 },
     actionBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold' },
-    entriesHeader: {
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-      marginTop: 8,
-      backgroundColor: colors.background,
-    },
+    entriesHeader: { paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.border, marginTop: 8, backgroundColor: colors.background },
     entriesTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: colors.mutedForeground },
     emptyContainer: { alignItems: 'center', paddingVertical: 40 },
     emptyText: { color: colors.mutedForeground, fontFamily: 'Inter_400Regular', fontSize: 14, marginTop: 10 },
@@ -1249,16 +910,17 @@ export default function PartyDetailScreen() {
       <View style={[s.container, { alignItems: 'center', justifyContent: 'center', padding: 32 }]}>
         <Feather name="alert-circle" size={40} color={colors.destructive} />
         <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 16, marginTop: 12 }}>
-          Party not found
+          {t('partyNotFound')}
         </Text>
         <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 16 }}>
-          <Text style={{ color: colors.primary, fontFamily: 'Inter_500Medium' }}>Go back</Text>
+          <Text style={{ color: colors.primary, fontFamily: 'Inter_500Medium' }}>{t('goBack')}</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   const initials = party.name.slice(0, 2).toUpperCase();
+  const roleLabel = party.role === 'CUSTOMER' ? t('customer') : t('supplier');
 
   return (
     <View style={s.container}>
@@ -1266,16 +928,14 @@ export default function PartyDetailScreen() {
       <View style={s.header}>
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
           <Feather name="chevron-left" size={18} color="rgba(255,255,255,0.8)" />
-          <Text style={s.backText}>Back</Text>
+          <Text style={s.backText}>{t('back')}</Text>
         </TouchableOpacity>
         <View style={s.partyInitials}>
           <Text style={s.partyInitialsText}>{initials}</Text>
         </View>
         <Text style={s.partyName}>{party.name}</Text>
         {party.phone ? <Text style={s.partyPhone}>{party.phone}</Text> : null}
-        <Text style={[s.partyPhone, { marginTop: 4 }]}>
-          {party.role === 'CUSTOMER' ? 'Customer' : 'Supplier'}
-        </Text>
+        <Text style={[s.partyPhone, { marginTop: 4 }]}>{roleLabel}</Text>
       </View>
 
       <ScrollView
@@ -1285,17 +945,17 @@ export default function PartyDetailScreen() {
         {/* Balance card */}
         <View style={s.balanceCard}>
           <View style={s.balanceLeft}>
-            <Text style={s.balanceLabel}>CURRENT BALANCE</Text>
+            <Text style={s.balanceLabel}>{t('currentBalanceLabel')}</Text>
             <Text style={[s.balanceAmount, { color: isGet ? colors.willGet : colors.willGive }]}>
               {formatAmount(party.currentBalance)}
             </Text>
             <Text style={[s.balanceType, { color: isGet ? colors.willGet : colors.willGive }]}>
-              {isGet ? '↑ You Will Get' : '↓ You Will Give'}
+              {isGet ? t('youWillGetArrow') : t('youWillGiveArrow')}
             </Text>
           </View>
           {party.dueDate && (
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>Due date</Text>
+              <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>{t('dueDate')}</Text>
               <Text style={{ fontSize: 14, color: colors.foreground, fontFamily: 'Inter_600SemiBold', marginTop: 2 }}>
                 {party.dueDate}
               </Text>
@@ -1307,58 +967,40 @@ export default function PartyDetailScreen() {
         <View style={s.actionRow}>
           <TouchableOpacity
             style={[s.actionBtn, { backgroundColor: colors.willGetBg }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              setPendingType('YOU_GAVE');
-              setShowSheet(true);
-            }}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setPendingType('YOU_GAVE'); setShowSheet(true); }}
             activeOpacity={0.8}
           >
             <Feather name="arrow-up-right" size={18} color={colors.willGet} />
-            <Text style={[s.actionBtnText, { color: colors.willGet }]}>You Gave</Text>
+            <Text style={[s.actionBtnText, { color: colors.willGet }]}>{t('youGave')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[s.actionBtn, { backgroundColor: colors.willGiveBg }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              setPendingType('YOU_GOT');
-              setShowSheet(true);
-            }}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setPendingType('YOU_GOT'); setShowSheet(true); }}
             activeOpacity={0.8}
           >
             <Feather name="arrow-down-left" size={18} color={colors.willGive} />
-            <Text style={[s.actionBtnText, { color: colors.willGive }]}>You Got</Text>
+            <Text style={[s.actionBtnText, { color: colors.willGive }]}>{t('youReceived')}</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Send Reminder button */}
+        {/* Send Reminder */}
         <View style={{ paddingHorizontal: 16, marginBottom: 4 }}>
           <TouchableOpacity
-            style={[
-              s.actionBtn,
-              {
-                backgroundColor: colors.card,
-                borderWidth: 1.5,
-                borderColor: colors.border,
-              },
-            ]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setShowReminderSheet(true);
-            }}
+            style={[s.actionBtn, { backgroundColor: colors.card, borderWidth: 1.5, borderColor: colors.border }]}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowReminderSheet(true); }}
             activeOpacity={0.8}
           >
             <Feather name="bell" size={16} color={colors.mutedForeground} />
             <Text style={[s.actionBtnText, { color: colors.mutedForeground, fontSize: 14 }]}>
-              Send Reminder
+              {t('sendReminderBtn')}
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Ledger entries */}
+        {/* Transaction history header */}
         <View style={s.entriesHeader}>
           <Text style={s.entriesTitle}>
-            TRANSACTION HISTORY ({entries.length})
+            {t('transactionHistory')} ({entries.length})
           </Text>
         </View>
 
@@ -1369,7 +1011,7 @@ export default function PartyDetailScreen() {
         ) : entries.length === 0 ? (
           <View style={s.emptyContainer}>
             <Feather name="file-text" size={36} color={colors.border} />
-            <Text style={s.emptyText}>No transactions yet</Text>
+            <Text style={s.emptyText}>{t('noTransactionsYet')}</Text>
           </View>
         ) : (
           entries.map(entry => (
@@ -1377,6 +1019,7 @@ export default function PartyDetailScreen() {
               key={entry.id}
               entry={entry}
               colors={colors}
+              isEnglish={isEnglish}
               onPress={() => setSelectedEntry(entry)}
             />
           ))
@@ -1391,10 +1034,7 @@ export default function PartyDetailScreen() {
         partyId={id!}
         partyName={party.name}
         onClose={() => setShowSheet(false)}
-        onSuccess={() => {
-          refetchParty();
-          refetchEntries();
-        }}
+        onSuccess={() => { refetchParty(); refetchEntries(); }}
       />
 
       <ReminderSheet
@@ -1411,16 +1051,8 @@ export default function PartyDetailScreen() {
           party={party}
           visible={!!selectedEntry}
           onClose={() => setSelectedEntry(null)}
-          onDeleted={() => {
-            setSelectedEntry(null);
-            refetchParty();
-            refetchEntries();
-          }}
-          onUpdated={(updated) => {
-            setSelectedEntry(updated);
-            refetchParty();
-            refetchEntries();
-          }}
+          onDeleted={() => { setSelectedEntry(null); refetchParty(); refetchEntries(); }}
+          onUpdated={(updated) => { setSelectedEntry(updated); refetchParty(); refetchEntries(); }}
         />
       )}
     </View>
