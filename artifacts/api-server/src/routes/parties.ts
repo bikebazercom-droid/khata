@@ -505,7 +505,7 @@ router.post(
       maximumFractionDigits: 2,
     }).format(amount);
 
-    const senderName = settings.storeName || "আমার ব্যবসা";
+    const senderName = settings.storeName || "আমার খাতা";
     const message = `বকেয়া তাগাদা: ${senderName}-এর পক্ষ থেকে ${party.name}-কে ৳${formattedAmount} টাকা বকেয়া পরিশোধের জন্য অনুরোধ করা হচ্ছে।`;
 
     res.json(

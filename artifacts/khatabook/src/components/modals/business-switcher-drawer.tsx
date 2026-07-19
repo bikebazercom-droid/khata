@@ -87,7 +87,7 @@ export function BusinessSwitcherDrawer() {
       const created: BusinessInfo = await res.json();
       setNewName('');
       setIsAddingNew(false);
-      setBusinesses((prev) => [...prev, created]);
+      setBusinesses([...businesses, created]);
       await handleSwitch(created.id);
     } catch (err) {
       console.error('Failed to create business:', err);

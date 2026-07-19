@@ -9,7 +9,7 @@ export const businessSettingsTable = pgTable("business_settings", {
   businessId: uuid("business_id")
     .references(() => businessesTable.id)
     .unique(),
-  storeName: text("store_name").notNull().default("আমার ব্যবসা"),
+  storeName: text("store_name").notNull().default("আমার খাতা"),
   language: text("language").notNull().default("English"),
   onlineCollectionBalance: numeric("online_collection_balance", {
     precision: 12,

@@ -28,7 +28,7 @@ export async function ensureDefaultBusiness(): Promise<void> {
   try {
     await db
       .insert(businessesTable)
-      .values({ id: SEED_BUSINESS_ID, name: "My Business" })
+      .values({ id: SEED_BUSINESS_ID, name: "আমার খাতা" })
       .onConflictDoNothing();
 
     await db
