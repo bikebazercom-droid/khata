@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -15,15 +15,7 @@ import {
   type DashboardSummary,
 } from '@workspace/api-client-react';
 import { TransactionEntryScreen } from '@/components/modals/transaction-entry-screen';
-import {
-  ChevronLeft,
-  Trash2,
-  Cloud,
-  CheckCircle2,
-  Receipt,
-  ImageIcon,
-  Pencil,
-} from 'lucide-react';
+import { ChevronLeft, Trash2, Cloud } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -37,10 +29,10 @@ import {
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
 import { billImageSrc } from '@/lib/billImageStorage';
-import { toWhatsAppNumber } from '@/lib/ledger-report';
 import { BillImageLightbox } from '@/components/modals/bill-image-lightbox';
 import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic';
 import { toast } from 'sonner';
+import html2canvas from 'html2canvas';
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -67,70 +59,78 @@ export function TransactionDetailPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
+  // Ref for the shareable receipt card
+  const receiptCardRef = useRef<HTMLDivElement>(null);
+
   const entry = entries.find((e) => e.id === entryId);
   const storeName = settings?.storeName || 'Banglakhata';
   const isGave = entry?.type === 'YOU_GAVE';
   const imageSrc = billImageSrc(entry?.billImage ?? null);
-  const partyInitials = (party?.name ?? '??').slice(0, 2).toUpperCase();
 
   const txDateKey = entry ? entryDateKey(entry) : '';
-  const transactionDate = txDateKey ? format(new Date(`${txDateKey}T00:00:00`), 'd MMM yyyy') : '';
+  const transactionDate = txDateKey ? format(new Date(`${txDateKey}T00:00:00`), 'd MMM yy') : '';
   const transactionTime = entry ? format(new Date(entry.createdAt as string), 'hh:mm a') : '';
 
-  function buildReceiptText(): string {
-    if (!party || !entry) return '';
-    const actionLabel = isGave ? 'দিয়েছেন' : 'পেয়েছেন';
-    const balanceLabel = party.balanceType === 'YOU_WILL_GET' ? 'পাবেন' : 'দেবেন';
-    const lines = [
-      '━━━━━━━━━━━━━━━━━━',
-      `${storeName} — লেনদেন স্লিপ`,
-      '━━━━━━━━━━━━━━━━━━',
-      `গ্রাহক: ${party.name}`,
-      `তারিখ: ${transactionDate} ${transactionTime}`,
-      `লেনদেন: আপনি ${actionLabel} ${formatCurrency(entry.amount)}`,
-      entry.description ? `নোট: ${entry.description}` : null,
-      `বর্তমান ব্যালেন্স: ${formatCurrency(party.currentBalance)} (আপনি ${balanceLabel})`,
-      '━━━━━━━━━━━━━━━━━━',
-      'Banglakhata দ্বারা তৈরি',
-    ];
-    return lines.filter(Boolean).join('\n');
-  }
+  const balanceColor = party?.balanceType === 'YOU_WILL_GET' ? '#047857' : '#DC2626';
+  const amountColor = isGave ? '#DC2626' : '#047857';
+  const amountLabel = isGave ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন';
+  const smsText = `${amountLabel}: ৳ ${entry ? formatCurrency(entry.amount) : ''}\nব্যালেন্স: ৳ ${party ? formatCurrency(party.currentBalance) : ''}`;
 
-  /**
-   * Optimistic delete — 0ms navigation, background network request.
-   *
-   * Pattern:
-   *   1. Snapshot all affected caches for rollback.
-   *   2. Apply the expected post-delete state to the caches synchronously
-   *      (removes the entry, reverses its balance delta).
-   *   3. Close the dialog and navigate back to the party ledger instantly.
-   *   4. Fire the DELETE request silently in the background.
-   *   5. On success: background invalidation reconciles with server truth.
-   *   6. On failure: restore the snapshots and show a non-blocking toast.
-   */
+  // ── Share: capture receipt card as JPG, open native share sheet ────────
+  const handleJpgShare = async () => {
+    if (!receiptCardRef.current || !entry || !party) return;
+    try {
+      const canvas = await html2canvas(receiptCardRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 3,
+        useCORS: true,
+        logging: false,
+      });
+      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
+      const filename = `Receipt_${entry.id}.jpg`;
+
+      const byteStr = atob(jpgDataUrl.split(',')[1]);
+      const ab = new ArrayBuffer(byteStr.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteStr.length; i++) ia[i] = byteStr.charCodeAt(i);
+      const blob = new Blob([ab], { type: 'image/jpeg' });
+      const file = new File([blob], filename, { type: 'image/jpeg', lastModified: Date.now() });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: 'লেনদেন রসিদ', text: 'Banglakhata থেকে পাঠানো রসিদ ছবি।' });
+          return;
+        } catch (err: unknown) {
+          if (err instanceof Error && err.name === 'AbortError') return;
+        }
+      }
+      // Fallback: download
+      const a = document.createElement('a');
+      a.href = jpgDataUrl; a.download = filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    } catch (err) {
+      console.error('Image rendering failed:', err);
+    }
+  };
+
+  // ── Optimistic delete ──────────────────────────────────────────────────
   function handleDelete() {
     if (!partyId || !entryId || !party || !entry) return;
 
     const entriesKey = getListLedgerEntriesQueryKey(partyId);
-    const partyKey = getGetPartyQueryKey(partyId);
+    const partyKey   = getGetPartyQueryKey(partyId);
     const partiesKey = getListPartiesQueryKey();
     const summaryKey = getGetDashboardSummaryQueryKey();
 
-    // ── 1. Snapshot ───────────────────────────────────────────────────────
     const previousEntries = queryClient.getQueryData<LedgerEntry[]>(entriesKey);
-    const previousParty = queryClient.getQueryData<Party>(partyKey);
+    const previousParty   = queryClient.getQueryData<Party>(partyKey);
     const previousParties = queryClient.getQueryData<Party[]>(partiesKey);
     const previousSummary = queryClient.getQueryData<DashboardSummary>(summaryKey);
 
-    // ── 2. Optimistic cache updates ───────────────────────────────────────
-    // Remove this entry from the list.
     queryClient.setQueryData<LedgerEntry[]>(entriesKey, (old) =>
       (old ?? []).filter((e) => e.id !== entryId),
     );
 
-    // Reverse the entry's balance delta on the party.
-    // YOU_GAVE originally applied +amount; reversal applies -amount.
-    // YOU_GOT  originally applied -amount; reversal applies +amount.
     const reverseDelta = entry.type === 'YOU_GAVE' ? -entry.amount : entry.amount;
     const updatedParty = applyBalanceDelta(party, reverseDelta);
 
@@ -145,11 +145,9 @@ export function TransactionDetailPage() {
       );
     }
 
-    // ── 3. Close dialog + instant navigation ─────────────────────────────
     setShowDeleteConfirm(false);
     navigate(`/party/${partyId}`, { replace: true });
 
-    // ── 4. Background DELETE request ─────────────────────────────────────
     void (async () => {
       try {
         const res = await fetch(`${BASE}/api/parties/${partyId}/entries/${entryId}`, {
@@ -157,17 +155,12 @@ export function TransactionDetailPage() {
           credentials: 'include',
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-        // ── 5. Background reconciliation ──────────────────────────────────
-        // Replace the optimistic state with the server's authoritative truth.
         queryClient.invalidateQueries({ queryKey: entriesKey });
         queryClient.invalidateQueries({ queryKey: partyKey });
         queryClient.invalidateQueries({ queryKey: partiesKey });
         queryClient.invalidateQueries({ queryKey: summaryKey });
       } catch (err) {
         console.error('Delete entry failed, rolling back:', err);
-
-        // ── 6. Rollback on failure ────────────────────────────────────────
         queryClient.setQueryData(entriesKey, previousEntries);
         queryClient.setQueryData(partyKey, previousParty);
         queryClient.setQueryData(partiesKey, previousParties);
@@ -177,24 +170,24 @@ export function TransactionDetailPage() {
     })();
   }
 
-  // Loading skeleton
+  // ── Loading skeleton ───────────────────────────────────────────────────
   if (partyLoading || entriesLoading) {
     return (
-      <div className="flex flex-col h-[100dvh] bg-[#f8fafc]">
-        <div className="h-14 bg-white border-b border-slate-200 animate-pulse" />
+      <div className="flex flex-col h-[100dvh] bg-[#F3F4F6]">
+        <div className="h-14 bg-[#0052B4] animate-pulse" />
         <div className="flex-1 p-4 space-y-3">
-          <div className="h-44 bg-white rounded-2xl animate-pulse" />
-          <div className="h-8 bg-white rounded-full animate-pulse w-36" />
-          <div className="h-36 bg-white rounded-2xl animate-pulse" />
+          <div className="h-44 bg-white rounded-lg animate-pulse" />
+          <div className="h-16 bg-white rounded-lg animate-pulse" />
+          <div className="h-12 bg-white rounded-lg animate-pulse" />
         </div>
       </div>
     );
   }
 
-  // Not found
+  // ── Not found ──────────────────────────────────────────────────────────
   if (!entry || !party) {
     return (
-      <div className="flex flex-col h-[100dvh] bg-[#f8fafc] items-center justify-center gap-4 px-6">
+      <div className="flex flex-col h-[100dvh] bg-[#F3F4F6] items-center justify-center gap-4 px-6">
         <p className="text-slate-500 font-semibold text-center">এন্ট্রিটি পাওয়া যায়নি</p>
         <Button variant="outline" onClick={() => navigate(partyId ? `/party/${partyId}` : '/')}>
           ফিরে যান
@@ -204,257 +197,216 @@ export function TransactionDetailPage() {
   }
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-[#f8fafc] overflow-hidden">
-      {/* ── Header ──────────────────────────────────────────── */}
-      <header className="flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-200 shrink-0">
+    <div className="flex flex-col h-[100dvh] bg-[#F3F4F6] overflow-hidden" style={{ fontFamily: 'sans-serif' }}>
+
+      {/* ── 1. Dark blue header ──────────────────────────────────── */}
+      <header
+        className="shrink-0 flex items-center gap-4 px-4 py-3"
+        style={{ backgroundColor: '#0052B4' }}
+      >
         <button
           type="button"
           onClick={() => navigate(`/party/${partyId}`)}
-          className="p-1 -ml-1 rounded-lg hover:bg-slate-100 transition-colors"
           aria-label="ফিরে যান"
+          className="p-1 -ml-1 rounded-lg active:bg-white/20 transition-colors"
         >
-          <ChevronLeft className="w-5 h-5 text-slate-600" />
+          <ChevronLeft className="w-5 h-5 text-white" />
         </button>
-        <h1 className="text-[15px] font-bold text-slate-800 tracking-tight flex-1">
+        <h1 className="text-[17px] font-bold text-white tracking-tight flex-1">
           বিস্তারিত প্রবেশিকা
         </h1>
       </header>
 
-      {/* ── Scrollable body ─────────────────────────────────── */}
+      {/* ── Scrollable body ─────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-4 py-4 pb-28 space-y-3">
 
-        {/* Main transaction card */}
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          {/* Coloured banner */}
-          <div className={cn('px-5 py-4', isGave ? 'bg-red-50' : 'bg-emerald-50')}>
-            <div className="flex items-center gap-4">
-              <div className={cn(
-                'w-12 h-12 rounded-full flex items-center justify-center font-extrabold text-[17px] shrink-0',
-                isGave ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700',
-              )}>
-                {partyInitials}
+        {/* ── 2. White receipt card (captured for share) ─────────── */}
+        <div
+          ref={receiptCardRef}
+          className="bg-white rounded-lg overflow-hidden"
+          style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.10)' }}
+        >
+          {/* Top row: avatar + phone/date | amount + label */}
+          <div className="flex justify-between items-start px-5 pt-5 pb-4">
+            <div className="flex items-center gap-3">
+              <div
+                className="flex items-center justify-center shrink-0 text-white font-bold text-xl"
+                style={{ backgroundColor: '#0A4384', width: 44, height: 44, borderRadius: '50%' }}
+              >
+                +
               </div>
-              <div className="min-w-0">
-                <p className="font-extrabold text-slate-800 text-base leading-tight truncate">
-                  {party.name}
+              <div>
+                <p className="text-[17px] font-bold text-[#1F2937] leading-tight">
+                  {party.phone || party.name}
                 </p>
-                <p className="text-[12px] text-slate-500 font-medium mt-0.5">
+                <p className="text-[13px] mt-0.5" style={{ color: '#6B7280' }}>
                   {transactionDate} • {transactionTime}
                 </p>
               </div>
             </div>
+            <div className="text-right">
+              <p className="text-[22px] font-bold" style={{ color: amountColor }}>
+                ৳ {formatCurrency(entry.amount)}
+              </p>
+              <p className="text-[13px] mt-1" style={{ color: '#4B5563' }}>
+                {amountLabel}
+              </p>
+            </div>
           </div>
 
-          {/* Amounts row */}
-          <div className="px-5 py-4 grid grid-cols-2 gap-4 border-t border-slate-100">
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                {isGave ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন'}
-              </p>
-              <p className={cn('text-2xl font-extrabold', isGave ? 'text-red-600' : 'text-emerald-600')}>
-                {formatCurrency(entry.amount)}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                বর্তমান ব্যালেন্স
-              </p>
-              <p className={cn(
-                'text-2xl font-extrabold',
-                party.balanceType === 'YOU_WILL_GET' ? 'text-emerald-600' : 'text-red-600',
-              )}>
-                {formatCurrency(party.currentBalance)}
-              </p>
-              <p className={cn(
-                'text-[11px] font-semibold mt-0.5',
-                party.balanceType === 'YOU_WILL_GET' ? 'text-emerald-500' : 'text-red-500',
-              )}>
-                {party.balanceType === 'YOU_WILL_GET' ? 'আপনি পাবেন' : 'আপনি দেবেন'}
-              </p>
-            </div>
+          {/* Divider */}
+          <hr style={{ border: 'none', borderTop: '1px solid #E5E7EB', margin: '0 20px' }} />
+
+          {/* Balance row */}
+          <div className="flex justify-between items-center px-5 py-4">
+            <p className="text-[15px] font-medium" style={{ color: '#374151' }}>
+              বর্তমান ব্যালেন্স
+            </p>
+            <p className="text-[18px] font-bold" style={{ color: balanceColor }}>
+              ৳ {formatCurrency(party.currentBalance)}
+            </p>
+          </div>
+
+          {/* Note (if any) */}
+          {entry.description && (
+            <>
+              <hr style={{ border: 'none', borderTop: '1px solid #F3F4F6', margin: '0 20px' }} />
+              <div className="px-5 py-3">
+                <p className="text-[11px] font-bold uppercase tracking-widest mb-1" style={{ color: '#9CA3AF' }}>নোট</p>
+                <p className="text-[13px]" style={{ color: '#6B7280' }}>{entry.description}</p>
+              </div>
+            </>
+          )}
+
+          {/* Edit button — excluded from capture */}
+          <div
+            data-html2canvas-ignore="true"
+            onClick={() => setIsEditOpen(true)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && setIsEditOpen(true)}
+            className="flex items-center justify-center gap-2 px-5 py-3 cursor-pointer active:bg-slate-50 transition-colors"
+            style={{ borderTop: '1px solid #F3F4F6', color: '#2563EB', fontSize: 15, fontWeight: 700 }}
+          >
+            🖊️ এন্ট্রি এডিট করুন
           </div>
         </div>
 
-        {/* Status pills */}
-        {(entry.billReference || entry.billImage) && (
-          <div className="flex items-center gap-2 flex-wrap">
-            {entry.billReference && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200 uppercase tracking-wider">
-                বিল: {entry.billReference}
-              </span>
-            )}
-            {entry.billImage && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <Cloud className="w-3 h-3" />
-                ক্লাউডে সংরক্ষিত
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Description */}
-        {entry.description && (
-          <div className="bg-white rounded-2xl shadow-sm px-5 py-4">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">নোট</p>
-            <p className="text-[14px] text-slate-700 font-medium leading-relaxed">{entry.description}</p>
-          </div>
-        )}
-
-        {/* Bill image */}
+        {/* Bill image (outside receipt card, not captured) */}
         {imageSrc && (
-          <div className="bg-white rounded-2xl shadow-sm px-5 py-4">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">
+          <div
+            className="bg-white rounded-lg overflow-hidden"
+            style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}
+          >
+            <p
+              className="px-4 pt-3 pb-1 text-[11px] font-bold uppercase tracking-widest"
+              style={{ color: '#9CA3AF' }}
+            >
               সংযুক্ত বিলের ছবি
             </p>
             <button
               type="button"
               onClick={() => setLightboxImage(imageSrc)}
-              className="block w-full active:scale-[0.98] transition-transform"
+              className="block w-full px-4 pb-3 active:scale-[0.98] transition-transform"
             >
               <img
                 src={imageSrc}
                 alt="সংযুক্ত বিল"
-                className="w-full max-h-64 object-contain rounded-xl border border-slate-200 bg-slate-50"
+                className="w-full max-h-56 object-contain rounded-lg border border-slate-100 bg-slate-50"
               />
-              <p className="text-[11px] text-slate-400 font-medium mt-2 text-center">
+              <p className="text-[11px] text-slate-400 font-medium mt-1.5 text-center">
                 ছবি বড় করতে ট্যাপ করুন
               </p>
             </button>
           </div>
         )}
 
-        {/* Digital receipt preview card */}
-        <div className="rounded-2xl overflow-hidden shadow-sm border border-slate-100">
-          {/* Header */}
-          <div className="bg-[#1B3A6B] px-5 py-4 flex flex-col items-center gap-1">
-            <img
-              src={`${BASE}/logo-icon.svg`}
-              alt="Banglakhata"
-              className="w-10 h-10 mb-1"
-            />
-            <p className="text-white font-extrabold text-[13px] tracking-tight">Banglakhata</p>
-          </div>
+        {/* ── 3. Info block 1: SMS status ─────────────────────────── */}
+        <div
+          className="bg-white rounded-lg px-4 py-4"
+          style={{ border: '1px solid #E5E7EB' }}
+        >
+          <p className="font-bold flex items-center gap-1.5 text-[14px]" style={{ color: '#DC2626' }}>
+            📢 SMS পাঠানো হয়নি
+          </p>
+          <p className="text-[14px] mt-2.5" style={{ color: '#4B5563' }}>
+            {amountLabel}: ৳ {formatCurrency(entry.amount)}
+          </p>
+          <p className="text-[14px] mt-1" style={{ color: '#4B5563' }}>
+            ব্যালেন্স: ৳ {formatCurrency(party.currentBalance)}
+          </p>
+          <p
+            className="text-[13px] mt-1.5 break-all"
+            style={{ color: '#9CA3AF' }}
+          >
+            {typeof window !== 'undefined' ? window.location.origin : ''}{BASE}/party/{partyId}
+          </p>
+        </div>
 
-          {/* Store name strip */}
-          <div className="bg-[#243E72] px-5 py-2 text-center">
-            <p className="text-white/88 text-[11px] font-semibold truncate">{storeName}</p>
-          </div>
+        {/* ── Info block 2: backup status ─────────────────────────── */}
+        <div
+          className="bg-white rounded-lg px-4 py-3.5 flex items-center gap-2 text-[14px]"
+          style={{ border: '1px solid #E5E7EB', color: '#4B5563' }}
+        >
+          <Cloud className="w-4 h-4 shrink-0" style={{ color: '#60A5FA' }} />
+          ☁️ এন্ট্রি ব্যাক আপ করা হয়েছে
+        </div>
 
-          {/* Amount banner */}
-          <div className={cn('px-5 py-4 text-center', isGave ? 'bg-red-50' : 'bg-emerald-50')}>
-            <p className={cn('text-[11px] font-semibold mb-0.5', isGave ? 'text-red-400' : 'text-emerald-400')}>
-              {isGave ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন'}
-            </p>
-            <p className={cn('text-3xl font-extrabold', isGave ? 'text-red-600' : 'text-emerald-600')}>
-              {formatCurrency(entry.amount)}
-            </p>
-          </div>
-
-          {/* Detail rows */}
-          <div className="bg-slate-50 px-5 py-4 space-y-3 border-t border-slate-100">
-            <div>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">গ্রাহক</p>
-              <p className="text-[14px] font-bold text-slate-800">{party.name}</p>
-            </div>
-            <div>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">তারিখ ও সময়</p>
-              <p className="text-[13px] font-semibold text-slate-600">{transactionDate} • {transactionTime}</p>
-            </div>
-            {entry.description && (
-              <div>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">নোট</p>
-                <p className="text-[13px] text-slate-600">{entry.description}</p>
-              </div>
-            )}
-
-            {/* Balance row */}
-            <div className="pt-2 border-t border-slate-200 grid grid-cols-2 gap-2">
-              <div>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">এই লেনদেন</p>
-                <p className={cn('text-[15px] font-extrabold', isGave ? 'text-red-600' : 'text-emerald-600')}>
-                  {formatCurrency(entry.amount)}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">বর্তমান ব্যালেন্স</p>
-                <p className={cn('text-[15px] font-extrabold',
-                  party.balanceType === 'YOU_WILL_GET' ? 'text-emerald-600' : 'text-red-600',
-                )}>
-                  {formatCurrency(party.currentBalance)}
-                </p>
-                <p className={cn('text-[10px] font-semibold',
-                  party.balanceType === 'YOU_WILL_GET' ? 'text-emerald-500' : 'text-red-500',
-                )}>
-                  {party.balanceType === 'YOU_WILL_GET' ? 'আপনি পাবেন' : 'আপনি দেবেন'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Footer safety badge */}
-          <div className="bg-[#0f1d35] px-5 py-3 flex items-center gap-2">
-            <div className="w-5 h-5 rounded-full bg-[#F5A623] shrink-0 flex items-center justify-center">
-              <CheckCircle2 className="w-3 h-3 text-[#0f1d35]" />
-            </div>
-            <p className="text-white/85 text-[11px] font-semibold">
-              ১০০% নিরাপদ ও সুরক্ষিত Banglakhata
-            </p>
-          </div>
-
+        {/* ── Trust badge ──────────────────────────────────────────── */}
+        <div className="flex items-center justify-center gap-1.5 py-2" style={{ color: '#10B981', fontWeight: 600, fontSize: 14 }}>
+          🛡️ 100% নিরাপদ ও সুরক্ষিত
         </div>
       </div>
 
-      {/* ── Fixed footer ─────────────────────────────────────── */}
-      <div className="fixed bottom-0 inset-x-0 flex flex-col gap-2 px-4 pt-3 pb-4 bg-white border-t border-slate-200 z-20">
-        {/* Edit — primary action, full width */}
-        <Button
-          className="w-full bg-[#1B3A6B] hover:bg-[#243E72] font-bold"
-          onClick={() => setIsEditOpen(true)}
-        >
-          <Pencil className="w-4 h-4 mr-2" />
-          এন্ট্রি এডিট করুন
-        </Button>
-        <Button
-          variant="outline"
-          className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 hover:text-red-700 font-bold"
+      {/* ── 4. Fixed footer: Delete (left) + Share (right) ──────── */}
+      <div
+        className="fixed bottom-0 inset-x-0 flex gap-3 px-4 py-3 z-20"
+        style={{ backgroundColor: '#ffffff', borderTop: '1px solid #E5E7EB', boxSizing: 'border-box' }}
+      >
+        <button
+          type="button"
           onClick={() => setShowDeleteConfirm(true)}
+          className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded font-bold text-[15px] active:scale-[0.97] transition-transform"
+          style={{ backgroundColor: '#ffffff', color: '#DC2626', border: '1px solid #DC2626' }}
         >
-          <Trash2 className="w-4 h-4 mr-2" />
-          মুছে ফেলুন
-        </Button>
+          🗑️ মুছে ফেলুন
+        </button>
+        <button
+          type="button"
+          onClick={handleJpgShare}
+          className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded font-bold text-[15px] text-white active:scale-[0.97] transition-transform"
+          style={{ backgroundColor: '#0A4384', border: 'none' }}
+        >
+          📢 শেয়ার করুন
+        </button>
       </div>
 
-      {/* Delete confirmation */}
+      {/* ── Delete confirmation ──────────────────────────────────── */}
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent className="max-w-sm rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>লেনদেন মুছে ফেলুন?</AlertDialogTitle>
             <AlertDialogDescription className="text-slate-600">
-              এই লেনদেন মুছে গেলে <span className="font-semibold text-slate-800">{party.name}</span>-এর
+              এই লেনদেন মুছে গেলে{' '}
+              <span className="font-semibold text-slate-800">{party.name}</span>-এর
               ব্যালেন্স আপডেট হয়ে যাবে। এটি পূর্বাবস্থায় ফেরানো যাবে না।
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="font-bold">বাতিল</AlertDialogCancel>
-            <Button
-              variant="destructive"
-              className="font-bold"
-              onClick={handleDelete}
-            >
+            <Button variant="destructive" className="font-bold" onClick={handleDelete}>
               মুছে ফেলুন
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Lightbox */}
+      {/* ── Lightbox ─────────────────────────────────────────────── */}
       {lightboxImage && (
         <BillImageLightbox src={lightboxImage} onClose={() => setLightboxImage(null)} />
       )}
 
-      {/* Edit overlay — mounts as a full-screen layer on top of the detail page.
-          Passing initialEntry activates edit mode: pre-populates the form and
-          routes the save button to PATCH instead of POST. */}
+      {/* ── Edit overlay ─────────────────────────────────────────── */}
       {isEditOpen && entry && (
         <TransactionEntryScreen
           partyId={partyId}

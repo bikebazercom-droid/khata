@@ -1,0 +1,135 @@
+Hey Agent, look closely at photo_2026-07-19_12-12-40.jpg. The user wants the Transaction Details Screen (বিস্তারিত প্রবেশিকা)—which opens when clicking a specific entry amount inside the customer profile ledger—to match this screenshot exactly in both style and functionality.
+
+KEY LAYOUT & FEATURE REQUIREMENTS:
+1. HEADER: Dark blue app bar with a back arrow and title "বিস্তারিত প্রবেশিকা".
+2. TOP RECEIPT CARD (White Box): 
+   - Top row: A circular '+' icon (blue background), Customer Phone Number and Entry Date/Time on the left. Transaction Amount (e.g., ৳ 5,000) and text "আপনি পেয়েছেন" or "আপনি দিয়েছেন" on the right.
+   - Divider line.
+   - Middle row: "বর্তমান ব্যালেন্স" on the left, and the dynamic Balance Amount on the right.
+   - Bottom click element: A button styled with a pencil icon saying "🖊️ এন্ট্রি এডিট করুন" which opens the edit entry sheet.
+3. INFOBAR CONTAINER (Light Gray/White blocks):
+   - First block: "📢 SMS পাঠানো হয়নি", text snippet showing "আপনি দিয়েছেন/পেয়েছেন: ৳...", and the online ledger link.
+   - Second block: "☁️ এন্ট্রি ব্যাক আপ করা হয়েছে".
+   - Badging: "🛡️ 100% নিরাপদ ও সুরক্ষিত" green trust badge.
+4. FOOTER FIXED BOTTOM STICKY BAR:
+   - Left side: "🗑️ মুছে ফেলুন" button (White background, red text, red border).
+   - Right side: "📢 শেয়ার করুন" button (Dark blue full background, white text).
+5. SHARING PIPELINE: Clicking the footer "শেয়ার করুন" button must capture ONLY the upper white receipt card, convert it silently to a high-quality JPG, and immediately open the smartphone's NATIVE SHARE SHEET (WhatsApp, Imo, etc.).
+
+Please replace or update the entire Transaction Detail Component immediately with this exact operational layout:
+
+```javascript
+import React, { useRef } from 'react';
+import html2canvas from 'html2canvas';
+
+export const TransactionDetailsScreen = ({ entry, customer, onBack, onEdit, onDelete }) => {
+  const receiptCardRef = useRef(null);
+
+  // DIRECT JPG EXTRACTION AND NATIVE SHARE SHEET ACTION
+  const handleJpgShare = async () => {
+    if (!receiptCardRef.current) return;
+    try {
+      const canvas = await html2canvas(receiptCardRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 3,
+        useCORS: true
+      });
+      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
+      const byteString = atob(jpgDataUrl.split(',')[1]);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      const imageBlob = new Blob([ab], { type: 'image/jpeg' });
+      const sharedFile = new File([imageBlob], `Receipt_${entry?.id || 'entry'}.jpg`, { type: 'image/jpeg' });
+
+      if (navigator.canShare && navigator.canShare({ files: [sharedFile] })) {
+        await navigator.share({
+          files: [sharedFile],
+          title: 'লেনদেন রসিদ',
+          text: 'Banglakhata থেকে পাঠানো রসিদ ছবি।'
+        });
+      } else {
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.href = jpgDataUrl;
+        downloadAnchor.download = `Receipt_${entry?.id || 'entry'}.jpg`;
+        downloadAnchor.click();
+      }
+    } catch (err) {
+      console.error('Image rendering failed:', err);
+    }
+  };
+
+  return (
+    <div style={{ backgroundColor: '#F3F4F6', minHeight: '100vh', paddingBottom: '80px', fontFamily: 'sans-serif' }}>
+      {/* 1. Header Bar */}
+      <div style={{ backgroundColor: '#0052B4', color: '#ffffff', padding: '16px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+        <span onClick={onBack} style={{ cursor: 'pointer', fontSize: '20px', fontWeight: 'bold' }}>←</span>
+        <span style={{ fontSize: '18px', fontWeight: 'bold' }}>বিস্তারিত প্রবেশিকা</span>
+      </div>
+
+      <div style={{ padding: '16px' }}>
+        {/* 2. Top Printable/Shareable Receipt Card */}
+        <div ref={receiptCardRef} style={{ backgroundColor: '#ffffff', borderRadius: '8px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <div style={{ backgroundColor: '#0A4384', color: '#ffffff', width: 44, height: 44, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 'bold' }}>+</div>
+              <div>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1F2937' }}>{customer?.phone || '+8801324740609'}</div>
+                <div style={{ fontSize: '13px', color: '#6B7280', marginTop: '2px' }}>{entry?.date || '19 Jul 26 • 12:11 PM'}</div>
+              </div>
+            </div>
+            <div style={{ text-align: 'right' }}>
+              <div style={{ fontSize: '22px', fontWeight: 'bold', color: '#047857' }}>৳ {entry?.amount || '৫,০০০'}</div>
+              <div style={{ fontSize: '13px', color: '#4B5563', marginTop: '2px' }}>{entry?.type === 'receive' ? 'আপনি পেয়েছেন' : 'আপনি দিয়েছেন'}</div>
+            </div>
+          </div>
+
+          <hr style={{ border: 'none', borderTop: '1px solid #E5E7EB', margin: '16px 0' }} />
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontSize: '15px', color: '#374151', fontWeight: '500' }}>বর্তমান ব্যালেন্স</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#047857' }}>৳ {customer?.balance || '৫,০০০'}</div>
+          </div>
+
+          <div onClick={onEdit} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#2563EB', fontSize: '15px', fontWeight: 'bold', marginTop: '20px', cursor: 'pointer', borderTop: '1px solid #F3F4F6', paddingTop: '12px' }}>
+            🖋️ এন্ট্রি এডিট করুন
+          </div>
+        </div>
+
+        {/* 3. Information Logs */}
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '6px', padding: '16px', border: '1px solid #E5E7EB', marginBottom: '12px' }}>
+          <div style={{ color: '#DC2626', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px' }}>📝 SMS পাঠানো হয়নি</div>
+          <div style={{ color: '#4B5563', fontSize: '14px', marginTop: '10px' }}>আপনি দিয়েছেন: ৳ {entry?.amount || '৫,০০০'}</div>
+          <div style={{ color: '#4B5563', fontSize: '14px', marginTop: '4px' }}>ব্যালেন্স: +(৳ {customer?.balance || '৫,০০০'})</div>
+          <div style={{ color: '#9CA3AF', fontSize: '13px', marginTop: '4px', wordBreak: 'break-all' }}>[https://khatabook.com/a2/ZdAf8WKPx](https://khatabook.com/a2/ZdAf8WKPx)</div>
+        </div>
+
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '6px', padding: '14px', border: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', gap: '8px', color: '#4B5563', fontSize: '14px', marginBottom: '20px' }}>
+          ☁️ এন্ট্রি ব্যাক আপ করা হয়েছে
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#10B981', fontWeight: '600', fontSize: '14px' }}>
+          🛡️ 100% নিরাপদ ও সুরক্ষিত
+        </div>
+      </div>
+
+      {/* 4. Sticky Footer Buttons (Matching Screenshot) */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, backgroundColor: '#ffffff', padding: '12px 16px', display: 'flex', gap: '12px', borderTop: '1px solid #E5E7EB', boxSizing: 'border-box' }}>
+        <button 
+          onClick={onDelete}
+          style={{ flex: 1, backgroundColor: '#ffffff', color: '#DC2626', border: '1px solid #DC2626', padding: '12px 0', borderRadius: '4px', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}
+        >
+          🗑️ মুছে ফেলুন
+        </button>
+        <button 
+          onClick={handleJpgShare}
+          style={{ flex: 1, backgroundColor: '#0A4384', color: '#ffffff', border: 'none', padding: '12px 0', borderRadius: '4px', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+        >
+          📢 শেয়ার করুন
+        </button>
+      </div>
+    </div>
+  );
+};
