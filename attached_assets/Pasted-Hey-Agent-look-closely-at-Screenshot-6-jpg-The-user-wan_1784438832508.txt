@@ -1,0 +1,71 @@
+Hey Agent, look closely at Screenshot_6.jpg. The user wants to COMPLETELY REMOVE the light blue option container/card box located right below the amount breakdown and above the action buttons row.
+
+TARGET ELEMENT TO WIPE OUT:
+The element displaying the text: "আপনার অ্যাকাউন্টে এই অর্থপ্রদান পেতে ব্যাংকের বিবরণ যোগ করুন" along with its surrounding blue borders, container divs, background styles, and the right chevron arrow icon (`>`).
+
+CRITICAL INSTRUCTIONS:
+1. Locate the component rendering this Payment Request Modal (specifically the structure within the layout wrapper file).
+2. Completely delete and strip out the JSX code block representing that bank account linkage invitation section.
+3. Ensure that NO spacer boxes, placeholder states, or conditional logic references remain for this bank linking block. The layout should flow directly from the "দেবেন (ছবি শেয়ার করতে ট্যাপ করুন)" line straight down into the "SMS" and "ডাউনলোড" button rows.
+
+Please modify the component code immediately to look like this clean structure:
+
+```javascript
+// Remove the old bank details link card container entirely from the return block.
+return (
+  <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', overflow: 'hidden' }}>
+    
+    {/* Captured Image Interface Container */}
+    <div ref={receiptCardAreaRef} style={{ padding: '20px' }}>
+      <p style={{ color: '#4B5563', fontSize: '15px', textAlign: 'center' }}>
+        আপনাকে অর্থ প্রদানের জন্য Shakil-এর কাছে অনুরোধ করুন
+      </p>
+
+      {/* Dynamic Main Balance Header */}
+      <div 
+        onClick={handleNativeShareSheet}
+        style={{ 
+          color: '#DC2626', 
+          fontSize: '36px', 
+          fontWeight: '900', 
+          textAlign: 'center', 
+          margin: '20px 0 5px 0',
+          cursor: 'pointer'
+        }}
+      >
+        ৳ {customer?.amount || '৮৬,৯৫,৭০২.৩২'}
+      </div>
+
+      <p style={{ color: '#9CA3AF', fontSize: '13px', textAlign: 'center', marginBottom: '20px' }}>
+        দেবেন (ছবি শেয়ার করতে ট্যাপ করুন)
+      </p>
+
+      {/* =======================================================================
+          BANK RECONCILIATION CONTAINER CARD HAS BEEN REMOVED PERMANENTLY FROM HERE
+          ======================================================================= */}
+    </div>
+
+    {/* Buttons Footer Layout Rows */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '16px' }}>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <button style={{ flex: 1, backgroundColor: '#2563EB', color: '#ffffff', padding: '12px 0', borderRadius: '8px' }}>
+          💬 SMS
+        </button>
+        
+        <button 
+          onClick={handlePureDownload}
+          style={{ flex: 1, backgroundColor: '#10B981', color: '#ffffff', padding: '12px 0', borderRadius: '8px', fontWeight: 'bold' }}
+        >
+          📥 ডাউনলোড
+        </button>
+      </div>
+
+      <button 
+        onClick={handleNativeShareSheet}
+        style={{ width: '100%', backgroundColor: '#004B93', color: '#ffffff', padding: '14px 0', borderRadius: '8px', fontWeight: 'bold' }}
+      >
+        📢 শেয়ার করুন (ইমু / হোয়াটসঅ্যাপ)
+      </button>
+    </div>
+  </div>
+);
