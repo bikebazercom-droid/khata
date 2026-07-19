@@ -204,26 +204,23 @@ export function PartyView() {
       phantomAnchor.click();
       document.body.removeChild(phantomAnchor);
 
-      // Convert to binary File for native share sheet
-      const base64Fetch = await fetch(jpgDataUrl);
-      const imageBlob = await base64Fetch.blob();
-      const sharedFile = new File([imageBlob], 'Banglakhata_Receipt.jpg', { type: 'image/jpeg' });
-
-      if (navigator.canShare && navigator.canShare({ files: [sharedFile] })) {
-        await navigator.share({
-          files: [sharedFile],
-          title: 'Banglakhata রশিদ',
-          text: 'Banglakhata অ্যাপ থেকে শেয়ার করা ডিজিটাল রসিদ।',
-        });
-        console.log('Native share overlay opened successfully.');
-      } else {
-        await navigator.share({
-          title: 'Banglakhata রশিদ',
-          text: 'রসিদটি আপনার ফোনের গ্যালারিতে JPG ছবি হিসেবে ডাউনলোড হয়েছে। অনুগ্রহ করে যেকোনো সোশ্যাল মিডিয়ায় পাঠিয়ে দিন।',
-        });
-      }
+      // Gallery save done. Now notify + open share sheet after a short breath.
+      setTimeout(() => {
+        alert('✅ রসিদের ছবিটি আপনার ফোনের গ্যালারি/ডাউনলোডে সেভ হয়েছে।\n\nএখন আপনার পছন্দের চ্যাট অ্যাপ (ইমু/হোয়াটসঅ্যাপ) ওপেন হলে গ্যালারি থেকে ছবিটি সিলেক্ট করে পাঠিয়ে দিন।');
+        if (navigator.share) {
+          navigator.share({
+            title: 'Banglakhata রশিদ',
+            text: 'Banglakhata রসিদের JPG ছবিটি গ্যালারিতে সেভ করা হয়েছে। অনুগ্রহ করে চ্যাটে এটি এটাচ করুন।',
+          }).catch(() => {
+            window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent('লেনদেনের JPG রসিদটি আমার গ্যালারি থেকে পাঠানো হচ্ছে।'), '_blank');
+          });
+        } else {
+          window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent('লেনদেনের JPG রসিদটি আমার গ্যালারি থেকে পাঠানো হচ্ছে।'), '_blank');
+        }
+      }, 300);
     } catch (err) {
       console.error('System Native Share Pipeline Exception Intercepted:', err);
+      window.open('https://api.whatsapp.com/send', '_blank');
     }
   };
 

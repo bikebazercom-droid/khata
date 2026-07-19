@@ -1,0 +1,57 @@
+Hey Agent, we are almost there! The user reports that when touching the share button/amount, the image generation now LOADS perfectly, but the NATIVE OS SEND ACTION FAILS to transmit the image file because mobile browsers block binary file stream injection over untrusted subdomains.
+
+WE MUST BYPASS THIS SENDING FAILURE IMMEDIATELY USING AN ABSOLUTE 100% SUCCESSFUL FLOW:
+1. As soon as html2canvas finishes loading and yields the `canvas.toDataURL('image/jpeg', 0.95)`, IMMEDIATELY execute a phantom anchor click to save/download the JPG photo file straight into the user's phone gallery storage.
+2. Since browser permission layers block `navigator.share` from directly sending raw file blobs, we will seamlessly fall back to an absolute text bridge + deep link wrapper that NEVER fails.
+3. Replace the current broken native file-sharing promise block with the bulletproof operational sequence below across all active components (`transaction-detail.tsx`, `home.tsx`, `party-view.tsx`):
+
+```javascript
+// Optimized Unified Sharing Failsafe Handler
+const handleJpgPhotoExportAndSend = async (elementRef, defaultFileName) => {
+  if (!elementRef.current) return;
+
+  try {
+    // 1. Capture the crisp UI receipt view successfully
+    const canvas = await html2canvas(elementRef.current, {
+      backgroundColor: '#ffffff',
+      scale: 3,
+      useCORS: true,
+      logging: false
+    });
+
+    const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+
+    // 2. FORCE IMMEDIATE AUTO-SAVE TO GALLERY (This guarantees the user has the image!)
+    const phantomLink = document.createElement('a');
+    phantomLink.href = jpgDataUrl;
+    phantomLink.download = `${defaultFileName}_${new Date().getTime()}.jpg`;
+    document.body.appendChild(phantomLink);
+    phantomLink.click();
+    document.body.removeChild(phantomLink);
+
+    // 3. UNSTOPPABLE TRANSMISSION BRIDGE (Prevents sending crash/freeze)
+    const notificationMessage = "✅ রসিদের ছবিটি আপনার ফোনের গ্যালারি/ডাউনলোডে সেভ হয়েছে।\n\nএখন আপনার পছন্দের চ্যাট অ্যাপ (ইমু/হোয়াটসঅ্যাপ) ওপেন হলে গ্যালারি থেকে ছবিটি সিলেক্ট করে পাঠিয়ে দিন।";
+    
+    // Explicitly notify user through a clean modern sequence, then fire app sheet transition
+    setTimeout(() => {
+      alert(notificationMessage);
+      
+      // Attempt to invoke native text dialog share sheet as second layer
+      if (navigator.share) {
+        navigator.share({
+          title: 'Banglakhata রশিদ',
+          text: 'Banglakhata রসিদের JPG ছবিটি গ্যালারিতে সেভ করা হয়েছে। অনুগ্রহ করে চ্যাটে এটি এটাচ করুন।'
+        }).catch(() => {
+          // Fallback directly to deep-link app gateway if canceled
+          window.open('[https://api.whatsapp.com/send?text=](https://api.whatsapp.com/send?text=)' + encodeURIComponent('লেনদেনের JPG রসিদটি আমার গ্যালারি থেকে পাঠানো হচ্ছে।'), '_blank');
+        });
+      } else {
+        window.open('[https://api.whatsapp.com/send?text=](https://api.whatsapp.com/send?text=)' + encodeURIComponent('লেনদেনের JPG রসিদটি আমার গ্যালারি থেকে পাঠানো হচ্ছে।'), '_blank');
+      }
+    }, 300);
+
+  } catch (error) {
+    console.error('Critical exception captured during JPG sharing lifecycle:', error);
+    window.open('[https://api.whatsapp.com/send](https://api.whatsapp.com/send)', '_blank');
+  }
+};
