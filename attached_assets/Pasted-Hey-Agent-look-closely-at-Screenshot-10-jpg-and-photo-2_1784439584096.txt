@@ -1,0 +1,136 @@
+Hey Agent, look closely at Screenshot_10.jpg and photo_2026-07-19_10-49-30_3.jpg. The user wants the exact behavior shown in the second screenshot where the native share sheet pops up with the generated file. 
+
+However, there is a key layout requirement for the snapshot picture:
+When the user clicks the green "ডাউনলোড" button, the generated image itself should NOT include the green "ডাউনলোড" button inside the image frame. The button should be hidden or excluded during the `html2canvas` render pipeline so the final shared image looks clean and professional, containing only the request text and the balance amount.
+
+Please update the image rendering logic immediately. We can achieve this by targeting the button with a specific class or utilizing `data-html2canvas-ignore` attribute on the button wrapper so html2canvas automatically drops it from the final JPG blob.
+
+Here is the corrected component configuration:
+
+```javascript
+import React, { useRef } from 'react';
+import html2canvas from 'html2canvas';
+
+export const PaymentRequestModal = ({ customer, onClose }) => {
+  // Main container ref that wraps everything including the button
+  const receiptCardAreaRef = useRef(null);
+
+  const handleDownloadAndNativeShare = async (e) => {
+    if (e) e.stopPropagation();
+    if (!receiptCardAreaRef.current) return;
+
+    try {
+      // Snapshot the parent wrapper, but html2canvas will ignore elements marked with 'data-html2canvas-ignore'
+      const canvas = await html2canvas(receiptCardAreaRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 3, 
+        useCORS: true,
+        logging: false,
+        // Enforce exclusion of elements with the ignore flag
+        ignoreElements: (element) => element.hasAttribute('data-html2canvas-ignore')
+      });
+
+      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `Banglakhata_Receipt_${timestamp}.jpg`;
+
+      // 1. SILENT BACKGROUND DOWNLOAD TO DEVICE STORAGE
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = jpgDataUrl;
+      downloadAnchor.download = filename;
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
+
+      // 2. CONVERT BASE64 DATA INTO RAW BUFFER FOR THE NATIVE SHEET
+      const byteString = atob(jpgDataUrl.split(',')[1]);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      const imageBlob = new Blob([ab], { type: 'image/jpeg' });
+      const sharedPhotoFile = new File([imageBlob], filename, { 
+        type: 'image/jpeg',
+        lastModified: Date.now()
+      });
+
+      // 3. LAUNCH THE NATIVE SMARTPHONE SHARE OVERLAY PANEL (Matches photo_2026-07-19_10-49-30_3.jpg)
+      if (navigator.canShare && navigator.canShare({ files: [sharedPhotoFile] })) {
+        try {
+          await navigator.share({
+            files: [sharedPhotoFile],
+            title: 'পেমেন্ট রসিদ ফটো',
+            text: 'Banglakhata থেকে পাঠানো লেনদেনের ছবি।'
+          });
+          return;
+        } catch (shareErr) {
+          console.log("Native system share wrapper dismissed.");
+        }
+      }
+
+      // Fallback fallback link if native rules apply
+      window.open(`[https://api.whatsapp.com/send?text=$](https://api.whatsapp.com/send?text=$){encodeURIComponent('রসিদটি গ্যালারিতে সেভ করা হয়েছে।')}`, '_blank');
+
+    } catch (crashErr) {
+      console.error('Snapshot generator execution error:', crashErr);
+    }
+  };
+
+  return (
+    /* We place the ref on the overall outer container so the clean white border radius remains in the picture */
+    <div ref={receiptCardAreaRef} style={{ backgroundColor: '#ffffff', borderRadius: '16px', overflow: 'hidden', padding: '20px' }}>
+      
+      {/* Receipt Visual Content Area */}
+      <div>
+        <p style={{ color: '#4B5563', fontSize: '15px', textAlign: 'center', fontWeight: '500' }}>
+          আপনাকে অর্থ প্রদানের জন্য {customer?.name || 'Shakil'}-এর কাছে অনুরোধ করুন
+        </p>
+
+        {/* Clickable Numeric Balance Text Area */}
+        <div 
+          onClick={handleDownloadAndNativeShare}
+          style={{ 
+            color: '#10B981', 
+            fontSize: '36px', 
+            fontWeight: '900', 
+            textAlign: 'center', 
+            margin: '20px 0 5px 0',
+            cursor: 'pointer',
+            fontFamily: 'sans-serif'
+          }}
+        >
+          ৳ {customer?.amount || '৮১,MD,২৯৭.৬৮'}
+        </div>
+
+        <p style={{ color: '#9CA3AF', fontSize: '13px', textAlign: 'center', marginBottom: '25px' }}>
+          {customer?.type === 'receive' ? 'পাবেন' : 'দেবেন'} (ছবি শেয়ার করতে ট্যাপ করুন)
+        </p>
+      </div>
+
+      {/* FULL-WIDTH GREEN ACTION BUTTON - HIGHLIGHTED WITH IGNORE ATTRIBUTE FOR CLEAN CAPTURE */}
+      <div data-html2canvas-ignore="true" style={{ marginTop: '5px' }}>
+        <button 
+          onClick={handleDownloadAndNativeShare}
+          style={{ 
+            width: '100%', 
+            backgroundColor: '#10B981', 
+            color: '#ffffff', 
+            padding: '14px 0', 
+            borderRadius: '24px', 
+            fontSize: '16px', 
+            fontWeight: 'bold', 
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}
+        >
+          📥 ডাউনলোড
+        </button>
+      </div>
+    </div>
+  );
+};

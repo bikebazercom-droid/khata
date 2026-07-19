@@ -123,6 +123,7 @@ export function HomeView() {
       scale: 3,
       useCORS: true,
       logging: false,
+      ignoreElements: (el) => el.hasAttribute('data-html2canvas-ignore'),
     });
     const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
     const byteString = atob(jpgDataUrl.split(',')[1]);
@@ -825,7 +826,7 @@ export function HomeView() {
             {/* ── END RECEIPT CAPTURE TARGET ─────────────────────────────── */}
 
             {/* Action buttons */}
-            <div className="flex flex-col gap-2 mt-5">
+            <div className="flex flex-col gap-2 mt-5" data-html2canvas-ignore="true">
               <button
                 type="button"
                 onClick={handleDownloadAndShare}
