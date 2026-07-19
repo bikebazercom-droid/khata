@@ -856,15 +856,6 @@ export function HomeView() {
                   {isWhatsAppSharing ? 'তৈরি হচ্ছে…' : '📥 ডাউনলোড'}
                 </button>
               </div>
-              {/* Row 2: Full-width Share */}
-              <button
-                type="button"
-                onClick={handleWhatsAppJpgShare}
-                disabled={isWhatsAppSharing}
-                className="w-full bg-[#004B93] active:bg-[#003a72] disabled:opacity-60 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.97] transition-all"
-              >
-                {isWhatsAppSharing ? 'তৈরি হচ্ছে…' : '📢 শেয়ার করুন (ইমু / হোয়াটসঅ্যাপ)'}
-              </button>
             </div>
           </div>
         </div>
