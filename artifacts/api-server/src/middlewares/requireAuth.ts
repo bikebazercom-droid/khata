@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { getAuth } from "@clerk/express";
-import { eq, isNull } from "drizzle-orm";
+import { eq, isNull, and } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import {
   db,
@@ -8,11 +8,11 @@ import {
   businessesTable,
   businessSettingsTable,
   partiesTable,
+  userBusinessesTable,
   type AppUser,
 } from "@workspace/db";
 
 // Fixed UUID for the seed business that owns all pre-auth legacy data.
-// This business is created on startup and the first user to sign in claims it.
 export const SEED_BUSINESS_ID = "00000000-0000-0000-0000-000000000001";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -24,11 +24,6 @@ export interface AuthenticatedRequest extends Request {
 
 // ─── Startup migration ───────────────────────────────────────────────────────
 
-/**
- * Ensures the seed business exists and all legacy (pre-auth) parties and
- * settings rows are assigned to it. Safe to call repeatedly — all operations
- * are idempotent.
- */
 export async function ensureDefaultBusiness(): Promise<void> {
   try {
     await db
@@ -45,12 +40,28 @@ export async function ensureDefaultBusiness(): Promise<void> {
       .update(businessSettingsTable)
       .set({ businessId: SEED_BUSINESS_ID })
       .where(isNull(businessSettingsTable.businessId));
+
+    // Backfill user_businesses for any existing app_users rows
+    const existingUsers = await db.select().from(appUsersTable);
+    for (const u of existingUsers) {
+      await db
+        .insert(userBusinessesTable)
+        .values({ userId: u.id, businessId: u.businessId })
+        .onConflictDoNothing();
+    }
   } catch (err) {
     console.error("[startup] ensureDefaultBusiness failed:", err);
   }
 }
 
 // ─── JIT user provisioning ───────────────────────────────────────────────────
+
+async function linkUserBusiness(userId: string, businessId: string) {
+  await db
+    .insert(userBusinessesTable)
+    .values({ userId, businessId })
+    .onConflictDoNothing();
+}
 
 export async function getOrCreateClerkUser(
   clerkUserId: string,
@@ -59,9 +70,12 @@ export async function getOrCreateClerkUser(
     .select()
     .from(appUsersTable)
     .where(eq(appUsersTable.clerkUserId, clerkUserId));
-  if (existing) return existing;
+  if (existing) {
+    // Ensure the user_businesses entry exists (idempotent backfill)
+    await linkUserBusiness(existing.id, existing.businessId);
+    return existing;
+  }
 
-  // First login: check if the seed business is still unclaimed.
   const [seedOwner] = await db
     .select()
     .from(appUsersTable)
@@ -70,13 +84,10 @@ export async function getOrCreateClerkUser(
 
   let businessId: string;
   if (!seedOwner) {
-    // Claim the seed business and all its legacy data.
     businessId = SEED_BUSINESS_ID;
   } else {
-    // Seed business already claimed — create a fresh business for this user.
     const [biz] = await db.insert(businessesTable).values({}).returning();
     businessId = biz!.id;
-    // Ensure default settings exist for the new business.
     await db
       .insert(businessSettingsTable)
       .values({ businessId })
@@ -87,6 +98,7 @@ export async function getOrCreateClerkUser(
     .insert(appUsersTable)
     .values({ clerkUserId, businessId, role: "owner" })
     .returning();
+  await linkUserBusiness(user!.id, businessId);
   return user!;
 }
 
@@ -97,9 +109,11 @@ export async function getOrCreatePhoneUser(
     .select()
     .from(appUsersTable)
     .where(eq(appUsersTable.phone, phone));
-  if (existing) return existing;
+  if (existing) {
+    await linkUserBusiness(existing.id, existing.businessId);
+    return existing;
+  }
 
-  // Same seed-business claim logic as Clerk path.
   const [seedOwner] = await db
     .select()
     .from(appUsersTable)
@@ -122,14 +136,43 @@ export async function getOrCreatePhoneUser(
     .insert(appUsersTable)
     .values({ phone, businessId, role: "owner" })
     .returning();
+  await linkUserBusiness(user!.id, businessId);
   return user!;
+}
+
+// ─── Business-id resolution ───────────────────────────────────────────────────
+
+/**
+ * If the request carries an `X-Business-Id` header and the user owns that
+ * business (has a row in user_businesses), use it; otherwise fall back to the
+ * user's default businessId.
+ */
+async function resolveBusinessId(
+  user: AppUser,
+  req: Request,
+): Promise<string> {
+  const requested = req.headers["x-business-id"] as string | undefined;
+  if (!requested || requested === user.businessId) return user.businessId;
+
+  const [membership] = await db
+    .select()
+    .from(userBusinessesTable)
+    .where(
+      and(
+        eq(userBusinessesTable.userId, user.id),
+        eq(userBusinessesTable.businessId, requested),
+      ),
+    )
+    .limit(1);
+
+  return membership ? membership.businessId : user.businessId;
 }
 
 // ─── Phone-session JWT ───────────────────────────────────────────────────────
 
 const SESSION_SECRET = process.env.SESSION_SECRET!;
 const COOKIE_NAME = "phone_session";
-const COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 interface PhoneSessionPayload {
   userId: string;
@@ -155,9 +198,7 @@ export function clearPhoneSession(res: Response): void {
   res.clearCookie(COOKIE_NAME, { path: "/" });
 }
 
-function verifyPhoneSession(
-  token: string,
-): PhoneSessionPayload | null {
+function verifyPhoneSession(token: string): PhoneSessionPayload | null {
   try {
     return jwt.verify(token, SESSION_SECRET) as PhoneSessionPayload;
   } catch {
@@ -167,11 +208,6 @@ function verifyPhoneSession(
 
 // ─── requireAuth middleware ───────────────────────────────────────────────────
 
-/**
- * Accepts either a valid Clerk session cookie (email / Google sign-in) or a
- * valid `phone_session` JWT cookie (custom Bangladeshi phone OTP sign-in).
- * Sets `req.userId` and `req.businessId` on success; returns 401 otherwise.
- */
 export async function requireAuth(
   req: Request,
   res: Response,
@@ -183,7 +219,7 @@ export async function requireAuth(
     try {
       const user = await getOrCreateClerkUser(clerkAuth.userId);
       (req as AuthenticatedRequest).userId = user.id;
-      (req as AuthenticatedRequest).businessId = user.businessId;
+      (req as AuthenticatedRequest).businessId = await resolveBusinessId(user, req);
       return next();
     } catch (err) {
       console.error("[requireAuth] Clerk JIT provision error:", err);
@@ -197,8 +233,9 @@ export async function requireAuth(
   if (cookieToken) {
     const payload = verifyPhoneSession(cookieToken);
     if (payload) {
+      const fakeUser = { id: payload.userId, businessId: payload.businessId } as AppUser;
       (req as AuthenticatedRequest).userId = payload.userId;
-      (req as AuthenticatedRequest).businessId = payload.businessId;
+      (req as AuthenticatedRequest).businessId = await resolveBusinessId(fakeUser, req);
       return next();
     }
   }
@@ -209,8 +246,9 @@ export async function requireAuth(
     const bearerToken = authHeader.slice(7);
     const payload = verifyPhoneSession(bearerToken);
     if (payload) {
+      const fakeUser = { id: payload.userId, businessId: payload.businessId } as AppUser;
       (req as AuthenticatedRequest).userId = payload.userId;
-      (req as AuthenticatedRequest).businessId = payload.businessId;
+      (req as AuthenticatedRequest).businessId = await resolveBusinessId(fakeUser, req);
       return next();
     }
   }

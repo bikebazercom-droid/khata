@@ -23,6 +23,8 @@ import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import { useRetryPendingUploads } from '@/lib/useRetryPendingUploads';
 import { readAuthCache, writeAuthCache, clearAuthCache } from '@/lib/authCache';
 import { restoreCache, persistCache, clearPersistedCache } from '@/lib/queryPersister';
+import { BusinessContextProvider } from '@/lib/businessContext';
+import { BusinessSwitcherDrawer } from '@/components/modals/business-switcher-drawer';
 
 // ─── Clerk setup ──────────────────────────────────────────────────────────────
 
@@ -378,6 +380,7 @@ function AppRouter() {
           </Switch>
         </TooltipProvider>
         <Toaster position="bottom-right" richColors />
+        <BusinessSwitcherDrawer />
         </ConnectionStateProvider>
       </QueryClientProvider>
     </ClerkProvider>
@@ -386,9 +389,11 @@ function AppRouter() {
 
 function App() {
   return (
-    <WouterRouter base={basePath}>
-      <AppRouter />
-    </WouterRouter>
+    <BusinessContextProvider>
+      <WouterRouter base={basePath}>
+        <AppRouter />
+      </WouterRouter>
+    </BusinessContextProvider>
   );
 }
 

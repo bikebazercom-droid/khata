@@ -9,6 +9,7 @@ import ledgerRouter from "./ledger";
 import eventsRouter from "./events";
 import storageRouter from "./storage";
 import staffRouter from "./staff";
+import businessesRouter from "./businesses";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(eventsRouter);
 
 // Staff duty deployment — fully isolated from customer ledger.
 router.use(staffRouter);
+router.use(businessesRouter);
 
 export default router;

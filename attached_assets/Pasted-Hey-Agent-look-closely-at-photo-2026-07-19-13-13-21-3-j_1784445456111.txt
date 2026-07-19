@@ -1,0 +1,121 @@
+Hey Agent, look closely at photo_2026-07-19_13-13-21_3.jpg. The user wants to scale their ledger system to support multiple completely isolated business khatas under a single user session. We need to add a bottom-sheet modal drawer that handles listing active businesses, switching the global context upon selection, and creating new businesses dynamically.
+
+CORE FUNCTIONAL SPECIFICATIONS:
+1. GLOBAL LEDGER STATE WRAPPER:
+   - The root or context state must maintain a `businesses` collection array: `[{ id, name, initial, customerCount, customers, transactions }]`.
+   - Maintain a `selectedBusinessId` pointer to correctly slice out, aggregate, and display balances/customers tied ONLY to that designated business dashboard environment.
+2. BOTTOM COMPONENT DRAWER (Strict adherence to photo_2026-07-19_13-13-21_3.jpg Layout):
+   - A list rendering all available businesses.
+   - Each individual entry contains:
+     * A circle filled badge showing the first character letters (e.g., "হগ" for হাজারি গোল্ড).
+     * The business name alongside the total customer summary string (e.g., "4 গ্রাহক").
+     * A blue select indicator checkbox vector row for the current active row. An empty circular loop indicates a selectable inactive entry.
+   - An intermediate actionable card option text: "🛡️ বিসনেস স্ট্যাম্প তৈরি করুন >>".
+   - A bottom fixed sticky drawer CTA button: "➕ নতুন KHATABOOK তৈরি করুন" styled with a dark blue layout.
+3. INTERACTIVE BEHAVIOR:
+   - Tapping any row swaps the global `selectedBusinessId` and closes the selector drawer layer. The main app dashboard must immediately update to show only that business's data.
+   - Tapping "➕ নতুন KHATABOOK তৈরি করুন" must prompt a localized dialog or a field input asking for the new Khata/Business entity name. Once saved, append it into the `businesses` array in state and automatically switch focus to this new empty business environment.
+
+Please deploy or append this fully self-contained switcher component layout into the active navigation router layers:
+
+```javascript
+import React, { useState } from 'react';
+
+export const MultiKhataSelectorDrawer = ({ 
+  isOpen, 
+  onClose, 
+  businesses = [
+    { id: '1', name: 'হাজারি গোল্ড', initial: 'হগ', customerCount: 4 },
+    { id: '2', name: 'অব্য', initial: 'টি', customerCount: 4 }
+  ], 
+  activeBusinessId, 
+  onSwitchBusiness, 
+  onAddNewBusiness 
+}) => {
+  const [isAddingNew, setIsAddingNew] = useState(false);
+  const [businessInputName, setBusinessInputName] = useState('');
+
+  if (!isOpen) return null;
+
+  const handleCreateKhata = () => {
+    if (!businessInputName.trim()) return;
+    onAddNewBusiness(businessInputName);
+    setBusinessInputName('');
+    setIsAddingNew(false);
+  };
+
+  return (
+    <div 
+      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 99999, display: 'flex', alignItems: 'flex-end' }}
+      onClick={onClose}
+    >
+      <div 
+        style={{ backgroundColor: '#ffffff', borderTopLeftRadius: '16px', borderTopRightRadius: '16px', width: '100%', padding: '20px 16px 12px 16px', boxSizing: 'border-box', maxHeight: '80vh', overflowY: 'auto' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        
+        {/* Business List Wrapper (as photo_2026-07-19_13-13-21_3.jpg) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {businesses.map((biz) => {
+            const isActive = biz.id === activeBusinessId;
+            return (
+              <div 
+                key={biz.id}
+                onClick={() => { onSwitchBusiness(biz.id); onClose(); }}
+                style={{ border: isActive ? '2px solid #0052B4' : '1px solid #E5E7EB', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ backgroundColor: '#2563EB', color: '#ffffff', width: '44px', height: '44px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifycontent: 'center', fontWeight: 'bold', fontSize: '16px' }}>
+                      {biz.initial}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#111827' }}>{biz.name}</div>
+                      <div style={{ fontSize: '14px', color: '#6B7280', marginTop: '2px' }}>{biz.customerCount} গ্রাহক</div>
+                    </div>
+                  </div>
+                  {/* Radio selection checkmark matching blueprint */}
+                  <div style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: isActive ? '#0052B4' : 'transparent', border: isActive ? 'none' : '2px solid #9CA3AF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {isActive && <span style={{ color: '#ffffff', fontSize: '14px', fontWeight: 'bold' }}>✓</span>}
+                  </div>
+                </div>
+
+                {isActive && (
+                  <div style={{ marginTop: '16px', border: '1px solid #F3F4F6', backgroundColor: '#FAFAFA', borderRadius: '8px', padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#0052B4', fontWeight: 'bold', fontSize: '15px' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>🛡️ বিসনেস স্ট্যাম্প তৈরি করুন</span>
+                    <span>&gt;&gt;</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Dynamic Inner Inline Input for Creating New Entry */}
+        {isAddingNew ? (
+          <div style={{ marginTop: '20px', padding: '12px', border: '1px solid #E5E7EB', borderRadius: '8px', backgroundColor: '#F9FAFB' }}>
+            <input 
+              type="text" 
+              placeholder="নতুন খাতা বা ব্যবসা প্রতিষ্ঠানের নাম লিখুন" 
+              value={businessInputName} 
+              onChange={(e) => setBusinessInputName(e.target.value)}
+              style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #D1D5DB', marginBottom: '10px', boxSizing: 'border-box' }}
+            />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={handleCreateKhata} style={{ flex: 1, backgroundColor: '#0052B4', color: '#ffffff', border: 'none', padding: '10px 0', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>যোগ করুন</button>
+              <button onClick={() => setIsAddingNew(false)} style={{ flex: 1, backgroundColor: '#E5E7EB', color: '#374151', border: 'none', padding: '10px 0', borderRadius: '4px', cursor: 'pointer' }}>বাতিল</button>
+            </div>
+          </div>
+        ) : (
+          /* Fixed Blue Base CTA Trigger button (as photo_2026-07-19_13-13-21_3.jpg) */
+          <button 
+            onClick={() => setIsAddingNew(true)}
+            style={{ width: '100%', backgroundColor: '#0052B4', color: '#ffffff', border: 'none', padding: '14px 0', borderRadius: '4px', fontSize: '16px', fontWeight: 'bold', marginTop: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+          >
+            + নতুন KHATABOOK তৈরি করুন
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};

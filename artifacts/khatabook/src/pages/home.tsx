@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Link, useLocation } from 'wouter';
+import { useBusinessContext } from '@/lib/businessContext';
 import {
   useListParties,
   useGetBusinessSettings,
@@ -21,6 +22,7 @@ import { bn } from 'date-fns/locale';
 import { toast } from 'sonner';
 
 export function HomeView() {
+  const { openSwitcher } = useBusinessContext();
   const [role, setRole] = useState<PartyRole>(PartyRole.CUSTOMER);
   const [search, setSearch] = useState('');
   const [location, navigate] = useLocation();
@@ -385,9 +387,17 @@ export function HomeView() {
               alt="Banglakhata"
               className="w-9 h-9 shrink-0"
             />
-            <h1 className="font-extrabold tracking-tight text-[15px] text-white truncate max-w-[120px]">
-              {settings?.storeName || 'Banglakhata'}
-            </h1>
+            <button
+              type="button"
+              onClick={openSwitcher}
+              className="flex items-center gap-1.5 active:opacity-75 transition-opacity min-w-0"
+              aria-label="খাতাবুক পরিবর্তন করুন"
+            >
+              <h1 className="font-extrabold tracking-tight text-[15px] text-white truncate max-w-[120px]">
+                {settings?.storeName || 'Banglakhata'}
+              </h1>
+              <ChevronRight className="w-3.5 h-3.5 text-white/60 shrink-0 rotate-90" />
+            </button>
             <button
               onClick={() => setIsRenameStoreOpen(true)}
               aria-label="দোকানের নাম সম্পাদনা করুন"

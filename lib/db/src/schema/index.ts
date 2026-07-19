@@ -7,3 +7,4 @@ export * from "./businessSettings";
 export * from "./staffPersonnel";
 export * from "./staffDeploymentLogs";
 export * from "./staffDestinations";
+export * from "./userBusinesses";
