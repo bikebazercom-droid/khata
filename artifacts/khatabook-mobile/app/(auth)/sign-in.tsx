@@ -345,7 +345,7 @@ export default function SignInScreen() {
               <View style={s.logoIcon}>
                 <Feather name="book-open" size={32} color="#fff" />
               </View>
-              <Text style={s.appName}>হাজারী খাতাবুক</Text>
+              <Text style={s.appName}>বাংলা খাতা</Text>
               <Text style={s.subtitle}>Sign in with phone number</Text>
             </View>
 
@@ -448,7 +448,7 @@ export default function SignInScreen() {
               <View style={s.logoIcon}>
                 <Feather name="book-open" size={32} color="#fff" />
               </View>
-              <Text style={s.appName}>হাজারী খাতাবুক</Text>
+              <Text style={s.appName}>বাংলা খাতা</Text>
               <Text style={s.subtitle}>Check your email for a code</Text>
             </View>
 
@@ -503,8 +503,8 @@ export default function SignInScreen() {
             <View style={s.logoIcon}>
               <Feather name="book-open" size={32} color="#fff" />
             </View>
-            <Text style={s.appName}>হাজারী খাতাবুক</Text>
-            <Text style={s.subtitle}>Sign in to access your khatabook</Text>
+            <Text style={s.appName}>বাংলা খাতা</Text>
+            <Text style={s.subtitle}>Sign in to access your BanglaKhata</Text>
           </View>
 
           <View style={s.modeSwitcher}>

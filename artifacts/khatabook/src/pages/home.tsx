@@ -392,7 +392,7 @@ export function HomeView() {
               type="button"
               onClick={openSwitcher}
               className="flex items-center gap-1.5 active:opacity-75 transition-opacity min-w-0"
-              aria-label="খাতাবুক পরিবর্তন করুন"
+              aria-label="বাংলা খাতা পরিবর্তন করুন"
             >
               <h1 className="font-extrabold tracking-tight text-[15px] text-white truncate max-w-[120px]">
                 {activeBusiness?.name || settings?.storeName || 'লোড হচ্ছে...'}

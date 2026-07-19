@@ -140,7 +140,7 @@ export function SettingsDrawer({
       setShowDeleteConfirm(false);
       onOpenChange(false);
 
-      toast.success('🗑️ বাংলা খাতা: আপনার সমস্ত তথ্য সফলভাবে মুছে ফেলা হয়েছে!', {
+      toast.success('🎉 বাংলা খাতা: আপনার সম্পূর্ণ বাংলা খাতা (BanglaKhata) অ্যাকাউন্টটি সফলভাবে এবং চিরতরে মুছে ফেলা হয়েছে!', {
         duration: 2500,
         style: {
           background: '#1E3A8A',

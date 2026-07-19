@@ -215,7 +215,7 @@ export function BusinessSwitcherDrawer() {
           <div className="px-4 pb-6 pt-2 space-y-3 max-h-[80vh] overflow-y-auto">
 
             <p className="text-[13px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-              আপনার খাতাবুকগুলো
+              আপনার বাংলা খাতাগুলো
             </p>
 
             {isLoading ? (
