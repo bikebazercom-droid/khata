@@ -112,26 +112,26 @@ export function BusinessSwitcherDrawer() {
       });
       if (!res.ok) throw new Error('delete failed');
 
-      const remaining = businesses.filter((b) => b.id !== confirmDeleteId);
-      setBusinesses(remaining);
-      setConfirmDeleteId(null);
-
+      // If the deleted business was active, point localStorage at the next one
       if (confirmDeleteId === selectedBusinessId) {
+        const remaining = businesses.filter((b) => b.id !== confirmDeleteId);
         if (remaining.length > 0) {
-          // Switch to first remaining business
-          await handleSwitch(remaining[0]!.id);
+          localStorage.setItem('selected_business_id', remaining[0]!.id);
+          setExtraHeaders({ 'x-business-id': remaining[0]!.id });
         } else {
-          // No businesses left — clear everything and close
-          setSelectedBusiness('');
           localStorage.removeItem('selected_business_id');
           setExtraHeaders({});
-          queryClient.clear();
-          closeSwitcher();
         }
       }
+
+      queryClient.clear();
+      await queryClient.invalidateQueries();
+
+      alert('খাতাটি ডাটাবেজ থেকে সম্পূর্ণ ডিলিট করা হয়েছে।');
+      window.location.reload();
     } catch (err) {
       console.error('Failed to delete business:', err);
-      alert('খাতা মুছে ফেলা যায়নি। আবার চেষ্টা করুন।');
+      alert('ডিলিট করা যায়নি, আবার চেষ্টা করুন।');
     } finally {
       setIsDeleting(false);
     }

@@ -1,0 +1,47 @@
+Hey Agent, look at Screenshot_14.jpg closely. The user has added a "🗑️ ডিলিট" button right inside the active business card selection block, but it is currently not functional. Tapping it does not delete the business from the database or handle the main account linkage properly.
+
+We need to make this "🗑️ ডিলিট" button work 100% perfectly with a confirmation modal and full cascading deletion from the live database.
+
+PLEASE PERFORM THESE WORKFLOW EDITS IN PARALLEL:
+
+1. UPDATE THE "🗑️ ডিলিট" BUTTON CLICK HANDLER (Frontend):
+Modify the drawer component so that clicking the "🗑️ ডিলিট" button triggers a confirmation dialog asking: "ডিলিট করতে চাইলে হা অথবা না চাপুন". If "হ্যাঁ" is pressed, it must fire a DELETE API request for that specific business ID.
+
+```javascript
+// Inside MultiKhataSelectorDrawer or wherever the list renders:
+const [businessToDelete, setBusinessToDelete] = useState(null);
+
+const executeDeleteKhata = async (id) => {
+  try {
+    const response = await fetch(`/api/businesses/${id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!response.ok) throw new Error('Failed to delete khata');
+
+    // If the active business was deleted, fallback to another available business ID
+    if (id === activeBusinessId) {
+      const remaining = businesses.filter(b => b.id !== id);
+      if (remaining.length > 0) {
+        localStorage.setItem('selectedBusinessId', remaining[0].id);
+        setExtraHeaders({ 'x-business-id': remaining[0].id });
+      } else {
+        localStorage.removeItem('selectedBusinessId');
+      }
+    }
+
+    queryClient.clear();
+    await queryClient.invalidateQueries();
+    alert('খাতাটি ডাটাবেজ থেকে সম্পূর্ণ ডিলিট করা হয়েছে।');
+    window.location.reload(); // Refresh to clean environment completely
+  } catch (error) {
+    console.error(error);
+    alert('ডিলিট করা যায়নি, আবার চেষ্টা করুন।');
+  } finally {
+    setBusinessToDelete(null);
+  }
+};
+
+// Wire the red "🗑️ ডিলিট" button in the JSX:
+// onClick={(e) => { e.stopPropagation(); setBusinessToDelete(biz.id); }}
