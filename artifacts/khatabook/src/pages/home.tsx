@@ -130,16 +130,29 @@ export function HomeView() {
       });
 
       const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
-
-      // Fetch blob from data URL (mirrors the PDF pipeline's blob source)
-      const binaryFetch = await fetch(jpgDataUrl);
-      const imageBinaryBlob = await binaryFetch.blob();
       const timestamp = new Date().toISOString().split('T')[0];
-      const sharedPhotoFile = new File([imageBinaryBlob], `Payment_Request_${timestamp}.jpg`, {
+      const filename = `Banglakhata_Receipt_${timestamp}.jpg`;
+
+      // ACTION 1: Force immediate silent download to gallery
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = jpgDataUrl;
+      downloadAnchor.download = filename;
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
+
+      // ACTION 2: Build binary File via atob → ArrayBuffer → Blob
+      const byteString = atob(jpgDataUrl.split(',')[1]);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+      const imageBlob = new Blob([ab], { type: 'image/jpeg' });
+      const sharedPhotoFile = new File([imageBlob], filename, {
         type: 'image/jpeg',
         lastModified: Date.now(),
       });
 
+      // ACTION 3: Invoke native share overlay
       if (navigator.canShare && navigator.canShare({ files: [sharedPhotoFile] })) {
         try {
           await navigator.share({
@@ -148,20 +161,19 @@ export function HomeView() {
             text: 'Banglakhata থেকে পাঠানো লেনদেনের ছবি।',
           });
           return;
-        } catch (e) {
-          if (e instanceof DOMException && (e as DOMException).name === 'AbortError') return;
-          // fall through to WhatsApp link
+        } catch (shareErr) {
+          console.log('Native share panel dismissed or blocked by browser restriction.');
         }
       }
 
+      // Failsafe: WhatsApp deep link
       window.open(
         'https://api.whatsapp.com/send?text=' +
-          encodeURIComponent('রসিদটি আপনার ফোনে JPG ছবি আকারে ডাউনলোড হয়েছে। ইমু বা হোয়াটসঅ্যাপ গ্যালারি থেকে সেন্ড করুন।'),
+          encodeURIComponent('রসিদটি আপনার ফোনে ছবি আকারে সেভ হয়েছে। গ্যালারি থেকে সেন্ড করুন।'),
         '_blank',
       );
     } catch (err) {
-      console.error('Snapshot or file streaming pipeline crash:', err);
-      window.open('https://api.whatsapp.com/send', '_blank');
+      console.error('Fatal sharing capture engine exception:', err);
     } finally {
       setIsWhatsAppSharing(false);
     }
