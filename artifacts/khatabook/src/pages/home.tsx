@@ -102,6 +102,81 @@ export function HomeView() {
     return { youWillGet, youWillGive };
   }, [summaryParties]);
 
+  /** Tap the balance chip → build a hidden receipt, capture as JPG, open native share sheet. */
+  const handleInstantShare = useCallback(async (
+    e: React.MouseEvent,
+    party: { name: string; phone?: string | null; currentBalance: number; balanceType: string; lastTransactionAt?: string | Date | null }
+  ) => {
+    e.stopPropagation();
+    const isGet = party.balanceType === 'YOU_WILL_GET';
+    const balanceColor = isGet ? '#065F46' : '#991B1B';
+    const amountLabel  = isGet ? 'আপনি পেয়েছেন' : 'আপনি দিয়েছেন';
+    const formatted    = formatCurrency(party.currentBalance);
+
+    const dateStr = party.lastTransactionAt
+      ? (() => {
+          const d = new Date(party.lastTransactionAt as string);
+          const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+          const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+          return `${date} • ${time}`;
+        })()
+      : '';
+
+    const el = document.createElement('div');
+    el.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:600px;background:#fff;padding:32px;font-family:sans-serif;border-radius:12px;';
+    el.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="background:#004B93;color:#fff;width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:bold;flex-shrink:0;">+</div>
+          <div>
+            <div style="font-size:20px;font-weight:700;color:#111827;">${party.phone || party.name}</div>
+            <div style="font-size:14px;color:#6B7280;margin-top:4px;">${dateStr}</div>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:26px;font-weight:800;color:${balanceColor};">৳ ${formatted}</div>
+          <div style="font-size:14px;color:#374151;margin-top:5px;">${amountLabel}</div>
+        </div>
+      </div>
+      <hr style="border:0;border-top:1px solid #E5E7EB;margin:18px 0;" />
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:18px;color:#111827;font-weight:500;">বর্তমান ব্যালেন্স</div>
+        <div style="font-size:22px;font-weight:800;color:${balanceColor};">৳ ${formatted}</div>
+      </div>
+    `;
+    document.body.appendChild(el);
+
+    try {
+      const canvas = await html2canvas(el, { backgroundColor: '#ffffff', scale: 3, useCORS: true, logging: false });
+      document.body.removeChild(el);
+
+      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
+      const filename   = `Banglakhata_${party.name}_${new Date().toISOString().split('T')[0]}.jpg`;
+
+      const byteStr = atob(jpgDataUrl.split(',')[1]);
+      const ab = new ArrayBuffer(byteStr.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteStr.length; i++) ia[i] = byteStr.charCodeAt(i);
+      const blob = new Blob([ab], { type: 'image/jpeg' });
+      const file = new File([blob], filename, { type: 'image/jpeg', lastModified: Date.now() });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: 'ব্যালেন্স রসিদ', text: `${party.name} — ${formatted}` });
+          return;
+        } catch (shareErr: unknown) {
+          if (shareErr instanceof Error && shareErr.name === 'AbortError') return;
+        }
+      }
+      // Fallback: trigger download
+      const a = document.createElement('a');
+      a.href = jpgDataUrl; a.download = filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    } catch (err) {
+      if (document.body.contains(el)) document.body.removeChild(el);
+      console.error('Instant share error:', err);
+    }
+  }, []);
 
   const exportFilteredReportToPDF = useCallback(async () => {
     setIsExportingPdf(true);
@@ -505,7 +580,12 @@ export function HomeView() {
                   <p className="text-xs font-medium text-slate-500 truncate">{party.phone}</p>
                 </div>
                 <div className="shrink-0 flex items-center gap-1.5">
-                  <div className="text-right">
+                  <button
+                    type="button"
+                    onClick={(e) => handleInstantShare(e, party)}
+                    className="text-right active:scale-95 transition-transform"
+                    aria-label={`${party.name}-এর ব্যালেন্স শেয়ার করুন`}
+                  >
                     <p
                       className={cn(
                         'text-[15px] font-bold tracking-tight',
@@ -517,7 +597,7 @@ export function HomeView() {
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 text-right">
                       {party.balanceType === 'YOU_WILL_GET' ? 'পাবেন' : 'দেবেন'}
                     </p>
-                  </div>
+                  </button>
                   <ChevronRight className="w-4 h-4 text-slate-300" />
                 </div>
               </div>

@@ -1,0 +1,79 @@
+Hey Agent, the user wants a highly customized, instant sharing workflow. When clicking/tapping on the balance amount next to a customer in the list, it should NOT open any modal window. 
+
+Instead, it must INSTANTLY and silently compile a beautiful dynamic transaction receipt element (matching the structure of photo_2026-07-18_19-56-31.jpg), capture it as a high-quality JPG image using html2canvas in the background, and immediately invoke the smartphone's NATIVE SHARE SHEET showing WhatsApp, Imo, Telegram, etc., to share that JPG file directly!
+
+CRITICAL STRUCTURAL SPECIFICATIONS (As per photo_2026-07-18_19-56-31.jpg):
+The generated receipt snapshot must look professionally styled:
+- A clean top section containing the Customer Phone Number/Name on the left, and the Transaction Entry Amount with the label "আপনি পেয়েছেন" or "আপনি দিয়েছেন" on the right.
+- A light horizontal divider line.
+- A bottom section displaying "বর্তমান ব্যালেন্স" on the left, and the absolute total net balance amount on the right.
+
+Please integrate this direct click handler pipeline into the customer list row component immediately:
+
+```javascript
+import React from 'react';
+import html2canvas from 'html2canvas';
+
+export const CustomerRowItem = ({ customer, currentTransaction }) => {
+  
+  // FUNCTION TO GENERATE HIDDEN DOM BLOCK, SNAPSHOT IT AS JPG, AND LAUNCH SYSTEM OVERLAY DIRECTLY
+  const handleInstantDirectJpgShare = async (e) => {
+    if (e) e.stopPropagation();
+    
+    try {
+      // 1. Create a dynamic receipt frame hidden perfectly outside the viewport
+      const hiddenRenderContainer = document.createElement('div');
+      hiddenRenderContainer.style.position = 'absolute';
+      hiddenRenderContainer.style.left = '-9999px';
+      hiddenRenderContainer.style.top = '-9999px';
+      hiddenRenderContainer.style.width = '600px';
+      hiddenRenderContainer.style.backgroundColor = '#ffffff';
+      hiddenRenderContainer.style.padding = '30px';
+      hiddenRenderContainer.style.fontFamily = 'sans-serif';
+      hiddenRenderContainer.style.borderRadius = '12px';
+      
+      // Match the visual structure of photo_2026-07-18_19-56-31.jpg
+      hiddenRenderContainer.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+          <div style="display: flex; align-items: center; gap: 15px;">
+            <div style="background-color: #004B93; color: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold;">+</div>
+            <div>
+              <div style="font-size: 22px; font-weight: bold; color: #111827;">${customer?.phone || '+8801629251426'}</div>
+              <div style="font-size: 15px; color: #6B7280; margin-top: 4px;">${currentTransaction?.date || '18 Jul 26 • 06:29 PM'}</div>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 26px; font-weight: bold; color: #065F46;">৳ ${currentTransaction?.amount || '৮,০০,০৮৮'}</div>
+            <div style="font-size: 15px; color: #374151; margin-top: 4px;">${currentTransaction?.type === 'receive' ? 'আপনি পেয়েছেন' : 'আপনি দিয়েছেন'}</div>
+          </div>
+        </div>
+        
+        <hr style="border: 0; border-top: 1px solid #E5E7EB; margin: 20px 0;" />
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 5px;">
+          <div style="font-size: 20px; color: #111827; fontWeight: 500;">বর্তমান ব্যালেন্স</div>
+          <div style="font-size: 24px; font-weight: bold; color: #065F46;">৳ ${customer?.totalBalance || '৯,৫৬,৮৩,৮৩৫.৫৬'}</div>
+        </div>
+      `;
+      
+      document.body.appendChild(hiddenRenderContainer);
+
+      // 2. Snapshot the generated layout via html2canvas
+      const canvas = await html2canvas(hiddenRenderContainer, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true
+      });
+      
+      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+      document.body.removeChild(hiddenRenderContainer); // Clean up DOM instantly
+
+      // 3. Convert image stream to Binary File Object for Native Sharing
+      const byteString = atob(jpgDataUrl.split(',')[1]);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      const imageBlob = new Blob([ab], { type: 'image/jpeg' });
+      const
