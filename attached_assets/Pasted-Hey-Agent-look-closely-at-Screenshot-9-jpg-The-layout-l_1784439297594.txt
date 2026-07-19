@@ -1,0 +1,139 @@
+Hey Agent, look closely at Screenshot_9.jpg. The layout looks perfect now with just the full-width green "ডাউনলোড" button. 
+
+The user wants this single "ডাউনলোড" button to perform BOTH actions sequentially upon a single touch/click event:
+1. ACTION 1 (IMMEDIATE DOWNLOAD): Snapshot the receipt container card area via html2canvas and instantly download it into the phone's gallery/local storage as a high-quality JPG image.
+2. ACTION 2 (AUTOMATIC NATIVE SHARE SHEET): Immediately after triggering the download anchor, convert that exact same image data into a binary stream and launch the smartphone's NATIVE OS SHARE OVERLAY PANEL (allowing instant sharing to Imo, WhatsApp, etc.).
+
+Update the unified click handler for both the interactive main Amount text AND the full-width green Download button immediately with this seamless binary pipeline script:
+
+```javascript
+import React, { useRef } from 'react';
+import html2canvas from 'html2canvas';
+
+export const PaymentRequestModal = ({ customer, onClose }) => {
+  const receiptCardAreaRef = useRef(null);
+
+  // CONSOLIDATED SINGLE-CLICK PIPELINE: DOWNLOAD TO STORAGE + TRIGGER NATIVE SHARING OVERLAY
+  const handleDownloadAndNativeShare = async (e) => {
+    if (e) e.stopPropagation();
+    if (!receiptCardAreaRef.current) return;
+
+    try {
+      // 1. Snapshot the target layout viewport perfectly at professional resolution
+      const canvas = await html2canvas(receiptCardAreaRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 3, 
+        useCORS: true,
+        logging: false
+      });
+
+      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `Banglakhata_Receipt_${timestamp}.jpg`;
+
+      // ==========================================================
+      // STAGE 1: FORCE INSTANT AUTOMATIC DOWNLOAD DIRECT TO STORAGE
+      // ==========================================================
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = jpgDataUrl;
+      downloadAnchor.download = filename;
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
+
+      // ==========================================================
+      // STAGE 2: CONVERT BASE64 DATA UNIFORMLY FOR LIVE SHARING SHEET
+      // ==========================================================
+      const byteString = atob(jpgDataUrl.split(',')[1]);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      const imageBlob = new Blob([ab], { type: 'image/jpeg' });
+      const sharedPhotoFile = new File([imageBlob], filename, { 
+        type: 'image/jpeg',
+        lastModified: Date.now()
+      });
+
+      // ==========================================================
+      // STAGE 3: LAUNCH SMARTPHONE'S NATIVE DIRECT SHARING SHEET
+      // ==========================================================
+      if (navigator.canShare && navigator.canShare({ files: [sharedPhotoFile] })) {
+        try {
+          await navigator.share({
+            files: [sharedPhotoFile],
+            title: 'পেমেন্ট রসিদ ফটো',
+            text: 'Banglakhata থেকে পাঠানো লেনদেনের ছবি।'
+          });
+          return; // Process completed successfully
+        } catch (shareErr) {
+          console.log("Native OS share panel dismissed or blocked by mobile client browser environment.");
+        }
+      }
+
+      // Failsafe deep-link backup trigger if absolute mobile web configurations apply
+      window.open(`[https://api.whatsapp.com/send?text=$](https://api.whatsapp.com/send?text=$){encodeURIComponent('রসিদটি আপনার ফোনে ছবি আকারে সেভ হয়েছে। গ্যালারি থেকে শেয়ার করুন।')}`, '_blank');
+
+    } catch (crashErr) {
+      console.error('Fatal sharing capture engine exception encountered:', crashErr);
+    }
+  };
+
+  return (
+    <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', overflow: 'hidden' }}>
+      
+      {/* Target Image Snapshot Container Marked with Ref */}
+      <div ref={receiptCardAreaRef} style={{ padding: '20px', paddingBottom: '10px' }}>
+        <p style={{ color: '#4B5563', fontSize: '15px', textAlign: 'center', fontWeight: '500' }}>
+          আপনাকে অর্থ প্রদানের জন্য {customer?.name || 'Shakil'}-এর কাছে অনুরোধ করুন
+        </p>
+
+        {/* Dynamic Amount Header Text - Clickable Backup Trigger */}
+        <div 
+          onClick={handleDownloadAndNativeShare}
+          style={{ 
+            color: '#10B981', 
+            fontSize: '36px', 
+            fontWeight: '900', 
+            textAlign: 'center', 
+            margin: '20px 0 5px 0',
+            cursor: 'pointer',
+            fontFamily: 'sans-serif'
+          }}
+        >
+          ৳ {customer?.amount || '৮১,MD,২৯৭.৬৮'}
+        </div>
+
+        {/* Conditional Label text showing 'পাবেন' or 'দেবেন' based on status */}
+        <p style={{ color: '#9CA3AF', fontSize: '13px', textAlign: 'center', marginBottom: '15px' }}>
+          {customer?.type === 'receive' ? 'পাবেন' : 'দেবেন'} (ছবি শেয়ার করতে ট্যাপ করুন)
+        </p>
+      </div>
+
+      {/* FULL-WIDTH GREEN ACTION BUTTON RENDERED ACCORDING TO SCREENSHOT_9 */}
+      <div style={{ padding: '16px', paddingTop: '0' }}>
+        <button 
+          onClick={handleDownloadAndNativeShare}
+          style={{ 
+            width: '100%', 
+            backgroundColor: '#10B981', 
+            color: '#ffffff', 
+            padding: '14px 0', 
+            borderRadius: '24px', 
+            fontSize: '16px', 
+            fontWeight: 'bold', 
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}
+        >
+          📥 ডাউনলোড করুন ও শেয়ার করুন
+        </button>
+      </div>
+    </div>
+  );
+};

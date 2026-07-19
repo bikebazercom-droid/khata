@@ -133,36 +133,24 @@ export function HomeView() {
     return { jpgDataUrl, imageBlob };
   }, [receiptRef]);
 
-  /** Download button: silently save JPG to gallery + toast confirmation. */
-  const handlePureDownload = useCallback(async () => {
+  /** Download + native share: saves JPG to gallery, then opens native share sheet. */
+  const handleDownloadAndShare = useCallback(async () => {
     if (!requestModalParty) return;
     setIsWhatsAppSharing(true);
     try {
       const imageData = await generateReceiptJpg();
       if (!imageData) return;
       const filename = `Banglakhata_Receipt_${new Date().toISOString().split('T')[0]}.jpg`;
+
+      // Stage 1: download to gallery
       const anchor = document.createElement('a');
       anchor.href = imageData.jpgDataUrl;
       anchor.download = filename;
       document.body.appendChild(anchor);
       anchor.click();
       document.body.removeChild(anchor);
-      toast.success('✅ রসিদের ছবিটি আপনার গ্যালারিতে ডাউনলোড হয়েছে!');
-    } catch (err) {
-      console.error('Download pipeline exception:', err);
-    } finally {
-      setIsWhatsAppSharing(false);
-    }
-  }, [generateReceiptJpg, requestModalParty]);
 
-  /** Share button & amount tap: build File → native share sheet → WhatsApp fallback. */
-  const handleWhatsAppJpgShare = useCallback(async () => {
-    if (!receiptRef.current || !requestModalParty) return;
-    setIsWhatsAppSharing(true);
-    try {
-      const imageData = await generateReceiptJpg();
-      if (!imageData) return;
-      const filename = `Banglakhata_Receipt_${new Date().toISOString().split('T')[0]}.jpg`;
+      // Stage 2: native share sheet
       const sharedPhotoFile = new File([imageData.imageBlob], filename, {
         type: 'image/jpeg',
         lastModified: Date.now(),
@@ -176,7 +164,8 @@ export function HomeView() {
             text: 'Banglakhata থেকে পাঠানো লেনদেনের ছবি।',
           });
           return;
-        } catch (shareErr) {
+        } catch (shareErr: unknown) {
+          if (shareErr instanceof Error && shareErr.name === 'AbortError') return;
           console.log('Native share panel dismissed or blocked by browser restriction.');
         }
       }
@@ -184,15 +173,15 @@ export function HomeView() {
       // Failsafe: WhatsApp deep link
       window.open(
         'https://api.whatsapp.com/send?text=' +
-          encodeURIComponent('রসিদটি ডাউনলোড করা হয়েছে।'),
+          encodeURIComponent('রসিদটি ডাউনলোড করা হয়েছে। গ্যালারি থেকে শেয়ার করুন।'),
         '_blank',
       );
     } catch (err) {
-      console.error('Fatal sharing capture engine exception:', err);
+      console.error('Download + share pipeline exception:', err);
     } finally {
       setIsWhatsAppSharing(false);
     }
-  }, [generateReceiptJpg, receiptRef, requestModalParty]);
+  }, [generateReceiptJpg, requestModalParty]);
 
   const exportFilteredReportToPDF = useCallback(async () => {
     setIsExportingPdf(true);
@@ -814,7 +803,7 @@ export function HomeView() {
               {/* Large amount — tap to share as photo */}
               <div className="mb-5">
                 <p
-                  onClick={handleWhatsAppJpgShare}
+                  onClick={handleDownloadAndShare}
                   className={cn(
                     'text-4xl font-extrabold tracking-tight cursor-pointer select-none active:opacity-70 transition-opacity',
                     requestModalParty.balanceType === 'YOU_WILL_GET'
@@ -839,7 +828,7 @@ export function HomeView() {
             <div className="flex flex-col gap-2 mt-5">
               <button
                 type="button"
-                onClick={handlePureDownload}
+                onClick={handleDownloadAndShare}
                 disabled={isWhatsAppSharing}
                 className="w-full bg-emerald-500 active:bg-emerald-600 disabled:opacity-60 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.97] transition-all"
               >
