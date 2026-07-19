@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -18,12 +18,10 @@ import { TransactionEntryScreen } from '@/components/modals/transaction-entry-sc
 import {
   ChevronLeft,
   Trash2,
-  Share2,
   Cloud,
   CheckCircle2,
   Receipt,
   ImageIcon,
-  Loader2,
   Pencil,
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -43,7 +41,6 @@ import { toWhatsAppNumber } from '@/lib/ledger-report';
 import { BillImageLightbox } from '@/components/modals/bill-image-lightbox';
 import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic';
 import { toast } from 'sonner';
-import html2canvas from 'html2canvas';
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -68,9 +65,7 @@ export function TransactionDetailPage() {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
-  const entryDetailsRef = useRef<HTMLDivElement>(null);
 
   const entry = entries.find((e) => e.id === entryId);
   const storeName = settings?.storeName || 'Banglakhata';
@@ -182,75 +177,6 @@ export function TransactionDetailPage() {
     })();
   }
 
-  /**
-   * Native share pipeline:
-   *  1. html2canvas → JPEG at scale 3.
-   *  2. Phantom anchor download as a safety net.
-   *  3. navigator.share({ files }) for native OS share sheet.
-   *  4. Fallback to navigator.share({ text }) if file sharing blocked.
-   *  5. All errors caught silently — button never freezes.
-   */
-  async function handleShare() {
-    if (!entryDetailsRef.current) return;
-    setIsSharing(true);
-    try {
-      const canvas = await html2canvas(entryDetailsRef.current, {
-        backgroundColor: '#ffffff',
-        scale: 3,
-        useCORS: true,
-        logging: false,
-      });
-
-      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
-      const timestamp = new Date().toISOString().split('T')[0];
-      const filename = `Banglakhata_Receipt_${timestamp}.jpg`;
-
-      // ACTION 1: Force immediate silent download to gallery
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.href = jpgDataUrl;
-      downloadAnchor.download = filename;
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      document.body.removeChild(downloadAnchor);
-
-      // ACTION 2: Build binary File via atob → ArrayBuffer → Blob
-      const byteString = atob(jpgDataUrl.split(',')[1]);
-      const ab = new ArrayBuffer(byteString.length);
-      const ia = new Uint8Array(ab);
-      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-      const imageBlob = new Blob([ab], { type: 'image/jpeg' });
-      const sharedPhotoFile = new File([imageBlob], filename, {
-        type: 'image/jpeg',
-        lastModified: Date.now(),
-      });
-
-      // ACTION 3: Invoke native share overlay
-      if (navigator.canShare && navigator.canShare({ files: [sharedPhotoFile] })) {
-        try {
-          await navigator.share({
-            files: [sharedPhotoFile],
-            title: 'পেমেন্ট রসিদ ফটো',
-            text: 'Banglakhata থেকে পাঠানো লেনদেনের ছবি।',
-          });
-          return;
-        } catch (shareErr) {
-          console.log('Native share panel dismissed or blocked by browser restriction.');
-        }
-      }
-
-      // Failsafe: WhatsApp deep link
-      window.open(
-        'https://api.whatsapp.com/send?text=' +
-          encodeURIComponent('রসিদটি আপনার ফোনে ছবি আকারে সেভ হয়েছে। গ্যালারি থেকে সেন্ড করুন।'),
-        '_blank',
-      );
-    } catch (err: unknown) {
-      console.error('Fatal sharing capture engine exception:', err);
-    } finally {
-      setIsSharing(false);
-    }
-  }
-
   // Loading skeleton
   if (partyLoading || entriesLoading) {
     return (
@@ -295,7 +221,7 @@ export function TransactionDetailPage() {
       </header>
 
       {/* ── Scrollable body ─────────────────────────────────── */}
-      <div ref={entryDetailsRef} className="flex-1 overflow-y-auto px-4 py-4 pb-28 space-y-3">
+      <div className="flex-1 overflow-y-auto px-4 py-4 pb-28 space-y-3">
 
         {/* Main transaction card */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
@@ -475,13 +401,6 @@ export function TransactionDetailPage() {
             </p>
           </div>
 
-          {/* Share hint — excluded from html2canvas capture */}
-          <div data-html2canvas-ignore className="bg-white px-5 py-3 flex items-center gap-2 border-t border-slate-100">
-            <ImageIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <p className="text-[11px] text-slate-400 font-medium">
-              "শেয়ার করুন" বাটনে ট্যাপ করলে এই রসিদটি ছবি হিসেবে তৈরি হবে
-            </p>
-          </div>
         </div>
       </div>
 
@@ -495,34 +414,14 @@ export function TransactionDetailPage() {
           <Pencil className="w-4 h-4 mr-2" />
           এন্ট্রি এডিট করুন
         </Button>
-        {/* Secondary row: Delete + Share */}
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 hover:text-red-700 font-bold"
-            onClick={() => setShowDeleteConfirm(true)}
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            মুছে ফেলুন
-          </Button>
-          <Button
-            className="flex-1 bg-slate-700 hover:bg-slate-800 font-bold"
-            onClick={handleShare}
-            disabled={isSharing}
-          >
-            {isSharing ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                রসিদ…
-              </>
-            ) : (
-              <>
-                <Share2 className="w-4 h-4 mr-2" />
-                শেয়ার করুন
-              </>
-            )}
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 hover:text-red-700 font-bold"
+          onClick={() => setShowDeleteConfirm(true)}
+        >
+          <Trash2 className="w-4 h-4 mr-2" />
+          মুছে ফেলুন
+        </Button>
       </div>
 
       {/* Delete confirmation */}

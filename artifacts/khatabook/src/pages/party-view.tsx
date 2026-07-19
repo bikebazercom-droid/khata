@@ -21,7 +21,6 @@ import {
   MessageSquareText,
   Plus,
   Loader2,
-  Share2,
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -174,71 +173,6 @@ export function PartyView() {
     } finally {
       restore?.();
       setIsGeneratingReport(false);
-    }
-  };
-
-  /**
-   * Native share pipeline:
-   *  1. html2canvas → JPEG at scale 3.
-   *  2. Phantom anchor download as a safety net.
-   *  3. navigator.share({ files }) for native OS share sheet.
-   *  4. Fallback to navigator.share({ text }) if file sharing blocked.
-   *  5. All errors caught silently — button never freezes.
-   */
-  const handleEntryShare = async (cardEl: HTMLElement) => {
-    try {
-      const canvas = await html2canvas(cardEl, {
-        backgroundColor: '#ffffff',
-        scale: 3,
-        useCORS: true,
-        logging: false,
-      });
-
-      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
-      const timestamp = new Date().toISOString().split('T')[0];
-      const filename = `Banglakhata_Receipt_${timestamp}.jpg`;
-
-      // ACTION 1: Force immediate silent download to gallery
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.href = jpgDataUrl;
-      downloadAnchor.download = filename;
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      document.body.removeChild(downloadAnchor);
-
-      // ACTION 2: Build binary File via atob → ArrayBuffer → Blob
-      const byteString = atob(jpgDataUrl.split(',')[1]);
-      const ab = new ArrayBuffer(byteString.length);
-      const ia = new Uint8Array(ab);
-      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-      const imageBlob = new Blob([ab], { type: 'image/jpeg' });
-      const sharedPhotoFile = new File([imageBlob], filename, {
-        type: 'image/jpeg',
-        lastModified: Date.now(),
-      });
-
-      // ACTION 3: Invoke native share overlay
-      if (navigator.canShare && navigator.canShare({ files: [sharedPhotoFile] })) {
-        try {
-          await navigator.share({
-            files: [sharedPhotoFile],
-            title: 'পেমেন্ট রসিদ ফটো',
-            text: 'Banglakhata থেকে পাঠানো লেনদেনের ছবি।',
-          });
-          return;
-        } catch (shareErr) {
-          console.log('Native share panel dismissed or blocked by browser restriction.');
-        }
-      }
-
-      // Failsafe: WhatsApp deep link
-      window.open(
-        'https://api.whatsapp.com/send?text=' +
-          encodeURIComponent('রসিদটি আপনার ফোনে ছবি আকারে সেভ হয়েছে। গ্যালারি থেকে সেন্ড করুন।'),
-        '_blank',
-      );
-    } catch (err) {
-      console.error('Fatal sharing capture engine exception:', err);
     }
   };
 
@@ -490,11 +424,7 @@ export function PartyView() {
                       <div
                         key={entry.id}
                         data-entry-card
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => navigate(`/party/${id}/entry/${entry.id}`)}
-                        onKeyDown={(e) => e.key === 'Enter' && navigate(`/party/${id}/entry/${entry.id}`)}
-                        className="bg-white rounded-xl shadow-sm grid grid-cols-[1fr_auto_auto] gap-3 items-center overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both cursor-pointer hover:shadow-md active:scale-[0.99] transition-all"
+                        className="bg-white rounded-xl shadow-sm grid grid-cols-[1fr_auto_auto] gap-3 items-center overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both"
                         style={{ animationDelay: `${i * 30}ms` }}
                       >
                         <div className="min-w-0 py-3 pl-4">
@@ -534,20 +464,6 @@ export function PartyView() {
                               />
                             </button>
                           )}
-                          {/* Per-entry share button */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const card = e.currentTarget.closest('[data-entry-card]') as HTMLElement | null;
-                              if (card) handleEntryShare(card);
-                            }}
-                            aria-label="শেয়ার করুন"
-                            className="mt-2 flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-[#004B93] active:scale-95 transition-all"
-                          >
-                            <Share2 className="w-3 h-3" />
-                            শেয়ার
-                          </button>
                         </div>
                         <div className={cn('w-20 h-full flex items-center justify-center py-3', isGave ? 'bg-[#FFF5F5]' : 'bg-white')}>
                           {isGave && (
