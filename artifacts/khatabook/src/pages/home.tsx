@@ -115,44 +115,59 @@ export function HomeView() {
     window.location.href = `sms:${phone}?body=${encodeURIComponent(message)}`;
   }, [requestModalParty, settings?.storeName]);
 
-  /** Capture the receipt box as a JPEG and share it via the Web Share API.
-   *  Falls back to a direct <a> download when sharing is unsupported. */
+  /** Shared utility: capture the receipt box → returns { jpgDataUrl, imageBlob }. */
+  const generateReceiptJpg = useCallback(async () => {
+    if (!receiptRef.current) return null;
+    const canvas = await html2canvas(receiptRef.current, {
+      backgroundColor: '#ffffff',
+      scale: 3,
+      useCORS: true,
+      logging: false,
+    });
+    const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
+    const byteString = atob(jpgDataUrl.split(',')[1]);
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+    const imageBlob = new Blob([ab], { type: 'image/jpeg' });
+    return { jpgDataUrl, imageBlob };
+  }, [receiptRef]);
+
+  /** Download button: silently save JPG to gallery + toast confirmation. */
+  const handlePureDownload = useCallback(async () => {
+    if (!requestModalParty) return;
+    setIsWhatsAppSharing(true);
+    try {
+      const imageData = await generateReceiptJpg();
+      if (!imageData) return;
+      const filename = `Banglakhata_Receipt_${new Date().toISOString().split('T')[0]}.jpg`;
+      const anchor = document.createElement('a');
+      anchor.href = imageData.jpgDataUrl;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      toast.success('✅ রসিদের ছবিটি আপনার গ্যালারিতে ডাউনলোড হয়েছে!');
+    } catch (err) {
+      console.error('Download pipeline exception:', err);
+    } finally {
+      setIsWhatsAppSharing(false);
+    }
+  }, [generateReceiptJpg, requestModalParty]);
+
+  /** Share button & amount tap: build File → native share sheet → WhatsApp fallback. */
   const handleWhatsAppJpgShare = useCallback(async () => {
     if (!receiptRef.current || !requestModalParty) return;
     setIsWhatsAppSharing(true);
     try {
-      // 1. Premium high-res snapshot of the receipt card
-      const canvas = await html2canvas(receiptRef.current, {
-        backgroundColor: '#ffffff',
-        scale: 3,
-        useCORS: true,
-        logging: false,
-      });
-
-      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
-      const timestamp = new Date().toISOString().split('T')[0];
-      const filename = `Banglakhata_Receipt_${timestamp}.jpg`;
-
-      // ACTION 1: Force immediate silent download to gallery
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.href = jpgDataUrl;
-      downloadAnchor.download = filename;
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      document.body.removeChild(downloadAnchor);
-
-      // ACTION 2: Build binary File via atob → ArrayBuffer → Blob
-      const byteString = atob(jpgDataUrl.split(',')[1]);
-      const ab = new ArrayBuffer(byteString.length);
-      const ia = new Uint8Array(ab);
-      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-      const imageBlob = new Blob([ab], { type: 'image/jpeg' });
-      const sharedPhotoFile = new File([imageBlob], filename, {
+      const imageData = await generateReceiptJpg();
+      if (!imageData) return;
+      const filename = `Banglakhata_Receipt_${new Date().toISOString().split('T')[0]}.jpg`;
+      const sharedPhotoFile = new File([imageData.imageBlob], filename, {
         type: 'image/jpeg',
         lastModified: Date.now(),
       });
 
-      // ACTION 3: Invoke native share overlay
       if (navigator.canShare && navigator.canShare({ files: [sharedPhotoFile] })) {
         try {
           await navigator.share({
@@ -169,7 +184,7 @@ export function HomeView() {
       // Failsafe: WhatsApp deep link
       window.open(
         'https://api.whatsapp.com/send?text=' +
-          encodeURIComponent('রসিদটি আপনার ফোনে ছবি আকারে সেভ হয়েছে। গ্যালারি থেকে সেন্ড করুন।'),
+          encodeURIComponent('রসিদটি ডাউনলোড করা হয়েছে।'),
         '_blank',
       );
     } catch (err) {
@@ -177,7 +192,7 @@ export function HomeView() {
     } finally {
       setIsWhatsAppSharing(false);
     }
-  }, [receiptRef, requestModalParty, settings?.storeName]);
+  }, [generateReceiptJpg, receiptRef, requestModalParty]);
 
   const exportFilteredReportToPDF = useCallback(async () => {
     setIsExportingPdf(true);
@@ -834,23 +849,35 @@ export function HomeView() {
             </div>
             {/* ── END RECEIPT CAPTURE TARGET ─────────────────────────────── */}
 
-            {/* Share buttons */}
-            <div className="flex gap-3 mt-5">
-              <button
-                type="button"
-                onClick={() => handleShareRequest('sms')}
-                className="flex-1 bg-blue-600 active:bg-blue-700 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.97] transition-all"
-              >
-                <MessageSquare className="w-4 h-4" />
-                SMS
-              </button>
+            {/* Action buttons */}
+            <div className="flex flex-col gap-2 mt-5">
+              {/* Row 1: SMS + Download */}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleShareRequest('sms')}
+                  className="flex-1 bg-blue-600 active:bg-blue-700 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.97] transition-all"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  SMS
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePureDownload}
+                  disabled={isWhatsAppSharing}
+                  className="flex-1 bg-emerald-500 active:bg-emerald-600 disabled:opacity-60 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.97] transition-all"
+                >
+                  {isWhatsAppSharing ? 'তৈরি হচ্ছে…' : '📥 ডাউনলোড'}
+                </button>
+              </div>
+              {/* Row 2: Full-width Share */}
               <button
                 type="button"
                 onClick={handleWhatsAppJpgShare}
                 disabled={isWhatsAppSharing}
-                className="flex-1 bg-[#004B93] active:bg-[#003a72] disabled:opacity-60 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.97] transition-all"
+                className="w-full bg-[#004B93] active:bg-[#003a72] disabled:opacity-60 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.97] transition-all"
               >
-                {isWhatsAppSharing ? 'তৈরি হচ্ছে…' : '📢 শেয়ার করুন'}
+                {isWhatsAppSharing ? 'তৈরি হচ্ছে…' : '📢 শেয়ার করুন (ইমু / হোয়াটসঅ্যাপ)'}
               </button>
             </div>
           </div>

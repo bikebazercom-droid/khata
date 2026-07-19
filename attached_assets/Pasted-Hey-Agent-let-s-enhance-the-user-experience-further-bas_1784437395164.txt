@@ -1,0 +1,139 @@
+Hey Agent, let's enhance the user experience further based on the user's latest request. We need to introduce a dedicated, clear "ডাউনলোড" (Download) button directly into the modal action layout footer. 
+
+Here is how the action mechanics should behave:
+1. "অ্যামাউন্ট টেক্সট" & "শেয়ার করুন" Button -> Triggers the snapshot, saves a copy, and instantly pops up the smartphone's NATIVE SHARE OVERLAY (exactly like the PDF popup in photo_2026-07-19_10-49-30_2.jpg).
+2. New "ডাউনলোড" Button -> Silently executes the `html2canvas` pipeline, saves the pristine JPG photo directly to the phone's local storage/gallery, and displays a clean visual confirmation toast or message without forcing the share sheet to prompt.
+
+Please update the payment request component footer to include this third dedicated button and optimize the split handlers now:
+
+```javascript
+import React, { useRef } from 'react';
+import html2canvas from 'html2canvas';
+
+export const PaymentRequestModal = ({ customer, onClose }) => {
+  const receiptCardAreaRef = useRef(null);
+  const timestamp = new Date().toISOString().split('T')[0];
+  const filename = `Banglakhata_Receipt_${timestamp}.jpg`;
+
+  // CORE IMAGE GENERATOR UTILITY
+  const generateJpgBlob = async () => {
+    if (!receiptCardAreaRef.current) return null;
+    const canvas = await html2canvas(receiptCardAreaRef.current, {
+      backgroundColor: '#ffffff',
+      scale: 3, 
+      useCORS: true,
+      logging: false
+    });
+    const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
+    
+    // Process base64 to binary raw data buffer
+    const byteString = atob(jpgDataUrl.split(',')[1]);
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    const imageBlob = new Blob([ab], { type: 'image/jpeg' });
+    return { jpgDataUrl, imageBlob };
+  };
+
+  // HANDLER 1: ONLY DOWNLOAD TO GALLERY
+  const handlePureDownload = async () => {
+    try {
+      const imageData = await generateJpgBlob();
+      if (!imageData) return;
+
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = imageData.jpgDataUrl;
+      downloadAnchor.download = filename;
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
+      
+      alert("✅ রসিদের ছবিটি আপনার ফোনের গ্যালারিতে ডাউনলোড হয়েছে!");
+    } catch (err) {
+      console.error('Download pipeline exception intercepted:', err);
+    }
+  };
+
+  // HANDLER 2: SNAPSHOT AND POP UP NATIVE OS SYSTEM SHARE SHEET
+  const handleNativeShareSheet = async (e) => {
+    if (e) e.stopPropagation();
+    try {
+      const imageData = await generateJpgBlob();
+      if (!imageData) return;
+
+      const sharedPhotoFile = new File([imageData.imageBlob], filename, { 
+        type: 'image/jpeg',
+        lastModified: Date.now()
+      });
+
+      // Invoke phone's original file overlay layer (Matching photo_2026-07-19_10-49-30_2.jpg)
+      if (navigator.canShare && navigator.canShare({ files: [sharedPhotoFile] })) {
+        await navigator.share({
+          files: [sharedPhotoFile],
+          title: 'পেমেন্ট রসিদ ফটো',
+          text: 'Banglakhata থেকে পাঠানো লেনদেনের ছবি।'
+        });
+        return;
+      }
+      
+      // Fallback if browser security rules restrict manual execution
+      window.open(`[https://api.whatsapp.com/send?text=$](https://api.whatsapp.com/send?text=$){encodeURIComponent('রসিদটি ডাউনলোড করা হয়েছে।')}`, '_blank');
+    } catch (shareErr) {
+      console.error('Share sheet interaction exception:', shareErr);
+    }
+  };
+
+  return (
+    <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', overflow: 'hidden' }}>
+      
+      {/* Captured Interface Container */}
+      <div ref={receiptCardAreaRef} style={{ padding: '20px' }}>
+        <p style={{ color: '#4B5563', fontSize: '15px', textAlign: 'center' }}>
+          আপনাকে অর্থ প্রদানের জন্য Shakil-এর কাছে অনুরোধ করুন
+        </p>
+
+        {/* Amount Text Input Wrapper */}
+        <div 
+          onClick={handleNativeShareSheet}
+          style={{ 
+            color: '#DC2626', 
+            fontSize: '36px', 
+            fontWeight: '900', 
+            textAlign: 'center', 
+            margin: '20px 0',
+            cursor: 'pointer'
+          }}
+        >
+          ৳ {customer?.amount || '৮৬,৯৫,৭০২.৩২'}
+        </div>
+      </div>
+
+      {/* THREE BUTTON FOOTER ROW ACTIONS LAYOUT */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '16px' }}>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button style={{ flex: 1, backgroundColor: '#2563EB', color: '#ffffff', padding: '12px 0', borderRadius: '8px' }}>
+            💬 SMS
+          </button>
+          
+          {/* NEW EXPLICIT PURE DOWNLOAD TO SYSTEM BUTTON */}
+          <button 
+            onClick={handlePureDownload}
+            style={{ flex: 1, backgroundColor: '#10B981', color: '#ffffff', padding: '12px 0', borderRadius: '8px', fontWeight: 'bold' }}
+          >
+            📥 ডাউনলোড করুন
+          </button>
+        </div>
+
+        {/* NATIVE SYSTEM OVERLAY GENERATOR BUTTON */}
+        <button 
+          onClick={handleNativeShareSheet}
+          style={{ width: '100%', backgroundColor: '#004B93', color: '#ffffff', padding: '14px 0', borderRadius: '8px', fontWeight: 'bold' }}
+        >
+          📢 শেয়ার করুন (ইমু / হোয়াটসঅ্যাপ)
+        </button>
+      </div>
+    </div>
+  );
+};
