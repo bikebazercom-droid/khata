@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Link, useLocation } from 'wouter';
@@ -9,7 +9,7 @@ import {
   DueFilter,
 } from '@workspace/api-client-react';
 import { useMemo } from 'react';
-import { Search, Plus, Settings, User, ChevronRight, UserPlus2, SlidersHorizontal, FileText, Users, Pencil, FolderOpen, X, MessageSquare, MessageCircle } from 'lucide-react';
+import { Search, Plus, Settings, User, ChevronRight, UserPlus2, SlidersHorizontal, FileText, Users, Pencil, FolderOpen, X } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { AddPartyModal } from '@/components/modals/add-party-modal';
@@ -63,10 +63,7 @@ export function HomeView() {
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
   const [isRenameStoreOpen, setIsRenameStoreOpen] = useState(false);
 
-  const [requestModalParty, setRequestModalParty] = useState<{ id: string; name: string; phone?: string | null; currentBalance: number; balanceType: string } | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
-  const [isWhatsAppSharing, setIsWhatsAppSharing] = useState(false);
-  const receiptRef = useRef<HTMLDivElement>(null);
 
   const { data: settings } = useGetBusinessSettings();
   // Role-only parties (no search/dueFilter) — used purely for the summary card so
@@ -105,84 +102,6 @@ export function HomeView() {
     return { youWillGet, youWillGive };
   }, [summaryParties]);
 
-  const handleShareRequest = useCallback((platform: 'sms') => {
-    if (!requestModalParty) return;
-    const storeName = settings?.storeName || 'Banglakhata';
-    const amount = formatCurrency(requestModalParty.currentBalance);
-    const message =
-      `প্রিয় ${requestModalParty.name}, আপনার বকেয়া ${amount} পরিশোধের জন্য বিনীত অনুরোধ করা হচ্ছে। — ${storeName}`;
-    const phone = requestModalParty.phone ?? '';
-    window.location.href = `sms:${phone}?body=${encodeURIComponent(message)}`;
-  }, [requestModalParty, settings?.storeName]);
-
-  /** Shared utility: capture the receipt box → returns { jpgDataUrl, imageBlob }. */
-  const generateReceiptJpg = useCallback(async () => {
-    if (!receiptRef.current) return null;
-    const canvas = await html2canvas(receiptRef.current, {
-      backgroundColor: '#ffffff',
-      scale: 3,
-      useCORS: true,
-      logging: false,
-      ignoreElements: (el) => el.hasAttribute('data-html2canvas-ignore'),
-    });
-    const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.98);
-    const byteString = atob(jpgDataUrl.split(',')[1]);
-    const ab = new ArrayBuffer(byteString.length);
-    const ia = new Uint8Array(ab);
-    for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-    const imageBlob = new Blob([ab], { type: 'image/jpeg' });
-    return { jpgDataUrl, imageBlob };
-  }, [receiptRef]);
-
-  /** Download + native share: saves JPG to gallery, then opens native share sheet. */
-  const handleDownloadAndShare = useCallback(async () => {
-    if (!requestModalParty) return;
-    setIsWhatsAppSharing(true);
-    try {
-      const imageData = await generateReceiptJpg();
-      if (!imageData) return;
-      const filename = `Banglakhata_Receipt_${new Date().toISOString().split('T')[0]}.jpg`;
-
-      // Stage 1: download to gallery
-      const anchor = document.createElement('a');
-      anchor.href = imageData.jpgDataUrl;
-      anchor.download = filename;
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-
-      // Stage 2: native share sheet
-      const sharedPhotoFile = new File([imageData.imageBlob], filename, {
-        type: 'image/jpeg',
-        lastModified: Date.now(),
-      });
-
-      if (navigator.canShare && navigator.canShare({ files: [sharedPhotoFile] })) {
-        try {
-          await navigator.share({
-            files: [sharedPhotoFile],
-            title: 'পেমেন্ট রসিদ ফটো',
-            text: 'Banglakhata থেকে পাঠানো লেনদেনের ছবি।',
-          });
-          return;
-        } catch (shareErr: unknown) {
-          if (shareErr instanceof Error && shareErr.name === 'AbortError') return;
-          console.log('Native share panel dismissed or blocked by browser restriction.');
-        }
-      }
-
-      // Failsafe: WhatsApp deep link
-      window.open(
-        'https://api.whatsapp.com/send?text=' +
-          encodeURIComponent('রসিদটি ডাউনলোড করা হয়েছে। গ্যালারি থেকে শেয়ার করুন।'),
-        '_blank',
-      );
-    } catch (err) {
-      console.error('Download + share pipeline exception:', err);
-    } finally {
-      setIsWhatsAppSharing(false);
-    }
-  }, [generateReceiptJpg, requestModalParty]);
 
   const exportFilteredReportToPDF = useCallback(async () => {
     setIsExportingPdf(true);
@@ -585,17 +504,8 @@ export function HomeView() {
                   </div>
                   <p className="text-xs font-medium text-slate-500 truncate">{party.phone}</p>
                 </div>
-                {/* Amount tap → payment request sheet; chevron tap → navigate */}
                 <div className="shrink-0 flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setRequestModalParty(party);
-                    }}
-                    aria-label={`${party.name}-এর কাছে অর্থ প্রদানের অনুরোধ করুন`}
-                    className="text-right active:scale-95 transition-all"
-                  >
+                  <div className="text-right">
                     <p
                       className={cn(
                         'text-[15px] font-bold tracking-tight',
@@ -607,7 +517,7 @@ export function HomeView() {
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 text-right">
                       {party.balanceType === 'YOU_WILL_GET' ? 'পাবেন' : 'দেবেন'}
                     </p>
-                  </button>
+                  </div>
                   <ChevronRight className="w-4 h-4 text-slate-300" />
                 </div>
               </div>
@@ -767,78 +677,6 @@ export function HomeView() {
         </div>
       )}
 
-      {/* ── Payment request bottom sheet ─────────────────────────────────
-          Opens when the user taps the balance amount on a party row.
-          SMS fires the native SMS intent; WhatsApp opens wa.me.         */}
-      {requestModalParty && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setRequestModalParty(null)}
-          />
-          {/* Sheet card */}
-          <div className="relative bg-white rounded-t-3xl px-5 pt-4 pb-[calc(1.5rem+var(--safe-bottom))] shadow-2xl">
-            {/* Drag handle */}
-            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4" />
-
-            {/* ── RECEIPT CAPTURE TARGET ──────────────────────────────────
-                html2canvas renders this box to a JPEG for WhatsApp sharing. */}
-            <div ref={receiptRef} className="bg-white px-1 py-2.5">
-              {/* Header */}
-              <div className="flex items-start justify-between gap-3 mb-5">
-                <p className="text-sm font-semibold text-slate-600 leading-snug flex-1">
-                  আপনাকে অর্থ প্রদানের জন্য{' '}
-                  <span className="text-slate-900 font-extrabold">{requestModalParty.name}</span>
-                  -এর কাছে অনুরোধ করুন
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setRequestModalParty(null)}
-                  className="shrink-0 w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 active:scale-90 transition-all"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Large amount — tap to share as photo */}
-              <div className="mb-5">
-                <p
-                  onClick={handleDownloadAndShare}
-                  className={cn(
-                    'text-4xl font-extrabold tracking-tight cursor-pointer select-none active:opacity-70 transition-opacity',
-                    requestModalParty.balanceType === 'YOU_WILL_GET'
-                      ? 'text-emerald-600'
-                      : 'text-red-600',
-                  )}
-                  title="ট্যাপ করে সরাসরি ছবি আকারে শেয়ার করুন"
-                  style={{ WebkitTapHighlightColor: 'transparent' }}
-                >
-                  {formatCurrency(requestModalParty.currentBalance)}
-                </p>
-                <p className="text-xs font-semibold text-slate-400 mt-1">
-                  {requestModalParty.balanceType === 'YOU_WILL_GET' ? 'পাবেন' : 'দেবেন'}
-                  <span className="ml-2 text-[10px] font-normal text-slate-300">(ছবি শেয়ার করতে ট্যাপ করুন)</span>
-                </p>
-              </div>
-
-            </div>
-            {/* ── END RECEIPT CAPTURE TARGET ─────────────────────────────── */}
-
-            {/* Action buttons */}
-            <div className="flex flex-col gap-2 mt-5" data-html2canvas-ignore="true">
-              <button
-                type="button"
-                onClick={handleDownloadAndShare}
-                disabled={isWhatsAppSharing}
-                className="w-full bg-emerald-500 active:bg-emerald-600 disabled:opacity-60 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.97] transition-all"
-              >
-                {isWhatsAppSharing ? 'তৈরি হচ্ছে…' : '📥 ডাউনলোড'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

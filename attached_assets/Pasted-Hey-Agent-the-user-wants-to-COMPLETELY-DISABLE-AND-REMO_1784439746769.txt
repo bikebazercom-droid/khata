@@ -1,0 +1,29 @@
+Hey Agent, the user wants to COMPLETELY DISABLE AND REMOVE the entire Payment Request / Transaction Detail popup modal screen from the system. 
+
+CURRENT BEHAVIOR:
+Currently, when a user taps/clicks on the red or green balance amount shown next to a customer's name on the main dashboard/list, it triggers and pops up a new transaction detail modal/screen (which contained the text "আপনাকে অর্থ প্রদানের জন্য...", download button, etc.).
+
+NEW REQUIRED BEHAVIOR:
+The user wants this popup screen TOTALLY REMOVED. Clicking or touching the red or green customer balance amount should DO NOTHING (no modal popup, no screen overlay, completely dead event). The entire modal state and its trigger must be stripped out.
+
+CRITICAL INSTRUCTIONS:
+1. Locate the main dashboard, customer list, or ledger component (e.g., `CustomerList.tsx`, `Dashboard.tsx`, or `CustomerCard.tsx`) where the customer rows are rendered.
+2. Find the click handler attached to the balance amount text element (the text styled in red/green showing the dynamic currency balance). It likely looks like `onClick={() => setOpenModal(true)}` or `onClick={() => handleAmountClick(customer)}`.
+3. COMPLETELY REMOVE that `onClick` event listener from the balance amount element so that clicking on it no longer alters state or opens any UI sheet.
+4. Clean up and delete any unused modal state variables (e.g., `isModalOpen`, `setSelectedCustomer`) and remove the import/render block of that specific transaction/payment request modal component from the parent file.
+
+Please refactor the click event wrapper to look like this clean, unclickable template immediately:
+
+```javascript
+// BEFORE refactoring, it probably looked like this:
+<div 
+  onClick={() => setIsPaymentModalOpen(true)} // <-- DELETE THIS TRIGGER COMPLETELY
+  className={customer.balance >= 0 ? 'text-green-600' : 'text-red-600'}
+>
+  ৳ {customer.balance}
+</div>
+
+// AFTER refactoring, it must look like this (completely unclickable and static):
+<div className={customer.balance >= 0 ? 'text-green-600' : 'text-red-600', 'font-bold'}>
+  ৳ {customer.balance}
+</div>
