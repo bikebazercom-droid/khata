@@ -837,25 +837,14 @@ export function HomeView() {
 
             {/* Action buttons */}
             <div className="flex flex-col gap-2 mt-5">
-              {/* Row 1: SMS + Download */}
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleShareRequest('sms')}
-                  className="flex-1 bg-blue-600 active:bg-blue-700 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.97] transition-all"
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  SMS
-                </button>
-                <button
-                  type="button"
-                  onClick={handlePureDownload}
-                  disabled={isWhatsAppSharing}
-                  className="flex-1 bg-emerald-500 active:bg-emerald-600 disabled:opacity-60 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.97] transition-all"
-                >
-                  {isWhatsAppSharing ? 'তৈরি হচ্ছে…' : '📥 ডাউনলোড'}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handlePureDownload}
+                disabled={isWhatsAppSharing}
+                className="w-full bg-emerald-500 active:bg-emerald-600 disabled:opacity-60 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.97] transition-all"
+              >
+                {isWhatsAppSharing ? 'তৈরি হচ্ছে…' : '📥 ডাউনলোড'}
+              </button>
             </div>
           </div>
         </div>
