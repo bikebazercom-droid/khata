@@ -781,20 +781,24 @@ export function HomeView() {
                 </button>
               </div>
 
-              {/* Large amount */}
+              {/* Large amount — tap to share as photo */}
               <div className="mb-5">
                 <p
+                  onClick={handleWhatsAppJpgShare}
                   className={cn(
-                    'text-4xl font-extrabold tracking-tight',
+                    'text-4xl font-extrabold tracking-tight cursor-pointer select-none active:opacity-70 transition-opacity',
                     requestModalParty.balanceType === 'YOU_WILL_GET'
                       ? 'text-emerald-600'
                       : 'text-red-600',
                   )}
+                  title="ট্যাপ করে সরাসরি ছবি আকারে শেয়ার করুন"
+                  style={{ WebkitTapHighlightColor: 'transparent' }}
                 >
                   {formatCurrency(requestModalParty.currentBalance)}
                 </p>
                 <p className="text-xs font-semibold text-slate-400 mt-1">
                   {requestModalParty.balanceType === 'YOU_WILL_GET' ? 'পাবেন' : 'দেবেন'}
+                  <span className="ml-2 text-[10px] font-normal text-slate-300">(ছবি শেয়ার করতে ট্যাপ করুন)</span>
                 </p>
               </div>
 

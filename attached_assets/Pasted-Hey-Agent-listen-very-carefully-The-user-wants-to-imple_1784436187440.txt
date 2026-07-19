@@ -1,0 +1,107 @@
+Hey Agent, listen very carefully. The user wants to implement a high-priority, seamless user experience directly tied to the CUSTOMER AMOUNT TEXT UI element (as shown in photo_2026-07-18_20-01-35_2.jpg). 
+
+CRITICAL REQUIREMENT:
+1. When the user CLICKS or TOUCHES the actual dynamic Pending Amount text itself (e.g., the large text displaying the balance like ৳ ৮৬,৯৫,৭০২.৩২), it must INSTANTLY trigger the entire layout block container (the beautifully formatted request box container) to be captured as a high-resolution PHOTO / JPG.
+2. The user should not be forced to manually open another sub-menu or click a separate footer button. Clicking the AMOUNT text itself acts as the primary click event handler for generating the photo share sheet!
+3. The photo must be compiled using `html2canvas` at high-density (`scale: 3`, `useCORS: true`), converted via binary blob stream into a standard JPEG `File` object (`receipt_photo.jpg`), and immediately passed to the smartphone's **NATIVE OVERLAY SHARE SHEET**.
+4. This allows the user to instantly send that transaction summary sheet as a real photo to anyone via Imo, WhatsApp, Messenger, or Facebook in one tap!
+
+Please map a React ref to the modal receipt wrapper card and wrap the Amount text element with this touch click handler right now:
+
+```javascript
+import React, { useRef } from 'react';
+import html2canvas from 'html2canvas';
+
+// Inside your main Component/Modal where the customer amount is rendered:
+export const PaymentRequestModal = ({ customer, onClose }) => {
+  // 1. Ref to capture the beautiful snapshot card layout
+  const captureCardAreaRef = useRef(null);
+
+  // 2. Core Snapshot and Native Photo Share Function
+  const handleAmountTouchPhotoShare = async (e) => {
+    // Prevent event bubbling if wrapped in other layers
+    if (e) e.stopPropagation();
+    
+    if (!captureCardAreaRef.current) return;
+
+    try {
+      // Create a premium quality crisp photo canvas
+      const canvas = await html2canvas(captureCardAreaRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 3, 
+        useCORS: true,
+        logging: false
+      });
+
+      // Convert canvas context to dynamic JPEG data URL string
+      const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+
+      // Automated Failsafe: Silent backup download to phone storage
+      const autoDownloadAnchor = document.createElement('a');
+      autoDownloadAnchor.href = jpgDataUrl;
+      autoDownloadAnchor.download = `Banglakhata_AmountPhoto_${new Date().getTime()}.jpg`;
+      document.body.appendChild(autoDownloadAnchor);
+      autoDownloadAnchor.click();
+      document.body.removeChild(autoDownloadAnchor);
+
+      // Convert Base64 to real Binary Image File Object
+      const rawFetch = await fetch(jpgDataUrl);
+      const imageBlob = await rawFetch.blob();
+      const photoFile = new File([imageBlob], 'amount_receipt.jpg', { type: 'image/jpeg' });
+
+      // Trigger the Smartphone's Native System Share Sheet instantly
+      if (navigator.canShare && navigator.canShare({ files: [photoFile] })) {
+        await navigator.share({
+          files: [photoFile],
+          title: 'পেমেন্ট রসিদ ফটো',
+          text: 'Banglakhata থেকে পাঠানো লেনদেনের ছবি।'
+        });
+      } else {
+        // Fallback text if the specific mobile webview restricts binary stream injection
+        await navigator.share({
+          title: 'পেমেন্ট রসিদ',
+          text: `রসিদটি আপনার ফোনের গ্যালারিতে JPG ছবি হিসেবে সেভ হয়েছে। অনুগ্রহ করে এটি ইমু বা হোয়াটসঅ্যাপে শেয়ার করুন।`
+        });
+      }
+    } catch (err) {
+      console.error('Touch sharing capture sequence encountered an error:', err);
+    }
+  };
+
+  return (
+    /* The main white card background area that will be turned into a photo */
+    <div ref={captureCardAreaRef} style={{ backgroundColor: '#ffffff', padding: '24px', borderRadius: '16px' }}>
+      
+      <p style={{ color: '#4B5563', fontSize: '15px', textAlign: 'center' }}>
+        आपको अर्थ प्रदान करने के लिए {customer?.name || 'Shakil'}-এর কাছে অনুরোধ করুন
+      </p>
+
+      {/* =======================================================================
+          CRITICAL: TOUCH-TO-SHARE ENGINE MAP ON DYNAMIC AMOUNT VALUE
+          ======================================================================= */}
+      <div 
+        onClick={handleAmountTouchPhotoShare}
+        onTouchStart={(e) => { /* Supports responsive mobile touch inputs explicitly */ }}
+        style={{ 
+          color: '#DC2626', 
+          fontSize: '36px', 
+          fontWeight: '900', 
+          textAlign: 'center', 
+          margin: '20px 0',
+          cursor: 'pointer',
+          userSelect: 'none',
+          WebkitTapHighlightColor: 'transparent'
+        }}
+        title="ট্যাপ করে সরাসরি ছবি আকারে শেয়ার করুন"
+      >
+        ৳ {customer?.amount || '৮৬,৯৫,৭০২.৩২'}
+      </div>
+
+      <p style={{ color: '#9CA3AF', fontSize: '13px', textAlign: 'center', marginTop: '-10px', marginBottom: '20px' }}>
+        দেবেন (ছবি আকারে শেয়ার করতে অ্যামাউন্টে টাচ করুন)
+      </p>
+
+      {/* Other Bank account summary fields can render safely here... */}
+    </div>
+  );
+};
