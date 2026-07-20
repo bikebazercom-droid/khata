@@ -131,7 +131,8 @@ interface TransactionSheetProps {
 function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyName, onClose, onSuccess }: TransactionSheetProps) {
   const colors = useColors();
   const { currentLanguage } = useLanguage();
-  const isEnglish = currentLanguage === 'en';
+  const _ls = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('app_lang') : null;
+  const isEnglish = currentLanguage === 'en' || _ls === 'en';
   const qc = useQueryClient();
   const { getToken } = useAuth();
 
@@ -368,7 +369,8 @@ interface ReminderSheetProps {
 function ReminderSheet({ visible, partyId, partyName, partyPhone, onClose }: ReminderSheetProps) {
   const colors = useColors();
   const { currentLanguage } = useLanguage();
-  const isEnglish = currentLanguage === 'en';
+  const _ls = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('app_lang') : null;
+  const isEnglish = currentLanguage === 'en' || _ls === 'en';
   const sendReminder = useSendPaymentReminder();
   const [message, setMessage] = useState('');
   const [fetching, setFetching] = useState(false);
@@ -558,7 +560,8 @@ interface EntryDetailSheetProps {
 function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onUpdated }: EntryDetailSheetProps) {
   const colors = useColors();
   const { currentLanguage } = useLanguage();
-  const isEnglish = currentLanguage === 'en';
+  const _ls = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('app_lang') : null;
+  const isEnglish = currentLanguage === 'en' || _ls === 'en';
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
 
@@ -828,7 +831,8 @@ export default function PartyDetailScreen() {
 
   // Derive isEnglish directly from the raw currentLanguage string — no memoized boolean
   const { currentLanguage } = useLanguage();
-  const isEnglish = currentLanguage === 'en';
+  const _ls = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('app_lang') : null;
+  const isEnglish = currentLanguage === 'en' || _ls === 'en';
 
   const [showSheet, setShowSheet] = useState(false);
   const [pendingType, setPendingType] = useState<'YOU_GAVE' | 'YOU_GOT'>('YOU_GAVE');

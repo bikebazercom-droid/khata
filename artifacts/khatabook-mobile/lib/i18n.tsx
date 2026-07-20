@@ -314,70 +314,93 @@ function formatBengaliNumber(amount: number): string {
 
 // ── Provider ───────────────────────────────────────────────────────────────────
 
+/** Read the stored lang from localStorage synchronously (web-only fast path). */
+function readLangFromStorage(): Lang {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const v = window.localStorage.getItem(STORAGE_KEY);
+      if (v === 'en' || v === 'bn') return v;
+    }
+  } catch { /* ignore */ }
+  return 'bn';
+}
+
+/** Write lang to localStorage synchronously (web) + SecureStore (native/web). */
+function writeLangToStorage(v: Lang) {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(STORAGE_KEY, v);
+    }
+  } catch { /* ignore */ }
+  SecureStore.setItemAsync(STORAGE_KEY, v).catch(() => {});
+}
+
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Lang>('bn');
+  // Initialise from localStorage synchronously so the very first render is correct on web.
+  const [lang, setLangState] = useState<Lang>(() => readLangFromStorage());
 
   /**
-   * Once the user explicitly picks a language in the current session, this ref
-   * is set to true. The server-sync effect checks this flag and skips — preventing
-   * a stale cached GET /api/settings (304/'বাংলা') from reverting the user's choice.
+   * Once the user explicitly picks a language this session, set this ref so the
+   * server-sync effect can never revert their choice via a stale cached response.
    */
   const userChosenRef = React.useRef(false);
 
-  /** Persist + apply a language change immediately (no server round-trip needed). */
   const setLanguage = React.useCallback((next: Lang) => {
-    userChosenRef.current = true;   // lock: server effect must not override this session
+    userChosenRef.current = true;
     setLangState(next);
-    SecureStore.setItemAsync(STORAGE_KEY, next).catch(() => {});
+    writeLangToStorage(next);
   }, []);
 
-  // Fast path: load persisted language from SecureStore before the first server response
+  // On native: SecureStore is async, so also load it after mount.
   useEffect(() => {
     SecureStore.getItemAsync(STORAGE_KEY)
-      .then((val) => { if (val === 'en' || val === 'bn') setLangState(val); })
+      .then((val) => {
+        if ((val === 'en' || val === 'bn') && !userChosenRef.current) setLangState(val);
+      })
       .catch(() => {});
   }, []);
 
-  // Server sync — only runs when settings arrive; skipped once user has made a choice
+  // Server sync — skipped once user has explicitly chosen this session.
   const { data: settings } = useGetBusinessSettings();
   useEffect(() => {
-    if (userChosenRef.current) return;   // user chose explicitly this session — never override
-    if (!settings?.language) return;     // 401 / not loaded yet — keep SecureStore value
+    if (userChosenRef.current) return;
+    if (!settings?.language) return;
     const resolved: Lang = settings.language === 'English' ? 'en' : 'bn';
     setLangState(resolved);
-    SecureStore.setItemAsync(STORAGE_KEY, resolved).catch(() => {});
+    writeLangToStorage(resolved);
   }, [settings?.language]);
 
-  const value = useMemo<LanguageCtx>(() => {
-    const isEnglish = lang === 'en';
-    const t = (key: TKey): string =>
-      ((dict[lang] as Record<string, string>)[key] ?? dict.bn[key] ?? key);
+  // NO useMemo — create a plain object every render so React Compiler cannot freeze it.
+  // LanguageProvider only re-renders when lang or settings change, so this is cheap.
+  const isEnglish = lang === 'en';
 
-    // formatNumber — plain digit conversion, no grouping (matches user's formatNumber spec).
-    const formatNumber = (amount: number): string => {
-      if (isEnglish) return amount.toString();
-      const bn: Record<string, string> = {
-        '0': '০', '1': '১', '2': '২', '3': '৩', '4': '৪',
-        '5': '৫', '6': '৬', '7': '৭', '8': '৮', '9': '৯',
-      };
-      return amount.toString().split('').map(d => bn[d] ?? d).join('');
-    };
+  const t = (key: TKey): string =>
+    ((dict[lang] as Record<string, string>)[key] ?? dict.bn[key] ?? key);
 
-    // formatCurrency — keeps Indian comma grouping for both modes; prefixes ৳.
-    const formatCurrency = (amount: number): string => {
-      if (isEnglish) {
-        const hasDecimal = !Number.isInteger(amount);
-        const grouped = new Intl.NumberFormat('en-IN', {
-          minimumFractionDigits: hasDecimal ? 2 : 0,
-          maximumFractionDigits: 2,
-        }).format(amount);
-        return `৳${grouped}`;
-      }
-      return `৳${formatBengaliNumber(amount)}`;
-    };
+  const formatNumber = (amount: number): string => {
+    if (isEnglish) return amount.toString();
+    return amount.toString().split('').map(d => EN_TO_BN[d] ?? d).join('');
+  };
 
-    return { lang, currentLanguage: lang, isEnglish, t, formatCurrency, formatNumber, setLanguage };
-  }, [lang, setLanguage]);
+  const formatCurrency = (amount: number): string => {
+    const hasDecimal = !Number.isInteger(Math.abs(amount));
+    const grouped = new Intl.NumberFormat('en-IN', {
+      minimumFractionDigits: hasDecimal ? 2 : 0,
+      maximumFractionDigits: 2,
+    }).format(Math.abs(amount));
+    if (isEnglish) return `৳${grouped}`;
+    return `৳${toBengaliDigits(grouped)}`;
+  };
+
+  const value: LanguageCtx = {
+    lang,
+    currentLanguage: lang,
+    isEnglish,
+    t,
+    formatCurrency,
+    formatNumber,
+    setLanguage,
+  };
 
   return (
     <LanguageContext.Provider value={value}>
