@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/admin/"
+title = "BanglaKhata Admin"
+version = "1.0.0"
+id = "artifacts/banglakhata-admin"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/admin/" ]
+localPort = 18257
+
+[services.development]
+run = "pnpm --filter @workspace/banglakhata-admin run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/banglakhata-admin", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/banglakhata-admin/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18257"
+BASE_PATH = "/admin/"

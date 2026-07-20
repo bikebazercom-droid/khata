@@ -20,6 +20,8 @@ tags:
     description: Business settings
   - name: Storage
     description: Object storage upload and serving endpoints.
+  - name: admin
+    description: Admin console operations
 paths:
   /healthz:
     get:
@@ -318,6 +320,248 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  # ── Admin endpoints ──────────────────────────────────────────────────────────
+  /admin/auth/login:
+    post:
+      operationId: adminLogin
+      tags: [admin]
+      summary: Admin login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminLoginInput"
+      responses:
+        "200":
+          description: JWT token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminLoginResult"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /admin/stats:
+    get:
+      operationId: getAdminStats
+      tags: [admin]
+      summary: Platform-wide statistics
+      security:
+        - adminBearer: []
+      responses:
+        "200":
+          description: Admin stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+
+  /admin/users:
+    get:
+      operationId: listAdminUsers
+      tags: [admin]
+      summary: List all app users
+      security:
+        - adminBearer: []
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: loginSource
+          in: query
+          schema:
+            $ref: "#/components/schemas/LoginSource"
+        - name: authProvider
+          in: query
+          schema:
+            $ref: "#/components/schemas/AuthProvider"
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Paginated users list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUsersPage"
+
+  /admin/users/{userId}:
+    get:
+      operationId: getAdminUser
+      tags: [admin]
+      summary: Get a single user with full detail
+      security:
+        - adminBearer: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserDetail"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateAdminUser
+      tags: [admin]
+      summary: Suspend or reactivate a user
+      security:
+        - adminBearer: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUserUpdate"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserDetail"
+        "404":
+          description: Not found
+
+  /admin/businesses:
+    get:
+      operationId: listAdminBusinesses
+      tags: [admin]
+      summary: List all businesses / shops
+      security:
+        - adminBearer: []
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Paginated businesses list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminBusinessesPage"
+
+  /admin/transactions:
+    get:
+      operationId: listAdminTransactions
+      tags: [admin]
+      summary: Global ledger entries across all businesses
+      security:
+        - adminBearer: []
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Paginated transactions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTransactionsPage"
+
+  /admin/otp-config:
+    get:
+      operationId: getAdminOtpConfig
+      tags: [admin]
+      summary: Get OTP gateway configuration
+      security:
+        - adminBearer: []
+      responses:
+        "200":
+          description: OTP config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOtpConfig"
+    put:
+      operationId: updateAdminOtpConfig
+      tags: [admin]
+      summary: Update OTP gateway configuration
+      security:
+        - adminBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminOtpConfigInput"
+      responses:
+        "200":
+          description: Updated OTP config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOtpConfig"
+
   /parties/{partyId}/reminder:
     post:
       operationId: sendPaymentReminder
@@ -613,3 +857,262 @@ components:
       properties:
         error:
           type: string
+
+    # ── Admin schemas ─────────────────────────────────────────────────────────
+    LoginSource:
+      type: string
+      enum: [play_store, app_store, web]
+
+    AuthProvider:
+      type: string
+      enum: [phone_otp, gmail]
+
+    AdminLoginInput:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    AdminLoginResult:
+      type: object
+      required: [token, expiresAt]
+      properties:
+        token:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+
+    AdminStats:
+      type: object
+      required:
+        - totalUsers
+        - totalBusinesses
+        - totalTransactions
+        - totalTransactionVolume
+        - newUsersToday
+        - newUsersThisWeek
+        - activeUsersThisMonth
+        - usersByLoginSource
+        - usersByAuthProvider
+      properties:
+        totalUsers:
+          type: integer
+        totalBusinesses:
+          type: integer
+        totalTransactions:
+          type: integer
+        totalTransactionVolume:
+          type: number
+        newUsersToday:
+          type: integer
+        newUsersThisWeek:
+          type: integer
+        activeUsersThisMonth:
+          type: integer
+        usersByLoginSource:
+          type: object
+          additionalProperties:
+            type: integer
+        usersByAuthProvider:
+          type: object
+          additionalProperties:
+            type: integer
+
+    AdminUser:
+      type: object
+      required:
+        - id
+        - name
+        - phone
+        - loginSource
+        - authProvider
+        - deviceMeta
+        - status
+        - businessCount
+        - createdAt
+        - lastLogin
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+        loginSource:
+          $ref: "#/components/schemas/LoginSource"
+        authProvider:
+          $ref: "#/components/schemas/AuthProvider"
+        deviceMeta:
+          type: string
+        status:
+          type: string
+          enum: [active, suspended]
+        businessCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        lastLogin:
+          type: ["string", "null"]
+          format: date-time
+
+    AdminUserDetail:
+      allOf:
+        - $ref: "#/components/schemas/AdminUser"
+        - type: object
+          required: [businesses]
+          properties:
+            businesses:
+              type: array
+              items:
+                $ref: "#/components/schemas/AdminBusinessSummary"
+
+    AdminUserUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [active, suspended]
+
+    AdminUsersPage:
+      type: object
+      required: [items, total, page, pageSize]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminUser"
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+
+    AdminBusinessSummary:
+      type: object
+      required: [id, name, partyCount, ledgerCount, createdAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        partyCount:
+          type: integer
+        ledgerCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    AdminBusiness:
+      type: object
+      required: [id, name, ownerName, ownerPhone, partyCount, ledgerCount, transactionVolume, createdAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        ownerName:
+          type: string
+        ownerPhone:
+          type: string
+        partyCount:
+          type: integer
+        ledgerCount:
+          type: integer
+        transactionVolume:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+
+    AdminBusinessesPage:
+      type: object
+      required: [items, total, page, pageSize]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminBusiness"
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+
+    AdminTransaction:
+      type: object
+      required: [id, businessName, partyName, partyPhone, type, amount, description, createdAt]
+      properties:
+        id:
+          type: string
+        businessName:
+          type: string
+        partyName:
+          type: string
+        partyPhone:
+          type: string
+        type:
+          $ref: "#/components/schemas/LedgerEntryType"
+        amount:
+          type: number
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    AdminTransactionsPage:
+      type: object
+      required: [items, total, page, pageSize]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminTransaction"
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+
+    AdminOtpConfig:
+      type: object
+      required: [gatewayUrl, apiKeyHint, remainingBalance, updatedAt]
+      properties:
+        gatewayUrl:
+          type: string
+        apiKeyHint:
+          type: string
+          description: Last 4 chars of key only — never expose the full key
+        remainingBalance:
+          type: integer
+        updatedAt:
+          type: ["string", "null"]
+          format: date-time
+
+    AdminOtpConfigInput:
+      type: object
+      required: [gatewayUrl, apiKey, remainingBalance]
+      properties:
+        gatewayUrl:
+          type: string
+        apiKey:
+          type: string
+        remainingBalance:
+          type: integer
+          minimum: 0
+
+  securitySchemes:
+    adminBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

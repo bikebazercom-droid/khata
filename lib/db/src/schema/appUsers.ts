@@ -2,6 +2,8 @@ import { pgTable, text, uuid, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { businessesTable } from "./businesses";
 
 export const userRoleEnum = pgEnum("user_role", ["owner", "staff"]);
+export const loginSourceEnum = pgEnum("login_source", ["play_store", "app_store", "web"]);
+export const userStatusEnum = pgEnum("user_status", ["active", "suspended"]);
 
 export const appUsersTable = pgTable("app_users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -15,6 +17,14 @@ export const appUsersTable = pgTable("app_users", {
   role: userRoleEnum("role").notNull().default("owner"),
   displayName: text("display_name"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  /** Which client platform the user registered from */
+  loginSource: loginSourceEnum("login_source").default("web"),
+  /** Device description e.g. "Samsung Galaxy S24" */
+  deviceMeta: text("device_meta").default(""),
+  /** Last successful login timestamp */
+  lastLogin: timestamp("last_login", { withTimezone: true }),
+  /** Admin-managed status; suspended users cannot sign in */
+  status: userStatusEnum("status").notNull().default("active"),
 });
 
 export type AppUser = typeof appUsersTable.$inferSelect;

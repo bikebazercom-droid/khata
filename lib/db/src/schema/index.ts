@@ -8,3 +8,4 @@ export * from "./staffPersonnel";
 export * from "./staffDeploymentLogs";
 export * from "./staffDestinations";
 export * from "./userBusinesses";
+export * from "./adminOtpConfig";

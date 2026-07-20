@@ -14,14 +14,48 @@ import {
   CreateLedgerEntryParams,
   CreateLedgerEntryBody,
   CreateLedgerEntryResponse,
-  PatchLedgerEntryParams,
-  PatchLedgerEntryBody,
-  PatchLedgerEntryResponse,
   SendPaymentReminderParams,
   SendPaymentReminderResponse,
   DeletePartyParams,
   DeletePartyResponse,
 } from "@workspace/api-zod";
+// Inline validators for the PATCH ledger-entry route (not in OpenAPI spec).
+type PatchLedgerEntryParamsData = { partyId: string; entryId: string };
+type PatchLedgerEntryBodyData = {
+  amount?: number;
+  type?: "YOU_GAVE" | "YOU_GOT";
+  description?: string;
+  billImage?: string | null;
+  dueDate?: string | null;
+};
+
+const PatchLedgerEntryParams = {
+  safeParse(v: unknown): { success: true; data: PatchLedgerEntryParamsData } | { success: false; error: { message: string } } {
+    const x = v as Record<string, unknown>;
+    if (typeof x?.partyId === "string" && typeof x?.entryId === "string") {
+      return { success: true, data: { partyId: x.partyId, entryId: x.entryId } };
+    }
+    return { success: false, error: { message: "partyId and entryId must be strings" } };
+  },
+};
+
+const PatchLedgerEntryBody = {
+  safeParse(v: unknown): { success: true; data: PatchLedgerEntryBodyData } | { success: false; error: { message: string } } {
+    const x = v as Record<string, unknown>;
+    if (typeof x !== "object" || x === null) return { success: false, error: { message: "body must be an object" } };
+    if (x.amount !== undefined && (typeof x.amount !== "number" || x.amount <= 0)) {
+      return { success: false, error: { message: "amount must be a positive number" } };
+    }
+    if (x.type !== undefined && x.type !== "YOU_GAVE" && x.type !== "YOU_GOT") {
+      return { success: false, error: { message: "type must be YOU_GAVE or YOU_GOT" } };
+    }
+    return { success: true, data: x as PatchLedgerEntryBodyData };
+  },
+};
+
+const PatchLedgerEntryResponse = {
+  parse(v: unknown) { return v; },
+};
 import {
   applyPartyFilters,
   fromSignedBalance,

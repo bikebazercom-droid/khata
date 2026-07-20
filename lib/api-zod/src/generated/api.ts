@@ -201,36 +201,6 @@ export const CreateLedgerEntryResponse = zod.object({
 })
 
 
-export const PatchLedgerEntryParams = zod.object({
-  "partyId": zod.coerce.string(),
-  "entryId": zod.coerce.string()
-})
-
-export const PatchLedgerEntryBody = zod.object({
-  /** Cloud storage object path. Pass null to remove the image; omit to leave unchanged. */
-  "billImage": zod.string().nullable().optional(),
-  /** Updated transaction amount (must be > 0). */
-  "amount": zod.number().gt(0).optional(),
-  /** Updated transaction direction. */
-  "type": zod.enum(['YOU_GAVE', 'YOU_GOT']).optional(),
-  /** Updated note / description. */
-  "description": zod.string().optional(),
-  /** Updated transaction date as YYYY-MM-DD string. */
-  "dueDate": zod.string().optional(),
-})
-
-export const PatchLedgerEntryResponse = zod.object({
-  "id": zod.string(),
-  "partyId": zod.string(),
-  "type": zod.enum(['YOU_GAVE', 'YOU_GOT']),
-  "amount": zod.number(),
-  "description": zod.string(),
-  "billReference": zod.string().nullable(),
-  "billImage": zod.string().nullable(),
-  "dueDate": zod.coerce.date().nullable(),
-  "createdAt": zod.coerce.date()
-})
-
 /**
  * Supports filtering by transaction date range and a free-text search across party name, phone, and entry description. Used by the global transaction report screen.
  * @summary List ledger entries across all parties
@@ -238,8 +208,7 @@ export const PatchLedgerEntryResponse = zod.object({
 export const ListGlobalLedgerEntriesQueryParams = zod.object({
   "startDate": zod.date().optional(),
   "endDate": zod.date().optional(),
-  "search": zod.coerce.string().optional(),
-  "partyRole": zod.enum(["CUSTOMER", "SUPPLIER"]).optional()
+  "search": zod.coerce.string().optional()
 })
 
 export const ListGlobalLedgerEntriesResponseItem = zod.object({
@@ -308,6 +277,235 @@ export const GetStorageObjectParams = zod.object({
 })
 
 export const GetStorageObjectResponse = zod.unknown()
+
+
+/**
+ * @summary Admin login
+ */
+export const AdminLoginBody = zod.object({
+  "username": zod.string(),
+  "password": zod.string()
+})
+
+export const AdminLoginResponse = zod.object({
+  "token": zod.string(),
+  "expiresAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Platform-wide statistics
+ */
+export const GetAdminStatsResponse = zod.object({
+  "totalUsers": zod.number(),
+  "totalBusinesses": zod.number(),
+  "totalTransactions": zod.number(),
+  "totalTransactionVolume": zod.number(),
+  "newUsersToday": zod.number(),
+  "newUsersThisWeek": zod.number(),
+  "activeUsersThisMonth": zod.number(),
+  "usersByLoginSource": zod.record(zod.string(), zod.number()),
+  "usersByAuthProvider": zod.record(zod.string(), zod.number())
+})
+
+
+/**
+ * @summary List all app users
+ */
+export const listAdminUsersQueryPageDefault = 1;
+
+export const listAdminUsersQueryPageSizeDefault = 20;
+export const listAdminUsersQueryPageSizeMax = 100;
+
+
+
+export const ListAdminUsersQueryParams = zod.object({
+  "search": zod.coerce.string().optional(),
+  "loginSource": zod.enum(['play_store', 'app_store', 'web']).optional(),
+  "authProvider": zod.enum(['phone_otp', 'gmail']).optional(),
+  "page": zod.coerce.number().min(1).default(listAdminUsersQueryPageDefault),
+  "pageSize": zod.coerce.number().min(1).max(listAdminUsersQueryPageSizeMax).default(listAdminUsersQueryPageSizeDefault)
+})
+
+export const ListAdminUsersResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "loginSource": zod.enum(['play_store', 'app_store', 'web']),
+  "authProvider": zod.enum(['phone_otp', 'gmail']),
+  "deviceMeta": zod.string(),
+  "status": zod.enum(['active', 'suspended']),
+  "businessCount": zod.number(),
+  "createdAt": zod.coerce.date(),
+  "lastLogin": zod.coerce.date().nullable()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "pageSize": zod.number()
+})
+
+
+/**
+ * @summary Get a single user with full detail
+ */
+export const GetAdminUserParams = zod.object({
+  "userId": zod.coerce.string()
+})
+
+export const GetAdminUserResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "loginSource": zod.enum(['play_store', 'app_store', 'web']),
+  "authProvider": zod.enum(['phone_otp', 'gmail']),
+  "deviceMeta": zod.string(),
+  "status": zod.enum(['active', 'suspended']),
+  "businessCount": zod.number(),
+  "createdAt": zod.coerce.date(),
+  "lastLogin": zod.coerce.date().nullable()
+}).and(zod.object({
+  "businesses": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "partyCount": zod.number(),
+  "ledgerCount": zod.number(),
+  "createdAt": zod.coerce.date()
+}))
+}))
+
+
+/**
+ * @summary Suspend or reactivate a user
+ */
+export const UpdateAdminUserParams = zod.object({
+  "userId": zod.coerce.string()
+})
+
+export const UpdateAdminUserBody = zod.object({
+  "status": zod.enum(['active', 'suspended'])
+})
+
+export const UpdateAdminUserResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "loginSource": zod.enum(['play_store', 'app_store', 'web']),
+  "authProvider": zod.enum(['phone_otp', 'gmail']),
+  "deviceMeta": zod.string(),
+  "status": zod.enum(['active', 'suspended']),
+  "businessCount": zod.number(),
+  "createdAt": zod.coerce.date(),
+  "lastLogin": zod.coerce.date().nullable()
+}).and(zod.object({
+  "businesses": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "partyCount": zod.number(),
+  "ledgerCount": zod.number(),
+  "createdAt": zod.coerce.date()
+}))
+}))
+
+
+/**
+ * @summary List all businesses / shops
+ */
+export const listAdminBusinessesQueryPageDefault = 1;
+
+export const listAdminBusinessesQueryPageSizeDefault = 20;
+export const listAdminBusinessesQueryPageSizeMax = 100;
+
+
+
+export const ListAdminBusinessesQueryParams = zod.object({
+  "search": zod.coerce.string().optional(),
+  "page": zod.coerce.number().min(1).default(listAdminBusinessesQueryPageDefault),
+  "pageSize": zod.coerce.number().min(1).max(listAdminBusinessesQueryPageSizeMax).default(listAdminBusinessesQueryPageSizeDefault)
+})
+
+export const ListAdminBusinessesResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "ownerName": zod.string(),
+  "ownerPhone": zod.string(),
+  "partyCount": zod.number(),
+  "ledgerCount": zod.number(),
+  "transactionVolume": zod.number(),
+  "createdAt": zod.coerce.date()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "pageSize": zod.number()
+})
+
+
+/**
+ * @summary Global ledger entries across all businesses
+ */
+export const listAdminTransactionsQueryPageDefault = 1;
+
+export const listAdminTransactionsQueryPageSizeDefault = 20;
+export const listAdminTransactionsQueryPageSizeMax = 100;
+
+
+
+export const ListAdminTransactionsQueryParams = zod.object({
+  "startDate": zod.date().optional(),
+  "endDate": zod.date().optional(),
+  "search": zod.coerce.string().optional(),
+  "page": zod.coerce.number().min(1).default(listAdminTransactionsQueryPageDefault),
+  "pageSize": zod.coerce.number().min(1).max(listAdminTransactionsQueryPageSizeMax).default(listAdminTransactionsQueryPageSizeDefault)
+})
+
+export const ListAdminTransactionsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "businessName": zod.string(),
+  "partyName": zod.string(),
+  "partyPhone": zod.string(),
+  "type": zod.enum(['YOU_GAVE', 'YOU_GOT']),
+  "amount": zod.number(),
+  "description": zod.string(),
+  "createdAt": zod.coerce.date()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "pageSize": zod.number()
+})
+
+
+/**
+ * @summary Get OTP gateway configuration
+ */
+export const GetAdminOtpConfigResponse = zod.object({
+  "gatewayUrl": zod.string(),
+  "apiKeyHint": zod.string().describe('Last 4 chars of key only — never expose the full key'),
+  "remainingBalance": zod.number(),
+  "updatedAt": zod.coerce.date().nullable()
+})
+
+
+/**
+ * @summary Update OTP gateway configuration
+ */
+export const updateAdminOtpConfigBodyRemainingBalanceMin = 0;
+
+
+
+export const UpdateAdminOtpConfigBody = zod.object({
+  "gatewayUrl": zod.string(),
+  "apiKey": zod.string(),
+  "remainingBalance": zod.number().min(updateAdminOtpConfigBodyRemainingBalanceMin)
+})
+
+export const UpdateAdminOtpConfigResponse = zod.object({
+  "gatewayUrl": zod.string(),
+  "apiKeyHint": zod.string().describe('Last 4 chars of key only — never expose the full key'),
+  "remainingBalance": zod.number(),
+  "updatedAt": zod.coerce.date().nullable()
+})
 
 
 /**

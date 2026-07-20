@@ -88,19 +88,6 @@ export interface LedgerEntry {
   createdAt: string;
 }
 
-export interface PatchLedgerEntryBody {
-  /** Cloud storage object path. Pass null to remove the image; omit to leave unchanged. */
-  billImage?: string | null;
-  /** Updated transaction amount (must be > 0). */
-  amount?: number;
-  /** Updated transaction direction. */
-  type?: LedgerEntryType;
-  /** Updated note / description. */
-  description?: string;
-  /** Updated due date as YYYY-MM-DD string. */
-  dueDate?: string | null;
-}
-
 export interface LedgerEntryInput {
   type: LedgerEntryType;
   /** @exclusiveMinimum 0 */
@@ -201,6 +188,154 @@ export interface ErrorEnvelope {
   error: string;
 }
 
+export type LoginSource = typeof LoginSource[keyof typeof LoginSource];
+
+
+export const LoginSource = {
+  play_store: 'play_store',
+  app_store: 'app_store',
+  web: 'web',
+} as const;
+
+export type AuthProvider = typeof AuthProvider[keyof typeof AuthProvider];
+
+
+export const AuthProvider = {
+  phone_otp: 'phone_otp',
+  gmail: 'gmail',
+} as const;
+
+export interface AdminLoginInput {
+  username: string;
+  password: string;
+}
+
+export interface AdminLoginResult {
+  token: string;
+  expiresAt: string;
+}
+
+export type AdminStatsUsersByLoginSource = {[key: string]: number};
+
+export type AdminStatsUsersByAuthProvider = {[key: string]: number};
+
+export interface AdminStats {
+  totalUsers: number;
+  totalBusinesses: number;
+  totalTransactions: number;
+  totalTransactionVolume: number;
+  newUsersToday: number;
+  newUsersThisWeek: number;
+  activeUsersThisMonth: number;
+  usersByLoginSource: AdminStatsUsersByLoginSource;
+  usersByAuthProvider: AdminStatsUsersByAuthProvider;
+}
+
+export type AdminUserStatus = typeof AdminUserStatus[keyof typeof AdminUserStatus];
+
+
+export const AdminUserStatus = {
+  active: 'active',
+  suspended: 'suspended',
+} as const;
+
+export interface AdminUser {
+  id: string;
+  name: string;
+  phone: string;
+  loginSource: LoginSource;
+  authProvider: AuthProvider;
+  deviceMeta: string;
+  status: AdminUserStatus;
+  businessCount: number;
+  createdAt: string;
+  /** @nullable */
+  lastLogin: string | null;
+}
+
+export interface AdminBusinessSummary {
+  id: string;
+  name: string;
+  partyCount: number;
+  ledgerCount: number;
+  createdAt: string;
+}
+
+export type AdminUserDetail = AdminUser & {
+  businesses: AdminBusinessSummary[];
+};
+
+export type AdminUserUpdateStatus = typeof AdminUserUpdateStatus[keyof typeof AdminUserUpdateStatus];
+
+
+export const AdminUserUpdateStatus = {
+  active: 'active',
+  suspended: 'suspended',
+} as const;
+
+export interface AdminUserUpdate {
+  status: AdminUserUpdateStatus;
+}
+
+export interface AdminUsersPage {
+  items: AdminUser[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface AdminBusiness {
+  id: string;
+  name: string;
+  ownerName: string;
+  ownerPhone: string;
+  partyCount: number;
+  ledgerCount: number;
+  transactionVolume: number;
+  createdAt: string;
+}
+
+export interface AdminBusinessesPage {
+  items: AdminBusiness[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface AdminTransaction {
+  id: string;
+  businessName: string;
+  partyName: string;
+  partyPhone: string;
+  type: LedgerEntryType;
+  amount: number;
+  description: string;
+  createdAt: string;
+}
+
+export interface AdminTransactionsPage {
+  items: AdminTransaction[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface AdminOtpConfig {
+  gatewayUrl: string;
+  /** Last 4 chars of key only — never expose the full key */
+  apiKeyHint: string;
+  remainingBalance: number;
+  /** @nullable */
+  updatedAt: string | null;
+}
+
+export interface AdminOtpConfigInput {
+  gatewayUrl: string;
+  apiKey: string;
+  /** @minimum 0 */
+  remainingBalance: number;
+}
+
 export type ListPartiesParams = {
 role?: PartyRole;
 search?: string;
@@ -211,6 +346,48 @@ export type ListGlobalLedgerEntriesParams = {
 startDate?: string;
 endDate?: string;
 search?: string;
-partyRole?: string;
+};
+
+export type ListAdminUsersParams = {
+search?: string;
+loginSource?: LoginSource;
+authProvider?: AuthProvider;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+pageSize?: number;
+};
+
+export type ListAdminBusinessesParams = {
+search?: string;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+pageSize?: number;
+};
+
+export type ListAdminTransactionsParams = {
+startDate?: string;
+endDate?: string;
+search?: string;
+/**
+ * @minimum 1
+ */
+page?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+pageSize?: number;
 };
 
