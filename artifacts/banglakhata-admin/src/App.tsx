@@ -3,7 +3,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
-import axios from 'axios';
+import { setAuthTokenGetter } from '@workspace/api-client-react';
 
 // App imports
 import LoginPage from '@/pages/login';
@@ -14,14 +14,10 @@ import BusinessesPage from '@/pages/businesses';
 import TransactionsPage from '@/pages/transactions';
 import SettingsPage from '@/pages/settings';
 
-// Configure Axios Interceptor for Admin API
-axios.interceptors.request.use((config) => {
-  const token = localStorage.getItem('admin_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+// Wire the admin JWT into every generated API call.
+// customFetch reads this getter before each request and attaches
+// "Authorization: Bearer <token>" when a token is present.
+setAuthTokenGetter(() => localStorage.getItem('admin_token'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
