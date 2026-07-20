@@ -317,23 +317,32 @@ function formatBengaliNumber(amount: number): string {
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>('bn');
 
+  /**
+   * Once the user explicitly picks a language in the current session, this ref
+   * is set to true. The server-sync effect checks this flag and skips — preventing
+   * a stale cached GET /api/settings (304/'বাংলা') from reverting the user's choice.
+   */
+  const userChosenRef = React.useRef(false);
+
   /** Persist + apply a language change immediately (no server round-trip needed). */
   const setLanguage = React.useCallback((next: Lang) => {
+    userChosenRef.current = true;   // lock: server effect must not override this session
     setLangState(next);
     SecureStore.setItemAsync(STORAGE_KEY, next).catch(() => {});
   }, []);
 
-  // Load persisted language on mount (fast path — before server responds)
+  // Fast path: load persisted language from SecureStore before the first server response
   useEffect(() => {
     SecureStore.getItemAsync(STORAGE_KEY)
       .then((val) => { if (val === 'en' || val === 'bn') setLangState(val); })
       .catch(() => {});
   }, []);
 
-  // Server is the authoritative source — syncs after login / on refetch
+  // Server sync — only runs when settings arrive; skipped once user has made a choice
   const { data: settings } = useGetBusinessSettings();
   useEffect(() => {
-    if (!settings?.language) return;
+    if (userChosenRef.current) return;   // user chose explicitly this session — never override
+    if (!settings?.language) return;     // 401 / not loaded yet — keep SecureStore value
     const resolved: Lang = settings.language === 'English' ? 'en' : 'bn';
     setLangState(resolved);
     SecureStore.setItemAsync(STORAGE_KEY, resolved).catch(() => {});
