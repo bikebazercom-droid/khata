@@ -26,7 +26,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
   const router = useRouter();
-  const { isEnglish, t, setLanguage } = useLanguage();
+  const { t } = useLanguage();
 
   const { isSignedIn } = useAuth();
   const { signOut } = useClerk();
@@ -56,24 +56,12 @@ export default function SettingsScreen() {
     }
   }
 
-  async function handleLanguageChange(lang: 'বাংলা' | 'English') {
-    // Apply immediately to context — this re-renders the whole app at once
-    setLanguage(lang === 'English' ? 'en' : 'bn');
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    try {
-      await updateSettings.mutateAsync({ data: { language: lang } });
-      qc.invalidateQueries({ queryKey: ['/api/settings'] });
-    } catch {
-      // silent — UI already updated optimistically above
-    }
-  }
-
   async function handleLogout() {
     Alert.alert(
       t('signOutLabel'),
-      isEnglish ? 'Are you sure you want to sign out?' : 'আপনি কি সাইন আউট করতে চান?',
+      'আপনি কি সাইন আউট করতে চান?',
       [
-        { text: isEnglish ? 'Cancel' : 'বাতিল', style: 'cancel' },
+        { text: 'বাতিল', style: 'cancel' },
         {
           text: t('signOutLabel'),
           style: 'destructive',
@@ -95,8 +83,6 @@ export default function SettingsScreen() {
       ],
     );
   }
-
-  const currentLang = settings?.language ?? 'বাংলা';
 
   const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -141,27 +127,6 @@ export default function SettingsScreen() {
       color: colors.foreground,
       padding: 0,
     },
-    langToggleRow: {
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-    },
-    langToggleLabel: {
-      fontSize: 15,
-      fontFamily: 'Inter_500Medium',
-      color: colors.foreground,
-      marginBottom: 10,
-    },
-    langBtnRow: { flexDirection: 'row', gap: 10 },
-    langBtn: {
-      flex: 1,
-      paddingVertical: 10,
-      borderRadius: 10,
-      borderWidth: 2,
-      alignItems: 'center',
-    },
-    langBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
     saveBtn: {
       backgroundColor: colors.primary,
       borderRadius: colors.radius,
@@ -232,38 +197,6 @@ export default function SettingsScreen() {
             )}
           </View>
 
-          {/* Language toggle row */}
-          <View style={s.langToggleRow}>
-            <Text style={s.langToggleLabel}>{t('languageLabel')}</Text>
-            <View style={s.langBtnRow}>
-              {(['বাংলা', 'English'] as const).map((lang) => {
-                const active = currentLang === lang;
-                return (
-                  <TouchableOpacity
-                    key={lang}
-                    style={[
-                      s.langBtn,
-                      {
-                        borderColor: active ? colors.primary : colors.border,
-                        backgroundColor: active ? colors.primary : colors.card,
-                      },
-                    ]}
-                    onPress={() => handleLanguageChange(lang)}
-                    activeOpacity={0.75}
-                  >
-                    <Text
-                      style={[
-                        s.langBtnText,
-                        { color: active ? colors.primaryForeground : colors.mutedForeground },
-                      ]}
-                    >
-                      {lang}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
         </View>
 
         {editing && (

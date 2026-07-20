@@ -16,23 +16,23 @@ import { useGetDashboardSummary, useGetBusinessSettings, useListParties } from '
 import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/lib/i18n';
 
-function formatRelativeTime(dateStr: string | null, isEnglish: boolean): string {
+function formatRelativeTime(dateStr: string | null): string {
   if (!dateStr) return '';
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return isEnglish ? 'Just now' : 'এইমাত্র';
-  if (mins < 60) return isEnglish ? `${mins}m ago` : `${mins} মিনিট আগে`;
+  if (mins < 1) return 'এইমাত্র';
+  if (mins < 60) return `${mins} মিনিট আগে`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return isEnglish ? `${hrs}h ago` : `${hrs} ঘণ্টা আগে`;
+  if (hrs < 24) return `${hrs} ঘণ্টা আগে`;
   const days = Math.floor(hrs / 24);
-  return isEnglish ? `${days}d ago` : `${days} দিন আগে`;
+  return `${days} দিন আগে`;
 }
 
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { isEnglish, t, formatCurrency } = useLanguage();
+  const { t, formatCurrency } = useLanguage();
 
   const { data: summary, isLoading: summaryLoading, refetch: refetchSummary } = useGetDashboardSummary();
   const { data: settings, isLoading: settingsLoading } = useGetBusinessSettings();
@@ -148,9 +148,7 @@ export default function HomeScreen() {
 
   const customerCount = summary?.customerCount ?? 0;
   const supplierCount = summary?.supplierCount ?? 0;
-  const subtitleText = isEnglish
-    ? `${customerCount} customers · ${supplierCount} suppliers`
-    : `${customerCount} গ্রাহক · ${supplierCount} সরবরাহকারী`;
+  const subtitleText = `${customerCount} গ্রাহক · ${supplierCount} সরবরাহকারী`;
 
   return (
     <View style={s.container}>
@@ -186,9 +184,7 @@ export default function HomeScreen() {
               {formatCurrency(summary?.youWillGet ?? 0)}
             </Text>
             <Text style={[s.balanceCount, { color: colors.willGet }]}>
-              {isEnglish
-                ? `${customerCount} customers`
-                : `${customerCount} ${t('customerLabel')}`}
+              {`${customerCount} ${t('customerLabel')}`}
             </Text>
           </View>
           <View style={[s.balanceCard, { backgroundColor: colors.willGiveBg }]}>
@@ -199,9 +195,7 @@ export default function HomeScreen() {
               {formatCurrency(summary?.youWillGive ?? 0)}
             </Text>
             <Text style={[s.balanceCount, { color: colors.willGive }]}>
-              {isEnglish
-                ? `${supplierCount} suppliers`
-                : `${supplierCount} ${t('supplierLabel')}`}
+              {`${supplierCount} ${t('supplierLabel')}`}
             </Text>
           </View>
         </View>
@@ -224,7 +218,7 @@ export default function HomeScreen() {
               const avatarBg = party.role === 'CUSTOMER' ? colors.willGetBg : colors.willGiveBg;
               const avatarColor = party.role === 'CUSTOMER' ? colors.willGet : colors.willGive;
               const roleStr = party.role === 'CUSTOMER' ? t('customerLabel') : t('supplierLabel');
-              const relTime = formatRelativeTime(party.lastTransactionAt, isEnglish);
+              const relTime = formatRelativeTime(party.lastTransactionAt);
               return (
                 <TouchableOpacity
                   key={party.id}

@@ -32,10 +32,9 @@ import {
 } from '@workspace/api-client-react';
 import type { LedgerEntry, Party } from '@workspace/api-client-react';
 import { useColors } from '@/hooks/useColors';
-import { useLanguage } from '@/lib/i18n';
 import { useQueryClient } from '@tanstack/react-query';
 
-// ─── Module-level helpers (no closures over lang/isEnglish) ─────────────────
+// ─── Module-level helpers ────────────────────────────────────────────────────
 
 const API_BASE = process.env.EXPO_PUBLIC_DOMAIN
   ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
@@ -46,35 +45,20 @@ const BN_DIGITS: Record<string, string> = {
   '5': '৫', '6': '৬', '7': '৭', '8': '৮', '9': '৯',
 };
 
-/** Currency formatter — takes isEnglish as a plain arg, zero closure risk. */
-function fmtCur(n: number, isEnglish: boolean): string {
+/** Currency formatter — always Bengali digits with ৳ prefix. */
+function fmtCur(n: number): string {
   const abs = Math.abs(n);
   const hasDecimal = !Number.isInteger(abs);
   const grouped = new Intl.NumberFormat('en-IN', {
     minimumFractionDigits: hasDecimal ? 2 : 0,
     maximumFractionDigits: 2,
   }).format(abs);
-  if (isEnglish) return `৳${grouped}`;
   return `৳${grouped.split('').map(c => BN_DIGITS[c] ?? c).join('')}`;
 }
 
-/** Plain number formatter for live-typing display in transaction sheet. */
-function fmtNum(s: string, isEnglish: boolean): string {
-  if (isEnglish) return s;
+/** Plain number formatter for live-typing display — always Bengali digits. */
+function fmtNum(s: string): string {
   return s.split('').map(c => BN_DIGITS[c] ?? c).join('');
-}
-
-/**
- * Brute-force Bengali→English digit replacer.
- * Use as a last-resort on any raw string that might already contain Bengali digits,
- * e.g. from a pre-formatted API value or a stale cached render.
- */
-const BN_TO_EN: Record<string, string> = {
-  '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4',
-  '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9',
-};
-function forceEnDigits(str: string): string {
-  return str.split('').map(c => BN_TO_EN[c] ?? c).join('');
 }
 
 function billImageSrc(billImage: string | null | undefined): string | null {
@@ -130,9 +114,6 @@ interface TransactionSheetProps {
 
 function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyName, onClose, onSuccess }: TransactionSheetProps) {
   const colors = useColors();
-  const { currentLanguage } = useLanguage();
-  const _ls = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('app_lang') : null;
-  const isEnglish = currentLanguage === 'en' || _ls === 'en';
   const qc = useQueryClient();
   const { getToken } = useAuth();
 
@@ -152,18 +133,15 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
 
   async function pickImage() {
     Alert.alert(
-      isEnglish ? 'Attach Bill' : 'বিল সংযুক্ত করুন',
-      isEnglish ? 'Choose a source' : 'উৎস বেছে নিন',
+      'বিল সংযুক্ত করুন',
+      'উৎস বেছে নিন',
       [
         {
-          text: isEnglish ? 'Camera' : 'ক্যামেরা',
+          text: 'ক্যামেরা',
           onPress: async () => {
             const perm = await ImagePicker.requestCameraPermissionsAsync();
             if (perm.status !== 'granted') {
-              Alert.alert(
-                isEnglish ? 'Permission required' : 'অনুমতি প্রয়োজন',
-                isEnglish ? 'Please allow camera access to take a photo.' : 'ছবি তুলতে ক্যামেরার অনুমতি দিন।',
-              );
+              Alert.alert('অনুমতি প্রয়োজন', 'ছবি তুলতে ক্যামেরার অনুমতি দিন।');
               return;
             }
             const r = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.6 });
@@ -175,14 +153,11 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
           },
         },
         {
-          text: isEnglish ? 'Photo Library' : 'ফটো লাইব্রেরি',
+          text: 'ফটো লাইব্রেরি',
           onPress: async () => {
             const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (perm.status !== 'granted') {
-              Alert.alert(
-                isEnglish ? 'Permission required' : 'অনুমতি প্রয়োজন',
-                isEnglish ? 'Please allow access to your photo library.' : 'ফটো লাইব্রেরির অনুমতি দিন।',
-              );
+              Alert.alert('অনুমতি প্রয়োজন', 'ফটো লাইব্রেরির অনুমতি দিন।');
               return;
             }
             const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6 });
@@ -193,7 +168,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
             }
           },
         },
-        { text: isEnglish ? 'Cancel' : 'বাতিল', style: 'cancel' },
+        { text: 'বাতিল', style: 'cancel' },
       ],
     );
   }
@@ -201,10 +176,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
   async function handleSubmit() {
     const parsed = parseFloat(amount);
     if (!amount || isNaN(parsed) || parsed <= 0) {
-      Alert.alert(
-        isEnglish ? 'Invalid amount' : 'ভুল পরিমাণ',
-        isEnglish ? 'Please enter a valid amount greater than 0.' : 'শূন্যের বেশি একটি বৈধ পরিমাণ লিখুন।',
-      );
+      Alert.alert('ভুল পরিমাণ', 'শূন্যের বেশি একটি বৈধ পরিমাণ লিখুন।');
       return;
     }
     try {
@@ -221,7 +193,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
       qc.invalidateQueries({ queryKey: ['/api/parties'] });
       reset(); onSuccess(); onClose();
     } catch {
-      Alert.alert('Error', isEnglish ? 'Could not record transaction. Please try again.' : 'লেনদেন রেকর্ড করা যায়নি। আবার চেষ্টা করুন।');
+      Alert.alert('Error', 'লেনদেন রেকর্ড করা যায়নি। আবার চেষ্টা করুন।');
     }
   }
 
@@ -251,11 +223,10 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
     cancelText: { color: colors.mutedForeground, fontSize: 15, fontFamily: 'Inter_500Medium' },
   });
 
-  // Live title shown while user types amount
-  const liveAmt = fmtNum(amount || '0', isEnglish);
+  const liveAmt = fmtNum(amount || '0');
   const titleText = isGave
-    ? (isEnglish ? `You gave ৳${liveAmt} to ${partyName}` : `আপনি দিয়েছেন ৳${liveAmt} ${partyName}-কে`)
-    : (isEnglish ? `You received ৳${liveAmt} from ${partyName}` : `আপনি পেয়েছেন ৳${liveAmt} ${partyName}-এর থেকে`);
+    ? `আপনি দিয়েছেন ৳${liveAmt} ${partyName}-কে`
+    : `আপনি পেয়েছেন ৳${liveAmt} ${partyName}-এর থেকে`;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -272,7 +243,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
             >
               <Feather name="arrow-up-right" size={18} color={type === 'YOU_GAVE' ? colors.willGet : colors.mutedForeground} />
               <Text style={[s.typeBtnText, { color: type === 'YOU_GAVE' ? colors.willGet : colors.mutedForeground }]}>
-                {isEnglish ? 'You Gave' : 'আপনি দিয়েছেন'}
+                আপনি দিয়েছেন
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -281,7 +252,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
             >
               <Feather name="arrow-down-left" size={18} color={type === 'YOU_GOT' ? colors.willGive : colors.mutedForeground} />
               <Text style={[s.typeBtnText, { color: type === 'YOU_GOT' ? colors.willGive : colors.mutedForeground }]}>
-                {isEnglish ? 'You Received' : 'আপনি পেয়েছেন'}
+                আপনি পেয়েছেন
               </Text>
             </TouchableOpacity>
           </View>
@@ -305,7 +276,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
             style={s.descInput}
             value={description}
             onChangeText={setDescription}
-            placeholder={isEnglish ? 'Enter details (item, bill no, quantity etc.)' : 'বিস্তারিত লিখুন (পণ্য, বিল নং, পরিমাণ ইত্যাদি)'}
+            placeholder="বিস্তারিত লিখুন (পণ্য, বিল নং, পরিমাণ ইত্যাদি)"
             placeholderTextColor={colors.mutedForeground}
             returnKeyType="done"
           />
@@ -327,9 +298,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
             <TouchableOpacity style={s.attachBtn} onPress={pickImage} activeOpacity={0.7}>
               <Feather name="camera" size={16} color={colors.mutedForeground} />
               <Text style={s.attachBtnText}>
-                {billImageUri
-                  ? (isEnglish ? 'Change photo' : 'ছবি পরিবর্তন করুন')
-                  : (isEnglish ? 'Attach bill photo' : 'বিল ছবি সংযুক্ত করুন')}
+                {billImageUri ? 'ছবি পরিবর্তন করুন' : 'বিল ছবি সংযুক্ত করুন'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -341,14 +310,12 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
             activeOpacity={0.85}
           >
             <Text style={s.submitText}>
-              {createEntry.isPending
-                ? (isEnglish ? 'Saving…' : 'সংরক্ষণ হচ্ছে…')
-                : (isEnglish ? 'Confirm Entry' : 'এন্ট্রি নিশ্চিত করুন')}
+              {createEntry.isPending ? 'সংরক্ষণ হচ্ছে…' : 'এন্ট্রি নিশ্চিত করুন'}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={s.cancelBtn} onPress={() => { reset(); onClose(); }}>
-            <Text style={s.cancelText}>{isEnglish ? 'Cancel' : 'বাতিল'}</Text>
+            <Text style={s.cancelText}>বাতিল</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -368,9 +335,6 @@ interface ReminderSheetProps {
 
 function ReminderSheet({ visible, partyId, partyName, partyPhone, onClose }: ReminderSheetProps) {
   const colors = useColors();
-  const { currentLanguage } = useLanguage();
-  const _ls = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('app_lang') : null;
-  const isEnglish = currentLanguage === 'en' || _ls === 'en';
   const sendReminder = useSendPaymentReminder();
   const [message, setMessage] = useState('');
   const [fetching, setFetching] = useState(false);
@@ -396,12 +360,12 @@ function ReminderSheet({ visible, partyId, partyName, partyPhone, onClose }: Rem
         if (await Linking.canOpenURL(url)) { await Linking.openURL(url); onClose(); return; }
       }
       Alert.alert(
-        isEnglish ? 'Reminder message' : 'রিমাইন্ডার বার্তা',
+        'রিমাইন্ডার বার্তা',
         message.trim(),
-        [{ text: isEnglish ? 'Close' : 'বন্ধ করুন', style: 'cancel', onPress: onClose }],
+        [{ text: 'বন্ধ করুন', style: 'cancel', onPress: onClose }],
       );
     } catch {
-      Alert.alert('Error', isEnglish ? 'Could not open SMS. Please try again.' : 'SMS খোলা যায়নি। আবার চেষ্টা করুন।');
+      Alert.alert('Error', 'SMS খোলা যায়নি। আবার চেষ্টা করুন।');
     } finally { setSending(false); }
   }
 
@@ -423,7 +387,7 @@ function ReminderSheet({ visible, partyId, partyName, partyPhone, onClose }: Rem
       <KeyboardAvoidingView style={s.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={s.sheet}>
           <View style={s.handle} />
-          <Text style={s.title}>{isEnglish ? 'Send Reminder' : 'রিমাইন্ডার পাঠান'}</Text>
+          <Text style={s.title}>রিমাইন্ডার পাঠান</Text>
           <Text style={s.subtitle}>{partyName}</Text>
 
           {fetching ? (
@@ -436,7 +400,7 @@ function ReminderSheet({ visible, partyId, partyName, partyPhone, onClose }: Rem
               value={message}
               onChangeText={setMessage}
               multiline
-              placeholder={isEnglish ? 'Reminder message…' : 'রিমাইন্ডার বার্তা…'}
+              placeholder="রিমাইন্ডার বার্তা…"
               placeholderTextColor={colors.mutedForeground}
             />
           )}
@@ -449,12 +413,12 @@ function ReminderSheet({ visible, partyId, partyName, partyPhone, onClose }: Rem
           >
             <Feather name="send" size={16} color="#fff" />
             <Text style={s.sendBtnText}>
-              {sending ? (isEnglish ? 'Opening…' : 'খুলছে…') : (isEnglish ? 'Send' : 'পাঠান')}
+              {sending ? 'খুলছে…' : 'পাঠান'}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={s.cancelBtn} onPress={onClose}>
-            <Text style={s.cancelText}>{isEnglish ? 'Cancel' : 'বাতিল'}</Text>
+            <Text style={s.cancelText}>বাতিল</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -467,11 +431,10 @@ function ReminderSheet({ visible, partyId, partyName, partyPhone, onClose }: Rem
 interface LedgerRowProps {
   entry: LedgerEntry;
   colors: ReturnType<typeof useColors>;
-  isEnglish: boolean;
   onPress?: () => void;
 }
 
-function LedgerRow({ entry, colors, isEnglish, onPress }: LedgerRowProps) {
+function LedgerRow({ entry, colors, onPress }: LedgerRowProps) {
   const { getToken } = useAuth();
   const isGave = entry.type === 'YOU_GAVE';
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -488,16 +451,11 @@ function LedgerRow({ entry, colors, isEnglish, onPress }: LedgerRowProps) {
 
   const entryIsToday = isToday(entry.createdAt);
   const dateLine = entryIsToday
-    ? `${formatDate(entry.createdAt)} · ${isEnglish ? 'Today' : 'আজ'} · ${formatTime(entry.createdAt)}`
+    ? `${formatDate(entry.createdAt)} · আজ · ${formatTime(entry.createdAt)}`
     : `${formatDate(entry.createdAt)} · ${formatTime(entry.createdAt)}`;
 
-  const descFallback = isGave
-    ? (isEnglish ? 'You gave' : 'আপনি দিয়েছেন')
-    : (isEnglish ? 'You got' : 'আপনি পেয়েছেন');
-
-  const typeTag = isGave
-    ? (isEnglish ? '▲ YOU GAVE' : '▲ আপনি দিয়েছেন')
-    : (isEnglish ? '▼ YOU GOT' : '▼ আপনি পেয়েছেন');
+  const descFallback = isGave ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন';
+  const typeTag = isGave ? '▲ আপনি দিয়েছেন' : '▼ আপনি পেয়েছেন';
 
   const s = StyleSheet.create({
     row: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
@@ -524,7 +482,7 @@ function LedgerRow({ entry, colors, isEnglish, onPress }: LedgerRowProps) {
           ) : null}
         </View>
         <Text style={[s.amount, { color: isGave ? colors.willGet : colors.willGive }]}>
-          {isGave ? '+' : '-'}{fmtCur(entry.amount, isEnglish)}
+          {isGave ? '+' : '-'}{fmtCur(entry.amount)}
         </Text>
       </TouchableOpacity>
 
@@ -537,7 +495,7 @@ function LedgerRow({ entry, colors, isEnglish, onPress }: LedgerRowProps) {
           >
             <Image source={imgSrc} style={{ width: '92%', height: '70%' }} resizeMode="contain" />
             <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 16 }}>
-              {isEnglish ? 'Tap to close' : 'বন্ধ করতে চাপুন'}
+              বন্ধ করতে চাপুন
             </Text>
           </TouchableOpacity>
         </Modal>
@@ -559,9 +517,6 @@ interface EntryDetailSheetProps {
 
 function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onUpdated }: EntryDetailSheetProps) {
   const colors = useColors();
-  const { currentLanguage } = useLanguage();
-  const _ls = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('app_lang') : null;
-  const isEnglish = currentLanguage === 'en' || _ls === 'en';
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
 
@@ -591,10 +546,7 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
   async function handleSave() {
     const p = parseFloat(editAmount);
     if (!editAmount || isNaN(p) || p <= 0) {
-      Alert.alert(
-        isEnglish ? 'Invalid amount' : 'ভুল পরিমাণ',
-        isEnglish ? 'Please enter a valid amount > 0.' : 'শূন্যের বেশি একটি বৈধ পরিমাণ লিখুন।',
-      );
+      Alert.alert('ভুল পরিমাণ', 'শূন্যের বেশি একটি বৈধ পরিমাণ লিখুন।');
       return;
     }
     try {
@@ -609,18 +561,18 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setIsEditing(false); onUpdated(updated);
     } catch {
-      Alert.alert('Error', isEnglish ? 'Could not update entry. Please try again.' : 'এন্ট্রি আপডেট করা যায়নি।');
+      Alert.alert('Error', 'এন্ট্রি আপডেট করা যায়নি।');
     }
   }
 
   function handleDelete() {
     Alert.alert(
-      isEnglish ? 'Delete Entry' : 'এন্ট্রি মুছুন',
-      isEnglish ? 'This entry will be permanently deleted. Are you sure?' : 'এই এন্ট্রিটি স্থায়ীভাবে মুছে যাবে। আপনি কি নিশ্চিত?',
+      'এন্ট্রি মুছুন',
+      'এই এন্ট্রিটি স্থায়ীভাবে মুছে যাবে। আপনি কি নিশ্চিত?',
       [
-        { text: isEnglish ? 'Cancel' : 'বাতিল', style: 'cancel' },
+        { text: 'বাতিল', style: 'cancel' },
         {
-          text: isEnglish ? 'Delete' : 'মুছুন', style: 'destructive',
+          text: 'মুছুন', style: 'destructive',
           onPress: async () => {
             try {
               await del.mutateAsync({ partyId: entry.partyId, entryId: entry.id });
@@ -631,7 +583,7 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               onDeleted();
             } catch {
-              Alert.alert('Error', isEnglish ? 'Could not delete entry. Please try again.' : 'এন্ট্রি মুছে ফেলা যায়নি।');
+              Alert.alert('Error', 'এন্ট্রি মুছে ফেলা যায়নি।');
             }
           },
         },
@@ -640,10 +592,8 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
   }
 
   async function handleShare() {
-    const dir = isGave ? (isEnglish ? 'gave' : 'দিয়েছেন') : (isEnglish ? 'received' : 'পেয়েছেন');
-    const youLabel = isEnglish ? 'You' : 'আপনি';
-    const balLabel = isEnglish ? 'Balance' : 'ব্যালেন্স';
-    const msg = `${youLabel} ${dir}: ${fmtCur(entry.amount, isEnglish)}\n${balLabel}: ${balSign}${fmtCur(party.currentBalance, isEnglish)}\nhttps://banglakhata.com/p/${entry.partyId}`;
+    const dir = isGave ? 'দিয়েছেন' : 'পেয়েছেন';
+    const msg = `আপনি ${dir}: ${fmtCur(entry.amount)}\nব্যালেন্স: ${balSign}${fmtCur(party.currentBalance)}\nhttps://banglakhata.com/p/${entry.partyId}`;
     try { await Share.share({ message: msg }); } catch { /* ignore */ }
   }
 
@@ -687,9 +637,7 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
     saveBtnText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
   });
 
-  const balanceLabel = isGave
-    ? (isEnglish ? 'You gave' : 'আপনি দিয়েছেন')
-    : (isEnglish ? 'You received' : 'আপনি পেয়েছেন');
+  const balanceLabel = isGave ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন';
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -698,9 +646,7 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Feather name="arrow-left" size={22} color="#fff" />
           </TouchableOpacity>
-          <Text style={s.headerTitle}>
-            {isEnglish ? 'Entry Details' : 'বিস্তারিত প্রবেশিকা'}
-          </Text>
+          <Text style={s.headerTitle}>বিস্তারিত প্রবেশিকা</Text>
         </View>
 
         <ScrollView style={s.body} contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
@@ -715,31 +661,27 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
                 </View>
               </View>
               <View style={{ marginLeft: 12, alignItems: 'flex-end' }}>
-                <Text style={[s.amtBig, { color: amtColor }]}>{fmtCur(Math.abs(entry.amount), isEnglish)}</Text>
+                <Text style={[s.amtBig, { color: amtColor }]}>{fmtCur(Math.abs(entry.amount))}</Text>
                 <Text style={s.dirLabel}>{balanceLabel}</Text>
               </View>
             </View>
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
-              <Text style={s.balLabel}>{isEnglish ? 'Current Balance' : 'বর্তমান ব্যালেন্স'}</Text>
-              <Text style={[s.balValue, { color: balColor }]}>{fmtCur(Math.abs(party.currentBalance), isEnglish)}</Text>
+              <Text style={s.balLabel}>বর্তমান ব্যালেন্স</Text>
+              <Text style={[s.balValue, { color: balColor }]}>{fmtCur(Math.abs(party.currentBalance))}</Text>
             </View>
 
             <TouchableOpacity style={s.editBtn} onPress={() => setIsEditing(true)} activeOpacity={0.7}>
               <Text style={{ fontSize: 15 }}>🖊️</Text>
-              <Text style={s.editBtnText}>{isEnglish ? 'Edit Entry' : 'এন্ট্রি এডিট করুন'}</Text>
+              <Text style={s.editBtnText}>এন্ট্রি এডিট করুন</Text>
             </TouchableOpacity>
           </View>
 
           {/* SMS card */}
           <View style={s.infoCard}>
-            <Text style={s.smsHeading}>
-              {isEnglish ? '📋 SMS Not Sent' : '📋 SMS পাঠানো হয়নি'}
-            </Text>
+            <Text style={s.smsHeading}>📋 SMS পাঠানো হয়নি</Text>
             <Text style={s.smsBody}>
-              {isEnglish
-                ? `You ${isGave ? 'gave' : 'received'}: ${fmtCur(Math.abs(entry.amount), true)}\nBalance: ${fmtCur(Math.abs(party.currentBalance), true)}\n`
-                : `আপনি ${isGave ? 'দিয়েছেন' : 'পেয়েছেন'}: ${fmtCur(Math.abs(entry.amount), false)}\nব্যালেন্স: ${fmtCur(Math.abs(party.currentBalance), false)}\n`}
+              {`আপনি ${isGave ? 'দিয়েছেন' : 'পেয়েছেন'}: ${fmtCur(Math.abs(entry.amount))}\nব্যালেন্স: ${fmtCur(Math.abs(party.currentBalance))}\n`}
               <Text style={s.smsLink} onPress={() => Linking.openURL(`https://banglakhata.com/p/${entry.partyId}`)}>
                 {`https://banglakhata.com/p/${entry.partyId}`}
               </Text>
@@ -748,16 +690,12 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
 
           {/* Backup card */}
           <View style={s.infoCard}>
-            <Text style={s.backupText}>
-              {isEnglish ? '☁️ Entry backed up' : '☁️ এন্ট্রি ব্যাক আপ করা হয়েছে'}
-            </Text>
+            <Text style={s.backupText}>☁️ এন্ট্রি ব্যাক আপ করা হয়েছে</Text>
           </View>
 
           {/* Security badge */}
           <View style={s.secBadge}>
-            <Text style={s.secText}>
-              {isEnglish ? '✔️ 100% Safe & Secure' : '✔️ 100% নিরাপদ ও সুরক্ষিত'}
-            </Text>
+            <Text style={s.secText}>✔️ 100% নিরাপদ ও সুরক্ষিত</Text>
           </View>
         </ScrollView>
 
@@ -765,11 +703,11 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
         <View style={s.bottomBar}>
           <TouchableOpacity style={s.deleteBtn} onPress={handleDelete} disabled={del.isPending} activeOpacity={0.8}>
             <Text style={{ fontSize: 16 }}>🗑️</Text>
-            <Text style={s.deleteBtnText}>{isEnglish ? 'Delete' : 'মুছে ফেলুন'}</Text>
+            <Text style={s.deleteBtnText}>মুছে ফেলুন</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.shareBtn} onPress={handleShare} activeOpacity={0.8}>
             <Text style={{ fontSize: 16 }}>📬</Text>
-            <Text style={s.shareBtnText}>{isEnglish ? 'Share' : 'শেয়ার করুন'}</Text>
+            <Text style={s.shareBtnText}>শেয়ার করুন</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -778,10 +716,8 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
       <Modal visible={isEditing} transparent animationType="fade" onRequestClose={() => setIsEditing(false)}>
         <KeyboardAvoidingView style={s.editOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={s.editCard}>
-            <Text style={s.editTitle}>
-              {isEnglish ? 'Edit Entry (Re-entry)' : 'এন্ট্রি সংশোধন (Re-entry)'}
-            </Text>
-            <Text style={s.editLabel}>{isEnglish ? 'Amount (৳)' : 'টাকার পরিমাণ (৳)'}</Text>
+            <Text style={s.editTitle}>এন্ট্রি সংশোধন (Re-entry)</Text>
+            <Text style={s.editLabel}>টাকার পরিমাণ (৳)</Text>
             <TextInput
               style={s.editInput}
               value={editAmount}
@@ -791,18 +727,18 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
               placeholderTextColor="#CBD5E1"
               autoFocus
             />
-            <Text style={s.editLabel}>{isEnglish ? 'Description / Details' : 'বিবরণ / ডিটেলস'}</Text>
+            <Text style={s.editLabel}>বিবরণ / ডিটেলস</Text>
             <TextInput
               style={s.editInput}
               value={editDesc}
               onChangeText={setEditDesc}
-              placeholder={isEnglish ? 'Note (optional)' : 'নোট (ঐচ্ছিক)'}
+              placeholder="নোট (ঐচ্ছিক)"
               placeholderTextColor="#CBD5E1"
               returnKeyType="done"
             />
             <View style={s.editActions}>
               <TouchableOpacity style={s.cancelBtn} onPress={() => setIsEditing(false)}>
-                <Text style={s.cancelBtnText}>{isEnglish ? 'Cancel' : 'বাতিল'}</Text>
+                <Text style={s.cancelBtnText}>বাতিল</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[s.saveBtn, { opacity: patch.isPending ? 0.6 : 1 }]}
@@ -810,7 +746,7 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
                 disabled={patch.isPending}
               >
                 <Text style={s.saveBtnText}>
-                  {patch.isPending ? (isEnglish ? 'Saving…' : 'সংরক্ষণ হচ্ছে…') : (isEnglish ? 'Save' : 'সংরক্ষণ করুন')}
+                  {patch.isPending ? 'সংরক্ষণ হচ্ছে…' : 'সংরক্ষণ করুন'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -828,11 +764,6 @@ export default function PartyDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-
-  // Derive isEnglish directly from the raw currentLanguage string — no memoized boolean
-  const { currentLanguage } = useLanguage();
-  const _ls = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem('app_lang') : null;
-  const isEnglish = currentLanguage === 'en' || _ls === 'en';
 
   const [showSheet, setShowSheet] = useState(false);
   const [pendingType, setPendingType] = useState<'YOU_GAVE' | 'YOU_GOT'>('YOU_GAVE');
@@ -888,27 +819,23 @@ export default function PartyDetailScreen() {
       <View style={[s.container, { alignItems: 'center', justifyContent: 'center', padding: 32 }]}>
         <Feather name="alert-circle" size={40} color={colors.destructive} />
         <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 16, marginTop: 12 }}>
-          {isEnglish ? 'Party not found' : 'পার্টি পাওয়া যায়নি'}
+          পার্টি পাওয়া যায়নি
         </Text>
         <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 16 }}>
-          <Text style={{ color: colors.primary, fontFamily: 'Inter_500Medium' }}>
-            {isEnglish ? 'Go back' : 'পেছনে যান'}
-          </Text>
+          <Text style={{ color: colors.primary, fontFamily: 'Inter_500Medium' }}>পেছনে যান</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   const initials = party.name.slice(0, 2).toUpperCase();
-  const roleLabel = party.role === 'CUSTOMER'
-    ? (isEnglish ? 'Customer' : 'গ্রাহক')
-    : (isEnglish ? 'Supplier' : 'সরবরাহকারী');
+  const roleLabel = party.role === 'CUSTOMER' ? 'গ্রাহক' : 'সরবরাহকারী';
 
   const quickActions = [
-    { icon: 'file-text' as const,      label: isEnglish ? 'Report'   : 'রিপোর্ট',    onPress: () => {} },
-    { icon: 'bell' as const,           label: isEnglish ? 'Reminder' : 'রিমাইন্ডার', onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowReminderSheet(true); } },
-    { icon: 'message-square' as const, label: isEnglish ? 'SMS'      : 'এসএমএস',     onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowReminderSheet(true); } },
-    { icon: 'edit-3' as const,         label: isEnglish ? 'Entry'    : 'এন্ট্রি',     onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setPendingType('YOU_GAVE'); setShowSheet(true); } },
+    { icon: 'file-text' as const,      label: 'রিপোর্ট',    onPress: () => {} },
+    { icon: 'bell' as const,           label: 'রিমাইন্ডার', onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowReminderSheet(true); } },
+    { icon: 'message-square' as const, label: 'এসএমএস',     onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowReminderSheet(true); } },
+    { icon: 'edit-3' as const,         label: 'এন্ট্রি',     onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setPendingType('YOU_GAVE'); setShowSheet(true); } },
   ];
 
   return (
@@ -917,21 +844,10 @@ export default function PartyDetailScreen() {
       <View style={s.header}>
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
           <Feather name="chevron-left" size={18} color="rgba(255,255,255,0.8)" />
-          <Text style={s.backText}>{isEnglish ? 'Back' : 'পেছনে'}</Text>
+          <Text style={s.backText}>পেছনে</Text>
         </TouchableOpacity>
         <View style={s.partyAv}><Text style={s.partyAvText}>{initials}</Text></View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={s.partyName}>{party.name}</Text>
-          {/* ── DIAGNOSTIC BADGE: flip confirms context is live ── */}
-          <Text style={{
-            fontSize: 9, fontFamily: 'Inter_700Bold', paddingHorizontal: 5, paddingVertical: 2,
-            borderRadius: 4, overflow: 'hidden',
-            backgroundColor: isEnglish ? '#16a34a' : '#dc2626',
-            color: '#fff',
-          }}>
-            {isEnglish ? 'ENG_ACTIVE' : 'BN_ACTIVE'}
-          </Text>
-        </View>
+        <Text style={s.partyName}>{party.name}</Text>
         {party.phone ? <Text style={s.partyPhone}>{party.phone}</Text> : null}
         <Text style={[s.partyPhone, { marginTop: 4 }]}>{roleLabel}</Text>
       </View>
@@ -943,22 +859,18 @@ export default function PartyDetailScreen() {
         {/* Balance card */}
         <View style={s.balCard}>
           <View style={s.balLeft}>
-            <Text style={s.balLabelText}>
-              {isEnglish ? 'CURRENT BALANCE' : 'বর্তমান ব্যালেন্স'}
-            </Text>
+            <Text style={s.balLabelText}>বর্তমান ব্যালেন্স</Text>
             <Text style={[s.balAmount, { color: isGet ? colors.willGet : colors.willGive }]}>
-              {fmtCur(party.currentBalance, isEnglish)}
+              {fmtCur(party.currentBalance)}
             </Text>
             <Text style={[s.balType, { color: isGet ? colors.willGet : colors.willGive }]}>
-              {isGet
-                ? (isEnglish ? '↑ You Will Get' : '↑ আপনি পাবেন')
-                : (isEnglish ? '↓ You Will Give' : '↓ আপনি দেবেন')}
+              {isGet ? '↑ আপনি পাবেন' : '↓ আপনি দেবেন'}
             </Text>
           </View>
           {party.dueDate ? (
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>
-                {isEnglish ? 'Due date' : 'বকেয়ার তারিখ'}
+                বকেয়ার তারিখ
               </Text>
               <Text style={{ fontSize: 14, color: colors.foreground, fontFamily: 'Inter_600SemiBold', marginTop: 2 }}>
                 {party.dueDate}
@@ -975,9 +887,7 @@ export default function PartyDetailScreen() {
             activeOpacity={0.8}
           >
             <Feather name="arrow-up-right" size={18} color={colors.willGet} />
-            <Text style={[s.actionBtnText, { color: colors.willGet }]}>
-              {isEnglish ? 'You Gave' : 'আপনি দিয়েছেন'}
-            </Text>
+            <Text style={[s.actionBtnText, { color: colors.willGet }]}>আপনি দিয়েছেন</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[s.actionBtn, { backgroundColor: colors.willGiveBg }]}
@@ -985,9 +895,7 @@ export default function PartyDetailScreen() {
             activeOpacity={0.8}
           >
             <Feather name="arrow-down-left" size={18} color={colors.willGive} />
-            <Text style={[s.actionBtnText, { color: colors.willGive }]}>
-              {isEnglish ? 'You Received' : 'আপনি পেয়েছেন'}
-            </Text>
+            <Text style={[s.actionBtnText, { color: colors.willGive }]}>আপনি পেয়েছেন</Text>
           </TouchableOpacity>
         </View>
 
@@ -1009,7 +917,7 @@ export default function PartyDetailScreen() {
         {/* Transaction history header */}
         <View style={s.entriesHeader}>
           <Text style={s.entriesTitle}>
-            {isEnglish ? 'TRANSACTION HISTORY' : 'লেনদেনের ইতিহাস'} ({entries.length})
+            লেনদেনের ইতিহাস ({entries.length})
           </Text>
         </View>
 
@@ -1018,9 +926,7 @@ export default function PartyDetailScreen() {
         ) : entries.length === 0 ? (
           <View style={s.emptyContainer}>
             <Feather name="file-text" size={36} color={colors.border} />
-            <Text style={s.emptyText}>
-              {isEnglish ? 'No transactions yet' : 'এখনো কোনো লেনদেন নেই'}
-            </Text>
+            <Text style={s.emptyText}>এখনো কোনো লেনদেন নেই</Text>
           </View>
         ) : (
           entries.map(entry => (
@@ -1028,7 +934,6 @@ export default function PartyDetailScreen() {
               key={entry.id}
               entry={entry}
               colors={colors}
-              isEnglish={isEnglish}
               onPress={() => setSelectedEntry(entry)}
             />
           ))

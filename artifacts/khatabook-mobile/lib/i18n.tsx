@@ -1,15 +1,12 @@
 /**
  * i18n — Global language context for BanglaKhata mobile app.
- * Mirror of the web i18n lib; uses SecureStore instead of localStorage.
+ * The app is permanently locked to Bengali (bn). All UI text is in Bengali.
  */
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { useGetBusinessSettings } from '@workspace/api-client-react';
-import * as SecureStore from 'expo-secure-store';
+import React, { createContext, useContext } from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type Lang = 'bn' | 'en';
-const STORAGE_KEY = 'app_lang';
+export type Lang = 'bn';
 
 // ── Translation dictionary ─────────────────────────────────────────────────────
 
@@ -71,7 +68,6 @@ const dict = {
     shareGave: 'দিয়েছেন',
     shareGot: 'পেয়েছেন',
     langHint: 'ইন্টারফেসের জন্য পছন্দের ভাষা বেছে নিন',
-    // ── User-requested keys (Screenshot_20 / Screenshot_21) ──
     report: 'রিপোর্ট',
     reminder: 'রিমাইন্ডার',
     sms: 'এসএমএস',
@@ -85,7 +81,6 @@ const dict = {
     placeholderDetails: 'বিস্তারিত লিখুন (পণ্য, বিল নং, পরিমাণ ইত্যাদি)',
     attachBill: 'বিল সংযুক্ত করুন',
     confirmEntry: 'এন্ট্রি নিশ্চিত করুন',
-    // ── TransactionSheet ──
     recordTransaction: 'লেনদেন রেকর্ড করুন',
     youGot: 'আপনি পেয়েছেন',
     youGaveLabel: '▲ আপনি দিয়েছেন',
@@ -96,19 +91,16 @@ const dict = {
     recordYouGot: 'পেয়েছেন রেকর্ড করুন',
     camera: 'ক্যামেরা',
     photoLibrary: 'ফটো লাইব্রেরি',
-    // ── ReminderSheet ──
     sendReminderBtn: 'রিমাইন্ডার পাঠান',
     reminderMsgPlaceholder: 'রিমাইন্ডার বার্তা…',
     send: 'পাঠান',
     sendingOpen: 'খুলছে…',
-    // ── LedgerRow ──
     tapToClose: 'বন্ধ করতে চাপুন',
     youGaveTag: '▲ আপনি দিয়েছেন',
     youGotTag: '▼ আপনি পেয়েছেন',
     descYouGave: 'আপনি দিয়েছেন',
     descYouGot: 'আপনি পেয়েছেন',
     balLabel: 'জের',
-    // ── PartyDetailScreen ──
     back: 'পেছনে',
     currentBalanceLabel: 'বর্তমান ব্যালেন্স',
     youWillGetArrow: '↑ আপনি পাবেন',
@@ -118,7 +110,6 @@ const dict = {
     noTransactionsYet: 'এখনো কোনো লেনদেন নেই',
     partyNotFound: 'পার্টি পাওয়া যায়নি',
     goBack: 'পেছনে যান',
-    // ── parties.tsx ──
     partiesTitle: 'পার্টিস',
     customersTab: 'গ্রাহকরা',
     suppliersTab: 'সরবরাহকারীরা',
@@ -138,130 +129,6 @@ const dict = {
     noTransactions: 'কোনো লেনদেন নেই',
     justNow: 'এইমাত্র',
   },
-  en: {
-    parties: 'Parties',
-    settings: 'Settings',
-    customer: 'Customer',
-    supplier: 'Supplier',
-    youWillGive: 'You Will Give',
-    youWillGet: 'You Will Get',
-    viewReport: 'View Report',
-    all: 'All',
-    get: 'Get',
-    give: 'Give',
-    addCustomer: 'Add Customer',
-    addSupplier: 'Add Supplier',
-    netBalance: 'Net Balance',
-    overallReceive: 'Overall you will receive',
-    overallPay: 'Overall you must pay',
-    recent: 'Recent',
-    seeAll: 'See all',
-    noRecent: 'No recent transactions',
-    loadingStore: 'Loading…',
-    myShop: 'My Shop',
-    customerLabel: 'Customer',
-    supplierLabel: 'Supplier',
-    mobileSettingsTitle: 'Settings',
-    businessSection: 'BUSINESS',
-    storeNameLabel: 'Store Name',
-    languageLabel: 'Language',
-    accountSection: 'ACCOUNT',
-    signOutLabel: 'Sign Out',
-    aboutSection: 'ABOUT',
-    appNameMobile: 'BanglaKhata',
-    savingLabel: 'Saving…',
-    saveChanges: 'Save Changes',
-    cancel: 'Cancel',
-    entryDetails: 'Entry Details',
-    currentBalance: 'Current Balance',
-    editEntry: 'Edit Entry',
-    smsNotSent: '📋 SMS Not Sent',
-    entryBackedUp: '☁️ Entry backed up',
-    secureLabel: '✔️ 100% Safe & Secure',
-    deleteEntryBtn: 'Delete',
-    shareEntryBtn: 'Share',
-    reentry: 'Edit Entry (Re-entry)',
-    amountLabel: 'Amount (৳)',
-    descLabel: 'Description / Details',
-    notePlaceholder: 'Note (optional)',
-    saving: 'Saving…',
-    save: 'Save',
-    deleteEntryTitle: 'Delete Entry',
-    deleteEntryMsg: 'This entry will be permanently deleted. Are you sure?',
-    cancelAlert: 'Cancel',
-    deleteAlert: 'Delete',
-    balGave: 'You gave',
-    balGot: 'You received',
-    shareGave: 'gave',
-    shareGot: 'received',
-    langHint: 'Choose your preferred language for the interface',
-    // ── User-requested keys (Screenshot_20 / Screenshot_21) ──
-    report: 'Report',
-    reminder: 'Reminder',
-    sms: 'SMS',
-    entry: 'Entry',
-    youGave: 'You Gave',
-    youReceived: 'You Received',
-    today: 'Today',
-    gaveBtn: 'You Gave ৳',
-    receivedBtn: 'You Received ৳',
-    receivedFrom: 'You received ৳ from',
-    placeholderDetails: 'Enter details (item, bill no, quantity etc.)',
-    attachBill: 'Attach Bill',
-    confirmEntry: 'Confirm Entry',
-    // ── TransactionSheet ──
-    recordTransaction: 'Record Transaction',
-    youGot: 'You Got',
-    youGaveLabel: '▲ YOU GAVE',
-    youGotLabel: '▼ YOU GOT',
-    changePhoto: 'Change photo',
-    attachBillPhoto: 'Attach bill photo',
-    recordYouGave: 'Record You Gave',
-    recordYouGot: 'Record You Got',
-    camera: 'Camera',
-    photoLibrary: 'Photo Library',
-    // ── ReminderSheet ──
-    sendReminderBtn: 'Send Reminder',
-    reminderMsgPlaceholder: 'Reminder message…',
-    send: 'Send',
-    sendingOpen: 'Opening…',
-    // ── LedgerRow ──
-    tapToClose: 'Tap to close',
-    youGaveTag: '▲ YOU GAVE',
-    youGotTag: '▼ YOU GOT',
-    descYouGave: 'You gave',
-    descYouGot: 'You got',
-    balLabel: 'Bal.',
-    // ── PartyDetailScreen ──
-    back: 'Back',
-    currentBalanceLabel: 'CURRENT BALANCE',
-    youWillGetArrow: '↑ You Will Get',
-    youWillGiveArrow: '↓ You Will Give',
-    dueDate: 'Due date',
-    transactionHistory: 'TRANSACTION HISTORY',
-    noTransactionsYet: 'No transactions yet',
-    partyNotFound: 'Party not found',
-    goBack: 'Go back',
-    // ── parties.tsx ──
-    partiesTitle: 'Parties',
-    customersTab: 'Customers',
-    suppliersTab: 'Suppliers',
-    searchCustomersPlaceholder: 'Search customers…',
-    searchSuppliersPlaceholder: 'Search suppliers…',
-    nameLabel: 'Name *',
-    enterNamePlaceholder: 'Enter name',
-    phoneOptional: 'Phone (optional)',
-    openingBalanceOptional: 'Opening balance (optional)',
-    balanceTypeLabel: 'Balance type',
-    adding: 'Adding…',
-    add: 'Add',
-    noResults: 'No results',
-    tryDifferentSearch: 'Try a different search term',
-    willGet: 'will get',
-    willGive: 'will give',
-    noTransactions: 'No transactions',
-    justNow: 'Just now',
-  },
 } as const;
 
 export type TKey = keyof typeof dict.bn;
@@ -270,27 +137,13 @@ export type TKey = keyof typeof dict.bn;
 
 export interface LanguageCtx {
   lang: Lang;
-  /** Raw string alias for `lang` — use `currentLanguage === 'en'` to derive isEnglish locally in each component. */
   currentLanguage: Lang;
-  isEnglish: boolean;
+  isEnglish: false;
   t: (key: TKey) => string;
   formatCurrency: (amount: number) => string;
   formatNumber: (amount: number) => string;
-  /** Call this immediately when the user picks a language in UI — bypasses server round-trip delay. */
-  setLanguage: (lang: Lang) => void;
+  setLanguage: (lang: Lang) => void; // no-op — language is locked to Bengali
 }
-
-const LanguageContext = createContext<LanguageCtx>({
-  lang: 'bn',
-  currentLanguage: 'bn',
-  isEnglish: false,
-  t: (key) => dict.bn[key],
-  formatCurrency: (n) => `৳${n.toLocaleString('en-IN')}`,
-  formatNumber: (n) => n.toLocaleString('en-IN'),
-  setLanguage: () => {},
-});
-
-export const useLanguage = () => useContext(LanguageContext);
 
 // ── Bengali digit helpers ──────────────────────────────────────────────────────
 
@@ -303,107 +156,43 @@ function toBengaliDigits(str: string): string {
   return str.split('').map((ch) => EN_TO_BN[ch] ?? ch).join('');
 }
 
-function formatBengaliNumber(amount: number): string {
-  const hasDecimal = !Number.isInteger(amount);
-  const formatted = new Intl.NumberFormat('en-IN', {
+// ── Singleton context value (never changes — language is fixed to bn) ──────────
+
+const t = (key: TKey): string => dict.bn[key];
+
+const formatCurrency = (amount: number): string => {
+  const abs = Math.abs(amount);
+  const hasDecimal = !Number.isInteger(abs);
+  const grouped = new Intl.NumberFormat('en-IN', {
     minimumFractionDigits: hasDecimal ? 2 : 0,
     maximumFractionDigits: 2,
-  }).format(amount);
-  return toBengaliDigits(formatted);
-}
+  }).format(abs);
+  return `৳${toBengaliDigits(grouped)}`;
+};
+
+const formatNumber = (amount: number): string =>
+  amount.toString().split('').map(d => EN_TO_BN[d] ?? d).join('');
+
+const CONTEXT_VALUE: LanguageCtx = {
+  lang: 'bn',
+  currentLanguage: 'bn',
+  isEnglish: false,
+  t,
+  formatCurrency,
+  formatNumber,
+  setLanguage: () => {}, // no-op
+};
+
+const LanguageContext = createContext<LanguageCtx>(CONTEXT_VALUE);
+
+export const useLanguage = () => useContext(LanguageContext);
 
 // ── Provider ───────────────────────────────────────────────────────────────────
 
-/** Read the stored lang from localStorage synchronously (web-only fast path). */
-function readLangFromStorage(): Lang {
-  try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const v = window.localStorage.getItem(STORAGE_KEY);
-      if (v === 'en' || v === 'bn') return v;
-    }
-  } catch { /* ignore */ }
-  return 'bn';
-}
-
-/** Write lang to localStorage synchronously (web) + SecureStore (native/web). */
-function writeLangToStorage(v: Lang) {
-  try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem(STORAGE_KEY, v);
-    }
-  } catch { /* ignore */ }
-  SecureStore.setItemAsync(STORAGE_KEY, v).catch(() => {});
-}
-
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  // Initialise from localStorage synchronously so the very first render is correct on web.
-  const [lang, setLangState] = useState<Lang>(() => readLangFromStorage());
-
-  /**
-   * Once the user explicitly picks a language this session, set this ref so the
-   * server-sync effect can never revert their choice via a stale cached response.
-   */
-  const userChosenRef = React.useRef(false);
-
-  const setLanguage = React.useCallback((next: Lang) => {
-    userChosenRef.current = true;
-    setLangState(next);
-    writeLangToStorage(next);
-  }, []);
-
-  // On native: SecureStore is async, so also load it after mount.
-  useEffect(() => {
-    SecureStore.getItemAsync(STORAGE_KEY)
-      .then((val) => {
-        if ((val === 'en' || val === 'bn') && !userChosenRef.current) setLangState(val);
-      })
-      .catch(() => {});
-  }, []);
-
-  // Server sync — skipped once user has explicitly chosen this session.
-  const { data: settings } = useGetBusinessSettings();
-  useEffect(() => {
-    if (userChosenRef.current) return;
-    if (!settings?.language) return;
-    const resolved: Lang = settings.language === 'English' ? 'en' : 'bn';
-    setLangState(resolved);
-    writeLangToStorage(resolved);
-  }, [settings?.language]);
-
-  // NO useMemo — create a plain object every render so React Compiler cannot freeze it.
-  // LanguageProvider only re-renders when lang or settings change, so this is cheap.
-  const isEnglish = lang === 'en';
-
-  const t = (key: TKey): string =>
-    ((dict[lang] as Record<string, string>)[key] ?? dict.bn[key] ?? key);
-
-  const formatNumber = (amount: number): string => {
-    if (isEnglish) return amount.toString();
-    return amount.toString().split('').map(d => EN_TO_BN[d] ?? d).join('');
-  };
-
-  const formatCurrency = (amount: number): string => {
-    const hasDecimal = !Number.isInteger(Math.abs(amount));
-    const grouped = new Intl.NumberFormat('en-IN', {
-      minimumFractionDigits: hasDecimal ? 2 : 0,
-      maximumFractionDigits: 2,
-    }).format(Math.abs(amount));
-    if (isEnglish) return `৳${grouped}`;
-    return `৳${toBengaliDigits(grouped)}`;
-  };
-
-  const value: LanguageCtx = {
-    lang,
-    currentLanguage: lang,
-    isEnglish,
-    t,
-    formatCurrency,
-    formatNumber,
-    setLanguage,
-  };
-
+  // No state needed — the value is a fixed constant.
   return (
-    <LanguageContext.Provider value={value}>
+    <LanguageContext.Provider value={CONTEXT_VALUE}>
       {children}
     </LanguageContext.Provider>
   );

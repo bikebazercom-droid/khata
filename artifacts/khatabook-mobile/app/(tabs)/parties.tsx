@@ -32,26 +32,25 @@ function formatAmount(n: number): string {
   return '৳' + new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n);
 }
 
-function formatRelativeTime(dateStr: string | null, isEnglish: boolean): string {
-  if (!dateStr) return isEnglish ? 'No transactions' : 'কোনো লেনদেন নেই';
+function formatRelativeTime(dateStr: string | null): string {
+  if (!dateStr) return 'কোনো লেনদেন নেই';
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return isEnglish ? 'Just now' : 'এইমাত্র';
-  if (mins < 60) return isEnglish ? `${mins}m ago` : `${mins} মিনিট আগে`;
+  if (mins < 1) return 'এইমাত্র';
+  if (mins < 60) return `${mins} মিনিট আগে`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return isEnglish ? `${hrs}h ago` : `${hrs} ঘণ্টা আগে`;
+  if (hrs < 24) return `${hrs} ঘণ্টা আগে`;
   const days = Math.floor(hrs / 24);
-  return isEnglish ? `${days}d ago` : `${days} দিন আগে`;
+  return `${days} দিন আগে`;
 }
 
 interface PartyCardProps {
   party: Party;
   onPress: () => void;
   colors: ReturnType<typeof useColors>;
-  isEnglish: boolean;
 }
 
-function PartyCard({ party, onPress, colors, isEnglish }: PartyCardProps) {
+function PartyCard({ party, onPress, colors }: PartyCardProps) {
   const isGet = party.balanceType === 'YOU_WILL_GET';
   const initials = party.name.slice(0, 2).toUpperCase();
   const avatarBg = isGet ? colors.willGetBg : colors.willGiveBg;
@@ -90,12 +89,12 @@ function PartyCard({ party, onPress, colors, isEnglish }: PartyCardProps) {
       <View style={{ flex: 1 }}>
         <Text style={s.name} numberOfLines={1}>{party.name}</Text>
         <Text style={s.meta}>
-          {party.phone ? party.phone + ' · ' : ''}{formatRelativeTime(party.lastTransactionAt, isEnglish)}
+          {party.phone ? party.phone + ' · ' : ''}{formatRelativeTime(party.lastTransactionAt)}
         </Text>
       </View>
       <View style={{ alignItems: 'flex-end' }}>
         <Text style={s.balance}>{formatAmount(party.currentBalance)}</Text>
-        <Text style={s.balanceLabel}>{isGet ? (isEnglish ? 'will get' : 'পাবেন') : (isEnglish ? 'will give' : 'দেবেন')}</Text>
+        <Text style={s.balanceLabel}>{isGet ? 'পাবেন' : 'দেবেন'}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -110,7 +109,7 @@ interface AddPartySheetProps {
 
 function AddPartySheet({ visible, role, onClose, onSuccess }: AddPartySheetProps) {
   const colors = useColors();
-  const { isEnglish, t } = useLanguage();
+  const { t } = useLanguage();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [openingBalance, setOpeningBalance] = useState('');
@@ -126,7 +125,7 @@ function AddPartySheet({ visible, role, onClose, onSuccess }: AddPartySheetProps
 
   async function handleSubmit() {
     if (!name.trim()) {
-      Alert.alert(isEnglish ? 'Name required' : 'নাম প্রয়োজন', isEnglish ? 'Please enter a name.' : 'একটি নাম লিখুন।');
+      Alert.alert('নাম প্রয়োজন', 'একটি নাম লিখুন।');
       return;
     }
     try {
@@ -144,7 +143,7 @@ function AddPartySheet({ visible, role, onClose, onSuccess }: AddPartySheetProps
       onSuccess();
       onClose();
     } catch {
-      Alert.alert('Error', isEnglish ? 'Could not add party. Please try again.' : 'পার্টি যোগ করা যায়নি। আবার চেষ্টা করুন।');
+      Alert.alert('Error', 'পার্টি যোগ করা যায়নি। আবার চেষ্টা করুন।');
     }
   }
 
@@ -206,7 +205,7 @@ function AddPartySheet({ visible, role, onClose, onSuccess }: AddPartySheetProps
       <KeyboardAvoidingView style={s.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={s.sheet}>
           <View style={s.handle} />
-          <Text style={s.title}>{isEnglish ? `Add ${roleLabel}` : `${roleLabel} যোগ করুন`}</Text>
+          <Text style={s.title}>{`${roleLabel} যোগ করুন`}</Text>
 
           <Text style={s.label}>{t('nameLabel')}</Text>
           <TextInput
@@ -290,7 +289,7 @@ export default function PartiesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const qc = useQueryClient();
-  const { isEnglish, t } = useLanguage();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<Tab>('CUSTOMER');
   const [search, setSearch] = useState('');
   const [showAddSheet, setShowAddSheet] = useState(false);
@@ -370,24 +369,19 @@ export default function PartiesScreen() {
     <PartyCard
       party={item}
       colors={colors}
-      isEnglish={isEnglish}
       onPress={() => router.push(`/party/${item.id}` as any)}
     />
-  ), [colors, router, isEnglish]);
+  ), [colors, router]);
 
   const keyExtractor = useCallback((item: Party) => item.id, []);
 
   const isCustomer = activeTab === 'CUSTOMER';
   const noResultsTitle = search
     ? t('noResults')
-    : isCustomer
-      ? (isEnglish ? 'No customers yet' : 'এখনো কোনো গ্রাহক নেই')
-      : (isEnglish ? 'No suppliers yet' : 'এখনো কোনো সরবরাহকারী নেই');
+    : isCustomer ? 'এখনো কোনো গ্রাহক নেই' : 'এখনো কোনো সরবরাহকারী নেই';
   const noResultsBody = search
     ? t('tryDifferentSearch')
-    : isCustomer
-      ? (isEnglish ? 'Tap + to add your first customer' : '+ চাপুন প্রথম গ্রাহক যোগ করতে')
-      : (isEnglish ? 'Tap + to add your first supplier' : '+ চাপুন প্রথম সরবরাহকারী যোগ করতে');
+    : isCustomer ? '+ চাপুন প্রথম গ্রাহক যোগ করতে' : '+ চাপুন প্রথম সরবরাহকারী যোগ করতে';
 
   return (
     <View style={s.container}>
