@@ -26,7 +26,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
   const router = useRouter();
-  const { isEnglish, t } = useLanguage();
+  const { isEnglish, t, setLanguage } = useLanguage();
 
   const { isSignedIn } = useAuth();
   const { signOut } = useClerk();
@@ -57,11 +57,14 @@ export default function SettingsScreen() {
   }
 
   async function handleLanguageChange(lang: 'বাংলা' | 'English') {
+    // Apply immediately to context — this re-renders the whole app at once
+    setLanguage(lang === 'English' ? 'en' : 'bn');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       await updateSettings.mutateAsync({ data: { language: lang } });
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      qc.invalidateQueries({ queryKey: ['/api/settings'] });
     } catch {
-      // silent — optimistic update via LanguageProvider
+      // silent — UI already updated optimistically above
     }
   }
 

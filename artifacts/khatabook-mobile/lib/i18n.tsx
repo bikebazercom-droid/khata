@@ -274,6 +274,8 @@ export interface LanguageCtx {
   t: (key: TKey) => string;
   formatCurrency: (amount: number) => string;
   formatNumber: (amount: number) => string;
+  /** Call this immediately when the user picks a language in UI — bypasses server round-trip delay. */
+  setLanguage: (lang: Lang) => void;
 }
 
 const LanguageContext = createContext<LanguageCtx>({
@@ -282,6 +284,7 @@ const LanguageContext = createContext<LanguageCtx>({
   t: (key) => dict.bn[key],
   formatCurrency: (n) => `৳${n.toLocaleString('en-IN')}`,
   formatNumber: (n) => n.toLocaleString('en-IN'),
+  setLanguage: () => {},
 });
 
 export const useLanguage = () => useContext(LanguageContext);
@@ -309,21 +312,27 @@ function formatBengaliNumber(amount: number): string {
 // ── Provider ───────────────────────────────────────────────────────────────────
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLang] = useState<Lang>('bn');
+  const [lang, setLangState] = useState<Lang>('bn');
 
-  // Load persisted language on mount
+  /** Persist + apply a language change immediately (no server round-trip needed). */
+  const setLanguage = React.useCallback((next: Lang) => {
+    setLangState(next);
+    SecureStore.setItemAsync(STORAGE_KEY, next).catch(() => {});
+  }, []);
+
+  // Load persisted language on mount (fast path — before server responds)
   useEffect(() => {
     SecureStore.getItemAsync(STORAGE_KEY)
-      .then((val) => { if (val === 'en' || val === 'bn') setLang(val); })
+      .then((val) => { if (val === 'en' || val === 'bn') setLangState(val); })
       .catch(() => {});
   }, []);
 
-  // Server is the authoritative source
+  // Server is the authoritative source — syncs after login / on refetch
   const { data: settings } = useGetBusinessSettings();
   useEffect(() => {
     if (!settings?.language) return;
     const resolved: Lang = settings.language === 'English' ? 'en' : 'bn';
-    setLang(resolved);
+    setLangState(resolved);
     SecureStore.setItemAsync(STORAGE_KEY, resolved).catch(() => {});
   }, [settings?.language]);
 
@@ -355,8 +364,8 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       return `৳${formatBengaliNumber(amount)}`;
     };
 
-    return { lang, isEnglish, t, formatCurrency, formatNumber };
-  }, [lang]);
+    return { lang, isEnglish, t, formatCurrency, formatNumber, setLanguage };
+  }, [lang, setLanguage]);
 
   return (
     <LanguageContext.Provider value={value}>
