@@ -1,6 +1,6 @@
-# Hazari Khatabook (হাজারী খাতাবুক)
+# BanglaKhata (বাংলা খাতা)
 
-A mobile-first, fully Bengali-localized billing & ledger web app for shop owners to track money owed by customers and owed to suppliers, built to feel and function like the Khatabook mobile app. Single-column, phone-frame layout (no desktop split-screen) with a native-app-like view switcher: a home/directory feed and a full-screen party ledger view.
+A mobile-first, fully Bengali-localized billing & ledger web app for shop owners to track money owed by customers and owed to suppliers. Single-column, phone-frame layout (no desktop split-screen) with a native-app-like view switcher: a home/directory feed and a full-screen party ledger view.
 
 ## Run & Operate
 

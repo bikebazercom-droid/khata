@@ -1,6 +1,6 @@
 kind = "mobile"
 previewPath = "/mobile/"
-title = "Hazari Khatabook Mobile"
+title = "BanglaKhata Mobile"
 version = "1.0.0"
 id = "artifacts/khatabook-mobile"
 router = "expo-domain"

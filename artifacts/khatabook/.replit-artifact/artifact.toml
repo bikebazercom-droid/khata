@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/"
-title = "Hazari Khatabook"
+title = "BanglaKhata"
 version = "1.0.0"
 id = "artifacts/khatabook"
 router = "path"
