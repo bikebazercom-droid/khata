@@ -12,6 +12,7 @@ import staffRouter from "./staff";
 import businessesRouter from "./businesses";
 import userRouter from "./user";
 import adminRouter from "./admin";
+import adminIsolatedRouter from "./adminIsolated";
 
 const router: IRouter = Router();
 
@@ -21,6 +22,7 @@ router.use(authRouter);
 
 // Admin routes — use their own JWT auth (adminBearer), not Clerk.
 router.use(adminRouter);
+router.use(adminIsolatedRouter);
 
 // All routes below require a valid session (Clerk or phone OTP).
 router.use(requireAuth as any);
