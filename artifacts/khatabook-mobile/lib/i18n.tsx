@@ -270,6 +270,8 @@ export type TKey = keyof typeof dict.bn;
 
 export interface LanguageCtx {
   lang: Lang;
+  /** Raw string alias for `lang` — use `currentLanguage === 'en'` to derive isEnglish locally in each component. */
+  currentLanguage: Lang;
   isEnglish: boolean;
   t: (key: TKey) => string;
   formatCurrency: (amount: number) => string;
@@ -280,6 +282,7 @@ export interface LanguageCtx {
 
 const LanguageContext = createContext<LanguageCtx>({
   lang: 'bn',
+  currentLanguage: 'bn',
   isEnglish: false,
   t: (key) => dict.bn[key],
   formatCurrency: (n) => `৳${n.toLocaleString('en-IN')}`,
@@ -364,7 +367,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       return `৳${formatBengaliNumber(amount)}`;
     };
 
-    return { lang, isEnglish, t, formatCurrency, formatNumber, setLanguage };
+    return { lang, currentLanguage: lang, isEnglish, t, formatCurrency, formatNumber, setLanguage };
   }, [lang, setLanguage]);
 
   return (
