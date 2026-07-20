@@ -503,7 +503,7 @@ interface LedgerRowProps {
 
 function LedgerRow({ entry, colors, isEnglish, onPress }: LedgerRowProps) {
   const { getToken } = useAuth();
-  const { formatCurrency } = useLanguage();
+  const { formatCurrency, t } = useLanguage();
   const isGave = entry.type === 'YOU_GAVE';
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
@@ -520,6 +520,17 @@ function LedgerRow({ entry, colors, isEnglish, onPress }: LedgerRowProps) {
     ? { uri: rawSrc, ...(authToken ? { headers: { Authorization: `Bearer ${authToken}` } } : {}) }
     : null;
 
+  // "Today" indicator
+  const entryDate = new Date(entry.createdAt);
+  const now = new Date();
+  const isToday =
+    entryDate.getDate() === now.getDate() &&
+    entryDate.getMonth() === now.getMonth() &&
+    entryDate.getFullYear() === now.getFullYear();
+  const dateMeta = isToday
+    ? `${formatDate(entry.createdAt)} · ${t('today')} · ${formatTime(entry.createdAt)}`
+    : `${formatDate(entry.createdAt)} · ${formatTime(entry.createdAt)}`;
+
   const s = StyleSheet.create({
     row: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
     dot: { width: 10, height: 10, borderRadius: 5, marginTop: 5, marginRight: 12, backgroundColor: isGave ? colors.willGet : colors.willGive },
@@ -530,24 +541,17 @@ function LedgerRow({ entry, colors, isEnglish, onPress }: LedgerRowProps) {
     billThumb: { width: 44, height: 44, borderRadius: 6, marginTop: 6, backgroundColor: colors.card },
   });
 
-  const descFallback = isGave
-    ? (isEnglish ? 'You gave' : 'আপনি দিয়েছেন')
-    : (isEnglish ? 'You got' : 'আপনি পেয়েছেন');
-  const typeLabel = isGave
-    ? (isEnglish ? '▲ YOU GAVE' : '▲ আপনি দিয়েছেন')
-    : (isEnglish ? '▼ YOU GOT' : '▼ আপনি পেয়েছেন');
-
   return (
     <>
       <TouchableOpacity style={s.row} onPress={onPress} activeOpacity={onPress ? 0.7 : 1}>
         <View style={s.dot} />
         <View style={{ flex: 1 }}>
           <Text style={s.desc} numberOfLines={2}>
-            {entry.description || descFallback}
+            {entry.description || (isGave ? t('descYouGave') : t('descYouGot'))}
           </Text>
-          <Text style={s.meta}>{formatDate(entry.createdAt)} · {formatTime(entry.createdAt)}</Text>
+          <Text style={s.meta}>{dateMeta}</Text>
           <Text style={[s.type, { color: isGave ? colors.willGet : colors.willGive }]}>
-            {typeLabel}
+            {isGave ? t('youGaveTag') : t('youGotTag')}
           </Text>
           {imageSource ? (
             <TouchableOpacity onPress={() => setLightboxOpen(true)} activeOpacity={0.85}>
@@ -758,7 +762,7 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', backgroundColor: '#fff' }}>
               <Text style={s.balLabel}>{t('currentBalance')}</Text>
-              <Text style={[s.balValue, { color: balColor }]}>৳ {Math.abs(party.currentBalance)}</Text>
+              <Text style={[s.balValue, { color: balColor }]}>{formatCurrency(Math.abs(party.currentBalance))}</Text>
             </View>
 
             <TouchableOpacity style={s.editBtn} onPress={() => setIsEditing(true)} activeOpacity={0.7}>
@@ -772,8 +776,8 @@ function EntryDetailSheet({ entry: initialEntry, party, visible, onClose, onDele
             <Text style={s.smsHeading}>{t('smsNotSent')}</Text>
             <Text style={s.smsBody}>
               {isEnglish
-                ? `You ${isGave ? 'gave' : 'received'}: ৳ ${Math.abs(entry.amount)}\nBalance: -(৳ ${Math.abs(party.currentBalance)})\n`
-                : `আপনি ${isGave ? 'দিয়েছেন' : 'পেয়েছেন'}: ৳ ${Math.abs(entry.amount)}\nব্যালেন্স: -(৳ ${Math.abs(party.currentBalance)})\n`}
+                ? `You ${isGave ? 'gave' : 'received'}: ${formatCurrency(Math.abs(entry.amount))}\nBalance: ${formatCurrency(Math.abs(party.currentBalance))}\n`
+                : `আপনি ${isGave ? 'দিয়েছেন' : 'পেয়েছেন'}: ${formatCurrency(Math.abs(entry.amount))}\nব্যালেন্স: ${formatCurrency(Math.abs(party.currentBalance))}\n`}
               <Text style={s.smsLink} onPress={() => Linking.openURL(`https://banglakhata.com/p/${entry.partyId}`)}>
                 {`https://banglakhata.com/p/${entry.partyId}`}
               </Text>

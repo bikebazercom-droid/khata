@@ -103,6 +103,11 @@ const dict = {
     sendingOpen: 'খুলছে…',
     // ── LedgerRow ──
     tapToClose: 'বন্ধ করতে চাপুন',
+    youGaveTag: '▲ আপনি দিয়েছেন',
+    youGotTag: '▼ আপনি পেয়েছেন',
+    descYouGave: 'আপনি দিয়েছেন',
+    descYouGot: 'আপনি পেয়েছেন',
+    balLabel: 'জের',
     // ── PartyDetailScreen ──
     back: 'পেছনে',
     currentBalanceLabel: 'বর্তমান ব্যালেন্স',
@@ -222,6 +227,11 @@ const dict = {
     sendingOpen: 'Opening…',
     // ── LedgerRow ──
     tapToClose: 'Tap to close',
+    youGaveTag: '▲ YOU GAVE',
+    youGotTag: '▼ YOU GOT',
+    descYouGave: 'You gave',
+    descYouGot: 'You got',
+    balLabel: 'Bal.',
     // ── PartyDetailScreen ──
     back: 'Back',
     currentBalanceLabel: 'CURRENT BALANCE',
