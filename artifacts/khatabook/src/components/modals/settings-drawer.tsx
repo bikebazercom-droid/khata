@@ -249,49 +249,7 @@ export function SettingsDrawer({
             )}
           </div>
 
-          {/* ── Row 2: Language ─────────────────────────────────────────── */}
-          <div>
-            <button type="button" onClick={() => toggleMenu('language')} className={rowHeader('language')}>
-              <span className="flex items-center gap-2">
-                <span>🌐</span>
-                <span className={activeMenu === 'language' ? 'text-white' : 'text-slate-700'}>
-                  {t('changeLanguage')}
-                </span>
-              </span>
-              {activeMenu === 'language'
-                ? <ChevronUp className="w-4 h-4 shrink-0 text-white" />
-                : <ChevronDown className="w-4 h-4 shrink-0 text-slate-400" />}
-            </button>
-
-            {activeMenu === 'language' && (
-              <div className={rowBody}>
-                <div className="grid grid-cols-2 gap-3">
-                  {(['বাংলা', 'English'] as const).map((lang) => {
-                    const active = currentLang === lang;
-                    return (
-                      <button
-                        key={lang}
-                        type="button"
-                        onClick={() => updateSettings.mutate({ data: { language: lang } })}
-                        className={`py-3.5 rounded-2xl border-2 text-center font-bold text-[14px] transition-all active:scale-95 ${
-                          active
-                            ? 'border-[#1B3A6B] bg-[#1B3A6B] text-white shadow-md'
-                            : 'border-slate-200 bg-white text-slate-600'
-                        }`}
-                      >
-                        {lang}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="text-[11px] text-slate-400 text-center">
-                  {t('langHint')}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* ── Row 3: Auth ─────────────────────────────────────────────── */}
+          {/* ── Row 2: Auth ─────────────────────────────────────────────── */}
           <div>
             <button type="button" onClick={() => toggleMenu('auth')} className={rowHeader('auth')}>
               <span className="flex items-center gap-2">
