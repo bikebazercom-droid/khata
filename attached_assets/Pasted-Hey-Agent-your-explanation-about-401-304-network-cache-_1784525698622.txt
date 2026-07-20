@@ -1,0 +1,32 @@
+Hey Agent, your explanation about 401/304 network cache race conditions and `userChosenRef` makes complete technical sense, BUT THE LIVE SCREEN IS STILL 100% IN BENGALI (Look at Screenshot_2_2.jpg and Screenshot_1_3.jpg). Nothing flipped to English text or English digits on the actual mobile view!
+
+This means the screen component you are rewriting is either NOT the one actually active on the screen, or the local environment is holding a stale state that completely bypasses your `isEnglish` logic. We need to force it visually right now.
+
+PLEASE EXECUTE THIS EXPLICIT ACTION LABELLING IN THE REACT/EXPO ELEMENT TREE IMMEDIATELY:
+
+1. PRINT A VISUAL TEST TAG TO CONFIRM THE ACTIVE FILE:
+At the very top header area of `party/[id].tsx`, right next to the customer name, inject this test text node:
+`{isEnglish ? <Text>ENG_ACTIVE</Text> : <Text>BN_ACTIVE</Text>}`
+If you don't see this badge flip immediately when clicking English, it means you are modifying a dead file, or the wrapper is completely disconnected from the state. Find the active screen file!
+
+2. OVERRIDE TRICKLE FALLBACK BLOCKS SYSTEMATICALLY:
+Since `fmtCur(n, isEnglish)` or the ternary strings are still rendering in Bengali, explicitly check if you have hardcoded strings in sub-sheets like `TransactionSheet`. Replace them natively:
+- Calculator Main Banner Text: `{isEnglish ? `You gave ৳${amount} to ${party.name}` : `আপনি দিয়েছেন ৳${amount} ${party.name}-কে`}`
+- Green Confirm Entry Button: `{isEnglish ? "Confirm Entry" : "এন্ট্রি নিশ্চিত করুন"}`
+- Input Placeholder text: `placeholder={isEnglish ? "Enter details (item, bill no, quantity etc.)" : "বিস্তারিত লিখুন (পণ্য, বিল নং, পরিমাণ ইত্যাদি)"}`
+- "Attach Bill" text node: `{isEnglish ? "Attach Bill" : "বিল সংযুক্ত করুন"}`
+
+3. BRUTE FORCE NUMBER CONVERSION:
+If the database values or context return Bengali strings like `৳১,০১,৪১২.৮৭`, implement a clean raw string regex replacer inside the JSX node itself to swap Bengali digits to English digits if `isEnglish` evaluates to true:
+```typescript
+const forceEnDigits = (str: string) => {
+  const bn = ['০','১','২','৩','৪','৫','৬','৭','৮','৯'];
+  const en = ['0','1','2','3','4','5','6','7','8','9'];
+  let res = str;
+  for(let i=0; i<10; i++) {
+    res = res.split(bn[i]).join(en[i]);
+  }
+  return res;
+};
+// Inside your balance component text container:
+<Text>{isEnglish ? forceEnDigits(rawText) : rawText}</Text>

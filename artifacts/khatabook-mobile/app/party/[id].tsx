@@ -64,6 +64,19 @@ function fmtNum(s: string, isEnglish: boolean): string {
   return s.split('').map(c => BN_DIGITS[c] ?? c).join('');
 }
 
+/**
+ * Brute-force Bengali→English digit replacer.
+ * Use as a last-resort on any raw string that might already contain Bengali digits,
+ * e.g. from a pre-formatted API value or a stale cached render.
+ */
+const BN_TO_EN: Record<string, string> = {
+  '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4',
+  '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9',
+};
+function forceEnDigits(str: string): string {
+  return str.split('').map(c => BN_TO_EN[c] ?? c).join('');
+}
+
 function billImageSrc(billImage: string | null | undefined): string | null {
   if (!billImage) return null;
   if (billImage.startsWith('data:')) return billImage;
@@ -903,7 +916,18 @@ export default function PartyDetailScreen() {
           <Text style={s.backText}>{isEnglish ? 'Back' : 'পেছনে'}</Text>
         </TouchableOpacity>
         <View style={s.partyAv}><Text style={s.partyAvText}>{initials}</Text></View>
-        <Text style={s.partyName}>{party.name}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={s.partyName}>{party.name}</Text>
+          {/* ── DIAGNOSTIC BADGE: flip confirms context is live ── */}
+          <Text style={{
+            fontSize: 9, fontFamily: 'Inter_700Bold', paddingHorizontal: 5, paddingVertical: 2,
+            borderRadius: 4, overflow: 'hidden',
+            backgroundColor: isEnglish ? '#16a34a' : '#dc2626',
+            color: '#fff',
+          }}>
+            {isEnglish ? 'ENG_ACTIVE' : 'BN_ACTIVE'}
+          </Text>
+        </View>
         {party.phone ? <Text style={s.partyPhone}>{party.phone}</Text> : null}
         <Text style={[s.partyPhone, { marginTop: 4 }]}>{roleLabel}</Text>
       </View>
