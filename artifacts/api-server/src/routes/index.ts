@@ -13,6 +13,7 @@ import businessesRouter from "./businesses";
 import userRouter from "./user";
 import adminRouter from "./admin";
 import adminIsolatedRouter from "./adminIsolated";
+import uploadsRouter from "./uploadBinary";
 import downloadsRouter from "./downloads";
 import downloadConfigsRouter from "./downloadConfigs";
 
@@ -27,6 +28,7 @@ router.use(downloadConfigsRouter);
 // Admin routes — use their own JWT auth (adminBearer), not Clerk.
 router.use(adminRouter);
 router.use(adminIsolatedRouter);
+router.use(uploadsRouter);
 
 // All routes below require a valid session (Clerk or phone OTP).
 router.use(requireAuth as any);

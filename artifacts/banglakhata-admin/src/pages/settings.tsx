@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { MessageSquare, Save, KeyRound, Server, Coins, Download, Smartphone, Monitor } from "lucide-react";
+import { MessageSquare, Save, KeyRound, Server, Coins, Download, Smartphone, Monitor, Upload, CheckCircle2, FileUp, AlertCircle } from "lucide-react";
 import { formatDate } from "@/lib/format";
 
 // ── Download-config types & hook ─────────────────────────────────────────────
@@ -62,6 +62,60 @@ function useDownloadConfig() {
   }, [toast]);
 
   return { data, loading, saving, save };
+}
+
+// ── Binary file info types & hook ─────────────────────────────────────────────
+
+interface BinaryFileInfo { exists: boolean; size: number; mtime: string | null; }
+interface BinaryInfo     { apk: BinaryFileInfo; exe: BinaryFileInfo; }
+
+function fmtBytes(b: number) {
+  if (b < 1024)            return `${b} B`;
+  if (b < 1024 * 1024)     return `${(b / 1024).toFixed(1)} KB`;
+  return `${(b / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/** Sizes ≤ 1 KB are the auto-generated startup placeholders. */
+function isPlaceholder(info: BinaryFileInfo) { return info.size <= 1024; }
+
+function useBinaryInfo() {
+  const [info, setInfo] = useState<BinaryInfo | null>(null);
+
+  const load = useCallback(async () => {
+    const res = await fetch("/api/admin/binary-info", {
+      headers: { Authorization: `Bearer ${getAdminToken()}` },
+    });
+    if (res.ok) setInfo(await res.json());
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  return { info, reload: load };
+}
+
+/** Upload a binary via XHR so we get upload-progress events. */
+function uploadBinaryFile(
+  file: File,
+  fieldname: "apk" | "exe",
+  onProgress: (pct: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const fd = new FormData();
+    fd.append(fieldname, file);
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/admin/upload-app-binary");
+    xhr.setRequestHeader("Authorization", `Bearer ${getAdminToken()}`);
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    });
+    xhr.addEventListener("load", () => {
+      xhr.status >= 200 && xhr.status < 300
+        ? resolve()
+        : reject(new Error(xhr.responseText || `HTTP ${xhr.status}`));
+    });
+    xhr.addEventListener("error", () => reject(new Error("Network error during upload.")));
+    xhr.send(fd);
+  });
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -129,6 +183,38 @@ export default function SettingsPage() {
     void dlSave({ androidStoreUrl, androidApkUrl, iosStoreUrl, windowsExeUrl });
   };
 
+  // ── Binary file upload ──────────────────────────────────────────────────────
+  const { info: binInfo, reload: reloadBinInfo } = useBinaryInfo();
+  const apkInputRef = useRef<HTMLInputElement>(null);
+  const exeInputRef = useRef<HTMLInputElement>(null);
+  const [apkProgress, setApkProgress] = useState<number | null>(null);
+  const [exeProgress, setExeProgress] = useState<number | null>(null);
+
+  const handleFileUpload = useCallback(async (
+    file: File,
+    fieldname: "apk" | "exe",
+    setProgress: (p: number | null) => void,
+  ) => {
+    setProgress(0);
+    try {
+      await uploadBinaryFile(file, fieldname, setProgress);
+      toast({
+        title: "আপলোড সফল ✓",
+        description: `${file.name} (${fmtBytes(file.size)}) সফলভাবে সার্ভারে সংরক্ষিত হয়েছে।`,
+      });
+      setProgress(null);
+      void reloadBinInfo();
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "আপলোড ব্যর্থ",
+        description: String(err),
+      });
+      setProgress(null);
+    }
+  }, [toast, reloadBinInfo]);
+
+  // ── Loading skeleton ────────────────────────────────────────────────────────
   if (otpLoading || dlLoading) {
     return (
       <SidebarLayout>
@@ -270,6 +356,178 @@ export default function SettingsPage() {
             </CardFooter>
           </Card>
         </form>
+
+        {/* ── App Binary File Upload ─────────────────────────────────────── */}
+        <Card className="shadow-sm border-none bg-white">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="p-2 bg-violet-500/10 rounded-lg">
+                <FileUp className="w-5 h-5 text-violet-600" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">অ্যাপ বাইনারি আপলোড</CardTitle>
+                <CardDescription>
+                  সরাসরি সার্ভারে APK ও EXE ফাইল আপলোড করুন — ডাউনলোড বাটন স্বয়ংক্রিয়ভাবে আপডেট হবে
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="space-y-6 pt-4 border-t">
+
+            {/* Hidden file inputs */}
+            <input
+              ref={apkInputRef}
+              type="file"
+              accept=".apk"
+              className="hidden"
+              onChange={e => {
+                const f = e.target.files?.[0];
+                if (f) void handleFileUpload(f, "apk", setApkProgress);
+                e.target.value = "";
+              }}
+            />
+            <input
+              ref={exeInputRef}
+              type="file"
+              accept=".exe"
+              className="hidden"
+              onChange={e => {
+                const f = e.target.files?.[0];
+                if (f) void handleFileUpload(f, "exe", setExeProgress);
+                e.target.value = "";
+              }}
+            />
+
+            {/* ── Android APK ────────────────────────────────────────────── */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Smartphone className="w-4 h-4 text-green-600" />
+                <span className="text-sm font-semibold text-slate-700">🤖 Android APK (.apk)</span>
+              </div>
+
+              {/* Current file status badge */}
+              {binInfo?.apk ? (
+                isPlaceholder(binInfo.apk) ? (
+                  <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>
+                      Placeholder file active ({fmtBytes(binInfo.apk.size)}) — real APK আপলোড করুন
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>
+                      APK আপলোড হয়েছে · {fmtBytes(binInfo.apk.size)}
+                      {binInfo.apk.mtime
+                        ? ` · Last updated: ${new Date(binInfo.apk.mtime).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
+                        : ""}
+                    </span>
+                  </div>
+                )
+              ) : (
+                <div className="h-8 w-64 bg-slate-100 animate-pulse rounded-lg" />
+              )}
+
+              {/* Upload button or progress bar */}
+              {apkProgress !== null ? (
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs text-slate-500">
+                    <span>আপলোড হচ্ছে…</span>
+                    <span className="font-medium tabular-nums">{apkProgress}%</span>
+                  </div>
+                  <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-green-500 transition-all duration-200 ease-linear rounded-full"
+                      style={{ width: `${apkProgress}%` }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-green-200 text-green-700 hover:bg-green-50 hover:border-green-300"
+                  onClick={() => apkInputRef.current?.click()}
+                >
+                  <Upload className="w-4 h-4" />
+                  Android APK আপলোড করুন
+                </Button>
+              )}
+            </div>
+
+            <div className="border-t" />
+
+            {/* ── Windows EXE ────────────────────────────────────────────── */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Monitor className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-semibold text-slate-700">💻 Windows Software (.exe)</span>
+              </div>
+
+              {/* Current file status badge */}
+              {binInfo?.exe ? (
+                isPlaceholder(binInfo.exe) ? (
+                  <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>
+                      Placeholder file active ({fmtBytes(binInfo.exe.size)}) — real EXE আপলোড করুন
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-blue-50 text-blue-700 border border-blue-200">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>
+                      EXE আপলোড হয়েছে · {fmtBytes(binInfo.exe.size)}
+                      {binInfo.exe.mtime
+                        ? ` · Last updated: ${new Date(binInfo.exe.mtime).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
+                        : ""}
+                    </span>
+                  </div>
+                )
+              ) : (
+                <div className="h-8 w-64 bg-slate-100 animate-pulse rounded-lg" />
+              )}
+
+              {/* Upload button or progress bar */}
+              {exeProgress !== null ? (
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs text-slate-500">
+                    <span>আপলোড হচ্ছে…</span>
+                    <span className="font-medium tabular-nums">{exeProgress}%</span>
+                  </div>
+                  <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-blue-500 transition-all duration-200 ease-linear rounded-full"
+                      style={{ width: `${exeProgress}%` }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300"
+                  onClick={() => exeInputRef.current?.click()}
+                >
+                  <Upload className="w-4 h-4" />
+                  Windows EXE আপলোড করুন
+                </Button>
+              )}
+            </div>
+
+          </CardContent>
+
+          <CardFooter className="bg-slate-50 border-t py-4 px-6 rounded-b-xl">
+            <p className="text-xs text-muted-foreground">
+              সর্বোচ্চ ফাইল সাইজ: <span className="font-medium">200 MB</span> ·
+              আপলোড হওয়া ফাইল <span className="font-mono text-xs">/api/downloads/</span> পাথ থেকে সরাসরি ডাউনলোড হবে।
+            </p>
+          </CardFooter>
+        </Card>
 
         {/* ── OTP Gateway ───────────────────────────────────────────────────── */}
         <form onSubmit={handleOtpSave}>
