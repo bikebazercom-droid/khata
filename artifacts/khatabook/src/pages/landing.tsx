@@ -9,12 +9,13 @@ interface DownloadInfo {
   iosStoreUrl: string | null;
   apkAvailable: boolean;
   apkUrl: string | null;
+  windowsAvailable: boolean;
+  windowsUrl: string | null;
 }
 
 // ── iOS modal ─────────────────────────────────────────────────────────────────
 
 function IosModal({ onClose, storeUrl }: { onClose: () => void; storeUrl: string | null }) {
-  // QR code targets the App Store listing if available, otherwise the landing page
   const qrTarget = storeUrl ?? window.location.origin;
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&color=1B3A6B&bgcolor=ffffff&data=${encodeURIComponent(qrTarget)}`;
 
@@ -37,7 +38,6 @@ function IosModal({ onClose, storeUrl }: { onClose: () => void; storeUrl: string
           </svg>
         </button>
 
-        {/* Apple icon */}
         <div className="flex justify-center mb-5">
           <div className="w-16 h-16 bg-[#1B3A6B]/5 rounded-2xl flex items-center justify-center">
             <svg className="w-9 h-9 text-[#1B3A6B]" viewBox="0 0 24 24" fill="currentColor">
@@ -111,7 +111,14 @@ export function LandingPage() {
     fetch(`${basePath}/api/downloads/info`)
       .then(r => r.json())
       .then(setInfo)
-      .catch(() => setInfo({ androidStoreUrl: null, iosStoreUrl: null, apkAvailable: false, apkUrl: null }));
+      .catch(() => setInfo({
+        androidStoreUrl: null,
+        iosStoreUrl: null,
+        apkAvailable: false,
+        apkUrl: null,
+        windowsAvailable: false,
+        windowsUrl: null,
+      }));
   }, []);
 
   function handleAndroidClick(e: React.MouseEvent<HTMLAnchorElement>) {
@@ -121,7 +128,6 @@ export function LandingPage() {
     if (info.androidStoreUrl) {
       window.open(info.androidStoreUrl, '_blank', 'noopener,noreferrer');
     } else if (info.apkAvailable && info.apkUrl) {
-      // Trigger browser download
       const a = document.createElement('a');
       a.href = info.apkUrl;
       a.download = 'banglakhata.apk';
@@ -144,11 +150,24 @@ export function LandingPage() {
     }
   }
 
-  // Label & sub-label change based on what's available
-  const androidLabel  = info?.androidStoreUrl ? 'Play Store' : info?.apkAvailable ? 'Download APK' : 'Play Store';
-  const androidSub    = info?.androidStoreUrl ? 'Android-এ ডাউনলোড' : info?.apkAvailable ? 'সরাসরি ডাউনলোড' : 'শীঘ্রই আসছে';
-  const iosLabel      = info?.iosStoreUrl ? 'App Store' : 'App Store';
-  const iosSub        = info?.iosStoreUrl ? 'iOS-এ ডাউনলোড' : 'শীঘ্রই আসছে';
+  function handleWindowsClick(e: React.MouseEvent<HTMLAnchorElement>) {
+    e.preventDefault();
+    if (!info) return;
+
+    if (info.windowsAvailable && info.windowsUrl) {
+      const a = document.createElement('a');
+      a.href = info.windowsUrl;
+      a.download = 'banglakhata-windows.exe';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  }
+
+  const androidLabel = info?.androidStoreUrl ? 'Play Store' : info?.apkAvailable ? 'Download APK' : 'Play Store';
+  const androidSub   = info?.androidStoreUrl ? 'Android-এ ডাউনলোড' : info?.apkAvailable ? 'সরাসরি ডাউনলোড' : 'শীঘ্রই আসছে';
+  const iosLabel     = info?.iosStoreUrl ? 'App Store' : 'App Store';
+  const iosSub       = info?.iosStoreUrl ? 'iOS-এ ডাউনলোড' : 'শীঘ্রই আসছে';
 
   return (
     <>
@@ -192,12 +211,12 @@ export function LandingPage() {
             আপনার ব্যবসার হিসাব রাখুন সহজেই
           </p>
           <p className="text-white/50 text-sm max-w-sm leading-relaxed mb-12">
-            কাস্টমার, সাপ্লায়ার, বকেয়া এবং লেনদেন — সব এক জায়গায়।
-            Android ও iOS-এ বিনামূল্যে পাওয়া যাচ্ছে।
+            গ্রাহক, সরবরাহকারী, বকেয়া এবং লেনদেন — সব এক জায়গায়।
+            Android, iOS ও Windows-এ বিনামূল্যে পাওয়া যাচ্ছে।
           </p>
 
-          {/* Download buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm">
+          {/* Download buttons — Android + iOS row */}
+          <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm mb-4">
 
             {/* Android */}
             <a
@@ -232,6 +251,25 @@ export function LandingPage() {
             </a>
           </div>
 
+          {/* Windows button — full width below */}
+          {info?.windowsAvailable && (
+            <a
+              href="#"
+              onClick={handleWindowsClick}
+              className="w-full max-w-sm flex items-center justify-center gap-3 bg-[#0078d4] hover:bg-[#006cbf] border border-[#0078d4]/50 text-white rounded-2xl px-6 py-4 font-bold text-sm shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+            >
+              {/* Windows logo */}
+              <svg className="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-13.051-1.949"/>
+              </svg>
+              <span>
+                Windows App / কম্পিউটার ভার্সন
+                <br/>
+                <span className="font-normal text-xs opacity-80">কম্পিউটারের জন্য ডাউনলোড করুন</span>
+              </span>
+            </a>
+          )}
+
           <p className="text-white/30 text-xs mt-6">
             বিনামূল্যে · কোনো ক্রেডিট কার্ড লাগবে না
           </p>
@@ -241,7 +279,7 @@ export function LandingPage() {
         <div className="w-full max-w-5xl grid grid-cols-1 sm:grid-cols-3 gap-4 px-6 pb-16">
           {[
             { title: "লেনদেনের হিসাব", desc: "যা দিলেন, যা পেলেন — সব রেকর্ড রাখুন" },
-            { title: "পার্টি ম্যানেজমেন্ট", desc: "কাস্টমার ও সাপ্লায়ারের তালিকা সহজে পরিচালনা করুন" },
+            { title: "পার্টি ম্যানেজমেন্ট", desc: "গ্রাহক ও সরবরাহকারীর তালিকা সহজে পরিচালনা করুন" },
             { title: "পেমেন্ট রিমাইন্ডার", desc: "বকেয়া পেলে অটো SMS রিমাইন্ডার পাঠান" },
           ].map((f) => (
             <div key={f.title} className="bg-white/5 border border-white/10 rounded-2xl p-5">

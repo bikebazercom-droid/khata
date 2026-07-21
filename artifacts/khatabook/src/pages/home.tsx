@@ -606,7 +606,7 @@ export function HomeView() {
         className="absolute right-4 bottom-[76px] z-20 flex items-center gap-2 bg-[#F5A623] text-white font-bold text-sm pl-4 pr-5 py-3.5 rounded-full shadow-[0_8px_24px_-6px_rgba(245,166,35,0.55)] active:scale-95 transition-all"
       >
         <Plus className="w-4 h-4" />
-        {role === PartyRole.CUSTOMER ? t('addCustomer') : t('addSupplier')}
+        {t('addCustomer')}
       </button>
 
       {/* Sticky bottom nav */}
