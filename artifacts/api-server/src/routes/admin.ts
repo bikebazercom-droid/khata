@@ -40,8 +40,11 @@ router.post("/admin/auth/login", async (req, res) => {
   res.json({ token, expiresAt });
 });
 
-// All routes below require admin JWT
-router.use(requireAdmin as any);
+// All routes below require admin JWT.
+// IMPORTANT: use path-scoped middleware — router.use(requireAdmin) with no
+// path would intercept every request forwarded to this router (including
+// /parties, /ledger, etc.) and return 401 before Clerk auth can run.
+router.use("/admin", requireAdmin as any);
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 

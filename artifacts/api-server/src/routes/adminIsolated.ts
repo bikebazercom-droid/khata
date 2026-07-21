@@ -1,7 +1,10 @@
 /**
- * /api/admin/isolated/... — thin alias routes that mirror the main admin
+ * /admin/isolated/... — thin alias routes that mirror the main admin
  * endpoints. Intended for isolated testing without touching the main route tree.
  * Auth requirement is identical: adminBearer JWT.
+ *
+ * NOTE: these routes live inside the /api router (app.use("/api", router)),
+ * so paths here are relative — /admin/isolated/... not /api/admin/isolated/...
  */
 import { Router } from "express";
 import { requireAdmin } from "../middlewares/requireAdmin";
@@ -16,9 +19,13 @@ import { count, sum } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
 const router = Router();
-router.use(requireAdmin as any);
 
-router.get("/api/admin/isolated/stats", async (_req, res) => {
+// requireAdmin is applied per-route, NOT as router.use() — a blanket
+// router.use(requireAdmin) with no path would intercept every request
+// that passes through this router (including /parties, /ledger, etc.)
+// and return 401 before the Clerk auth middleware could run.
+
+router.get("/admin/isolated/stats", requireAdmin as any, async (_req, res) => {
   try {
     const [[{ totalUsers }], [{ totalBusinesses }], [{ totalTx }], [{ vol }]] =
       await Promise.all([
@@ -49,7 +56,7 @@ router.get("/api/admin/isolated/stats", async (_req, res) => {
   }
 });
 
-router.get("/api/admin/isolated/otp-balance", async (_req, res) => {
+router.get("/admin/isolated/otp-balance", requireAdmin as any, async (_req, res) => {
   try {
     const [row] = await db.select().from(adminOtpConfigTable).limit(1);
     res.json({ remainingBalance: row?.remainingBalance ?? 0 });
