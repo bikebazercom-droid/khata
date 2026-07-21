@@ -19,7 +19,11 @@
   "pnpm": {
     "overrides": {
       "react": "19.1.0",
-      "react-dom": "19.1.0"
+      "react-dom": "19.1.0",
+      "js-yaml": ">=4.3.0",
+      "uuid": ">=11.1.1",
+      "esbuild": ">=0.28.1",
+      "postcss": ">=8.5.10"
     }
   }
 }
