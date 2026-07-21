@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "khatabook-mobile",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/images/icon.png",
       "resizeMode": "contain",
@@ -19,7 +19,6 @@
     },
     "android": {
       "package": "com.banglakhata.app",
-      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#1B3A6B"
@@ -40,8 +39,7 @@
       "expo-web-browser"
     ],
     "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
+      "typedRoutes": true
     }
   }
 }

@@ -18,13 +18,15 @@
     "preview": {
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease -x lint -x test"
       },
       "ios": {
         "simulator": false
       },
       "env": {
-        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": ""
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "",
+        "GRADLE_OPTS": "-Dorg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m"
       }
     },
     "production": {
