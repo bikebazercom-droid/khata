@@ -14,6 +14,7 @@ import userRouter from "./user";
 import adminRouter from "./admin";
 import adminIsolatedRouter from "./adminIsolated";
 import downloadsRouter from "./downloads";
+import downloadConfigsRouter from "./downloadConfigs";
 
 const router: IRouter = Router();
 
@@ -21,6 +22,7 @@ const router: IRouter = Router();
 router.use(healthRouter);
 router.use(authRouter);
 router.use(downloadsRouter);
+router.use(downloadConfigsRouter);
 
 // Admin routes — use their own JWT auth (adminBearer), not Clerk.
 router.use(adminRouter);
