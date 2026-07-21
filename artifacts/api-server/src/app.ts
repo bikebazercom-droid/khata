@@ -1,6 +1,7 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import path from "path";
 import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
 import { publishableKeyFromHost } from "@clerk/shared/keys";
@@ -58,6 +59,21 @@ app.use(
       process.env.CLERK_PUBLISHABLE_KEY,
     ),
   })),
+);
+
+// Serve downloadable files (APK, etc.) from the public/downloads directory.
+// Accessible at /api/downloads/<filename> in both dev and production.
+app.use(
+  "/api/downloads",
+  express.static(path.join(process.cwd(), "public/downloads"), {
+    dotfiles: "ignore",
+    setHeaders(res, filePath) {
+      if (filePath.endsWith(".apk")) {
+        res.setHeader("Content-Type", "application/vnd.android.package-archive");
+        res.setHeader("Content-Disposition", 'attachment; filename="banglakhata.apk"');
+      }
+    },
+  }),
 );
 
 app.use("/api", router);

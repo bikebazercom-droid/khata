@@ -13,12 +13,14 @@ import businessesRouter from "./businesses";
 import userRouter from "./user";
 import adminRouter from "./admin";
 import adminIsolatedRouter from "./adminIsolated";
+import downloadsRouter from "./downloads";
 
 const router: IRouter = Router();
 
 // Public routes (no auth required).
 router.use(healthRouter);
 router.use(authRouter);
+router.use(downloadsRouter);
 
 // Admin routes — use their own JWT auth (adminBearer), not Clerk.
 router.use(adminRouter);
