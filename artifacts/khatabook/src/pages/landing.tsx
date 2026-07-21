@@ -116,6 +116,26 @@ export function LandingPage() {
       }));
   }, []);
 
+  // ── helpers ─────────────────────────────────────────────────────────────────
+
+  /** Returns true for any URL that should be downloaded, not navigated to. */
+  function isDownloadUrl(url: string): boolean {
+    return /\.(apk|exe|zip|dmg|msi|pkg|ipa)(\?.*)?$/i.test(url)
+      || url.includes('/api/downloads/')
+      || url.includes('/downloads/');
+  }
+
+  /** Programmatically triggers a browser Save-As download via a hidden <a>. */
+  function triggerDownload(url: string, filename: string) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
   // ── click handlers ──────────────────────────────────────────────────────────
 
   function handleAndroidClick(e: React.MouseEvent<HTMLAnchorElement>) {
@@ -123,14 +143,15 @@ export function LandingPage() {
     if (!cfg) return;
 
     if (cfg.androidStoreUrl) {
-      window.open(cfg.androidStoreUrl, '_blank', 'noopener,noreferrer');
+      // If the admin pasted a direct download URL into the "Store URL" field,
+      // trigger a proper file download instead of navigating to the URL.
+      if (isDownloadUrl(cfg.androidStoreUrl)) {
+        triggerDownload(cfg.androidStoreUrl, 'banglakhata.apk');
+      } else {
+        window.open(cfg.androidStoreUrl, '_blank', 'noopener,noreferrer');
+      }
     } else if (cfg.apkAvailable && cfg.androidApkUrl) {
-      const a = document.createElement('a');
-      a.href = cfg.androidApkUrl;
-      a.download = 'banglakhata.apk';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      triggerDownload(cfg.androidApkUrl, 'banglakhata.apk');
     } else {
       setShowAndroidToast(true);
     }
@@ -141,6 +162,8 @@ export function LandingPage() {
     if (!cfg) return;
 
     if (cfg.iosStoreUrl) {
+      // iOS downloads (.ipa) are handled via TestFlight/App Store only —
+      // always open the store URL in a new tab.
       window.open(cfg.iosStoreUrl, '_blank', 'noopener,noreferrer');
     } else {
       setShowIosModal(true);
@@ -150,13 +173,7 @@ export function LandingPage() {
   function handleWindowsClick(e: React.MouseEvent<HTMLAnchorElement>) {
     e.preventDefault();
     if (!cfg?.windowsUrl) return;
-
-    const a = document.createElement('a');
-    a.href = cfg.windowsUrl;
-    a.download = 'banglakhata-windows.exe';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    triggerDownload(cfg.windowsUrl, 'banglakhata-windows.exe');
   }
 
   // ── derived labels ──────────────────────────────────────────────────────────
