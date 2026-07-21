@@ -140,21 +140,19 @@ export function LandingPage() {
 
   function handleAndroidClick(e: React.MouseEvent<HTMLAnchorElement>) {
     e.preventDefault();
-    if (!cfg) return;
 
-    if (cfg.androidStoreUrl) {
-      // If the admin pasted a direct download URL into the "Store URL" field,
-      // trigger a proper file download instead of navigating to the URL.
-      if (isDownloadUrl(cfg.androidStoreUrl)) {
-        triggerDownload(cfg.androidStoreUrl, 'banglakhata.apk');
-      } else {
-        window.open(cfg.androidStoreUrl, '_blank', 'noopener,noreferrer');
-      }
-    } else if (cfg.apkAvailable && cfg.androidApkUrl) {
-      triggerDownload(cfg.androidApkUrl, 'banglakhata.apk');
-    } else {
-      setShowAndroidToast(true);
+    // If a real Play Store URL is configured, open it.
+    if (cfg?.androidStoreUrl && !isDownloadUrl(cfg.androidStoreUrl)) {
+      window.open(cfg.androidStoreUrl, '_blank', 'noopener,noreferrer');
+      return;
     }
+
+    // Otherwise trigger a download — priority: store-url-that-is-a-file >
+    // explicit apk url > server fallback path (always exists after startup).
+    const url = (cfg?.androidStoreUrl && isDownloadUrl(cfg.androidStoreUrl))
+      ? cfg.androidStoreUrl
+      : (cfg?.androidApkUrl ?? '/api/downloads/banglakhata.apk');
+    triggerDownload(url, 'banglakhata.apk');
   }
 
   function handleIosClick(e: React.MouseEvent<HTMLAnchorElement>) {
@@ -172,18 +170,18 @@ export function LandingPage() {
 
   function handleWindowsClick(e: React.MouseEvent<HTMLAnchorElement>) {
     e.preventDefault();
-    if (!cfg?.windowsUrl) return;
-    triggerDownload(cfg.windowsUrl, 'banglakhata-windows.exe');
+    // Fall back to the server path if config hasn't loaded yet.
+    const url = cfg?.windowsUrl ?? '/api/downloads/banglakhata-windows.exe';
+    triggerDownload(url, 'banglakhata-windows.exe');
   }
 
   // ── derived labels ──────────────────────────────────────────────────────────
 
-  const androidLabel = cfg?.androidStoreUrl ? 'Play Store'
-                     : cfg?.apkAvailable     ? 'Download APK'
-                     : 'Play Store';
-  const androidSub   = cfg?.androidStoreUrl ? 'Android-এ ডাউনলোড'
-                     : cfg?.apkAvailable     ? 'সরাসরি ডাউনলোড'
-                     : 'শীঘ্রই আসছে';
+  // If the store URL is a real store (not a download link) show "Play Store".
+  // In every other case show "Download APK" — file always exists after startup.
+  const isRealStoreUrl = cfg?.androidStoreUrl && !isDownloadUrl(cfg.androidStoreUrl);
+  const androidLabel   = isRealStoreUrl ? 'Play Store' : 'Download APK';
+  const androidSub     = isRealStoreUrl ? 'Android-এ ডাউনলোড' : 'সরাসরি ডাউনলোড';
   const iosLabel     = cfg?.iosStoreUrl ? 'App Store' : 'App Store';
   const iosSub       = cfg?.iosStoreUrl ? 'iOS-এ ডাউনলোড' : 'শীঘ্রই আসছে';
 
@@ -256,20 +254,18 @@ export function LandingPage() {
             </a>
           </div>
 
-          {/* Windows button — only shown when available */}
-          {cfg?.windowsAvailable && (
-            <a href="#" onClick={handleWindowsClick}
-              className="w-full max-w-sm flex items-center justify-center gap-3 bg-[#0078d4] hover:bg-[#006cbf] border border-[#0078d4]/50 text-white rounded-2xl px-6 py-4 font-bold text-sm shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
-              <svg className="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-13.051-1.949"/>
-              </svg>
-              <span>
-                Windows App / কম্পিউটার ভার্সন
-                <br/>
-                <span className="font-normal text-xs opacity-80">কম্পিউটারের জন্য ডাউনলোড করুন</span>
-              </span>
-            </a>
-          )}
+          {/* Windows button — always visible; file is guaranteed to exist */}
+          <a href="#" onClick={handleWindowsClick}
+            className="w-full max-w-sm flex items-center justify-center gap-3 bg-[#0078d4] hover:bg-[#006cbf] border border-[#0078d4]/50 text-white rounded-2xl px-6 py-4 font-bold text-sm shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
+            <svg className="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-13.051-1.949"/>
+            </svg>
+            <span>
+              Windows App / কম্পিউটার ভার্সন
+              <br/>
+              <span className="font-normal text-xs opacity-80">কম্পিউটারের জন্য ডাউনলোড করুন</span>
+            </span>
+          </a>
 
           <p className="text-white/30 text-xs mt-6">
             বিনামূল্যে · কোনো ক্রেডিট কার্ড লাগবে না

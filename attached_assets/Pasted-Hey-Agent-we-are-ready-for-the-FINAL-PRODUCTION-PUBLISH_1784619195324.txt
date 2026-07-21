@@ -1,0 +1,23 @@
+Hey Agent, we are ready for the FINAL PRODUCTION PUBLISH of BanglaKhata (`hazarikhata.replit.app`). Please carefully resolve the discrepancies seen between Dev Preview (`Screenshot_22.jpg`) and Live Production (`Screenshot_23.jpg`) and execute these tasks sequentially:
+
+1. GUARANTEED PUBLIC DUMMY FILE GENERATION (ON SERVER STARTUP):
+   - In `server.ts` or `downloads.ts`, write code to auto-generate valid non-empty placeholder binary files if they do not exist on disk during server startup:
+     * File 1: `artifacts/api-server/public/downloads/banglakhata.apk` (and `./public/downloads/banglakhata.apk`)
+     * File 2: `artifacts/api-server/public/downloads/banglakhata-windows.exe` (and `./public/downloads/banglakhata-windows.exe`)
+   - Ensure these files are readable by Express and served via public unauthenticated routes (`/api/downloads/*`).
+
+2. LANDING PAGE BUTTON VISIBILITY & FALLBACK LOGIC:
+   - Ensure the Landing Page (`/`) ALWAYS renders all 3 download buttons in both Dev and Production environments:
+     * Android Button: If `PLAY STORE URL` is empty or set to `/api/downloads/banglakhata.apk`, clicking MUST trigger immediate file download of the APK. Do NOT mark it as "শীঘ্রই আসছে" if a file or fallback exists!
+     * iOS Button: Displays "শীঘ্রই আসছে" (Coming Soon).
+     * Windows Button: Always visible. Clicking triggers immediate download of `banglakhata-windows.exe`.
+
+3. ADMIN PANEL DEFAULT FALLBACKS (`/admin/settings`):
+   - Ensure that if Admin fields are left empty or set to internal relative paths (e.g. `/api/downloads/banglakhata.apk`), the API endpoint `/api/public/download-configs` gracefully returns these valid local download URLs.
+
+4. FULL PRODUCTION BUILD & DEPLOYMENT:
+   - Run a clean production build (`npm run build`).
+   - Trigger a complete redeploy/restart of the live production process for `hazarikhata.replit.app`.
+   - Verify using cURL against production that `https://hazarikhata.replit.app/api/downloads/banglakhata.apk` returns `200 OK` with binary attachment headers.
+
+Please execute these 4 steps now, verify the live site shows all 3 working buttons, and notify me when complete!
