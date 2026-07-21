@@ -15,10 +15,16 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.replit.khatabook.mobile"
+      "bundleIdentifier": "com.banglakhata.app"
     },
     "android": {
-      "package": "com.replit.khatabook.mobile"
+      "package": "com.banglakhata.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#1B3A6B"
+      },
+      "permissions": []
     },
     "web": {
       "favicon": "./assets/images/icon.png"
