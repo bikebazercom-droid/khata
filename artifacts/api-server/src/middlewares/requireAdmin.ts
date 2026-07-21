@@ -1,7 +1,13 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-const ADMIN_SECRET = process.env.ADMIN_SECRET ?? "changeme-dev-secret";
+const ADMIN_SECRET = process.env.ADMIN_SECRET;
+if (!ADMIN_SECRET) {
+  throw new Error(
+    "ADMIN_SECRET environment variable is not set. " +
+    "Set it to a long random string before starting the server."
+  );
+}
 
 export interface AdminTokenPayload {
   sub: string; // "admin"

@@ -12,8 +12,14 @@ import { eq, ilike, or, count, sum, sql, and, gte, lte, desc } from "drizzle-orm
 import { requireAdmin, signAdminToken } from "../middlewares/requireAdmin";
 import { logger } from "../lib/logger";
 
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME ?? "admin";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "banglakhata-admin-2024";
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
+  throw new Error(
+    "ADMIN_USERNAME and ADMIN_PASSWORD environment variables must both be set. " +
+    "Set them to strong, unique values before starting the server."
+  );
+}
 
 const router = Router();
 
