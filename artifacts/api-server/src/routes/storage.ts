@@ -4,12 +4,14 @@ import {
   RequestUploadUrlResponse,
 } from '@workspace/api-zod';
 import { Router, type IRouter, type Request, type Response } from 'express';
+import { and, eq } from 'drizzle-orm';
+import { db, ledgerEntriesTable, partiesTable } from '@workspace/db';
 
-import { ObjectPermission } from '../lib/objectAcl';
 import {
   ObjectNotFoundError,
   ObjectStorageService,
 } from '../lib/objectStorage';
+import { type AuthenticatedRequest } from '../middlewares/requireAuth';
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -107,20 +109,30 @@ router.get('/storage/objects/*path', async (req: Request, res: Response) => {
     const objectFile =
       await objectStorageService.getObjectEntityFile(objectPath);
 
-    // --- Protected route example (uncomment when using replit-auth) ---
-    // if (!req.isAuthenticated()) {
-    //   res.status(401).json({ error: "Unauthorized" });
-    //   return;
-    // }
-    // const canAccess = await objectStorageService.canAccessObjectEntity({
-    //   userId: req.user.id,
-    //   objectFile,
-    //   requestedPermission: ObjectPermission.READ,
-    // });
-    // if (!canAccess) {
-    //   res.status(403).json({ error: "Forbidden" });
-    //   return;
-    // }
+    // Enforce per-object ownership: verify the requested object is referenced
+    // by a ledger entry that belongs to the authenticated user's business.
+    // This prevents any authenticated user from fetching another tenant's
+    // bill images by guessing or enumerating object paths.
+    const { businessId } = req as AuthenticatedRequest;
+    const [ownerEntry] = await db
+      .select({ id: ledgerEntriesTable.id })
+      .from(ledgerEntriesTable)
+      .innerJoin(
+        partiesTable,
+        eq(ledgerEntriesTable.partyId, partiesTable.id),
+      )
+      .where(
+        and(
+          eq(ledgerEntriesTable.billImage, objectPath),
+          eq(partiesTable.businessId, businessId),
+        ),
+      )
+      .limit(1);
+
+    if (!ownerEntry) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
 
     const response = await objectStorageService.downloadObject(objectFile);
 
