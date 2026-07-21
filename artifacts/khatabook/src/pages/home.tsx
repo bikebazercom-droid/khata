@@ -29,7 +29,7 @@ export function HomeView() {
   const [search, setSearch] = useState('');
   const [location, navigate] = useLocation();
 
-  const { isEnglish, t, formatCurrency } = useLanguage();
+  const { t, formatCurrency } = useLanguage();
 
   // ── Advanced filter / sort sheet ────────────────────────────────────────
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
@@ -108,13 +108,11 @@ export function HomeView() {
     const balanceColor = isGet ? '#065F46' : '#991B1B';
     const amountLabel  = isGet ? t('receiptGot') : t('receiptGave');
     const formatted    = formatCurrency(party.currentBalance);
-    const dateLocale   = isEnglish ? 'en-GB' : 'bn-BD';
-
     const dateStr = party.lastTransactionAt
       ? (() => {
           const d = new Date(party.lastTransactionAt as string);
-          const date = d.toLocaleDateString(dateLocale, { day: 'numeric', month: 'short', year: '2-digit' });
-          const time = d.toLocaleTimeString(isEnglish ? 'en-US' : 'bn-BD', { hour: '2-digit', minute: '2-digit', hour12: true });
+          const date = d.toLocaleDateString('bn-BD', { day: 'numeric', month: 'short', year: '2-digit' });
+          const time = d.toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit', hour12: true });
           return `${date} • ${time}`;
         })()
       : '';
@@ -172,18 +170,17 @@ export function HomeView() {
       if (document.body.contains(el)) document.body.removeChild(el);
       console.error('Instant share error:', err);
     }
-  }, [isEnglish, t, formatCurrency]);
+  }, [t, formatCurrency]);
 
   const exportFilteredReportToPDF = useCallback(async () => {
     setIsExportingPdf(true);
 
     const shopProfile   = loadShopProfile();
     const storeName     = shopProfile.businessName || settings?.storeName || 'Banglakhata';
-    const dateLocale    = isEnglish ? 'en-GB' : 'bn-BD';
     const roleLabel     = role === PartyRole.CUSTOMER ? t('customer') : t('supplier');
     const nameColHeader = role === PartyRole.CUSTOMER ? t('pdfName') : t('pdfSupplierNameCol');
     const statementTitle = role === PartyRole.CUSTOMER ? t('pdfCustomerStatement') : t('pdfSupplierStatement');
-    const dateStr       = new Date().toLocaleDateString(dateLocale, { day: 'numeric', month: 'long', year: 'numeric' });
+    const dateStr       = new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
     const footerAddress = shopProfile.address || '';
     const footerPhone   = shopProfile.phone   || '';
 
@@ -205,9 +202,7 @@ export function HomeView() {
       no_date:   t('noDate'),
     };
     const countTag = filterDisplayLabel[appliedFilter] ?? t('all');
-    const asOfLabel = isEnglish
-      ? `(${t('pdfAsOfToday')} — ${dateStr})`
-      : `(${t('pdfAsOfToday')} — ${dateStr})`;
+    const asOfLabel = `(${t('pdfAsOfToday')} — ${dateStr})`;
 
     const container = document.createElement('div');
     container.style.cssText = [
@@ -268,7 +263,7 @@ export function HomeView() {
             <td style="width:33.33%;padding:16px;">
               <div style="font-size:14px;color:#666;margin-bottom:6px;">${t('pdfTotalBalance')}</div>
               <div style="font-size:18px;font-weight:bold;color:${netBalance >= 0 ? '#16A34A' : '#DC2626'};">
-                ৳${Math.abs(netBalance).toFixed(2)} ${netBalance >= 0 ? 'Cr' : 'Dr'}
+                ৳${Math.abs(netBalance).toFixed(2)} ${netBalance >= 0 ? 'ক্রেডিট' : 'ডেবিট'}
               </div>
             </td>
           </tr>
@@ -363,7 +358,7 @@ export function HomeView() {
     } finally {
       setIsExportingPdf(false);
     }
-  }, [parties, role, appliedFilter, settings?.storeName, isEnglish, t]);
+  }, [parties, role, appliedFilter, settings?.storeName, t]);
 
   return (
     <div className="flex flex-col h-full w-full bg-white relative">
@@ -570,7 +565,7 @@ export function HomeView() {
                       <span className="text-[10px] font-medium text-slate-400 shrink-0 ml-2">
                         {formatDistanceToNow(new Date(party.lastTransactionAt), {
                           addSuffix: true,
-                          locale: isEnglish ? undefined : bnLocale,
+                          locale: bnLocale,
                         })}
                       </span>
                     )}

@@ -67,7 +67,7 @@ export function SettingsDrawer({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { isEnglish, t } = useLanguage();
+  const { t } = useLanguage();
   const { data: settings } = useGetBusinessSettings();
   const queryClient = useQueryClient();
   const { signOut } = useClerk();
@@ -177,8 +177,6 @@ export function SettingsDrawer({
     }
   }
 
-  const currentLang = settings?.language ?? 'বাংলা';
-
   const rowHeader = (menu: ActiveMenu) =>
     `w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border text-sm font-semibold text-slate-700 transition-all active:scale-[0.98] ${
       activeMenu === menu
@@ -188,22 +186,13 @@ export function SettingsDrawer({
 
   const rowBody = 'mt-1 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 space-y-3';
 
-  // Language-aware profile field labels / placeholders
-  const profileFields = isEnglish
-    ? [
-        { field: 'userName'    as const, label: t('fieldUserName'),  placeholder: 'e.g. Sakil Ahmed',    type: 'text'  },
-        { field: 'businessName'as const, label: t('fieldShopName'),  placeholder: 'e.g. BanglaKhata Store',    type: 'text'  },
-        { field: 'phone'       as const, label: t('fieldPhone'),     placeholder: 'e.g. 017XXXXXXXX',    type: 'text'  },
-        { field: 'email'       as const, label: t('fieldEmail'),     placeholder: 'example@gmail.com',   type: 'email' },
-        { field: 'address'     as const, label: t('fieldAddress'),   placeholder: 'e.g. Dhaka, BD',      type: 'text'  },
-      ]
-    : [
-        { field: 'userName'    as const, label: t('fieldUserName'),  placeholder: 'উদা: সাকিল আহমেদ',   type: 'text'  },
-        { field: 'businessName'as const, label: t('fieldShopName'),  placeholder: 'উদা: বাংলা খাতা স্টোর',  type: 'text'  },
-        { field: 'phone'       as const, label: t('fieldPhone'),     placeholder: 'উদা: 017XXXXXXXX',    type: 'text'  },
-        { field: 'email'       as const, label: t('fieldEmail'),     placeholder: 'example@gmail.com',   type: 'email' },
-        { field: 'address'     as const, label: t('fieldAddress'),   placeholder: 'উদা: চকবাজার, ঢাকা', type: 'text'  },
-      ];
+  const profileFields = [
+    { field: 'userName'    as const, label: t('fieldUserName'),  placeholder: 'উদা: সাকিল আহমেদ',      type: 'text'  },
+    { field: 'businessName'as const, label: t('fieldShopName'),  placeholder: 'উদা: বাংলা খাতা স্টোর', type: 'text'  },
+    { field: 'phone'       as const, label: t('fieldPhone'),     placeholder: 'উদা: 017XXXXXXXX',       type: 'text'  },
+    { field: 'email'       as const, label: t('fieldEmail'),     placeholder: 'example@gmail.com',      type: 'email' },
+    { field: 'address'     as const, label: t('fieldAddress'),   placeholder: 'উদা: চকবাজার, ঢাকা',    type: 'text'  },
+  ];
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>

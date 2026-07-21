@@ -37,6 +37,7 @@ import {
 import { billImageSrc, prefetchImagesForPdf } from '@/lib/billImageStorage';
 import { toast } from 'sonner';
 import { format, isToday } from 'date-fns';
+import { bn as bnLocale } from 'date-fns/locale';
 
 /**
  * The entry's real transaction date. Users can backdate/forward-date an
@@ -433,13 +434,13 @@ export function PartyView() {
                       >
                         <div className="min-w-0 py-3 pl-4">
                           <p className="text-[12px] font-bold text-slate-700">
-                            {format(new Date(`${entryDateKey(entry)}T00:00:00`), 'd MMM yy')} • {format(new Date(entry.createdAt as string), 'hh:mm a')}
+                            {format(new Date(`${entryDateKey(entry)}T00:00:00`), 'd MMM yy', { locale: bnLocale })} • {format(new Date(entry.createdAt as string), 'HH:mm')}
                           </p>
                           <p className={cn(
                             'text-[11px] font-semibold mt-0.5',
                             entry.balanceAfter >= 0 ? 'text-emerald-500' : 'text-red-500',
                           )}>
-                            Bal. {formatCurrency(Math.abs(entry.balanceAfter))}
+                            জের: {formatCurrency(Math.abs(entry.balanceAfter))}
                           </p>
                           {entry.description ? (
                             <p className="text-[11px] font-semibold text-slate-400 mt-0.5 truncate max-w-[180px]">
