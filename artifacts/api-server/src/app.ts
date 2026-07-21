@@ -72,6 +72,10 @@ app.use(
         res.setHeader("Content-Type", "application/vnd.android.package-archive");
         res.setHeader("Content-Disposition", 'attachment; filename="banglakhata.apk"');
       }
+      if (filePath.endsWith(".exe")) {
+        res.setHeader("Content-Type", "application/octet-stream");
+        res.setHeader("Content-Disposition", 'attachment; filename="banglakhata-windows.exe"');
+      }
     },
   }),
 );
