@@ -500,7 +500,7 @@ export function HomeView() {
           className="w-14 h-11 shrink-0 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
         >
           <FileText className={cn('w-4 h-4', isExportingPdf && 'animate-pulse')} />
-          <span className="text-[9px] font-bold leading-none">{isExportingPdf ? '...' : 'PDF'}</span>
+          <span className="text-[9px] font-bold leading-none">{isExportingPdf ? '...' : 'পিডিএফ'}</span>
         </button>
       </div>
 

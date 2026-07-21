@@ -148,7 +148,7 @@ export default function HomeScreen() {
 
   const customerCount = summary?.customerCount ?? 0;
   const supplierCount = summary?.supplierCount ?? 0;
-  const subtitleText = `${customerCount} গ্রাহক · ${supplierCount} সরবরাহকারী`;
+  const subtitleText = `${customerCount} কাস্টমার · ${supplierCount} সাপ্লায়ার`;
 
   return (
     <View style={s.container}>

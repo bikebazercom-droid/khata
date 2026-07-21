@@ -94,7 +94,7 @@ function PartyCard({ party, onPress, colors }: PartyCardProps) {
       </View>
       <View style={{ alignItems: 'flex-end' }}>
         <Text style={s.balance}>{formatAmount(party.currentBalance)}</Text>
-        <Text style={s.balanceLabel}>{isGet ? 'পাবেন' : 'দেবেন'}</Text>
+        <Text style={s.balanceLabel}>{isGet ? 'পেয়েছেন' : 'দিয়েছেন'}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -378,10 +378,10 @@ export default function PartiesScreen() {
   const isCustomer = activeTab === 'CUSTOMER';
   const noResultsTitle = search
     ? t('noResults')
-    : isCustomer ? 'এখনো কোনো গ্রাহক নেই' : 'এখনো কোনো সরবরাহকারী নেই';
+    : isCustomer ? 'এখনো কোনো কাস্টমার নেই' : 'এখনো কোনো সাপ্লায়ার নেই';
   const noResultsBody = search
     ? t('tryDifferentSearch')
-    : isCustomer ? '+ চাপুন প্রথম গ্রাহক যোগ করতে' : '+ চাপুন প্রথম সরবরাহকারী যোগ করতে';
+    : isCustomer ? '+ চাপুন প্রথম কাস্টমার যোগ করতে' : '+ চাপুন প্রথম সাপ্লায়ার যোগ করতে';
 
   return (
     <View style={s.container}>
