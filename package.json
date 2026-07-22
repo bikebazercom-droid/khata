@@ -5,7 +5,9 @@
   "scripts": {
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+    "build:apk": "pnpm --filter @workspace/khatabook-mobile run build:apk",
+    "build:all": "bash scripts/build-all.sh"
   },
   "private": true,
   "dependencies": {
