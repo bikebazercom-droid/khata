@@ -1,6 +1,16 @@
 const { getDefaultConfig } = require('expo/metro-config');
+const path = require('path');
 
-const config = getDefaultConfig(__dirname);
+const projectRoot = __dirname;
+const workspaceRoot = path.resolve(projectRoot, '../..');
+
+const config = getDefaultConfig(projectRoot);
+
+config.watchFolders = [workspaceRoot];
+config.resolver.nodeModulesPaths = [
+  path.resolve(projectRoot, 'node_modules'),
+  path.resolve(workspaceRoot, 'node_modules'),
+];
 
 // Exclude Clerk's ephemeral temp directories (clerk/backend creates _tmp_NNN
 // directories at startup that are cleaned up before Metro finishes crawling).
