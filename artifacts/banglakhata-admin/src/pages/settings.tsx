@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { MessageSquare, Save, KeyRound, Server, Coins, Download, Smartphone, Monitor, Upload, CheckCircle2, FileUp, AlertCircle } from "lucide-react";
+import { MessageSquare, Save, KeyRound, Server, Coins, Download, Smartphone, Monitor, Upload, CheckCircle2, FileUp, AlertCircle, Apple } from "lucide-react";
 import { formatDate } from "@/lib/format";
 
 // ── Download-config types & hook ─────────────────────────────────────────────
@@ -67,7 +67,7 @@ function useDownloadConfig() {
 // ── Binary file info types & hook ─────────────────────────────────────────────
 
 interface BinaryFileInfo { exists: boolean; size: number; mtime: string | null; }
-interface BinaryInfo     { apk: BinaryFileInfo; exe: BinaryFileInfo; }
+interface BinaryInfo     { apk: BinaryFileInfo; exe: BinaryFileInfo; mac: BinaryFileInfo; }
 
 function fmtBytes(b: number) {
   if (b < 1024)            return `${b} B`;
@@ -116,6 +116,147 @@ function uploadBinaryFile(
     xhr.addEventListener("error", () => reject(new Error("Network error during upload.")));
     xhr.send(fd);
   });
+}
+
+// ── Direct Download Test Card ─────────────────────────────────────────────────
+
+function DownloadTestCard({ binInfo }: { binInfo: BinaryInfo | null }) {
+  const { toast } = useToast();
+
+  function triggerDownload(url: string, filename: string) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  function handleDownload(
+    platform: "android" | "windows" | "mac",
+    fileInfo: BinaryFileInfo | undefined,
+    url: string,
+    filename: string,
+  ) {
+    if (!fileInfo || isPlaceholder(fileInfo)) {
+      toast({
+        title: "ডাউনলোড প্রস্তুত নয়",
+        description: "Software binary update in progress. Please check back shortly.",
+        variant: "destructive",
+      });
+      return;
+    }
+    triggerDownload(url, filename);
+  }
+
+  const buttons: Array<{
+    platform: "android" | "windows" | "mac";
+    label: string;
+    sublabel: string;
+    icon: React.ReactNode;
+    fileInfo: BinaryFileInfo | undefined;
+    url: string;
+    filename: string;
+    colorClass: string;
+    badgeClass: string;
+  }> = [
+    {
+      platform: "android",
+      label: "Android",
+      sublabel: ".apk",
+      icon: <Smartphone className="w-5 h-5" />,
+      fileInfo: binInfo?.apk,
+      url: "/api/downloads/banglakhata.apk",
+      filename: "banglakhata.apk",
+      colorClass: "bg-green-600 hover:bg-green-700 text-white",
+      badgeClass: binInfo?.apk && !isPlaceholder(binInfo.apk)
+        ? "bg-green-100 text-green-700"
+        : "bg-amber-100 text-amber-700",
+    },
+    {
+      platform: "windows",
+      label: "Windows",
+      sublabel: ".exe",
+      icon: <Monitor className="w-5 h-5" />,
+      fileInfo: binInfo?.exe,
+      url: "/api/downloads/banglakhata-windows.exe",
+      filename: "banglakhata-windows.exe",
+      colorClass: "bg-blue-600 hover:bg-blue-700 text-white",
+      badgeClass: binInfo?.exe && !isPlaceholder(binInfo.exe)
+        ? "bg-blue-100 text-blue-700"
+        : "bg-amber-100 text-amber-700",
+    },
+    {
+      platform: "mac",
+      label: "macOS / Linux",
+      sublabel: ".dmg",
+      icon: <Apple className="w-5 h-5" />,
+      fileInfo: binInfo?.mac,
+      url: "/api/downloads/banglakhata-mac.dmg",
+      filename: "banglakhata-mac.dmg",
+      colorClass: "bg-slate-700 hover:bg-slate-800 text-white",
+      badgeClass: binInfo?.mac && !isPlaceholder(binInfo.mac)
+        ? "bg-slate-100 text-slate-700"
+        : "bg-amber-100 text-amber-700",
+    },
+  ];
+
+  return (
+    <Card className="shadow-sm border-none bg-white">
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="p-2 bg-emerald-500/10 rounded-lg">
+            <Download className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div>
+            <CardTitle className="text-lg">ডাউনলোড টেস্ট বাটন</CardTitle>
+            <CardDescription>
+              প্রতিটি প্ল্যাটফর্মের ফাইল সরাসরি ডাউনলোড করে পরীক্ষা করুন
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="pt-4 border-t">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {buttons.map((btn) => {
+            const ready = btn.fileInfo && !isPlaceholder(btn.fileInfo);
+            return (
+              <button
+                key={btn.platform}
+                type="button"
+                onClick={() => handleDownload(btn.platform, btn.fileInfo, btn.url, btn.filename)}
+                className={`group flex flex-col items-center gap-3 rounded-xl p-5 transition-all ${
+                  ready
+                    ? `${btn.colorClass} shadow-sm hover:shadow-md`
+                    : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                }`}
+              >
+                <div className={`p-3 rounded-full ${ready ? "bg-white/20" : "bg-slate-200"}`}>
+                  {btn.icon}
+                </div>
+                <div className="text-center">
+                  <div className="font-semibold text-sm">{btn.label}</div>
+                  <div className={`text-xs mt-0.5 font-mono ${ready ? "opacity-75" : "text-slate-400"}`}>
+                    {btn.sublabel}
+                  </div>
+                </div>
+                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${btn.badgeClass}`}>
+                  {ready
+                    ? `${fmtBytes(btn.fileInfo!.size)} · প্রস্তুত`
+                    : "Placeholder"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-xs text-muted-foreground mt-4">
+          Placeholder বাটনে ক্লিক করলে ডাউনলোড হবে না — একটি বার্তা দেখাবে।
+          আসল ফাইল আপলোড হলে বাটন স্বয়ংক্রিয়ভাবে সক্রিয় হবে।
+        </p>
+      </CardContent>
+    </Card>
+  );
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -187,8 +328,10 @@ export default function SettingsPage() {
   const { info: binInfo, reload: reloadBinInfo } = useBinaryInfo();
   const apkInputRef = useRef<HTMLInputElement>(null);
   const exeInputRef = useRef<HTMLInputElement>(null);
+  const macInputRef = useRef<HTMLInputElement>(null);
   const [apkProgress, setApkProgress] = useState<number | null>(null);
   const [exeProgress, setExeProgress] = useState<number | null>(null);
+  const [macProgress, setMacProgress] = useState<number | null>(null);
 
   const handleFileUpload = useCallback(async (
     file: File,
@@ -398,6 +541,17 @@ export default function SettingsPage() {
                 e.target.value = "";
               }}
             />
+            <input
+              ref={macInputRef}
+              type="file"
+              accept=".dmg,.zip"
+              className="hidden"
+              onChange={e => {
+                const f = e.target.files?.[0];
+                if (f) void handleFileUpload(f, "mac" as any, setMacProgress);
+                e.target.value = "";
+              }}
+            />
 
             {/* ── Android APK ────────────────────────────────────────────── */}
             <div className="space-y-3">
@@ -519,6 +673,67 @@ export default function SettingsPage() {
               )}
             </div>
 
+            <div className="border-t" />
+
+            {/* ── macOS / Linux DMG ──────────────────────────────────────── */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Apple className="w-4 h-4 text-slate-600" />
+                <span className="text-sm font-semibold text-slate-700">🍎 macOS / Linux (.dmg / .zip)</span>
+              </div>
+
+              {/* Current file status badge */}
+              {binInfo?.mac ? (
+                isPlaceholder(binInfo.mac) ? (
+                  <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>
+                      Placeholder file active ({fmtBytes(binInfo.mac.size)}) — real DMG আপলোড করুন
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-slate-50 text-slate-700 border border-slate-200">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>
+                      DMG আপলোড হয়েছে · {fmtBytes(binInfo.mac.size)}
+                      {binInfo.mac.mtime
+                        ? ` · Last updated: ${new Date(binInfo.mac.mtime).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
+                        : ""}
+                    </span>
+                  </div>
+                )
+              ) : (
+                <div className="h-8 w-64 bg-slate-100 animate-pulse rounded-lg" />
+              )}
+
+              {/* Upload button or progress bar */}
+              {macProgress !== null ? (
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs text-slate-500">
+                    <span>আপলোড হচ্ছে…</span>
+                    <span className="font-medium tabular-nums">{macProgress}%</span>
+                  </div>
+                  <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-slate-500 transition-all duration-200 ease-linear rounded-full"
+                      style={{ width: `${macProgress}%` }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+                  onClick={() => macInputRef.current?.click()}
+                >
+                  <Upload className="w-4 h-4" />
+                  macOS DMG আপলোড করুন
+                </Button>
+              )}
+            </div>
+
           </CardContent>
 
           <CardFooter className="bg-slate-50 border-t py-4 px-6 rounded-b-xl">
@@ -528,6 +743,9 @@ export default function SettingsPage() {
             </p>
           </CardFooter>
         </Card>
+
+        {/* ── Direct Download Test Buttons ───────────────────────────────────── */}
+        <DownloadTestCard binInfo={binInfo} />
 
         {/* ── OTP Gateway ───────────────────────────────────────────────────── */}
         <form onSubmit={handleOtpSave}>

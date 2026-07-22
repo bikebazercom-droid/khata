@@ -1,8 +1,8 @@
 /**
  * Admin-protected binary upload routes.
  *
- *   POST /admin/upload-app-binary  — upload APK or EXE (field: "apk" | "exe")
- *   GET  /admin/binary-info        — returns file size + mtime for both binaries
+ *   POST /admin/upload-app-binary  — upload APK, EXE, or DMG (field: "apk" | "exe" | "mac")
+ *   GET  /admin/binary-info        — returns file size + mtime for all three binaries
  */
 import { Router } from "express";
 import multer from "multer";
@@ -19,6 +19,14 @@ const DOWNLOADS_DIR = path.join(process.cwd(), "public/downloads");
 const FILE_MAP: Record<string, string> = {
   apk: "banglakhata.apk",
   exe: "banglakhata-windows.exe",
+  mac: "banglakhata-mac.dmg",
+};
+
+// Accepted extensions per field
+const ACCEPTED_EXT: Record<string, string[]> = {
+  apk: [".apk"],
+  exe: [".exe"],
+  mac: [".dmg", ".zip", ".tar.gz"],
 };
 
 // Ensure the directory always exists before multer tries to write.
@@ -30,7 +38,7 @@ const storage = multer.diskStorage({
   },
   filename(_req, file, cb) {
     const dest = FILE_MAP[file.fieldname];
-    if (!dest) return cb(new Error(`Unknown field '${file.fieldname}'. Use 'apk' or 'exe'.`), "");
+    if (!dest) return cb(new Error(`Unknown field '${file.fieldname}'. Use 'apk', 'exe', or 'mac'.`), "");
     cb(null, dest);
   },
 });
@@ -40,13 +48,16 @@ const upload = multer({
   limits: { fileSize: 200 * 1024 * 1024 }, // 200 MB
   fileFilter(_req, file, cb) {
     if (!Object.keys(FILE_MAP).includes(file.fieldname)) {
-      return cb(new Error(`Invalid field name '${file.fieldname}'. Use 'apk' or 'exe'.`));
+      return cb(new Error(`Invalid field name '${file.fieldname}'. Use 'apk', 'exe', or 'mac'.`));
     }
-    if (file.fieldname === "apk" && !file.originalname.toLowerCase().endsWith(".apk")) {
-      return cb(new Error("Android field only accepts .apk files."));
-    }
-    if (file.fieldname === "exe" && !file.originalname.toLowerCase().endsWith(".exe")) {
-      return cb(new Error("Windows field only accepts .exe files."));
+    const lc   = file.originalname.toLowerCase();
+    const exts = ACCEPTED_EXT[file.fieldname] ?? [];
+    if (!exts.some((ext) => lc.endsWith(ext))) {
+      return cb(
+        new Error(
+          `Field '${file.fieldname}' only accepts: ${exts.join(", ")}. Got: ${file.originalname}`,
+        ),
+      );
     }
     cb(null, true);
   },
@@ -61,12 +72,16 @@ router.post(
   (req: any, res: any) => {
     const files: Express.Multer.File[] = req.files ?? [];
     if (files.length === 0) {
-      return res.status(400).json({ error: "No file uploaded. Send a multipart field named 'apk' or 'exe'." });
+      return res
+        .status(400)
+        .json({ error: "No file uploaded. Send a multipart field named 'apk', 'exe', or 'mac'." });
     }
 
     const file = files[0];
     if (!FILE_MAP[file.fieldname]) {
-      return res.status(400).json({ error: `Invalid field: '${file.fieldname}'. Use 'apk' or 'exe'.` });
+      return res
+        .status(400)
+        .json({ error: `Invalid field: '${file.fieldname}'. Use 'apk', 'exe', or 'mac'.` });
     }
 
     logger.info(
@@ -99,6 +114,7 @@ router.get("/admin/binary-info", requireAdmin as any, (_req: any, res: any) => {
   res.json({
     apk: stat("banglakhata.apk"),
     exe: stat("banglakhata-windows.exe"),
+    mac: stat("banglakhata-mac.dmg"),
   });
 });
 

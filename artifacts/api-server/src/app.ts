@@ -77,6 +77,10 @@ app.use(
         res.setHeader("Content-Type", "application/octet-stream");
         res.setHeader("Content-Disposition", 'attachment; filename="banglakhata-windows.exe"');
       }
+      if (filePath.endsWith(".dmg")) {
+        res.setHeader("Content-Type", "application/x-apple-diskimage");
+        res.setHeader("Content-Disposition", 'attachment; filename="banglakhata-mac.dmg"');
+      }
     },
   }),
 );
@@ -123,6 +127,19 @@ app.use("/api", router);
       logger.info(
         "[ensureDownloadFiles] created placeholder banglakhata-windows.exe",
       );
+    }
+
+    const macPath = path.join(dir, "banglakhata-mac.dmg");
+    if (!fs.existsSync(macPath)) {
+      // Minimal stub so the route returns 503 (placeholder) rather than 404.
+      const buf = Buffer.alloc(256);
+      buf.write(
+        "BanglaKhata macOS App - Placeholder. Replace with the real DMG.\n",
+        0,
+        "utf8",
+      );
+      fs.writeFileSync(macPath, buf);
+      logger.info("[ensureDownloadFiles] created placeholder banglakhata-mac.dmg");
     }
   } catch (err) {
     logger.error({ err }, "[ensureDownloadFiles] failed to create placeholder files");
