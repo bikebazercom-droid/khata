@@ -69,6 +69,12 @@ const fmtDate = (d: Date) =>
 const fmtDateStr = (d: string) => fmtDate(new Date(d));
 const fmtTimeStr = (d: string) =>
   new Date(d).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
+// "18 Jul 26" — short row date matching screenshot
+const ROW_MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fmtRowDate = (d: string) => {
+  const dt = new Date(d);
+  return `${dt.getDate()} ${ROW_MO[dt.getMonth()]} ${String(dt.getFullYear()).slice(-2)}`;
+};
 
 // ─── Filter definitions ───────────────────────────────────────────────────────
 
@@ -375,9 +381,6 @@ export default function ReportScreen() {
   // Search
   const [query, setQuery] = useState('');
 
-  // Type filter: 'all' | 'gave' | 'got'
-  const [typeFilter, setTypeFilter] = useState<'all' | 'gave' | 'got'>('all');
-
   // Data
   const { data:party, isLoading:pL } = useGetParty(id!);
   const { data:entries=[], isLoading:eL } = useListLedgerEntries(id!);
@@ -409,15 +412,12 @@ export default function ReportScreen() {
     return map;
   }, [dateFiltered]);
 
-  // Filtered by type, then search
+  // Filtered by search only (no type filter — matches screenshot)
   const filtered = useMemo(() => {
-    let list = dateFiltered;
-    if (typeFilter === 'gave') list = list.filter(e => e.type === 'YOU_GAVE');
-    if (typeFilter === 'got')  list = list.filter(e => e.type === 'YOU_GOT');
-    if (!query.trim()) return list;
+    if (!query.trim()) return dateFiltered;
     const q = query.toLowerCase();
-    return list.filter(e => (e.description??'').toLowerCase().includes(q));
-  }, [dateFiltered, typeFilter, query]);
+    return dateFiltered.filter(e => (e.description??'').toLowerCase().includes(q));
+  }, [dateFiltered, query]);
 
   // Totals (always over the full date-filtered set, not type-filtered)
   const gave     = useMemo(() => dateFiltered.filter(e=>e.type==='YOU_GAVE').reduce((s,e)=>s+e.amount,0), [dateFiltered]);
@@ -615,33 +615,6 @@ export default function ReportScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Type filter tabs — সব / আপনি দিয়েছেন / আপনি পেয়েছেন */}
-        <View style={{ flexDirection:'row', gap:6, marginTop:10 }}>
-          {([ 
-            { key:'all'  as const, label:'সব' },
-            { key:'gave' as const, label:'আপনি দিয়েছেন' },
-            { key:'got'  as const, label:'আপনি পেয়েছেন' },
-          ]).map(tab => {
-            const active = typeFilter === tab.key;
-            return (
-              <TouchableOpacity
-                key={tab.key}
-                style={{
-                  paddingHorizontal:11, paddingVertical:6, borderRadius:20,
-                  backgroundColor: active ? '#fff' : 'rgba(255,255,255,0.15)',
-                  borderWidth:1,
-                  borderColor: active ? '#fff' : 'rgba(255,255,255,0.28)',
-                }}
-                onPress={() => { Haptics.selectionAsync(); setTypeFilter(tab.key); }}
-                activeOpacity={0.72}
-              >
-                <Text style={{ fontSize:12, fontFamily:'Inter_600SemiBold', color: active ? PRIMARY : 'rgba(255,255,255,0.92)' }}>
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
       </View>
       {/* ══════════════════════════════════════════════════════════════════════ */}
 
@@ -653,48 +626,45 @@ export default function ReportScreen() {
           </View>
         ) : (
           <>
-            {/* ── Stats 2×2 ────────────────────────────────────────────────── */}
-            <View style={{ paddingHorizontal:12, paddingTop:12, gap:8 }}>
-              <View style={{ flexDirection:'row', gap:8 }}>
-                {/* মোট ব্যালেন্স */}
-                <View style={[sc.card, { borderLeftColor: isGet ? colors.willGet : colors.willGive }]}>
-                  <Text style={sc.lbl}>মোট ব্যালেন্স</Text>
-                  <Text style={[sc.val, { color: isGet ? colors.willGet : colors.willGive }]}>{fmtCur(Math.abs(net))}</Text>
-                  <Text style={sc.sub}>{isGet ? '↑ পাবেন' : '↓ দেবেন'}</Text>
-                </View>
-                {/* মোট এন্ট্রি সংখ্যা */}
-                <View style={[sc.card, { borderLeftColor:PRIMARY }]}>
-                  <Text style={sc.lbl}>মোট এন্ট্রি সংখ্যা</Text>
-                  <Text style={[sc.val, { color:PRIMARY }]}>{toBn(filtered.length)}</Text>
-                  <Text style={sc.sub}>টি লেনদেন</Text>
-                </View>
+            {/* ── Stats — মোট ব্যালেন্স row + 3-col sub-row ─────────────── */}
+            <View style={{ paddingHorizontal:14, paddingTop:14, paddingBottom:2 }}>
+              {/* Row 1: মোট ব্যালেন্স */}
+              <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                <Text style={{ fontSize:15, fontFamily:'Inter_600SemiBold', color:'#1E293B' }}>মোট ব্যালেন্স</Text>
+                <Text style={{ fontSize:18, fontFamily:'Inter_700Bold', color: isGet ? colors.willGet : colors.willGive }}>
+                  {fmtCur(Math.abs(net))}
+                </Text>
               </View>
-              <View style={{ flexDirection:'row', gap:8 }}>
+              {/* Divider */}
+              <View style={{ height:1, backgroundColor:'#E2E8F0', marginBottom:10 }} />
+              {/* Row 2: 3-column sub-stats */}
+              <View style={{ flexDirection:'row', alignItems:'flex-start' }}>
+                {/* মোট */}
+                <View style={{ flex:1 }}>
+                  <Text style={{ fontSize:11, fontFamily:'Inter_400Regular', color:'#64748B' }}>মোট</Text>
+                  <Text style={{ fontSize:13, fontFamily:'Inter_700Bold', color:'#1E293B', marginTop:2 }}>
+                    {toBn(filtered.length)} এন্ট্রিগুলো
+                  </Text>
+                </View>
                 {/* আপনি দিয়েছেন */}
-                <View style={[sc.card, { borderLeftColor:colors.willGet }]}>
-                  <Text style={sc.lbl}>আপনি দিয়েছেন</Text>
-                  <Text style={[sc.val, { color:colors.willGet }]}>{fmtCur(gave)}</Text>
+                <View style={{ flex:1, alignItems:'center' }}>
+                  <Text style={{ fontSize:11, fontFamily:'Inter_400Regular', color:'#64748B' }}>আপনি দিয়েছেন</Text>
+                  <Text style={{ fontSize:13, fontFamily:'Inter_700Bold', color:colors.willGet, marginTop:2 }}>
+                    {fmtCur(gave)}
+                  </Text>
                 </View>
                 {/* আপনি পেয়েছেন */}
-                <View style={[sc.card, { borderLeftColor:colors.willGive }]}>
-                  <Text style={sc.lbl}>আপনি পেয়েছেন</Text>
-                  <Text style={[sc.val, { color:colors.willGive }]}>{fmtCur(received)}</Text>
+                <View style={{ flex:1, alignItems:'flex-end' }}>
+                  <Text style={{ fontSize:11, fontFamily:'Inter_400Regular', color:'#64748B' }}>আপনি</Text>
+                  <Text style={{ fontSize:13, fontFamily:'Inter_700Bold', color:colors.willGive, marginTop:2 }}>
+                    {fmtCur(received)}
+                  </Text>
                 </View>
               </View>
             </View>
 
-            {/* ── Section header ───────────────────────────────────────────── */}
-            <View style={{ paddingHorizontal:16, paddingTop:14, paddingBottom:8, flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
-              <Text style={{ fontSize:12, fontFamily:'Inter_600SemiBold', color:'#64748B', textTransform:'uppercase', letterSpacing:0.5 }}>
-                লেনদেনের তালিকা
-              </Text>
-              <Text style={{ fontSize:12, fontFamily:'Inter_500Medium', color:'#94A3B8' }}>
-                {toBn(filtered.length)} টি
-              </Text>
-            </View>
-
-            {/* ── Entry list ───────────────────────────────────────────────── */}
-            <View style={ec.card}>
+            {/* ── Entry list — 3-column layout matching screenshot ─────────── */}
+            <View style={{ marginHorizontal:14, marginTop:10, marginBottom:8, borderRadius:12, overflow:'hidden', backgroundColor:'#fff', shadowColor:'#000', shadowOffset:{width:0,height:1}, shadowOpacity:0.06, shadowRadius:4, elevation:2 }}>
               {filtered.length === 0 ? (
                 <View style={{ alignItems:'center', paddingVertical:44 }}>
                   <Feather name="inbox" size={42} color="#CBD5E1" />
@@ -704,34 +674,48 @@ export default function ReportScreen() {
                 </View>
               ) : (
                 filtered.map((entry, idx) => {
-                  const isGave  = entry.type === 'YOU_GAVE';
-                  const accent  = isGave ? colors.willGet : colors.willGive;
+                  const isGave = entry.type === 'YOU_GAVE';
+                  const bal    = runningBalances.get(entry.id) ?? 0;
+                  const rowBg  = idx % 2 === 1 ? '#FEF2F2' : '#fff';
                   return (
-                    <View key={entry.id} style={[ec.row, idx === filtered.length-1 && { borderBottomWidth:0 }]}>
-                      <View style={[ec.dot, { backgroundColor:accent }]} />
-                      <View style={{ flex:1 }}>
-                        <Text style={ec.desc} numberOfLines={2}>
-                          {entry.description || (isGave ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন')}
+                    <View
+                      key={entry.id}
+                      style={{
+                        flexDirection:'row', alignItems:'center',
+                        paddingVertical:12, paddingHorizontal:14,
+                        backgroundColor:rowBg,
+                        borderBottomWidth: idx < filtered.length - 1 ? 1 : 0,
+                        borderBottomColor:'#F1F5F9',
+                      }}
+                    >
+                      {/* LEFT: date + balance badge */}
+                      <View style={{ flex:1.1 }}>
+                        <Text style={{ fontSize:13, fontFamily:'Inter_600SemiBold', color:'#1E293B' }}>
+                          {fmtRowDate(entry.createdAt)}
                         </Text>
-                        <Text style={ec.meta}>{fmtDateStr(entry.createdAt)} · {fmtTimeStr(entry.createdAt)}</Text>
-                        <Text style={{ fontSize:11, fontFamily:'Inter_600SemiBold', color:accent, marginTop:1 }}>
-                          {isGave ? '▲ দিয়েছেন' : '▼ পেয়েছেন'}
-                        </Text>
+                        <View style={{ marginTop:4, backgroundColor:'#F1F5F9', borderRadius:6, paddingHorizontal:6, paddingVertical:2, alignSelf:'flex-start' }}>
+                          <Text style={{ fontSize:10, fontFamily:'Inter_500Medium', color:'#64748B' }}>
+                            ব্যালেন্স {fmtCur(Math.abs(bal))}
+                          </Text>
+                        </View>
                       </View>
-                      {/* Amount + running balance */}
-                      <View style={{ alignItems:'flex-end' }}>
-                        <Text style={[ec.amt, { color:accent }]}>
-                          {isGave ? '+' : '-'}{fmtCur(entry.amount)}
-                        </Text>
-                        {(() => {
-                          const bal = runningBalances.get(entry.id) ?? 0;
-                          const bc  = bal >= 0 ? colors.willGet : colors.willGive;
-                          return (
-                            <Text style={{ fontSize:10, color:bc, fontFamily:'Inter_500Medium', marginTop:2 }}>
-                              ব্যালেন্স: {fmtCur(Math.abs(bal))}
-                            </Text>
-                          );
-                        })()}
+
+                      {/* MIDDLE: আপনি দিয়েছেন amount (red) or empty */}
+                      <View style={{ flex:1, alignItems:'center' }}>
+                        {isGave && (
+                          <Text style={{ fontSize:13, fontFamily:'Inter_700Bold', color:colors.willGet }}>
+                            {fmtCur(entry.amount)}
+                          </Text>
+                        )}
+                      </View>
+
+                      {/* RIGHT: আপনি পেয়েছেন amount (green) or empty */}
+                      <View style={{ flex:1, alignItems:'flex-end' }}>
+                        {!isGave && (
+                          <Text style={{ fontSize:13, fontFamily:'Inter_700Bold', color:colors.willGive }}>
+                            {fmtCur(entry.amount)}
+                          </Text>
+                        )}
                       </View>
                     </View>
                   );
@@ -805,21 +789,6 @@ export default function ReportScreen() {
 
 // ─── Shared StyleSheet atoms ──────────────────────────────────────────────────
 
-const sc = StyleSheet.create({
-  card: { flex:1, backgroundColor:'#fff', borderRadius:12, padding:14, borderLeftWidth:4, shadowColor:'#000', shadowOffset:{width:0,height:1}, shadowOpacity:0.06, shadowRadius:4, elevation:2 },
-  lbl:  { fontSize:11, fontFamily:'Inter_500Medium', color:'#64748B', marginBottom:5 },
-  val:  { fontSize:20, fontFamily:'Inter_700Bold' },
-  sub:  { fontSize:11, fontFamily:'Inter_400Regular', color:'#94A3B8', marginTop:2 },
-});
-
-const ec = StyleSheet.create({
-  card: { backgroundColor:'#fff', marginHorizontal:12, borderRadius:12, overflow:'hidden', marginBottom:8, shadowColor:'#000', shadowOffset:{width:0,height:1}, shadowOpacity:0.06, shadowRadius:4, elevation:2 },
-  row:  { flexDirection:'row', alignItems:'flex-start', paddingVertical:13, paddingHorizontal:14, borderBottomWidth:1, borderBottomColor:'#F1F5F9' },
-  dot:  { width:8, height:8, borderRadius:4, marginTop:5, marginRight:10 },
-  desc: { fontSize:13, fontFamily:'Inter_500Medium', color:'#1E293B' },
-  meta: { fontSize:11, color:'#94A3B8', fontFamily:'Inter_400Regular', marginTop:2 },
-  amt:  { fontSize:15, fontFamily:'Inter_700Bold', textAlign:'right' },
-});
 
 const bb = StyleSheet.create({
   bar:      { flexDirection:'row', gap:10, paddingHorizontal:14, paddingTop:10, backgroundColor:'#fff', borderTopWidth:1, borderTopColor:'#E2E8F0' },
