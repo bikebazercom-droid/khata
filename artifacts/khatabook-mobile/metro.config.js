@@ -12,20 +12,23 @@ config.resolver.nodeModulesPaths = [
   path.resolve(workspaceRoot, 'node_modules'),
 ];
 
-// Exclude Clerk's ephemeral temp directories (clerk/backend creates _tmp_NNN
-// directories at startup that are cleaned up before Metro finishes crawling).
+// Exclude:
+//   1. Clerk's ephemeral temp directories (_tmp_NNN dirs deleted before crawl ends)
+//   2. Replit's .local/skills ephemeral dirs (deleted while Metro is still watching)
 const originalBlockList = config.resolver?.blockList;
-const clerkTmpPattern = /node_modules\/@clerk\/backend_tmp_\d+/;
+const blockPatterns = [
+  /node_modules\/@clerk\/backend_tmp_\d+/,
+  /\/\.local\/skills\//,
+  /\/\.local\/skills\b/,
+];
 
 if (originalBlockList instanceof RegExp) {
-  config.resolver.blockList = new RegExp(
-    `(${originalBlockList.source})|(${clerkTmpPattern.source})`,
-  );
+  config.resolver.blockList = [originalBlockList, ...blockPatterns];
 } else {
   const existingPatterns = Array.isArray(originalBlockList)
     ? originalBlockList
     : [];
-  config.resolver.blockList = [clerkTmpPattern, ...existingPatterns];
+  config.resolver.blockList = [...blockPatterns, ...existingPatterns];
 }
 
 module.exports = config;
