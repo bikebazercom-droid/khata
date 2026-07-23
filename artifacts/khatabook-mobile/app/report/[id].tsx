@@ -1,18 +1,19 @@
 /**
  * Customer Statement / Report Screen  —  app/report/[id].tsx
  *
- * Layout
- * ──────
- *  Blue header: ← <Name> এর রিপোর্ট
- *  Filter bar:  [আরম্ভের তারিখ] [শেষের তারিখ] [⚙ filter button]
- *  Search bar:  🔍 এন্ট্রি অনুসন্ধান করুন
- *  Stats grid:  মোট ব্যালেন্স · মোট এন্ট্রি · দিয়েছেন · পেয়েছেন
- *  Entry list
- *  Bottom bar:  [ডাউনলোড PDF]  [WhatsApp-এ শেয়ার করুন]
+ * ┌──────────────────────────────────────┐  ← Dark-blue header zone
+ * │ ← [Name] এর রিপোর্ট                 │
+ * │ [আরম্ভের তারিখ]   [শেষের তারিখ]     │
+ * │ 🔍 এন্ট্রি অনুসন্ধান করুন  | সব ▼  │
+ * └──────────────────────────────────────┘
+ *   Stats 2×2 (মোট ব্যালেন্স · এন্ট্রি · দিয়েছেন · পেয়েছেন)
+ *   Entry list
+ * ┌──────────────────────────────────────┐  ← Sticky bottom bar
+ * │ [📄 PDF ডাউনলোড]  [⬡ শেয়ার করুন]  │
+ * └──────────────────────────────────────┘
  *
- * The filter bottom sheet ("রিপোর্ট সময়কাল নির্বাচন করুন") is opened by the
- * filter button and provides radio shortcuts that auto-fill the date boxes.
- * Tapping either date box opens a small popup date-picker (switches to custom mode).
+ * Filter dropdown ("সব ▼") opens bottom sheet "রিপোর্ট সময়কাল নির্বাচন করুন".
+ * Date boxes are tappable; popup spinner sets custom range.
  */
 import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
@@ -43,8 +44,8 @@ import { useColors } from '@/hooks/useColors';
 // ─── Bengali helpers ──────────────────────────────────────────────────────────
 
 const BN: Record<string, string> = {
-  '0': '০','1': '১','2': '২','3': '৩','4': '৪',
-  '5': '৫','6': '৬','7': '৭','8': '৮','9': '৯',
+  '0':'০','1':'১','2':'২','3':'৩','4':'৪',
+  '5':'৫','6':'৬','7':'৭','8':'৮','9':'৯',
 };
 const toBn = (s: string | number) =>
   String(s).split('').map(c => BN[c] ?? c).join('');
@@ -58,18 +59,15 @@ const fmtCur = (n: number) => {
   return `৳${str.split('').map(c => BN[c] ?? c).join('')}`;
 };
 
-// Short date like "১ জুল ২০২৬"
-const SHORT_MONTHS = ['জান','ফেব','মার','এপ্র','মে','জুন','জুল','আগ','সেপ','অক্ট','নভ','ডিস'];
+const SHORT_MO = ['জান','ফেব','মার','এপ্র','মে','জুন','জুল','আগ','সেপ','অক্ট','নভ','ডিস'];
 const fmtShort = (d: Date) =>
-  `${toBn(d.getDate())} ${SHORT_MONTHS[d.getMonth()]} ${toBn(d.getFullYear())}`;
+  `${toBn(d.getDate())} ${SHORT_MO[d.getMonth()]} ${toBn(d.getFullYear())}`;
 
-// Long date like "1 Jul 2026" for PDF
 const fmtDate = (d: Date) =>
-  d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-
+  d.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
 const fmtDateStr = (d: string) => fmtDate(new Date(d));
 const fmtTimeStr = (d: string) =>
-  new Date(d).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  new Date(d).toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
 
 // ─── Filter definitions ───────────────────────────────────────────────────────
 
@@ -77,172 +75,158 @@ type FilterKey = 'all' | 'one_day' | 'week' | 'month' | 'custom';
 
 interface FilterOption { key: FilterKey; label: string; sublabel: string; }
 const FILTERS: FilterOption[] = [
-  { key: 'all',     label: 'সব',             sublabel: 'সমস্ত লেনদেন দেখান' },
-  { key: 'one_day', label: 'এক দিন',         sublabel: 'শুধু আজকের লেনদেন' },
-  { key: 'week',    label: 'গত সপ্তাহে',      sublabel: 'গত ৭ দিনের লেনদেন' },
-  { key: 'month',   label: 'গত মাসের',        sublabel: 'গত ৩০ দিনের লেনদেন' },
-  { key: 'custom',  label: 'তারিখের পরিসর',   sublabel: 'নিজে তারিখ নির্বাচন করুন' },
+  { key:'all',     label:'সব',           sublabel:'সমস্ত লেনদেন দেখান' },
+  { key:'one_day', label:'এক দিন',       sublabel:'শুধু আজকের লেনদেন' },
+  { key:'week',    label:'গত সপ্তাহে',   sublabel:'গত ৭ দিনের লেনদেন' },
+  { key:'month',   label:'গত মাসের',     sublabel:'গত ৩০ দিনের লেনদেন' },
+  { key:'custom',  label:'তারিখের পরিসর',sublabel:'নিজে তারিখ নির্বাচন করুন' },
 ];
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
-function dayStart(d: Date) { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0); }
-function dayEnd(d: Date)   { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999); }
+const ds = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0);
+const de = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
 
-/** Returns the {start, end} dates for a given filter key. null = show all. */
-function getRange(key: FilterKey, cStart: Date, cEnd: Date): { start: Date; end: Date } | null {
-  const now = new Date();
-  const today = dayStart(now);
+function getRange(key: FilterKey, cs: Date, ce: Date): { start: Date; end: Date } | null {
+  const now = new Date(), today = ds(now);
   switch (key) {
     case 'all':     return null;
-    case 'one_day': return { start: dayStart(today), end: dayEnd(today) };
+    case 'one_day': return { start: ds(today), end: de(today) };
     case 'week': {
       const w = new Date(today); w.setDate(w.getDate() - 6);
-      return { start: dayStart(w), end: dayEnd(now) };
+      return { start: ds(w), end: de(now) };
     }
     case 'month': {
       const m = new Date(today); m.setDate(m.getDate() - 29);
-      return { start: dayStart(m), end: dayEnd(now) };
+      return { start: ds(m), end: de(now) };
     }
-    case 'custom':  return { start: dayStart(cStart), end: dayEnd(cEnd) };
+    case 'custom': return { start: ds(cs), end: de(ce) };
   }
 }
 
-/** Returns the computed start/end for the date boxes (never null). */
-function getDisplayDates(key: FilterKey, cStart: Date, cEnd: Date): { start: Date; end: Date } {
-  const range = getRange(key, cStart, cEnd);
-  if (!range) {
-    const today = new Date();
-    return { start: new Date(today.getFullYear(), 0, 1), end: today }; // Jan 1 → today
+function displayDates(key: FilterKey, cs: Date, ce: Date): { start: Date; end: Date } {
+  const r = getRange(key, cs, ce);
+  if (!r) {
+    const t = new Date();
+    return { start: new Date(t.getFullYear(), 0, 1), end: t };
   }
-  return range;
+  return r;
 }
 
-/** Human-readable label for the PDF. */
-function humanFilterLabel(key: FilterKey, cStart: Date, cEnd: Date): string {
+function filterLabel(key: FilterKey, cs: Date, ce: Date): string {
   if (key === 'all') return 'সব সময়';
-  if (key === 'custom') return `${fmtDate(cStart)} — ${fmtDate(cEnd)}`;
+  if (key === 'custom') return `${fmtDate(cs)} — ${fmtDate(ce)}`;
   return FILTERS.find(f => f.key === key)?.label ?? '';
 }
 
-// ─── Spinner Wheel Date Picker ────────────────────────────────────────────────
+// ─── Spinner date picker ──────────────────────────────────────────────────────
 
 const MONTHS_BN = [
   'জানুয়ারি','ফেব্রুয়ারি','মার্চ','এপ্রিল','মে','জুন',
   'জুলাই','আগস্ট','সেপ্টেম্বর','অক্টোবর','নভেম্বর','ডিসেম্বর',
 ];
-function daysInMonth(y: number, m: number) { return new Date(y, m + 1, 0).getDate(); }
+const dim = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
 
-function SpinnerDatePicker({ date, onChange }: { date: Date; onChange: (d: Date) => void }) {
+function SpinnerPicker({ date, onChange }: { date: Date; onChange: (d: Date) => void }) {
   const d = date.getDate(), m = date.getMonth(), y = date.getFullYear();
-
-  function adjust(field: 'day' | 'month' | 'year', delta: number) {
-    const next = new Date(date);
+  function adj(field: 'day'|'month'|'year', delta: number) {
+    const n = new Date(date);
     if (field === 'day') {
-      const max = daysInMonth(y, m);
-      let nd = d + delta;
+      const max = dim(y, m); let nd = d + delta;
       if (nd < 1) nd = max; if (nd > max) nd = 1;
-      next.setDate(nd);
+      n.setDate(nd);
     } else if (field === 'month') {
       let nm = m + delta; if (nm < 0) nm = 11; if (nm > 11) nm = 0;
-      next.setMonth(nm);
-      const cap = daysInMonth(next.getFullYear(), nm);
-      if (next.getDate() > cap) next.setDate(cap);
+      n.setMonth(nm);
+      const cap = dim(n.getFullYear(), nm);
+      if (n.getDate() > cap) n.setDate(cap);
     } else {
-      next.setFullYear(y + delta);
-      const cap = daysInMonth(next.getFullYear(), m);
-      if (next.getDate() > cap) next.setDate(cap);
+      n.setFullYear(y + delta);
+      const cap = dim(n.getFullYear(), m);
+      if (n.getDate() > cap) n.setDate(cap);
     }
-    onChange(next);
+    onChange(n);
   }
-
-  const cell = (value: string, field: 'day' | 'month' | 'year', wide?: boolean) => (
-    <View style={[spn.cell, wide && { flex: 2 }]}>
-      <TouchableOpacity onPress={() => adjust(field, 1)} hitSlop={{ top: 8, bottom: 4, left: 16, right: 16 }}>
-        <Feather name="chevron-up" size={18} color="#475569" />
+  const cell = (val: string, field: 'day'|'month'|'year', wide?: boolean) => (
+    <View style={[sp.cell, wide && { flex: 2.2 }]}>
+      <TouchableOpacity onPress={() => adj(field, 1)} hitSlop={{ top:8, bottom:4, left:14, right:14 }}>
+        <Feather name="chevron-up" size={20} color="#334155" />
       </TouchableOpacity>
-      <Text style={spn.val} numberOfLines={1}>{value}</Text>
-      <TouchableOpacity onPress={() => adjust(field, -1)} hitSlop={{ top: 4, bottom: 8, left: 16, right: 16 }}>
-        <Feather name="chevron-down" size={18} color="#475569" />
+      <Text style={sp.val} numberOfLines={1}>{val}</Text>
+      <TouchableOpacity onPress={() => adj(field, -1)} hitSlop={{ top:4, bottom:8, left:14, right:14 }}>
+        <Feather name="chevron-down" size={20} color="#334155" />
       </TouchableOpacity>
     </View>
   );
-
   return (
-    <View style={spn.row}>
+    <View style={sp.row}>
       {cell(toBn(d), 'day')}
-      <Text style={spn.sep}>/</Text>
+      <Text style={sp.sep}>/</Text>
       {cell(MONTHS_BN[m], 'month', true)}
-      <Text style={spn.sep}>/</Text>
+      <Text style={sp.sep}>/</Text>
       {cell(toBn(y), 'year')}
     </View>
   );
 }
-const spn = StyleSheet.create({
-  row:  { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
-  cell: { flex: 1, alignItems: 'center' },
-  val:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#1E293B', marginVertical: 4, textAlign: 'center' },
-  sep:  { fontSize: 16, color: '#CBD5E1', marginHorizontal: 8 },
+const sp = StyleSheet.create({
+  row:  { flexDirection:'row', alignItems:'center', paddingVertical:10 },
+  cell: { flex:1, alignItems:'center' },
+  val:  { fontSize:15, fontFamily:'Inter_700Bold', color:'#1E293B', marginVertical:5, textAlign:'center' },
+  sep:  { fontSize:18, color:'#CBD5E1', marginHorizontal:6 },
 });
 
-// ─── Date Picker Popup ────────────────────────────────────────────────────────
+// ─── Date popup modal ─────────────────────────────────────────────────────────
 
-function DatePickerPopup({
-  visible, label, date, onConfirm, onClose,
-}: {
+function DatePopup({ visible, label, date, onConfirm, onClose }: {
   visible: boolean; label: string; date: Date;
   onConfirm: (d: Date) => void; onClose: () => void;
 }) {
   const [local, setLocal] = useState(date);
-
-  // reset local when opened
-  React.useEffect(() => { if (visible) setLocal(date); }, [visible]);
-
+  React.useEffect(() => { if (visible) setLocal(date); }, [visible, date]);
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
-        <View style={pop.backdrop} />
+        <View style={dp.bg} />
       </TouchableWithoutFeedback>
-      <View style={pop.box}>
-        <Text style={pop.title}>{label}</Text>
-        <SpinnerDatePicker date={local} onChange={setLocal} />
-        <View style={pop.btnRow}>
-          <TouchableOpacity style={pop.cancel} onPress={onClose} activeOpacity={0.8}>
-            <Text style={pop.cancelTxt}>বাতিল</Text>
+      <View style={dp.box}>
+        <Text style={dp.title}>{label}</Text>
+        <SpinnerPicker date={local} onChange={setLocal} />
+        <View style={dp.btns}>
+          <TouchableOpacity style={dp.cancel} onPress={onClose}>
+            <Text style={dp.cancelTxt}>বাতিল</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={pop.confirm} onPress={() => { onConfirm(local); onClose(); }} activeOpacity={0.85}>
-            <Text style={pop.confirmTxt}>নিশ্চিত</Text>
+          <TouchableOpacity style={dp.ok} onPress={() => { onConfirm(local); onClose(); }}>
+            <Text style={dp.okTxt}>নিশ্চিত করুন</Text>
           </TouchableOpacity>
         </View>
       </View>
     </Modal>
   );
 }
-const pop = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
-  box:      { position: 'absolute', left: 20, right: 20, top: '30%', backgroundColor: '#fff', borderRadius: 16, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24, elevation: 24 },
-  title:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#1E293B', marginBottom: 12, textAlign: 'center' },
-  btnRow:   { flexDirection: 'row', gap: 10, marginTop: 16 },
-  cancel:   { flex: 1, paddingVertical: 13, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center' },
-  cancelTxt:{ fontSize: 14, fontFamily: 'Inter_600SemiBold', color: '#64748B' },
-  confirm:  { flex: 1, paddingVertical: 13, borderRadius: 10, backgroundColor: '#004B93', alignItems: 'center' },
-  confirmTxt:{ fontSize: 14, fontFamily: 'Inter_700Bold', color: '#fff' },
+const dp = StyleSheet.create({
+  bg:       { ...StyleSheet.absoluteFillObject, backgroundColor:'rgba(0,0,0,0.55)' },
+  box:      { position:'absolute', left:18, right:18, top:'28%', backgroundColor:'#fff', borderRadius:18, padding:22, shadowColor:'#000', shadowOffset:{width:0,height:10}, shadowOpacity:0.2, shadowRadius:30, elevation:30 },
+  title:    { fontSize:15, fontFamily:'Inter_700Bold', color:'#1E293B', marginBottom:14, textAlign:'center' },
+  btns:     { flexDirection:'row', gap:10, marginTop:18 },
+  cancel:   { flex:1, paddingVertical:13, borderRadius:10, borderWidth:1.5, borderColor:'rgba(255,255,255,0.3)', backgroundColor:'rgba(255,255,255,0.12)', alignItems:'center' },
+  cancelTxt:{ fontSize:14, fontFamily:'Inter_600SemiBold', color:'#64748B' },
+  ok:       { flex:1, paddingVertical:13, borderRadius:10, backgroundColor:'#004B93', alignItems:'center' },
+  okTxt:    { fontSize:14, fontFamily:'Inter_700Bold', color:'#fff' },
 });
 
 // ─── PDF HTML ─────────────────────────────────────────────────────────────────
 
-function buildPdfHtml(opts: {
-  partyName: string; partyPhone?: string | null;
-  filterLbl: string; entries: LedgerEntry[];
-  totalGave: number; totalReceived: number; net: number; isGet: boolean;
+function buildHtml(opts: {
+  partyName:string; partyPhone?:string|null; filterLbl:string;
+  entries:LedgerEntry[]; gave:number; received:number; net:number; isGet:boolean;
 }): string {
   const rows = opts.entries.map(e => {
-    const isGave = e.type === 'YOU_GAVE';
+    const g = e.type === 'YOU_GAVE';
     return `<tr>
       <td>${fmtDateStr(e.createdAt)}<br/><small style="color:#64748b">${fmtTimeStr(e.createdAt)}</small></td>
-      <td>${e.description || (isGave ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন')}</td>
-      <td style="color:#16a34a;text-align:right">${isGave ? fmtCur(e.amount) : '—'}</td>
-      <td style="color:#dc2626;text-align:right">${!isGave ? fmtCur(e.amount) : '—'}</td>
+      <td>${e.description||(g?'আপনি দিয়েছেন':'আপনি পেয়েছেন')}</td>
+      <td style="color:#16a34a;text-align:right">${g?fmtCur(e.amount):'—'}</td>
+      <td style="color:#dc2626;text-align:right">${!g?fmtCur(e.amount):'—'}</td>
     </tr>`;
   }).join('');
   const nc = opts.isGet ? '#16a34a' : '#dc2626';
@@ -250,28 +234,28 @@ function buildPdfHtml(opts: {
   return `<!DOCTYPE html><html lang="bn"><head><meta charset="UTF-8"/>
 <style>
   body{font-family:Arial,sans-serif;margin:0;padding:24px;color:#1e293b;font-size:13px}
-  h1{font-size:22px;color:#004B93;margin:0 0 2px}
-  .sub{color:#64748b;font-size:12px;margin-bottom:20px}
-  .summary{display:flex;gap:12px;margin-bottom:20px}
-  .card{flex:1;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center}
-  .lbl{font-size:11px;color:#64748b;margin-bottom:4px} .val{font-size:16px;font-weight:700}
+  h1{font-size:20px;color:#004B93;margin:0 0 4px}
+  .sub{color:#64748b;font-size:12px;margin-bottom:18px}
+  .summ{display:flex;gap:10px;margin-bottom:18px}
+  .card{flex:1;border:1px solid #e2e8f0;border-radius:8px;padding:10px;text-align:center}
+  .lbl{font-size:11px;color:#64748b;margin-bottom:3px} .val{font-size:15px;font-weight:700}
   table{width:100%;border-collapse:collapse}
-  th{background:#004B93;color:#fff;padding:8px 10px;font-size:12px;text-align:left}
-  td{padding:8px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top}
+  th{background:#004B93;color:#fff;padding:7px 9px;font-size:12px;text-align:left}
+  td{padding:7px 9px;border-bottom:1px solid #f1f5f9;vertical-align:top}
   tr:last-child td{border-bottom:none}
-  .footer{margin-top:24px;text-align:center;font-size:11px;color:#94a3b8}
+  .ft{margin-top:22px;text-align:center;font-size:11px;color:#94a3b8}
 </style></head><body>
 <h1>📒 বাংলা খাতা — স্টেটমেন্ট</h1>
-<div class="sub">গ্রাহক: <strong>${opts.partyName}</strong>${opts.partyPhone ? ` · ফোন: ${opts.partyPhone}` : ''}
-<br/>সময়কাল: ${opts.filterLbl}<br/>তৈরির তারিখ: ${fmtDate(new Date())}</div>
-<div class="summary">
-  <div class="card"><div class="lbl">মোট দিয়েছেন</div><div class="val" style="color:#16a34a">${fmtCur(opts.totalGave)}</div></div>
-  <div class="card"><div class="lbl">মোট পেয়েছেন</div><div class="val" style="color:#dc2626">${fmtCur(opts.totalReceived)}</div></div>
-  <div class="card"><div class="lbl">নেট ব্যালেন্স</div><div class="val" style="color:${nc}">${fmtCur(Math.abs(opts.net))}<br/><small style="font-size:10px">${ns}</small></div></div>
+<div class="sub">গ্রাহক: <strong>${opts.partyName}</strong>${opts.partyPhone?` · ${opts.partyPhone}`:''}
+<br/>সময়কাল: ${opts.filterLbl} · তৈরি: ${fmtDate(new Date())}</div>
+<div class="summ">
+  <div class="card"><div class="lbl">দিয়েছেন</div><div class="val" style="color:#16a34a">${fmtCur(opts.gave)}</div></div>
+  <div class="card"><div class="lbl">পেয়েছেন</div><div class="val" style="color:#dc2626">${fmtCur(opts.received)}</div></div>
+  <div class="card"><div class="lbl">নেট</div><div class="val" style="color:${nc}">${fmtCur(Math.abs(opts.net))}<br/><small style="font-size:10px">${ns}</small></div></div>
 </div>
-<table><thead><tr><th>তারিখ</th><th>বিবরণ</th><th style="text-align:right">দিয়েছেন (৳)</th><th style="text-align:right">পেয়েছেন (৳)</th></tr></thead>
-<tbody>${rows.length ? rows : '<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:20px">কোনো লেনদেন নেই</td></tr>'}</tbody></table>
-<div class="footer">বাংলা খাতা — সম্পূর্ণ নিরাপদ ও সুরক্ষিত ✔️</div>
+<table><thead><tr><th>তারিখ</th><th>বিবরণ</th><th style="text-align:right">দিয়েছেন</th><th style="text-align:right">পেয়েছেন</th></tr></thead>
+<tbody>${rows||'<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:18px">কোনো লেনদেন নেই</td></tr>'}</tbody></table>
+<div class="ft">বাংলা খাতা — সম্পূর্ণ নিরাপদ ও সুরক্ষিত ✔️</div>
 </body></html>`;
 }
 
@@ -280,435 +264,378 @@ function buildPdfHtml(opts: {
 function FilterSheet({
   visible, pendingFilter, setPendingFilter,
   pendingStart, pendingEnd, setPendingStart, setPendingEnd,
-  onApply, onClose, slideAnim, primaryColor, bottomInset,
+  onApply, onClose, anim, primary, bottomInset,
 }: {
-  visible: boolean;
-  pendingFilter: FilterKey; setPendingFilter: (k: FilterKey) => void;
-  pendingStart: Date; pendingEnd: Date;
-  setPendingStart: (d: Date) => void; setPendingEnd: (d: Date) => void;
-  onApply: () => void; onClose: () => void;
-  slideAnim: Animated.Value; primaryColor: string; bottomInset: number;
+  visible:boolean; pendingFilter:FilterKey; setPendingFilter:(k:FilterKey)=>void;
+  pendingStart:Date; pendingEnd:Date;
+  setPendingStart:(d:Date)=>void; setPendingEnd:(d:Date)=>void;
+  onApply:()=>void; onClose:()=>void;
+  anim:Animated.Value; primary:string; bottomInset:number;
 }) {
-  const translateY = slideAnim.interpolate({ inputRange: [0, 1], outputRange: [700, 0] });
-
+  const ty = anim.interpolate({ inputRange:[0,1], outputRange:[700,0] });
   return (
     <Modal visible={visible} transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
-        <Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)' }, { opacity: slideAnim }]} />
+        <Animated.View style={[StyleSheet.absoluteFillObject, { backgroundColor:'rgba(0,0,0,0.45)', opacity:anim }]} />
       </TouchableWithoutFeedback>
-
-      <Animated.View style={[bsh.panel, { paddingBottom: Math.max(bottomInset, 16) }, { transform: [{ translateY }] }]}>
+      <Animated.View style={[bsh.panel, { paddingBottom:Math.max(bottomInset,16), transform:[{translateY:ty}] }]}>
         <View style={bsh.handle} />
-
         <View style={bsh.titleRow}>
           <Text style={bsh.title}>রিপোর্ট সময়কাল নির্বাচন করুন</Text>
-          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity onPress={onClose} hitSlop={{top:8,bottom:8,left:8,right:8}}>
             <Feather name="x" size={20} color="#64748B" />
           </TouchableOpacity>
         </View>
-
-        <View style={bsh.divider} />
-
-        {FILTERS.map((f, i) => {
+        <View style={bsh.div} />
+        {FILTERS.map((f,i) => {
           const sel = pendingFilter === f.key;
           return (
             <TouchableOpacity
               key={f.key}
-              style={[bsh.option, i < FILTERS.length - 1 && bsh.optBorder, sel && { backgroundColor: '#EFF6FF' }]}
+              style={[bsh.opt, i < FILTERS.length-1 && bsh.optB, sel && { backgroundColor:'#EFF6FF' }]}
               onPress={() => { Haptics.selectionAsync(); setPendingFilter(f.key); }}
               activeOpacity={0.7}
             >
-              <View style={[bsh.radio, sel && { borderColor: primaryColor }]}>
-                {sel && <View style={[bsh.radioDot, { backgroundColor: primaryColor }]} />}
+              <View style={[bsh.radio, sel && { borderColor:primary }]}>
+                {sel && <View style={[bsh.dot, { backgroundColor:primary }]} />}
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[bsh.optLabel, sel && { color: primaryColor, fontFamily: 'Inter_700Bold' }]}>{f.label}</Text>
-                <Text style={bsh.optSub}>{f.sublabel}</Text>
+              <View style={{ flex:1 }}>
+                <Text style={[bsh.optL, sel && { color:primary, fontFamily:'Inter_700Bold' }]}>{f.label}</Text>
+                <Text style={bsh.optS}>{f.sublabel}</Text>
               </View>
-              {sel && <Feather name="check" size={16} color={primaryColor} />}
+              {sel && <Feather name="check" size={16} color={primary} />}
             </TouchableOpacity>
           );
         })}
-
-        {/* Inline date pickers only when custom is selected */}
         {pendingFilter === 'custom' && (
-          <View style={bsh.datePickers}>
-            <View style={{ flex: 1 }}>
-              <Text style={bsh.datePickerLabel}>আরম্ভের তারিখ</Text>
-              <SpinnerDatePicker date={pendingStart} onChange={setPendingStart} />
+          <View style={bsh.pickers}>
+            <View style={{ flex:1 }}>
+              <Text style={bsh.pickerLbl}>আরম্ভের তারিখ</Text>
+              <SpinnerPicker date={pendingStart} onChange={setPendingStart} />
             </View>
-            <View style={{ width: 1, backgroundColor: '#E2E8F0', marginHorizontal: 12, alignSelf: 'stretch' }} />
-            <View style={{ flex: 1 }}>
-              <Text style={bsh.datePickerLabel}>শেষের তারিখ</Text>
-              <SpinnerDatePicker date={pendingEnd} onChange={setPendingEnd} />
+            <View style={{ width:1, backgroundColor:'#E2E8F0', marginHorizontal:14, alignSelf:'stretch' }} />
+            <View style={{ flex:1 }}>
+              <Text style={bsh.pickerLbl}>শেষের তারিখ</Text>
+              <SpinnerPicker date={pendingEnd} onChange={setPendingEnd} />
             </View>
           </View>
         )}
-
-        <View style={bsh.divider} />
-
-        <TouchableOpacity style={[bsh.applyBtn, { backgroundColor: primaryColor }]} onPress={onApply} activeOpacity={0.85}>
+        <View style={bsh.div} />
+        <TouchableOpacity style={[bsh.apply, { backgroundColor:primary }]} onPress={onApply} activeOpacity={0.85}>
           <Text style={bsh.applyTxt}>প্রয়োগ করুন</Text>
         </TouchableOpacity>
       </Animated.View>
     </Modal>
   );
 }
-
 const bsh = StyleSheet.create({
-  panel:         { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 12, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 24 },
-  handle:        { width: 40, height: 4, borderRadius: 2, backgroundColor: '#CBD5E1', alignSelf: 'center', marginBottom: 16 },
-  titleRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 14 },
-  title:         { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#1E293B', flex: 1 },
-  divider:       { height: 1, backgroundColor: '#F1F5F9' },
-  option:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, gap: 14 },
-  optBorder:     { borderBottomWidth: 1, borderBottomColor: '#F8FAFC' },
-  radio:         { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#CBD5E1', alignItems: 'center', justifyContent: 'center' },
-  radioDot:      { width: 10, height: 10, borderRadius: 5 },
-  optLabel:      { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: '#1E293B', marginBottom: 1 },
-  optSub:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: '#94A3B8' },
-  datePickers:   { flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 12 },
-  datePickerLabel:{ fontSize: 11, fontFamily: 'Inter_600SemiBold', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
-  applyBtn:      { marginHorizontal: 20, marginTop: 14, paddingVertical: 16, borderRadius: 12, alignItems: 'center' },
-  applyTxt:      { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#fff' },
+  panel:    { position:'absolute', bottom:0, left:0, right:0, backgroundColor:'#fff', borderTopLeftRadius:22, borderTopRightRadius:22, paddingTop:12, shadowColor:'#000', shadowOffset:{width:0,height:-6}, shadowOpacity:0.14, shadowRadius:24, elevation:24 },
+  handle:   { width:40, height:4, borderRadius:2, backgroundColor:'#CBD5E1', alignSelf:'center', marginBottom:16 },
+  titleRow: { flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:20, paddingBottom:14 },
+  title:    { fontSize:16, fontFamily:'Inter_700Bold', color:'#1E293B', flex:1 },
+  div:      { height:1, backgroundColor:'#F1F5F9' },
+  opt:      { flexDirection:'row', alignItems:'center', paddingHorizontal:20, paddingVertical:14, gap:14 },
+  optB:     { borderBottomWidth:1, borderBottomColor:'#F8FAFC' },
+  radio:    { width:20, height:20, borderRadius:10, borderWidth:2, borderColor:'#CBD5E1', alignItems:'center', justifyContent:'center' },
+  dot:      { width:10, height:10, borderRadius:5 },
+  optL:     { fontSize:15, fontFamily:'Inter_600SemiBold', color:'#1E293B', marginBottom:1 },
+  optS:     { fontSize:12, fontFamily:'Inter_400Regular', color:'#94A3B8' },
+  pickers:  { flexDirection:'row', paddingHorizontal:20, paddingVertical:14 },
+  pickerLbl:{ fontSize:11, fontFamily:'Inter_600SemiBold', color:'#64748B', textTransform:'uppercase', letterSpacing:0.4, marginBottom:4 },
+  apply:    { marginHorizontal:20, marginTop:14, paddingVertical:16, borderRadius:12, alignItems:'center' },
+  applyTxt: { fontSize:16, fontFamily:'Inter_700Bold', color:'#fff' },
 });
 
-// ─── Report Screen ────────────────────────────────────────────────────────────
+// ─── Main Report Screen ───────────────────────────────────────────────────────
 
 export default function ReportScreen() {
-  const { id }  = useLocalSearchParams<{ id: string }>();
+  const { id }  = useLocalSearchParams<{ id:string }>();
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
   const colors  = useColors();
 
-  // ── Applied filter ─────────────────────────────────────────────────────────
-  const [filter,      setFilter]      = useState<FilterKey>('all');
-  const [customStart, setCustomStart] = useState(() => { const d = new Date(); d.setDate(1); return d; });
-  const [customEnd,   setCustomEnd]   = useState(() => new Date());
+  const PRIMARY = colors.primary;   // dark blue
 
-  // ── Sheet (pending state — committed only on "প্রয়োগ করুন") ──────────────
-  const [sheetOpen,      setSheetOpen]      = useState(false);
-  const [pendingFilter,  setPendingFilter]  = useState<FilterKey>('all');
-  const [pendingStart,   setPendingStart]   = useState(() => { const d = new Date(); d.setDate(1); return d; });
-  const [pendingEnd,     setPendingEnd]     = useState(() => new Date());
-  const slideAnim = useRef(new Animated.Value(0)).current;
+  // Applied filter
+  const [filter,  setFilter]  = useState<FilterKey>('all');
+  const [cStart,  setCStart]  = useState(() => { const d=new Date(); d.setDate(1); return d; });
+  const [cEnd,    setCEnd]    = useState(() => new Date());
 
-  // ── Date-box popup ─────────────────────────────────────────────────────────
-  const [datePop, setDatePop] = useState<null | 'start' | 'end'>(null);
+  // Sheet pending state
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [pFilter,   setPFilter]   = useState<FilterKey>('all');
+  const [pStart,    setPStart]    = useState(() => { const d=new Date(); d.setDate(1); return d; });
+  const [pEnd,      setPEnd]      = useState(() => new Date());
+  const anim = useRef(new Animated.Value(0)).current;
 
-  // ── Search query ───────────────────────────────────────────────────────────
+  // Date popup
+  const [datePop, setDatePop] = useState<null|'start'|'end'>(null);
+
+  // Search
   const [query, setQuery] = useState('');
 
-  // ── Data ───────────────────────────────────────────────────────────────────
-  const { data: party,        isLoading: pLoading } = useGetParty(id!);
-  const { data: entries = [], isLoading: eLoading } = useListLedgerEntries(id!);
+  // Data
+  const { data:party, isLoading:pL } = useGetParty(id!);
+  const { data:entries=[], isLoading:eL } = useListLedgerEntries(id!);
 
-  // ── Derived dates (for date boxes) ────────────────────────────────────────
-  const displayDates = useMemo(
-    () => getDisplayDates(filter, customStart, customEnd),
-    [filter, customStart, customEnd],
-  );
+  // Computed display dates (for the header boxes)
+  const disp = useMemo(() => displayDates(filter, cStart, cEnd), [filter, cStart, cEnd]);
 
-  // ── Filtered entries ───────────────────────────────────────────────────────
+  // Filtered by date
   const dateFiltered = useMemo(() => {
-    const range = getRange(filter, customStart, customEnd);
-    if (!range) return entries;
+    const r = getRange(filter, cStart, cEnd);
+    if (!r) return entries;
     return entries.filter(e => {
       const t = new Date(e.createdAt).getTime();
-      return t >= range.start.getTime() && t <= range.end.getTime();
+      return t >= r.start.getTime() && t <= r.end.getTime();
     });
-  }, [entries, filter, customStart, customEnd]);
+  }, [entries, filter, cStart, cEnd]);
 
+  // Filtered by search
   const filtered = useMemo(() => {
     if (!query.trim()) return dateFiltered;
-    const q = query.trim().toLowerCase();
-    return dateFiltered.filter(e =>
-      (e.description ?? '').toLowerCase().includes(q),
-    );
+    const q = query.toLowerCase();
+    return dateFiltered.filter(e => (e.description??'').toLowerCase().includes(q));
   }, [dateFiltered, query]);
 
-  // ── Computed totals ────────────────────────────────────────────────────────
-  const totalGave     = useMemo(() => filtered.filter(e => e.type === 'YOU_GAVE').reduce((s, e) => s + e.amount, 0), [filtered]);
-  const totalReceived = useMemo(() => filtered.filter(e => e.type === 'YOU_GOT').reduce((s, e)  => s + e.amount, 0), [filtered]);
-  const net           = useMemo(() => totalGave - totalReceived, [totalGave, totalReceived]);
-  const isGet         = party ? party.balanceType === 'YOU_WILL_GET' : net > 0;
+  // Totals
+  const gave     = useMemo(() => filtered.filter(e=>e.type==='YOU_GAVE').reduce((s,e)=>s+e.amount,0), [filtered]);
+  const received = useMemo(() => filtered.filter(e=>e.type==='YOU_GOT').reduce((s,e)=>s+e.amount,0), [filtered]);
+  const net      = useMemo(() => gave - received, [gave, received]);
+  const isGet    = party ? party.balanceType === 'YOU_WILL_GET' : net > 0;
 
-  // ── Sheet helpers ──────────────────────────────────────────────────────────
+  // Sheet helpers
   function openSheet() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setPendingFilter(filter);
-    setPendingStart(customStart);
-    setPendingEnd(customEnd);
+    setPFilter(filter); setPStart(cStart); setPEnd(cEnd);
     setSheetOpen(true);
-    Animated.spring(slideAnim, { toValue: 1, useNativeDriver: true, damping: 18, stiffness: 180 }).start();
+    Animated.spring(anim, { toValue:1, useNativeDriver:true, damping:18, stiffness:180 }).start();
   }
   function closeSheet() {
-    Animated.timing(slideAnim, { toValue: 0, duration: 220, useNativeDriver: true }).start(() => setSheetOpen(false));
+    Animated.timing(anim, { toValue:0, duration:220, useNativeDriver:true }).start(() => setSheetOpen(false));
   }
   function applySheet() {
-    setFilter(pendingFilter);
-    if (pendingFilter === 'custom') {
-      setCustomStart(pendingStart);
-      setCustomEnd(pendingEnd);
-    }
+    setFilter(pFilter);
+    if (pFilter === 'custom') { setCStart(pStart); setCEnd(pEnd); }
     closeSheet();
   }
 
-  // ── Date box taps ──────────────────────────────────────────────────────────
-  function handleDateBoxTap(which: 'start' | 'end') {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setDatePop(which);
-  }
-  function handleDatePopConfirm(d: Date) {
+  // Date box popup
+  function onDateConfirm(d: Date) {
     if (datePop === 'start') {
-      setCustomStart(d);
-      if (d > customEnd) setCustomEnd(d);
+      setCStart(d); if (d > cEnd) setCEnd(d);
     } else {
-      setCustomEnd(d);
-      if (d < customStart) setCustomStart(d);
+      setCEnd(d); if (d < cStart) setCStart(d);
     }
     setFilter('custom');
     setDatePop(null);
   }
 
-  // ── PDF + share ────────────────────────────────────────────────────────────
-  const [generating, setGenerating] = useState<'pdf' | 'whatsapp' | null>(null);
+  // PDF generate (save via native print dialog)
+  const [pdfBusy,   setPdfBusy]   = useState(false);
+  const [shareBusy, setShareBusy] = useState(false);
 
-  const handleShare = useCallback(async (mode: 'pdf' | 'whatsapp') => {
+  const getHtml = useCallback(() => buildHtml({
+    partyName: party?.name ?? '',
+    partyPhone: party?.phone,
+    filterLbl: filterLabel(filter, cStart, cEnd),
+    entries: filtered, gave, received, net, isGet,
+  }), [party, filter, cStart, cEnd, filtered, gave, received, net, isGet]);
+
+  async function handlePdf() {
     if (!party) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setGenerating(mode);
+    setPdfBusy(true);
     try {
-      const html = buildPdfHtml({
-        partyName: party.name, partyPhone: party.phone,
-        filterLbl: humanFilterLabel(filter, customStart, customEnd),
-        entries: filtered, totalGave, totalReceived, net, isGet,
-      });
-      const { uri } = await Print.printToFileAsync({ html, base64: false });
-      if (!(await Sharing.isAvailableAsync())) {
-        Alert.alert('শেয়ার করা যাচ্ছে না', 'এই ডিভাইসে শেয়ারিং সমর্থিত নয়।');
-        return;
+      await Print.printAsync({ html: getHtml() });
+    } catch (e: any) {
+      // User cancelled print → no error alert needed
+      if (!String(e).includes('cancel')) {
+        Alert.alert('ত্রুটি', 'PDF তৈরি করা যায়নি।');
       }
-      await Sharing.shareAsync(uri, {
-        mimeType: 'application/pdf',
-        dialogTitle: mode === 'whatsapp' ? 'WhatsApp-এ শেয়ার করুন' : 'PDF ডাউনলোড করুন',
-        UTI: 'com.adobe.pdf',
-      });
-    } catch {
-      Alert.alert('ত্রুটি', 'PDF তৈরি করা যায়নি। আবার চেষ্টা করুন।');
     } finally {
-      setGenerating(null);
+      setPdfBusy(false);
     }
-  }, [party, filter, customStart, customEnd, filtered, totalGave, totalReceived, net, isGet]);
+  }
 
-  const isLoading = pLoading || eLoading;
-  const accentColor = (isGave: boolean) => isGave ? colors.willGet : colors.willGive;
+  async function handleShare() {
+    if (!party) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setShareBusy(true);
+    try {
+      const { uri } = await Print.printToFileAsync({ html: getHtml(), base64:false });
+      const ok = await Sharing.isAvailableAsync();
+      if (!ok) { Alert.alert('শেয়ার করা যাচ্ছে না', 'এই ডিভাইসে শেয়ারিং সমর্থিত নয়।'); return; }
+      await Sharing.shareAsync(uri, { mimeType:'application/pdf', UTI:'com.adobe.pdf', dialogTitle:'শেয়ার করুন' });
+    } catch {
+      Alert.alert('ত্রুটি', 'শেয়ার করা যায়নি।');
+    } finally {
+      setShareBusy(false);
+    }
+  }
 
-  // ── Styles ─────────────────────────────────────────────────────────────────
-  const s = StyleSheet.create({
-    container:   { flex: 1, backgroundColor: '#F1F5F9' },
-    // Header
-    header:      { paddingTop: Platform.OS === 'web' ? 16 : insets.top + 8, paddingBottom: 16, paddingHorizontal: 16, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', gap: 12 },
-    headerName:  { fontSize: 17, fontFamily: 'Inter_700Bold', color: '#fff', flex: 1 },
-    // Filter card
-    filterCard:  { backgroundColor: '#fff', marginHorizontal: 12, marginTop: 12, marginBottom: 0, borderRadius: 12, padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 3 },
-    dateRow:     { flexDirection: 'row', gap: 8, marginBottom: 10 },
-    dateBox:     { flex: 1, borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 10, backgroundColor: '#F8FAFC' },
-    dateBoxActive:{ borderColor: colors.primary },
-    dateLabel:   { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: '#94A3B8', marginBottom: 3, textTransform: 'uppercase', letterSpacing: 0.4 },
-    dateValue:   { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#1E293B' },
-    filterBtnRow:{ flexDirection: 'row', gap: 8 },
-    searchBox:   { flex: 1, flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 8, paddingHorizontal: 10, backgroundColor: '#F8FAFC', gap: 8 },
-    searchInput: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: '#1E293B', paddingVertical: 10 },
-    filterBtn:   { width: 44, height: 44, borderRadius: 8, borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' },
-    filterBtnActive: { borderColor: colors.primary, backgroundColor: colors.primary + '15' },
-    // Stats
-    statsWrap:   { paddingHorizontal: 12, paddingTop: 10 },
-    statsRow:    { flexDirection: 'row', gap: 8, marginBottom: 8 },
-    statCard:    { flex: 1, backgroundColor: '#fff', borderRadius: 10, padding: 13, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 },
-    statLabel:   { fontSize: 11, fontFamily: 'Inter_500Medium', color: '#64748B', marginBottom: 5 },
-    statValue:   { fontSize: 18, fontFamily: 'Inter_700Bold' },
-    statSub:     { fontSize: 11, fontFamily: 'Inter_400Regular', color: '#94A3B8', marginTop: 2 },
-    // Section header
-    sectionHead: { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#F1F5F9' },
-    sectionTxt:  { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 },
-    // Entries
-    entriesCard: { backgroundColor: '#fff', marginHorizontal: 12, borderRadius: 12, overflow: 'hidden', marginBottom: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 },
-    entryRow:    { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 13, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-    dot:         { width: 8, height: 8, borderRadius: 4, marginTop: 5, marginRight: 10 },
-    entryMain:   { flex: 1 },
-    entryDesc:   { fontSize: 13, fontFamily: 'Inter_500Medium', color: '#1E293B' },
-    entryMeta:   { fontSize: 11, color: '#94A3B8', fontFamily: 'Inter_400Regular', marginTop: 2 },
-    entryTag:    { fontSize: 11, fontFamily: 'Inter_600SemiBold', marginTop: 1 },
-    entryAmt:    { fontSize: 15, fontFamily: 'Inter_700Bold', textAlign: 'right' },
-    emptyBox:    { alignItems: 'center', paddingVertical: 40 },
-    emptyTxt:    { color: '#94A3B8', fontFamily: 'Inter_400Regular', fontSize: 14, marginTop: 10 },
-    // Bottom bar
-    bottomBar:   { flexDirection: 'row', gap: 10, paddingHorizontal: 12, paddingTop: 10, paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 14, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#E2E8F0' },
-    pdfBtn:      { flex: 1, paddingVertical: 15, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7, backgroundColor: colors.primary },
-    waBtn:       { flex: 1, paddingVertical: 15, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7, backgroundColor: '#25D366' },
-    btnTxt:      { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#fff' },
-  });
+  const loading = pL || eL;
+  const curLbl  = FILTERS.find(f=>f.key===filter)?.label ?? 'সব';
 
-  const isFiltered = filter !== 'all';
+  // ── Styles ──────────────────────────────────────────────────────────────────
+  const HEADER_BG = PRIMARY;          // e.g. #004B93
+  const HEADER_OVERLAY = 'rgba(0,0,0,0.18)'; // slight darken on date boxes
 
   return (
-    <KeyboardAvoidingView
-      style={s.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="arrow-left" size={22} color="#fff" />
-        </TouchableOpacity>
-        <Text style={s.headerName} numberOfLines={1}>
-          {pLoading ? 'লোড হচ্ছে…' : `${party?.name ?? ''} এর রিপোর্ট`}
-        </Text>
-        <Feather name="file-text" size={19} color="rgba(255,255,255,0.8)" />
-      </View>
+    <KeyboardAvoidingView style={{ flex:1, backgroundColor:'#F1F5F9' }} behavior={Platform.OS==='ios'?'padding':undefined}>
 
-      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      {/* ══════════════════════════════════════════════════════════════════════
+          DARK-BLUE HEADER ZONE
+          ══════════════════════════════════════════════════════════════════════ */}
+      <View style={{ backgroundColor:HEADER_BG, paddingTop: Platform.OS==='web' ? 16 : insets.top + 6, paddingBottom:16, paddingHorizontal:14 }}>
 
-        {/* ── Filter card ─────────────────────────────────────────────────── */}
-        <View style={s.filterCard}>
-          {/* Date range boxes */}
-          <View style={s.dateRow}>
-            {/* Start date */}
-            <TouchableOpacity
-              style={[s.dateBox, datePop === 'start' && s.dateBoxActive]}
-              onPress={() => handleDateBoxTap('start')}
-              activeOpacity={0.75}
-            >
-              <Text style={s.dateLabel}>আরম্ভের তারিখ</Text>
-              <Text style={s.dateValue}>{fmtShort(displayDates.start)}</Text>
-            </TouchableOpacity>
-
-            {/* Divider arrow */}
-            <View style={{ justifyContent: 'flex-end', paddingBottom: 10 }}>
-              <Feather name="arrow-right" size={14} color="#94A3B8" />
-            </View>
-
-            {/* End date */}
-            <TouchableOpacity
-              style={[s.dateBox, datePop === 'end' && s.dateBoxActive]}
-              onPress={() => handleDateBoxTap('end')}
-              activeOpacity={0.75}
-            >
-              <Text style={s.dateLabel}>শেষের তারিখ</Text>
-              <Text style={s.dateValue}>{fmtShort(displayDates.end)}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Search bar + filter button */}
-          <View style={s.filterBtnRow}>
-            <View style={s.searchBox}>
-              <Feather name="search" size={15} color="#94A3B8" />
-              <TextInput
-                style={s.searchInput}
-                placeholder="এন্ট্রি অনুসন্ধান করুন"
-                placeholderTextColor="#94A3B8"
-                value={query}
-                onChangeText={setQuery}
-                returnKeyType="search"
-                clearButtonMode="while-editing"
-              />
-            </View>
-            <TouchableOpacity
-              style={[s.filterBtn, isFiltered && s.filterBtnActive]}
-              onPress={openSheet}
-              activeOpacity={0.75}
-            >
-              <Feather name="sliders" size={18} color={isFiltered ? colors.primary : '#64748B'} />
-            </TouchableOpacity>
-          </View>
+        {/* Title row */}
+        <View style={{ flexDirection:'row', alignItems:'center', marginBottom:14, gap:10 }}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={{top:8,bottom:8,left:8,right:8}}>
+            <Feather name="arrow-left" size={22} color="#fff" />
+          </TouchableOpacity>
+          <Text style={{ flex:1, fontSize:17, fontFamily:'Inter_700Bold', color:'#fff' }} numberOfLines={1}>
+            {pL ? 'লোড হচ্ছে…' : `${party?.name ?? ''} এর রিপোর্ট`}
+          </Text>
+          <Feather name="file-text" size={18} color="rgba(255,255,255,0.75)" />
         </View>
 
-        {/* ── Active filter pill ──────────────────────────────────────────── */}
-        {isFiltered && (
+        {/* Date boxes row */}
+        <View style={{ flexDirection:'row', gap:8, marginBottom:10 }}>
+          {/* Start date */}
           <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginHorizontal: 12, marginTop: 8, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, backgroundColor: colors.primary + '18', gap: 6 }}
+            style={{ flex:1, backgroundColor:HEADER_OVERLAY, borderRadius:10, paddingHorizontal:12, paddingVertical:9, borderWidth:1, borderColor:'rgba(255,255,255,0.25)' }}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setDatePop('start'); }}
+            activeOpacity={0.75}
+          >
+            <Text style={{ fontSize:10, color:'rgba(255,255,255,0.7)', fontFamily:'Inter_500Medium', marginBottom:2 }}>
+              আরম্ভের তারিখ
+            </Text>
+            <View style={{ flexDirection:'row', alignItems:'center', gap:5 }}>
+              <Feather name="calendar" size={12} color="rgba(255,255,255,0.8)" />
+              <Text style={{ fontSize:13, fontFamily:'Inter_700Bold', color:'#fff' }}>{fmtShort(disp.start)}</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Arrow */}
+          <View style={{ justifyContent:'flex-end', paddingBottom:10 }}>
+            <Feather name="arrow-right" size={14} color="rgba(255,255,255,0.6)" />
+          </View>
+
+          {/* End date */}
+          <TouchableOpacity
+            style={{ flex:1, backgroundColor:HEADER_OVERLAY, borderRadius:10, paddingHorizontal:12, paddingVertical:9, borderWidth:1, borderColor:'rgba(255,255,255,0.25)' }}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setDatePop('end'); }}
+            activeOpacity={0.75}
+          >
+            <Text style={{ fontSize:10, color:'rgba(255,255,255,0.7)', fontFamily:'Inter_500Medium', marginBottom:2 }}>
+              শেষের তারিখ
+            </Text>
+            <View style={{ flexDirection:'row', alignItems:'center', gap:5 }}>
+              <Feather name="calendar" size={12} color="rgba(255,255,255,0.8)" />
+              <Text style={{ fontSize:13, fontFamily:'Inter_700Bold', color:'#fff' }}>{fmtShort(disp.end)}</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Search bar + filter dropdown */}
+        <View style={{ flexDirection:'row', backgroundColor:'rgba(255,255,255,0.15)', borderRadius:10, borderWidth:1, borderColor:'rgba(255,255,255,0.22)', alignItems:'center', paddingLeft:10 }}>
+          <Feather name="search" size={15} color="rgba(255,255,255,0.7)" />
+          <TextInput
+            style={{ flex:1, fontSize:14, fontFamily:'Inter_400Regular', color:'#fff', paddingVertical:11, paddingHorizontal:8 }}
+            placeholder="এন্ট্রি অনুসন্ধান করুন"
+            placeholderTextColor="rgba(255,255,255,0.5)"
+            value={query}
+            onChangeText={setQuery}
+            returnKeyType="search"
+          />
+          {/* Filter dropdown button */}
+          <TouchableOpacity
+            style={{ flexDirection:'row', alignItems:'center', gap:5, paddingHorizontal:12, paddingVertical:11, borderLeftWidth:1, borderLeftColor:'rgba(255,255,255,0.22)' }}
             onPress={openSheet}
             activeOpacity={0.7}
           >
-            <Feather name="calendar" size={12} color={colors.primary} />
-            <Text style={{ fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.primary }}>
-              {FILTERS.find(f => f.key === filter)?.label ?? 'কাস্টম'}
-            </Text>
-            <TouchableOpacity
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-              onPress={() => { setFilter('all'); setQuery(''); }}
-            >
-              <Feather name="x" size={12} color={colors.primary} />
-            </TouchableOpacity>
+            <Text style={{ fontSize:13, fontFamily:'Inter_700Bold', color:'#fff' }}>{curLbl}</Text>
+            <Feather name="chevron-down" size={14} color="rgba(255,255,255,0.85)" />
           </TouchableOpacity>
-        )}
+        </View>
+      </View>
+      {/* ══════════════════════════════════════════════════════════════════════ */}
 
-        {isLoading ? (
-          <View style={{ padding: 56, alignItems: 'center' }}>
-            <ActivityIndicator size="large" color={colors.primary} />
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom:12 }}>
+
+        {loading ? (
+          <View style={{ padding:56, alignItems:'center' }}>
+            <ActivityIndicator size="large" color={PRIMARY} />
           </View>
         ) : (
           <>
-            {/* ── Stats ──────────────────────────────────────────────────── */}
-            <View style={s.statsWrap}>
-              <View style={s.statsRow}>
-                <View style={[s.statCard, { borderLeftWidth: 3, borderLeftColor: isGet ? colors.willGet : colors.willGive }]}>
-                  <Text style={s.statLabel}>মোট ব্যালেন্স</Text>
-                  <Text style={[s.statValue, { color: isGet ? colors.willGet : colors.willGive }]}>{fmtCur(Math.abs(net))}</Text>
-                  <Text style={s.statSub}>{isGet ? '↑ পাবেন' : '↓ দেবেন'}</Text>
+            {/* ── Stats 2×2 ────────────────────────────────────────────────── */}
+            <View style={{ paddingHorizontal:12, paddingTop:12, gap:8 }}>
+              <View style={{ flexDirection:'row', gap:8 }}>
+                {/* মোট ব্যালেন্স */}
+                <View style={[sc.card, { borderLeftColor: isGet ? colors.willGet : colors.willGive }]}>
+                  <Text style={sc.lbl}>মোট ব্যালেন্স</Text>
+                  <Text style={[sc.val, { color: isGet ? colors.willGet : colors.willGive }]}>{fmtCur(Math.abs(net))}</Text>
+                  <Text style={sc.sub}>{isGet ? '↑ পাবেন' : '↓ দেবেন'}</Text>
                 </View>
-                <View style={[s.statCard, { borderLeftWidth: 3, borderLeftColor: colors.primary }]}>
-                  <Text style={s.statLabel}>মোট এন্ট্রি সংখ্যা</Text>
-                  <Text style={[s.statValue, { color: colors.primary }]}>{toBn(filtered.length)}</Text>
-                  <Text style={s.statSub}>টি লেনদেন</Text>
+                {/* মোট এন্ট্রি সংখ্যা */}
+                <View style={[sc.card, { borderLeftColor:PRIMARY }]}>
+                  <Text style={sc.lbl}>মোট এন্ট্রি সংখ্যা</Text>
+                  <Text style={[sc.val, { color:PRIMARY }]}>{toBn(filtered.length)}</Text>
+                  <Text style={sc.sub}>টি লেনদেন</Text>
                 </View>
               </View>
-              <View style={s.statsRow}>
-                <View style={[s.statCard, { borderLeftWidth: 3, borderLeftColor: colors.willGet }]}>
-                  <Text style={s.statLabel}>আপনি দিয়েছেন</Text>
-                  <Text style={[s.statValue, { color: colors.willGet }]}>{fmtCur(totalGave)}</Text>
+              <View style={{ flexDirection:'row', gap:8 }}>
+                {/* আপনি দিয়েছেন */}
+                <View style={[sc.card, { borderLeftColor:colors.willGet }]}>
+                  <Text style={sc.lbl}>আপনি দিয়েছেন</Text>
+                  <Text style={[sc.val, { color:colors.willGet }]}>{fmtCur(gave)}</Text>
                 </View>
-                <View style={[s.statCard, { borderLeftWidth: 3, borderLeftColor: colors.willGive }]}>
-                  <Text style={s.statLabel}>আপনি পেয়েছেন</Text>
-                  <Text style={[s.statValue, { color: colors.willGive }]}>{fmtCur(totalReceived)}</Text>
+                {/* আপনি পেয়েছেন */}
+                <View style={[sc.card, { borderLeftColor:colors.willGive }]}>
+                  <Text style={sc.lbl}>আপনি পেয়েছেন</Text>
+                  <Text style={[sc.val, { color:colors.willGive }]}>{fmtCur(received)}</Text>
                 </View>
               </View>
             </View>
 
-            {/* ── Section header ────────────────────────────────────────── */}
-            <View style={s.sectionHead}>
-              <Text style={s.sectionTxt}>
-                {`লেনদেনের তালিকা`}
-                {query.trim() ? ` · "${query}"` : ''}
-                {` · ${toBn(filtered.length)} টি`}
+            {/* ── Section header ───────────────────────────────────────────── */}
+            <View style={{ paddingHorizontal:16, paddingTop:14, paddingBottom:8, flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+              <Text style={{ fontSize:12, fontFamily:'Inter_600SemiBold', color:'#64748B', textTransform:'uppercase', letterSpacing:0.5 }}>
+                লেনদেনের তালিকা
+              </Text>
+              <Text style={{ fontSize:12, fontFamily:'Inter_500Medium', color:'#94A3B8' }}>
+                {toBn(filtered.length)} টি
               </Text>
             </View>
 
-            {/* ── Entry list ────────────────────────────────────────────── */}
-            <View style={s.entriesCard}>
+            {/* ── Entry list ───────────────────────────────────────────────── */}
+            <View style={ec.card}>
               {filtered.length === 0 ? (
-                <View style={s.emptyBox}>
-                  <Feather name="inbox" size={40} color="#CBD5E1" />
-                  <Text style={s.emptyTxt}>
+                <View style={{ alignItems:'center', paddingVertical:44 }}>
+                  <Feather name="inbox" size={42} color="#CBD5E1" />
+                  <Text style={{ color:'#94A3B8', fontFamily:'Inter_400Regular', fontSize:14, marginTop:10 }}>
                     {query.trim() ? 'কোনো মিল পাওয়া যায়নি' : 'এই সময়কালে কোনো লেনদেন নেই'}
                   </Text>
                 </View>
               ) : (
                 filtered.map((entry, idx) => {
-                  const isGave = entry.type === 'YOU_GAVE';
-                  const color  = accentColor(isGave);
+                  const isGave  = entry.type === 'YOU_GAVE';
+                  const accent  = isGave ? colors.willGet : colors.willGive;
                   return (
-                    <View key={entry.id} style={[s.entryRow, idx === filtered.length - 1 && { borderBottomWidth: 0 }]}>
-                      <View style={[s.dot, { backgroundColor: color }]} />
-                      <View style={s.entryMain}>
-                        <Text style={s.entryDesc} numberOfLines={2}>
+                    <View key={entry.id} style={[ec.row, idx === filtered.length-1 && { borderBottomWidth:0 }]}>
+                      <View style={[ec.dot, { backgroundColor:accent }]} />
+                      <View style={{ flex:1 }}>
+                        <Text style={ec.desc} numberOfLines={2}>
                           {entry.description || (isGave ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন')}
                         </Text>
-                        <Text style={s.entryMeta}>{fmtDateStr(entry.createdAt)} · {fmtTimeStr(entry.createdAt)}</Text>
-                        <Text style={[s.entryTag, { color }]}>{isGave ? '▲ দিয়েছেন' : '▼ পেয়েছেন'}</Text>
+                        <Text style={ec.meta}>{fmtDateStr(entry.createdAt)} · {fmtTimeStr(entry.createdAt)}</Text>
+                        <Text style={{ fontSize:11, fontFamily:'Inter_600SemiBold', color:accent, marginTop:1 }}>
+                          {isGave ? '▲ দিয়েছেন' : '▼ পেয়েছেন'}
+                        </Text>
                       </View>
-                      <Text style={[s.entryAmt, { color }]}>
+                      <Text style={[ec.amt, { color:accent }]}>
                         {isGave ? '+' : '-'}{fmtCur(entry.amount)}
                       </Text>
                     </View>
@@ -716,54 +643,95 @@ export default function ReportScreen() {
                 })
               )}
             </View>
-
-            <View style={{ height: 20 }} />
           </>
         )}
       </ScrollView>
 
-      {/* ── Bottom action bar ────────────────────────────────────────────────── */}
-      <View style={s.bottomBar}>
+      {/* ══════════════════════════════════════════════════════════════════════
+          STICKY BOTTOM BAR
+          ══════════════════════════════════════════════════════════════════════ */}
+      <View style={[bb.bar, { paddingBottom: Platform.OS==='ios' ? insets.bottom + 10 : 16 }]}>
+
+        {/* Left: Outline PDF button */}
         <TouchableOpacity
-          style={[s.pdfBtn, generating === 'pdf' && { opacity: 0.6 }]}
-          onPress={() => handleShare('pdf')}
-          disabled={generating !== null}
-          activeOpacity={0.85}
+          style={[bb.pdfBtn, pdfBusy && { opacity:0.6 }]}
+          onPress={handlePdf}
+          disabled={pdfBusy || shareBusy}
+          activeOpacity={0.82}
         >
-          {generating === 'pdf' ? <ActivityIndicator size="small" color="#fff" /> : <Feather name="download" size={16} color="#fff" />}
-          <Text style={s.btnTxt}>{generating === 'pdf' ? 'তৈরি হচ্ছে…' : 'ডাউনলোড PDF'}</Text>
+          {pdfBusy
+            ? <ActivityIndicator size="small" color={PRIMARY} />
+            : <Feather name="file-text" size={17} color={PRIMARY} />
+          }
+          <Text style={[bb.pdfTxt, { color:PRIMARY }]}>
+            {pdfBusy ? 'তৈরি হচ্ছে…' : 'PDF ডাউনলোড'}
+          </Text>
         </TouchableOpacity>
 
+        {/* Right: Filled share button */}
         <TouchableOpacity
-          style={[s.waBtn, generating === 'whatsapp' && { opacity: 0.6 }]}
-          onPress={() => handleShare('whatsapp')}
-          disabled={generating !== null}
+          style={[bb.shareBtn, { backgroundColor:PRIMARY }, shareBusy && { opacity:0.6 }]}
+          onPress={handleShare}
+          disabled={pdfBusy || shareBusy}
           activeOpacity={0.85}
         >
-          {generating === 'whatsapp' ? <ActivityIndicator size="small" color="#fff" /> : <Feather name="share-2" size={16} color="#fff" />}
-          <Text style={s.btnTxt}>{generating === 'whatsapp' ? 'তৈরি হচ্ছে…' : 'WhatsApp-এ শেয়ার করুন'}</Text>
+          {shareBusy
+            ? <ActivityIndicator size="small" color="#fff" />
+            : <Feather name="share-2" size={17} color="#fff" />
+          }
+          <Text style={bb.shareTxt}>
+            {shareBusy ? 'তৈরি হচ্ছে…' : 'শেয়ার করুন'}
+          </Text>
         </TouchableOpacity>
       </View>
 
-      {/* ── Date picker popup ─────────────────────────────────────────────────── */}
-      <DatePickerPopup
+      {/* Date picker popup */}
+      <DatePopup
         visible={datePop !== null}
-        label={datePop === 'start' ? 'আরম্ভের তারিখ নির্বাচন করুন' : 'শেষের তারিখ নির্বাচন করুন'}
-        date={datePop === 'start' ? displayDates.start : displayDates.end}
-        onConfirm={handleDatePopConfirm}
+        label={datePop==='start' ? 'আরম্ভের তারিখ নির্বাচন করুন' : 'শেষের তারিখ নির্বাচন করুন'}
+        date={datePop==='start' ? disp.start : disp.end}
+        onConfirm={onDateConfirm}
         onClose={() => setDatePop(null)}
       />
 
-      {/* ── Filter bottom sheet ───────────────────────────────────────────────── */}
+      {/* Filter bottom sheet */}
       <FilterSheet
         visible={sheetOpen}
-        pendingFilter={pendingFilter}  setPendingFilter={setPendingFilter}
-        pendingStart={pendingStart}    pendingEnd={pendingEnd}
-        setPendingStart={setPendingStart} setPendingEnd={setPendingEnd}
-        onApply={applySheet}  onClose={closeSheet}
-        slideAnim={slideAnim} primaryColor={colors.primary}
+        pendingFilter={pFilter}  setPendingFilter={setPFilter}
+        pendingStart={pStart}    pendingEnd={pEnd}
+        setPendingStart={setPStart} setPendingEnd={setPEnd}
+        onApply={applySheet}    onClose={closeSheet}
+        anim={anim}             primary={PRIMARY}
         bottomInset={insets.bottom}
       />
     </KeyboardAvoidingView>
   );
 }
+
+// ─── Shared StyleSheet atoms ──────────────────────────────────────────────────
+
+const sc = StyleSheet.create({
+  card: { flex:1, backgroundColor:'#fff', borderRadius:12, padding:14, borderLeftWidth:4, shadowColor:'#000', shadowOffset:{width:0,height:1}, shadowOpacity:0.06, shadowRadius:4, elevation:2 },
+  lbl:  { fontSize:11, fontFamily:'Inter_500Medium', color:'#64748B', marginBottom:5 },
+  val:  { fontSize:20, fontFamily:'Inter_700Bold' },
+  sub:  { fontSize:11, fontFamily:'Inter_400Regular', color:'#94A3B8', marginTop:2 },
+});
+
+const ec = StyleSheet.create({
+  card: { backgroundColor:'#fff', marginHorizontal:12, borderRadius:12, overflow:'hidden', marginBottom:8, shadowColor:'#000', shadowOffset:{width:0,height:1}, shadowOpacity:0.06, shadowRadius:4, elevation:2 },
+  row:  { flexDirection:'row', alignItems:'flex-start', paddingVertical:13, paddingHorizontal:14, borderBottomWidth:1, borderBottomColor:'#F1F5F9' },
+  dot:  { width:8, height:8, borderRadius:4, marginTop:5, marginRight:10 },
+  desc: { fontSize:13, fontFamily:'Inter_500Medium', color:'#1E293B' },
+  meta: { fontSize:11, color:'#94A3B8', fontFamily:'Inter_400Regular', marginTop:2 },
+  amt:  { fontSize:15, fontFamily:'Inter_700Bold', textAlign:'right' },
+});
+
+const bb = StyleSheet.create({
+  bar:      { flexDirection:'row', gap:10, paddingHorizontal:14, paddingTop:10, backgroundColor:'#fff', borderTopWidth:1, borderTopColor:'#E2E8F0' },
+  // Outline PDF button
+  pdfBtn:   { flex:1, flexDirection:'row', alignItems:'center', justifyContent:'center', gap:7, paddingVertical:14, borderRadius:11, borderWidth:2, borderColor:'#004B93', backgroundColor:'#fff' },
+  pdfTxt:   { fontSize:14, fontFamily:'Inter_700Bold' },
+  // Filled share button
+  shareBtn: { flex:1, flexDirection:'row', alignItems:'center', justifyContent:'center', gap:7, paddingVertical:14, borderRadius:11 },
+  shareTxt: { fontSize:14, fontFamily:'Inter_700Bold', color:'#fff' },
+});
