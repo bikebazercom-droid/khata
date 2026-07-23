@@ -13,6 +13,7 @@ import { PartyView } from '@/pages/party-view';
 import { PartyProfileView } from '@/pages/party-profile';
 import { TransactionDetailPage } from '@/pages/transaction-detail';
 import { ReportView } from '@/pages/report-view';
+import { PartyReportView } from '@/pages/party-report-view';
 import { StaffDeploymentPage } from '@/pages/staff-deployment';
 import { LandingPage } from '@/pages/landing';
 import { SignInPage } from '@/pages/sign-in';
@@ -221,20 +222,11 @@ function useAppAuth() {
   // Read once at mount — synchronous, ~0 ms, avoids any re-render on change.
   const [cachedAuth] = useState(() => readAuthCache());
 
-  // ── Development bypass ────────────────────────────────────────────────────
-  // import.meta.env.DEV is true only in Vite dev mode; false in production
-  // builds, so this branch is completely compiled away when deployed.
-  // The API server has a matching NODE_ENV !== 'production' bypass so all
-  // API calls succeed without a real auth token during local development.
-  if (import.meta.env.DEV) {
-    // eslint-disable-next-line react-hooks/rules-of-hooks — DEV is a
-    // build-time constant so the hooks above always run in the same order.
-    return { isAuthenticated: true, isLoading: false, authMethod: 'dev' as const };
-  }
-
   // Only call /me when Clerk says we're NOT signed in — avoids a redundant
-  // round-trip for Clerk users.
-  const enabled = isLoaded && !clerkSignedIn;
+  // round-trip for Clerk users. In dev bypass mode the query is always
+  // disabled so no real network call is made, but the hook itself must still
+  // be called unconditionally to satisfy React's rules of hooks.
+  const enabled = !import.meta.env.DEV && isLoaded && !clerkSignedIn;
   const { data: phoneAuth, isLoading: phoneLoading } = useQuery({
     queryKey: ['auth-me'],
     queryFn: fetchMe,
@@ -257,6 +249,8 @@ function useAppAuth() {
 
   // Persist / clear the cache whenever auth settles.
   useEffect(() => {
+    // In dev bypass mode there is no real session to persist.
+    if (import.meta.env.DEV) return;
     if (!authSettled) return;
     if (realAuth) {
       writeAuthCache(clerkSignedIn ? 'clerk' : 'phone');
@@ -265,6 +259,15 @@ function useAppAuth() {
       clearAuthCache();
     }
   }, [authSettled, realAuth, clerkSignedIn]);
+
+  // ── Development bypass — returned AFTER all hooks so hook order is stable ──
+  // import.meta.env.DEV is a Vite build-time constant: true in dev mode,
+  // false (and tree-shaken away) in production builds. The API server has a
+  // matching NODE_ENV !== 'production' guard so every API call succeeds
+  // without a real auth token during local development.
+  if (import.meta.env.DEV) {
+    return { isAuthenticated: true, isLoading: false, authMethod: 'dev' as const };
+  }
 
   return { isAuthenticated, isLoading, authMethod: clerkSignedIn ? 'clerk' : (phoneAuth ? 'phone' : null) };
 }
@@ -362,6 +365,13 @@ function AppRouter() {
               {() => (
                 <ProtectedLayout>
                   <TransactionDetailPage />
+                </ProtectedLayout>
+              )}
+            </Route>
+            <Route path="/party/:id/report">
+              {() => (
+                <ProtectedLayout>
+                  <PartyReportView />
                 </ProtectedLayout>
               )}
             </Route>

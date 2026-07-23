@@ -352,15 +352,10 @@ export function PartyView() {
       <div className="bg-white mt-3 shrink-0 border-b border-slate-200 grid grid-cols-3 divide-x divide-slate-100">
         <button
           type="button"
-          onClick={handleReport}
-          disabled={isGeneratingReport}
-          className="flex flex-col items-center gap-1 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors disabled:opacity-60"
+          onClick={() => navigate(`/party/${id}/report`)}
+          className="flex flex-col items-center gap-1 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
         >
-          {isGeneratingReport ? (
-            <Loader2 className="w-5 h-5 text-slate-500 animate-spin" />
-          ) : (
-            <FileDown className="w-5 h-5 text-slate-500" />
-          )}
+          <FileDown className="w-5 h-5 text-slate-500" />
           <span className="text-[11px] font-bold text-slate-600">রিপোর্ট</span>
         </button>
         <button
