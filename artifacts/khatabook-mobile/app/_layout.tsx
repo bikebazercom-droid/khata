@@ -51,6 +51,10 @@ function RootLayoutNav() {
         name="party/[id]"
         options={{ headerShown: false, presentation: 'card' }}
       />
+      <Stack.Screen
+        name="report/[id]"
+        options={{ headerShown: false, presentation: 'card' }}
+      />
     </Stack>
   );
 }

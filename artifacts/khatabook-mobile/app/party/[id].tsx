@@ -832,7 +832,7 @@ export default function PartyDetailScreen() {
   const roleLabel = party.role === 'CUSTOMER' ? 'গ্রাহক' : 'সরবরাহকারী';
 
   const quickActions = [
-    { icon: 'file-text' as const,      label: 'রিপোর্ট',    onPress: () => {} },
+    { icon: 'file-text' as const,      label: 'রিপোর্ট',    onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/report/${id}` as any); } },
     { icon: 'bell' as const,           label: 'রিমাইন্ডার', onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowReminderSheet(true); } },
     { icon: 'message-square' as const, label: 'এসএমএস',     onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowReminderSheet(true); } },
     { icon: 'edit-3' as const,         label: 'এন্ট্রি',     onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setPendingType('YOU_GAVE'); setShowSheet(true); } },
