@@ -374,6 +374,9 @@ export default function ReportScreen() {
   // Search
   const [query, setQuery] = useState('');
 
+  // Type filter: 'all' | 'gave' | 'got'
+  const [typeFilter, setTypeFilter] = useState<'all' | 'gave' | 'got'>('all');
+
   // Data
   const { data:party, isLoading:pL } = useGetParty(id!);
   const { data:entries=[], isLoading:eL } = useListLedgerEntries(id!);
@@ -391,16 +394,33 @@ export default function ReportScreen() {
     });
   }, [entries, filter, cStart, cEnd]);
 
-  // Filtered by search
-  const filtered = useMemo(() => {
-    if (!query.trim()) return dateFiltered;
-    const q = query.toLowerCase();
-    return dateFiltered.filter(e => (e.description??'').toLowerCase().includes(q));
-  }, [dateFiltered, query]);
+  // Running balance per entry (within the date-filtered window, sorted oldest→newest)
+  const runningBalances = useMemo(() => {
+    const sorted = [...dateFiltered].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
+    let bal = 0;
+    const map = new Map<string, number>();
+    for (const e of sorted) {
+      bal += e.type === 'YOU_GAVE' ? e.amount : -e.amount;
+      map.set(e.id, bal);
+    }
+    return map;
+  }, [dateFiltered]);
 
-  // Totals
-  const gave     = useMemo(() => filtered.filter(e=>e.type==='YOU_GAVE').reduce((s,e)=>s+e.amount,0), [filtered]);
-  const received = useMemo(() => filtered.filter(e=>e.type==='YOU_GOT').reduce((s,e)=>s+e.amount,0), [filtered]);
+  // Filtered by type, then search
+  const filtered = useMemo(() => {
+    let list = dateFiltered;
+    if (typeFilter === 'gave') list = list.filter(e => e.type === 'YOU_GAVE');
+    if (typeFilter === 'got')  list = list.filter(e => e.type === 'YOU_GOT');
+    if (!query.trim()) return list;
+    const q = query.toLowerCase();
+    return list.filter(e => (e.description??'').toLowerCase().includes(q));
+  }, [dateFiltered, typeFilter, query]);
+
+  // Totals (always over the full date-filtered set, not type-filtered)
+  const gave     = useMemo(() => dateFiltered.filter(e=>e.type==='YOU_GAVE').reduce((s,e)=>s+e.amount,0), [dateFiltered]);
+  const received = useMemo(() => dateFiltered.filter(e=>e.type==='YOU_GOT').reduce((s,e)=>s+e.amount,0), [dateFiltered]);
   const net      = useMemo(() => gave - received, [gave, received]);
   const isGet    = party ? party.balanceType === 'YOU_WILL_GET' : net > 0;
 
@@ -549,7 +569,7 @@ export default function ReportScreen() {
             onChangeText={setQuery}
             returnKeyType="search"
           />
-          {/* Filter dropdown button */}
+          {/* Period filter dropdown — opens bottom sheet */}
           <TouchableOpacity
             style={{ flexDirection:'row', alignItems:'center', gap:5, paddingHorizontal:12, paddingVertical:11, borderLeftWidth:1, borderLeftColor:'rgba(255,255,255,0.22)' }}
             onPress={openSheet}
@@ -558,6 +578,34 @@ export default function ReportScreen() {
             <Text style={{ fontSize:13, fontFamily:'Inter_700Bold', color:'#fff' }}>{curLbl}</Text>
             <Feather name="chevron-down" size={14} color="rgba(255,255,255,0.85)" />
           </TouchableOpacity>
+        </View>
+
+        {/* Type filter tabs — সব / আপনি দিয়েছেন / আপনি পেয়েছেন */}
+        <View style={{ flexDirection:'row', gap:6, marginTop:10 }}>
+          {([ 
+            { key:'all'  as const, label:'সব' },
+            { key:'gave' as const, label:'আপনি দিয়েছেন' },
+            { key:'got'  as const, label:'আপনি পেয়েছেন' },
+          ]).map(tab => {
+            const active = typeFilter === tab.key;
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                style={{
+                  paddingHorizontal:11, paddingVertical:6, borderRadius:20,
+                  backgroundColor: active ? '#fff' : 'rgba(255,255,255,0.15)',
+                  borderWidth:1,
+                  borderColor: active ? '#fff' : 'rgba(255,255,255,0.28)',
+                }}
+                onPress={() => { Haptics.selectionAsync(); setTypeFilter(tab.key); }}
+                activeOpacity={0.72}
+              >
+                <Text style={{ fontSize:12, fontFamily:'Inter_600SemiBold', color: active ? PRIMARY : 'rgba(255,255,255,0.92)' }}>
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
       {/* ══════════════════════════════════════════════════════════════════════ */}
@@ -635,9 +683,21 @@ export default function ReportScreen() {
                           {isGave ? '▲ দিয়েছেন' : '▼ পেয়েছেন'}
                         </Text>
                       </View>
-                      <Text style={[ec.amt, { color:accent }]}>
-                        {isGave ? '+' : '-'}{fmtCur(entry.amount)}
-                      </Text>
+                      {/* Amount + running balance */}
+                      <View style={{ alignItems:'flex-end' }}>
+                        <Text style={[ec.amt, { color:accent }]}>
+                          {isGave ? '+' : '-'}{fmtCur(entry.amount)}
+                        </Text>
+                        {(() => {
+                          const bal = runningBalances.get(entry.id) ?? 0;
+                          const bc  = bal >= 0 ? colors.willGet : colors.willGive;
+                          return (
+                            <Text style={{ fontSize:10, color:bc, fontFamily:'Inter_500Medium', marginTop:2 }}>
+                              ব্যালেন্স: {fmtCur(Math.abs(bal))}
+                            </Text>
+                          );
+                        })()}
+                      </View>
                     </View>
                   );
                 })
