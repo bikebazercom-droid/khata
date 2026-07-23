@@ -36,6 +36,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { useGetParty, useListLedgerEntries } from '@workspace/api-client-react';
 import type { LedgerEntry } from '@workspace/api-client-react';
@@ -462,17 +463,44 @@ export default function ReportScreen() {
     entries: filtered, gave, received, net, isGet,
   }), [party, filter, cStart, cEnd, filtered, gave, received, net, isGet]);
 
+  // Shared helper — generates the PDF and returns its local URI
+  async function generatePdfUri(): Promise<string> {
+    const { uri: tmpUri } = await Print.printToFileAsync({ html: getHtml(), base64: false });
+    // Copy into documentDirectory so the file persists after the temp cache is cleared
+    const safeName = (party?.name ?? 'report').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const destUri  = `${FileSystem.documentDirectory}${safeName}_report.pdf`;
+    await FileSystem.copyAsync({ from: tmpUri, to: destUri });
+    return destUri;
+  }
+
   async function handlePdf() {
     if (!party) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setPdfBusy(true);
     try {
-      await Print.printAsync({ html: getHtml() });
-    } catch (e: any) {
-      // User cancelled print → no error alert needed
-      if (!String(e).includes('cancel')) {
-        Alert.alert('ত্রুটি', 'PDF তৈরি করা যায়নি।');
-      }
+      const savedUri = await generatePdfUri();
+      // Notify the user and offer to open / share immediately
+      Alert.alert(
+        'PDF সংরক্ষিত হয়েছে ✓',
+        'রিপোর্টটি আপনার ডিভাইসে সেভ হয়েছে।',
+        [
+          {
+            text: 'শেয়ার করুন',
+            onPress: async () => {
+              try {
+                await Sharing.shareAsync(savedUri, {
+                  mimeType: 'application/pdf',
+                  UTI: 'com.adobe.pdf',
+                  dialogTitle: 'শেয়ার করুন',
+                });
+              } catch { /* user dismissed share sheet */ }
+            },
+          },
+          { text: 'ঠিক আছে', style: 'cancel' },
+        ],
+      );
+    } catch {
+      Alert.alert('ত্রুটি', 'PDF তৈরি করা যায়নি। আবার চেষ্টা করুন।');
     } finally {
       setPdfBusy(false);
     }
@@ -483,10 +511,17 @@ export default function ReportScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setShareBusy(true);
     try {
-      const { uri } = await Print.printToFileAsync({ html: getHtml(), base64:false });
+      const savedUri = await generatePdfUri();
       const ok = await Sharing.isAvailableAsync();
-      if (!ok) { Alert.alert('শেয়ার করা যাচ্ছে না', 'এই ডিভাইসে শেয়ারিং সমর্থিত নয়।'); return; }
-      await Sharing.shareAsync(uri, { mimeType:'application/pdf', UTI:'com.adobe.pdf', dialogTitle:'শেয়ার করুন' });
+      if (!ok) {
+        Alert.alert('শেয়ার করা যাচ্ছে না', 'এই ডিভাইসে শেয়ারিং সমর্থিত নয়।');
+        return;
+      }
+      await Sharing.shareAsync(savedUri, {
+        mimeType: 'application/pdf',
+        UTI: 'com.adobe.pdf',
+        dialogTitle: 'শেয়ার করুন — WhatsApp, SMS, ইত্যাদি',
+      });
     } catch {
       Alert.alert('ত্রুটি', 'শেয়ার করা যায়নি।');
     } finally {
