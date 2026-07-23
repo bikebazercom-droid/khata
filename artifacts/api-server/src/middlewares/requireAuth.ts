@@ -206,6 +206,9 @@ function verifyPhoneSession(token: string): PhoneSessionPayload | null {
   }
 }
 
+// Fixed UUID for the dev-bypass user (development only, never used in prod).
+const DEV_USER_ID = "00000000-0000-0000-0000-000000000002";
+
 // ─── requireAuth middleware ───────────────────────────────────────────────────
 
 export async function requireAuth(
@@ -213,6 +216,27 @@ export async function requireAuth(
   res: Response,
   next: NextFunction,
 ): Promise<void> {
+  // ── 0. Development bypass — NEVER active when NODE_ENV=production ──────────
+  if (process.env.NODE_ENV !== "production") {
+    try {
+      // Ensure a stable dev user exists (idempotent, uses fixed UUID).
+      await db
+        .insert(appUsersTable)
+        .values({ id: DEV_USER_ID, businessId: SEED_BUSINESS_ID, role: "owner" })
+        .onConflictDoNothing();
+      await db
+        .insert(userBusinessesTable)
+        .values({ userId: DEV_USER_ID, businessId: SEED_BUSINESS_ID })
+        .onConflictDoNothing();
+      (req as AuthenticatedRequest).userId = DEV_USER_ID;
+      (req as AuthenticatedRequest).businessId = SEED_BUSINESS_ID;
+      return next();
+    } catch (err) {
+      console.warn("[requireAuth] dev-bypass setup error — falling through to real auth:", err);
+      // Fall through to real auth if the bypass setup fails.
+    }
+  }
+
   // ── 1. Try Clerk ──
   const clerkAuth = getAuth(req);
   if (clerkAuth?.userId) {

@@ -221,6 +221,17 @@ function useAppAuth() {
   // Read once at mount — synchronous, ~0 ms, avoids any re-render on change.
   const [cachedAuth] = useState(() => readAuthCache());
 
+  // ── Development bypass ────────────────────────────────────────────────────
+  // import.meta.env.DEV is true only in Vite dev mode; false in production
+  // builds, so this branch is completely compiled away when deployed.
+  // The API server has a matching NODE_ENV !== 'production' bypass so all
+  // API calls succeed without a real auth token during local development.
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line react-hooks/rules-of-hooks — DEV is a
+    // build-time constant so the hooks above always run in the same order.
+    return { isAuthenticated: true, isLoading: false, authMethod: 'dev' as const };
+  }
+
   // Only call /me when Clerk says we're NOT signed in — avoids a redundant
   // round-trip for Clerk users.
   const enabled = isLoaded && !clerkSignedIn;

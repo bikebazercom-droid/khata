@@ -110,9 +110,22 @@ function ClassicTabLayout() {
 export default function TabLayout() {
   const { isSignedIn, getToken, isLoaded } = useAuth();
 
+  // ── Development bypass ───────────────────────────────────────────────────
+  // __DEV__ is a React Native / Expo build-time constant:
+  //   true  → Expo dev server / Expo Go (development)
+  //   false → production APK / IPA build
+  // The API server has a matching NODE_ENV !== 'production' bypass so all
+  // API calls succeed without a real auth token in development.
+  const isDevBypass = __DEV__;
+
   // Wire up auth token getter for API requests.
-  // Checks Clerk token first, then falls back to stored phone session token.
+  // In dev bypass mode we send no token — the server accepts unauthenticated
+  // requests and uses the seed business automatically.
   useEffect(() => {
+    if (isDevBypass) {
+      setAuthTokenGetter(async () => null);
+      return;
+    }
     setAuthTokenGetter(async () => {
       // Try Clerk token first
       try {
@@ -130,18 +143,19 @@ export default function TabLayout() {
       }
       return null;
     });
-  }, [getToken]);
+  }, [getToken, isDevBypass]);
+
+  // In development, skip the auth gate and go straight to the app.
+  if (isDevBypass) {
+    if (isLiquidGlassAvailable()) return <NativeTabLayout />;
+    return <ClassicTabLayout />;
+  }
 
   // Wait for Clerk to load before deciding where to send the user
   if (!isLoaded) return null;
 
   // Check if user is signed in via Clerk OR has a stored phone token
-  // We redirect to sign-in if not authenticated via Clerk (phone auth
-  // is checked in a separate effect; for simplicity, phone-authed users
-  // go straight to tabs after their token is stored).
   if (!isSignedIn) {
-    // Check for phone session asynchronously — if stored, allow through.
-    // Since we can't await here, we use a wrapper component.
     return <PhoneAuthGate />;
   }
 
