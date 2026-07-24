@@ -750,7 +750,7 @@ export function PartyReportView() {
                   <p className="text-[13px] font-extrabold text-red-600 mt-0.5">{formatCurrency(received)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">আপনি</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">আপনি পেয়েছেন</p>
                   <p className="text-[13px] font-extrabold text-emerald-600 mt-0.5">{formatCurrency(gave)}</p>
                 </div>
               </div>
@@ -771,7 +771,6 @@ export function PartyReportView() {
                     // YOU_GAVE = আপনি পেয়েছেন (credit) → white row + white credit cell
                     const isGave   = entry.type === 'YOU_GAVE';
                     const bal      = runningBalances.get(entry.id) ?? 0;
-                    const leftBg   = isGave ? 'bg-white' : 'bg-[#FEF2F2]';
                     const isLast   = idx === filtered.length - 1;
                     return (
                       <div
@@ -779,8 +778,8 @@ export function PartyReportView() {
                         className={cn('grid', !isLast && 'border-b border-slate-100')}
                         style={{ gridTemplateColumns: '1fr 5.5rem 5.5rem' }}
                       >
-                        {/* Col 1: date + running balance — pink if debit, white if credit */}
-                        <div className={cn('px-3 py-3', leftBg)}>
+                        {/* Col 1: date + running balance — always white */}
+                        <div className="bg-white px-3 py-3">
                           <p className="text-[13px] font-bold text-slate-800">
                             {format(new Date(entry.createdAt), 'd MMM yy')}
                           </p>
