@@ -1,11 +1,8 @@
 /**
- * Per-party report screen — matches the screenshot layout:
- *   Dark-blue header → date boxes → search + period dropdown
- *   Stats row (মোট ব্যালেন্স + 3-col sub-stats)
- *   Transaction list (3-col: date+balance | debit | credit, alternating row bg)
- *   Footer: [PDF ডাউনলোড] [শেয়ার করুন]
- *
- * PDF is generated ONLY when the user explicitly taps a button.
+ * Per-party report screen
+ *  • Bengali calendar date-picker (custom modal, Bengali numerals)
+ *  • "রিপোর্টে অন্তর্ভুক্ত করুন" options sheet before PDF/Share
+ *  • Transaction list matching the Khatabook-style screenshot
  */
 import { useMemo, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
@@ -25,6 +22,9 @@ import {
   FileDown,
   Share2,
   Loader2,
+  Check,
+  ChevronLeft as ChevLeft,
+  ChevronRight as ChevRight,
 } from 'lucide-react';
 import {
   format,
@@ -38,9 +38,228 @@ import {
 import { bn } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
 import { ReportPeriodDrawer, type ReportPeriod } from '@/components/modals/report-period-drawer';
+
+// ─── Bengali helpers ──────────────────────────────────────────────────────────
+
+const BN_DIGITS = ['০','১','২','৩','৪','৫','৬','৭','৮','৯'];
+const toBn = (n: number) =>
+  String(n).split('').map(d => BN_DIGITS[+d] ?? d).join('');
+
+const BN_MONTHS = [
+  'জানুয়ারি','ফেব্রুয়ারি','মার্চ','এপ্রিল','মে','জুন',
+  'জুলাই','আগস্ট','সেপ্টেম্বর','অক্টোবর','নভেম্বর','ডিসেম্বর',
+];
+const BN_MONTHS_SHORT = [
+  'জান.','ফেব.','মার.','এপ্রি.','মে','জুন',
+  'জুল.','আগ.','সেপ.','অক্টো.','নভে.','ডিসে.',
+];
+const BN_DAYS_COL   = ['র','সো','ম','বু','বৃ','শু','শ'];   // column headers (Sun–Sat)
+const BN_DAYS_SHORT = ['রবি','সোম','মঙ্গল','বুধ','বৃহস্পতি','শুক্র','শনি'];
+
+// ─── Bengali Calendar Modal ───────────────────────────────────────────────────
+
+function BengaliCalendarModal({
+  value,
+  onConfirm,
+  onCancel,
+  onClear,
+}: {
+  value: Date | null;
+  onConfirm: (d: Date) => void;
+  onCancel: () => void;
+  onClear: () => void;
+}) {
+  const today = new Date();
+  const init  = value ?? today;
+  const [tempDate,  setTempDate]  = useState<Date>(init);
+  const [viewYear,  setViewYear]  = useState(init.getFullYear());
+  const [viewMonth, setViewMonth] = useState(init.getMonth());
+
+  const firstWeekday = new Date(viewYear, viewMonth, 1).getDay();   // 0=Sun
+  const daysInMonth  = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+  const cells: (number | null)[] = [
+    ...Array(firstWeekday).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  // pad to complete rows
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const prevMonth = () => {
+    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
+    else setViewMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0); }
+    else setViewMonth(m => m + 1);
+  };
+
+  const isSelected = (d: number) =>
+    tempDate.getFullYear() === viewYear &&
+    tempDate.getMonth()    === viewMonth &&
+    tempDate.getDate()     === d;
+
+  const isToday = (d: number) =>
+    today.getFullYear() === viewYear &&
+    today.getMonth()    === viewMonth &&
+    today.getDate()     === d;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+      onClick={onCancel}
+    >
+      <div
+        className="bg-white rounded-2xl overflow-hidden w-full max-w-sm shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* ── Blue header ── */}
+        <div className="bg-[#1565C0] px-5 pt-5 pb-6 text-white">
+          <p className="text-[13px] opacity-70 mb-1 font-medium">{toBn(viewYear)}</p>
+          <p className="text-[28px] font-extrabold leading-none">
+            {BN_DAYS_SHORT[tempDate.getDay()].slice(0, 4)}&nbsp;
+            {toBn(tempDate.getDate())}&nbsp;
+            {BN_MONTHS_SHORT[tempDate.getMonth()]}
+          </p>
+        </div>
+
+        {/* ── Month navigation ── */}
+        <div className="flex items-center justify-between px-3 py-3">
+          <button
+            onClick={prevMonth}
+            className="w-9 h-9 flex items-center justify-center rounded-full active:bg-slate-100 text-slate-600"
+          >
+            <ChevLeft className="w-5 h-5" />
+          </button>
+          <p className="text-[15px] font-bold text-slate-800">
+            {BN_MONTHS[viewMonth]} {toBn(viewYear)}
+          </p>
+          <button
+            onClick={nextMonth}
+            className="w-9 h-9 flex items-center justify-center rounded-full active:bg-slate-100 text-slate-600"
+          >
+            <ChevRight className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* ── Weekday column headers ── */}
+        <div className="grid grid-cols-7 px-3 mb-1">
+          {BN_DAYS_COL.map(d => (
+            <div key={d} className="text-center text-[13px] font-semibold text-slate-400 py-1">
+              {d}
+            </div>
+          ))}
+        </div>
+
+        {/* ── Date cells ── */}
+        <div className="grid grid-cols-7 px-3 pb-2">
+          {cells.map((d, i) => (
+            <div key={i} className="flex items-center justify-center py-[3px]">
+              {d !== null && (
+                <button
+                  onClick={() => setTempDate(new Date(viewYear, viewMonth, d))}
+                  className={cn(
+                    'w-9 h-9 rounded-full text-[14px] font-medium flex items-center justify-center transition-all active:scale-95',
+                    isSelected(d)
+                      ? 'bg-[#1565C0] text-white font-bold shadow-md'
+                      : isToday(d)
+                      ? 'border-2 border-[#1565C0] text-[#1565C0] font-bold'
+                      : 'text-slate-800 hover:bg-slate-100 active:bg-slate-200'
+                  )}
+                >
+                  {toBn(d)}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* ── Action buttons ── */}
+        <div className="flex flex-col items-end gap-4 px-6 pt-2 pb-5">
+          <button
+            onClick={() => onConfirm(tempDate)}
+            className="text-[#1565C0] font-bold text-[14px] active:opacity-60 transition-opacity"
+          >
+            ঠিক আছে
+          </button>
+          <button
+            onClick={onCancel}
+            className="text-[#1565C0] font-bold text-[14px] active:opacity-60 transition-opacity"
+          >
+            বাতিল করুন
+          </button>
+          <button
+            onClick={onClear}
+            className="text-[#1565C0] font-bold text-[14px] active:opacity-60 transition-opacity"
+          >
+            সরিয়ে দিন
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Report Options Bottom Sheet ──────────────────────────────────────────────
+
+function ReportOptionsSheet({
+  open,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: (includeDetailed: boolean) => void;
+}) {
+  const [includeDetailed, setIncludeDetailed] = useState(false);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-t-2xl w-full max-w-lg px-5 pt-5 pb-[calc(1.5rem+var(--safe-bottom))] shadow-xl"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Drag handle */}
+        <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto mb-5" />
+
+        <p className="text-[#004B93] font-bold text-[16px] mb-4">রিপোর্টে অন্তর্ভুক্ত করুন</p>
+
+        {/* Checkbox row */}
+        <button
+          type="button"
+          onClick={() => setIncludeDetailed(v => !v)}
+          className="flex items-center gap-3 py-3 w-full text-left active:opacity-70 transition-opacity"
+        >
+          <div
+            className={cn(
+              'w-5 h-5 border-2 rounded flex items-center justify-center shrink-0 transition-colors',
+              includeDetailed ? 'bg-[#004B93] border-[#004B93]' : 'border-slate-400 bg-white'
+            )}
+          >
+            {includeDetailed && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+          </div>
+          <span className="text-[15px] text-slate-800 font-medium">বিস্তারিত প্রবেশিকা</span>
+        </button>
+
+        <div className="h-px bg-slate-100 my-3" />
+
+        <button
+          type="button"
+          onClick={() => onConfirm(includeDetailed)}
+          className="w-full h-12 bg-[#004B93] text-white rounded-xl font-bold text-[15px] active:opacity-90 transition-opacity mt-2"
+        >
+          ঠিক আছে
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ─── Period helpers ───────────────────────────────────────────────────────────
 
@@ -61,10 +280,18 @@ function resolveDateRange(
   const today = new Date();
   switch (period) {
     case 'ALL':   return null;
-    case 'SINGLE_DAY': { const d = cs ?? today; return { start: startOfDay(d), end: endOfDay(d) }; }
-    case 'LAST_WEEK':  return { start: startOfDay(subDays(today, 6)), end: endOfDay(today) };
-    case 'LAST_MONTH': { const lm = subMonths(today, 1); return { start: startOfMonth(lm), end: endOfMonth(lm) }; }
-    case 'THIS_MONTH': return { start: startOfMonth(today), end: endOfMonth(today) };
+    case 'SINGLE_DAY': {
+      const d = cs ?? today;
+      return { start: startOfDay(d), end: endOfDay(d) };
+    }
+    case 'LAST_WEEK':
+      return { start: startOfDay(subDays(today, 6)), end: endOfDay(today) };
+    case 'LAST_MONTH': {
+      const lm = subMonths(today, 1);
+      return { start: startOfMonth(lm), end: endOfMonth(lm) };
+    }
+    case 'THIS_MONTH':
+      return { start: startOfMonth(today), end: endOfMonth(today) };
     case 'CUSTOM_RANGE':
       if (!cs || !ce) return null;
       return { start: startOfDay(cs), end: endOfDay(ce) };
@@ -72,29 +299,38 @@ function resolveDateRange(
   }
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export function PartyReportView() {
-  const [, params] = useRoute('/party/:id/report');
-  const id = params?.id ?? '';
-  const [, navigate] = useLocation();
+  const [, params]    = useRoute('/party/:id/report');
+  const id            = params?.id ?? '';
+  const [, navigate]  = useLocation();
 
-  const { data: party, isLoading: partyLoading } = useGetParty(id, {
+  const { data: party,      isLoading: partyLoading   } = useGetParty(id, {
     query: { enabled: !!id, queryKey: getGetPartyQueryKey(id) },
   });
   const { data: allEntries = [], isLoading: entriesLoading } = useListLedgerEntries(id, {
     query: { enabled: !!id, queryKey: getListLedgerEntriesQueryKey(id) },
   });
 
-  const [period,       setPeriod]       = useState<ReportPeriod>('ALL');
-  const [isPeriodOpen, setIsPeriodOpen] = useState(false);
-  const [startDate,    setStartDate]    = useState<Date | null>(null);
-  const [endDate,      setEndDate]      = useState<Date | null>(null);
-  const [search,       setSearch]       = useState('');
-  const [isPdfBusy,    setIsPdfBusy]    = useState(false);
-  const [isShareBusy,  setIsShareBusy]  = useState(false);
+  // ── UI state ──
+  const [period,        setPeriod]        = useState<ReportPeriod>('ALL');
+  const [isPeriodOpen,  setIsPeriodOpen]  = useState(false);
+  const [startDate,     setStartDate]     = useState<Date | null>(null);
+  const [endDate,       setEndDate]       = useState<Date | null>(null);
+  const [search,        setSearch]        = useState('');
 
-  // Date-filtered entries (all, for totals)
+  // Calendar modal: 'start' | 'end' | null
+  const [calendarFor,   setCalendarFor]   = useState<'start' | 'end' | null>(null);
+
+  // Options sheet: which action is pending
+  const [pendingAction, setPendingAction] = useState<'pdf' | 'share' | null>(null);
+
+  // Busy flags
+  const [isPdfBusy,   setIsPdfBusy]   = useState(false);
+  const [isShareBusy, setIsShareBusy] = useState(false);
+
+  // ── Data ──
   const dateFiltered = useMemo(() => {
     const range = resolveDateRange(period, startDate, endDate);
     if (!range) return allEntries;
@@ -104,7 +340,6 @@ export function PartyReportView() {
     });
   }, [allEntries, period, startDate, endDate]);
 
-  // Running balance per entry (oldest → newest within date window)
   const runningBalances = useMemo(() => {
     const sorted = [...dateFiltered].sort(
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
@@ -118,9 +353,8 @@ export function PartyReportView() {
     return map;
   }, [dateFiltered]);
 
-  // Displayed entries: newest-first, filtered by search
   const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim();
+    const q    = search.toLowerCase().trim();
     const list = [...dateFiltered].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
@@ -128,14 +362,11 @@ export function PartyReportView() {
     return list.filter(e => (e.description ?? '').toLowerCase().includes(q));
   }, [dateFiltered, search]);
 
-  // Totals (over full date window, not search-filtered)
   const gave     = useMemo(() => dateFiltered.reduce((s, e) => e.type === 'YOU_GAVE' ? s + e.amount : s, 0), [dateFiltered]);
   const received = useMemo(() => dateFiltered.reduce((s, e) => e.type === 'YOU_GOT'  ? s + e.amount : s, 0), [dateFiltered]);
   const net      = gave - received;
-  const isGet    = party ? party.balanceType === 'YOU_WILL_GET' : net > 0;
+  const isGet    = net > 0;
 
-  // Opening balance = running total of ALL entries BEFORE the current date window.
-  // For the "ALL" period this is always zero (no entries precede the window).
   const openingBalance = useMemo(() => {
     const range = resolveDateRange(period, startDate, endDate);
     if (!range) return 0;
@@ -147,23 +378,14 @@ export function PartyReportView() {
   const loading = partyLoading || entriesLoading;
   const curLbl  = PERIOD_LABELS[period];
 
-  // ── PDF generation ───────────────────────────────────────────────────────────
-  // Layout matches the screenshot:
-  //   • Navy header bar: party name (left) + "বাংলা খাতা" (right)
-  //   • White body: title, date range, 4-col summary, transaction table
-  //   • Table columns: তারিখ | ডেবিট(-) | ক্রেডিট(+) | ব্যালেন্স
-  //     – YOU_GAVE → ক্রেডিট(+) (party owes you more)
-  //     – YOU_GOT  → ডেবিট(-)  (party owes you less)
-  //     – running balance shown as "X.XX Cr" or "X.XX Dr"
-  //   • Navy footer strip
+  // ── PDF generation ────────────────────────────────────────────────────────
 
   const buildPdfHtml = () => {
-    const name  = party?.name  ?? '';
-    const phone = party?.phone ?? '';
-    const now   = new Date();
+    const name   = party?.name  ?? '';
+    const phone  = party?.phone ?? '';
+    const now    = new Date();
 
-    // Period label for the PDF sub-heading
-    const range = resolveDateRange(period, startDate, endDate);
+    const range     = resolveDateRange(period, startDate, endDate);
     const periodStr = (() => {
       if (!range) return 'সকল এন্ট্রি';
       const s = format(range.start, 'd MMMM yyyy', { locale: bn });
@@ -171,16 +393,11 @@ export function PartyReportView() {
       return s === e ? s : `${s} - ${e}`;
     })();
 
-    // Helper: balance → "1,234.00 Cr" / "1,234.00 Dr"
     const fmtBal = (b: number) =>
       `${Math.abs(b).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${b >= 0 ? 'Cr' : 'Dr'}`;
-
-    // Helper: amount → "1,234.00"
     const fmtAmt = (a: number) =>
       a.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    // Build PDF rows: entries sorted oldest→newest, grouped by day.
-    // Each date group gets a full-width header row.
     const ascEntries = [...dateFiltered].sort(
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     );
@@ -192,23 +409,22 @@ export function PartyReportView() {
 
     for (const e of ascEntries) {
       const dayKey  = format(new Date(e.createdAt), 'yyyy-MM-dd');
-      const isGave  = e.type === 'YOU_GAVE';   // shown in ক্রেডিট(+)
+      const isGave  = e.type === 'YOU_GAVE';
       runBal += isGave ? e.amount : -e.amount;
 
-      // Date group header row
       if (dayKey !== lastDayKey) {
-        const dayLabel = format(new Date(e.createdAt), 'd MMMM yyyy', { locale: bn });
+        const dayLabel    = format(new Date(e.createdAt), 'd MMMM yyyy', { locale: bn });
         const openingNote = isFirstGroup
           ? ` <span style="font-weight:400;color:#64748b;font-size:11px;">(ওপেনিং ব্যালেন্স: ${fmtBal(openingBalance)})</span>`
           : '';
         tableRows += `<tr style="background:#f1f5f9;">
           <td colspan="4" style="padding:7px 10px;border:1px solid #cbd5e1;font-weight:700;font-size:12px;">${dayLabel}${openingNote}</td>
         </tr>`;
-        lastDayKey = dayKey;
+        lastDayKey   = dayKey;
         isFirstGroup = false;
       }
 
-      const shortDate = format(new Date(e.createdAt), 'dd/MM');
+      const shortDate  = format(new Date(e.createdAt), 'dd/MM');
       const debitCell  = isGave
         ? '<td style="padding:7px 10px;border:1px solid #e2e8f0;background:#fef2f2;"></td>'
         : `<td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:right;background:#fef2f2;font-size:12px;">${fmtAmt(e.amount)}</td>`;
@@ -229,8 +445,8 @@ export function PartyReportView() {
       tableRows = `<tr><td colspan="4" style="padding:16px;text-align:center;color:#94a3b8;border:1px solid #e2e8f0;">কোনো লেনদেন নেই</td></tr>`;
     }
 
-    // Totals row
-    const netColor = net >= 0 ? '#166534' : '#991b1b';
+    const netColor     = net >= 0 ? '#166534' : '#991b1b';
+    const openBalColor = openingBalance >= 0 ? '#166534' : '#991b1b';
     tableRows += `<tr style="background:#f8fafc;font-weight:700;">
       <td style="padding:8px 10px;border:1px solid #cbd5e1;font-size:12px;">সর্বমোট</td>
       <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;background:#fef2f2;font-size:12px;">${fmtAmt(received)}</td>
@@ -240,7 +456,6 @@ export function PartyReportView() {
 
     const timeStr = format(now, 'h:mm a');
     const dateStr = format(now, 'd MMMM yy', { locale: bn });
-    const openBalColor = openingBalance >= 0 ? '#166534' : '#991b1b';
 
     return `<!DOCTYPE html><html lang="bn"><head><meta charset="UTF-8"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -254,23 +469,18 @@ export function PartyReportView() {
 </head><body>
 <div class="page">
 
-  <!-- ══ 1. Navy Header ══ -->
   <div style="background:#003366;display:flex;justify-content:space-between;align-items:center;padding:14px 22px;color:#fff;">
     <span style="font-size:16px;font-weight:700;">${name}</span>
     <span style="font-size:15px;font-weight:700;">📒 বাংলা খাতা</span>
   </div>
 
-  <!-- ══ 2. White content ══ -->
   <div style="padding:26px 28px;">
-
-    <!-- Title -->
     <div style="text-align:center;margin-bottom:18px;">
       <div style="font-size:18px;font-weight:700;color:#1e293b;">${phone || name} এর স্টেটমেন্ট</div>
       ${phone ? `<div style="font-size:12px;color:#64748b;margin-top:3px;">ফোন নম্বর: ${phone}</div>` : ''}
       <div style="font-size:12px;color:#64748b;margin-top:2px;">(${periodStr})</div>
     </div>
 
-    <!-- 4-col summary -->
     <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;margin-bottom:16px;">
       <tr>
         <td style="padding:12px 14px;border:1px solid #e2e8f0;width:25%;vertical-align:top;">
@@ -294,12 +504,10 @@ export function PartyReportView() {
       </tr>
     </table>
 
-    <!-- Entry count -->
     <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:#374151;">
       এন্ট্রির সংখ্যা: ${dateFiltered.length} (${curLbl})
     </div>
 
-    <!-- Transaction table -->
     <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;">
       <thead>
         <tr style="background:#f8fafc;">
@@ -312,15 +520,12 @@ export function PartyReportView() {
       <tbody>${tableRows}</tbody>
     </table>
 
-    <!-- Creation time + page number -->
     <div style="display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;margin-top:8px;">
       <span>রিপোর্টটি তৈরির সময় : ${timeStr} | ${dateStr}</span>
       <span>Page 1 of 1</span>
     </div>
+  </div>
 
-  </div><!-- /content -->
-
-  <!-- ══ 3. Navy Footer ══ -->
   <div style="background:#003366;color:#fff;padding:12px 22px;display:flex;justify-content:space-between;align-items:center;font-size:12px;">
     <div style="display:flex;align-items:center;gap:10px;">
       <span>এখনই বাংলা খাতা ব্যবহার শুরু করুন</span>
@@ -329,15 +534,12 @@ export function PartyReportView() {
     <div style="font-size:11px;opacity:0.8;">নিয়ম ও শর্তাবলী প্রযোজ্য</div>
   </div>
 
-</div><!-- /page -->
+</div>
 </body></html>`;
   };
 
   const generatePdfBlob = (): Promise<Blob> =>
     new Promise((resolve, reject) => {
-      // Use an isolated iframe so the full HTML document (with its own
-      // <head>/<style> and Noto Sans Bengali font link) renders correctly
-      // without interference from the main app's Tailwind/Inter styles.
       const iframe = document.createElement('iframe');
       iframe.style.cssText =
         'position:fixed;left:-9999px;top:0;width:820px;height:1200px;border:none;visibility:hidden;';
@@ -350,30 +552,20 @@ export function PartyReportView() {
       iframe.onload = async () => {
         try {
           const iframeDoc = iframe.contentDocument!;
-
-          // Wait for Noto Sans Bengali to finish loading inside the iframe
           await Promise.allSettled([
             iframeDoc.fonts.load('400 14px "Noto Sans Bengali"'),
             iframeDoc.fonts.load('700 14px "Noto Sans Bengali"'),
           ]);
-
-          // Give the browser an extra frame to finish painting
           await new Promise(r => setTimeout(r, 300));
 
-          const target = iframeDoc.body;
-          const canvas = await html2canvas(target, {
-            scale: 2,
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: '#e8ecf1',
-            logging: false,
-            windowWidth: 820,
+          const canvas  = await html2canvas(iframeDoc.body, {
+            scale: 2, useCORS: true, allowTaint: true,
+            backgroundColor: '#e8ecf1', logging: false, windowWidth: 820,
           });
-
           const imgData = canvas.toDataURL('image/jpeg', 0.95);
-          const pdf = new jsPDF('p', 'mm', 'a4');
+          const pdf     = new jsPDF('p', 'mm', 'a4');
           const pdfW = 210, pdfH = 297;
-          const imgH = (canvas.height * pdfW) / canvas.width;
+          const imgH    = (canvas.height * pdfW) / canvas.width;
           let yOffset = 0, first = true;
           while (yOffset < imgH) {
             if (!first) pdf.addPage();
@@ -388,14 +580,10 @@ export function PartyReportView() {
           cleanup();
         }
       };
+      iframe.onerror = e => { cleanup(); reject(e); };
 
-      iframe.onerror = (e) => { cleanup(); reject(e); };
-
-      // Write the full HTML document into the iframe
-      const iframeDoc = iframe.contentDocument!;
-      iframeDoc.open();
-      iframeDoc.write(buildPdfHtml());
-      iframeDoc.close();
+      const doc = iframe.contentDocument!;
+      doc.open(); doc.write(buildPdfHtml()); doc.close();
     });
 
   const pdfFilename = () =>
@@ -403,13 +591,13 @@ export function PartyReportView() {
 
   const triggerDownload = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a   = document.createElement('a');
     a.href = url; a.download = filename;
     document.body.appendChild(a); a.click();
     document.body.removeChild(a); URL.revokeObjectURL(url);
   };
 
-  const handlePdf = async () => {
+  const executePdf = async () => {
     setIsPdfBusy(true);
     try {
       const blob = await generatePdfBlob();
@@ -423,12 +611,12 @@ export function PartyReportView() {
     }
   };
 
-  const handleShare = async () => {
+  const executeShare = async () => {
     setIsShareBusy(true);
     try {
-      const blob = await generatePdfBlob();
+      const blob     = await generatePdfBlob();
       const filename = pdfFilename();
-      const file = new File([blob], filename, { type: 'application/pdf' });
+      const file     = new File([blob], filename, { type: 'application/pdf' });
       if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], title: `${party?.name ?? ''} এর রিপোর্ট` });
       } else {
@@ -445,7 +633,14 @@ export function PartyReportView() {
     }
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────────
+  // Options sheet confirm
+  const handleOptionsConfirm = (_includeDetailed: boolean) => {
+    setPendingAction(null);
+    if (pendingAction === 'pdf')   executePdf();
+    if (pendingAction === 'share') executeShare();
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col h-full w-full bg-[#f8fafc]">
@@ -467,60 +662,44 @@ export function PartyReportView() {
           </h1>
         </div>
 
-        {/* Date boxes */}
+        {/* Date boxes — open Bengali calendar on tap */}
         <div className="grid grid-cols-2 gap-2 mb-3">
-          {/* Start date */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className="flex items-center gap-2 bg-white/15 border border-white/30 rounded-xl px-3 py-2.5 text-left w-full active:scale-[0.98] transition-all"
-              >
-                <CalendarIcon className="w-3.5 h-3.5 text-white/70 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-[9px] font-bold text-white/60 uppercase tracking-wider">আরম্ভের তারিখ</p>
-                  <p className="text-[12px] font-bold text-white truncate">
-                    {startDate ? format(startDate, 'd MMM yyyy', { locale: bn }) : 'নির্বাচন করুন'}
-                  </p>
-                </div>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={startDate ?? undefined}
-                onSelect={d => { setStartDate(d ?? null); setPeriod('CUSTOM_RANGE'); }}
-              />
-            </PopoverContent>
-          </Popover>
+          <button
+            type="button"
+            onClick={() => setCalendarFor('start')}
+            className={cn(
+              'flex items-center gap-2 bg-white/15 border rounded-xl px-3 py-2.5 text-left w-full active:scale-[0.98] transition-all',
+              startDate ? 'border-white/60' : 'border-white/30',
+            )}
+          >
+            <CalendarIcon className="w-3.5 h-3.5 text-white/70 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-[9px] font-bold text-white/60 uppercase tracking-wider">আরম্ভের তারিখ</p>
+              <p className={cn('text-[12px] font-bold truncate', startDate ? 'text-white' : 'text-white/50')}>
+                {startDate ? format(startDate, 'd MMM yyyy', { locale: bn }) : 'নির্বাচন করুন'}
+              </p>
+            </div>
+          </button>
 
-          {/* End date */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className="flex items-center gap-2 bg-white/15 border border-white/30 rounded-xl px-3 py-2.5 text-left w-full active:scale-[0.98] transition-all"
-              >
-                <CalendarIcon className="w-3.5 h-3.5 text-white/70 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-[9px] font-bold text-white/60 uppercase tracking-wider">শেষের তারিখ</p>
-                  <p className="text-[12px] font-bold text-white truncate">
-                    {endDate ? format(endDate, 'd MMM yyyy', { locale: bn }) : 'নির্বাচন করুন'}
-                  </p>
-                </div>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="single"
-                selected={endDate ?? undefined}
-                onSelect={d => { setEndDate(d ?? null); setPeriod('CUSTOM_RANGE'); }}
-              />
-            </PopoverContent>
-          </Popover>
+          <button
+            type="button"
+            onClick={() => setCalendarFor('end')}
+            className={cn(
+              'flex items-center gap-2 bg-white/15 border rounded-xl px-3 py-2.5 text-left w-full active:scale-[0.98] transition-all',
+              endDate ? 'border-white/60' : 'border-white/30',
+            )}
+          >
+            <CalendarIcon className="w-3.5 h-3.5 text-white/70 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-[9px] font-bold text-white/60 uppercase tracking-wider">শেষের তারিখ</p>
+              <p className={cn('text-[12px] font-bold truncate', endDate ? 'text-white' : 'text-white/50')}>
+                {endDate ? format(endDate, 'd MMM yyyy', { locale: bn }) : 'নির্বাচন করুন'}
+              </p>
+            </div>
+          </button>
         </div>
 
-        {/* Search bar + period dropdown */}
+        {/* Search + period dropdown */}
         <div className="flex items-center bg-white/15 border border-white/25 rounded-xl overflow-hidden">
           <Search className="w-4 h-4 text-white/60 ml-3 shrink-0" />
           <input
@@ -540,7 +719,6 @@ export function PartyReportView() {
           </button>
         </div>
       </div>
-      {/* ══════════════════════════════════════════════════════════════════════ */}
 
       {/* ══ Scrollable body ══ */}
       <div className="flex-1 overflow-y-auto pb-[80px]">
@@ -550,9 +728,8 @@ export function PartyReportView() {
           </div>
         ) : (
           <>
-            {/* Stats section */}
+            {/* Stats */}
             <div className="px-4 pt-4 pb-2">
-              {/* Row 1: মোট ব্যালেন্স */}
               <div className="flex items-center justify-between mb-2">
                 <p className="text-[15px] font-bold text-slate-800">মোট ব্যালেন্স</p>
                 <p className={cn('text-[18px] font-extrabold tracking-tight', isGet ? 'text-emerald-600' : 'text-red-600')}>
@@ -560,7 +737,6 @@ export function PartyReportView() {
                 </p>
               </div>
               <div className="h-px bg-slate-200 mb-3" />
-              {/* Row 2: 3-col sub-stats */}
               <div className="grid grid-cols-3 gap-1">
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">মোট</p>
@@ -568,11 +744,11 @@ export function PartyReportView() {
                 </div>
                 <div className="text-center">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">আপনি দিয়েছেন</p>
-                  <p className="text-[13px] font-extrabold text-emerald-600 mt-0.5">{formatCurrency(gave)}</p>
+                  <p className="text-[13px] font-extrabold text-red-600 mt-0.5">{formatCurrency(received)}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">আপনি</p>
-                  <p className="text-[13px] font-extrabold text-red-600 mt-0.5">{formatCurrency(received)}</p>
+                  <p className="text-[13px] font-extrabold text-emerald-600 mt-0.5">{formatCurrency(gave)}</p>
                 </div>
               </div>
             </div>
@@ -595,13 +771,12 @@ export function PartyReportView() {
                       <div
                         key={entry.id}
                         className={cn(
-                          'grid items-center gap-2 px-3 py-3',
+                          'flex items-center justify-between px-4 py-3',
                           rowBg,
                           idx < filtered.length - 1 && 'border-b border-slate-100',
                         )}
-                        style={{ gridTemplateColumns: '1fr 5rem 5rem' }}
                       >
-                        {/* LEFT: date + balance badge */}
+                        {/* LEFT: date + running balance */}
                         <div>
                           <p className="text-[13px] font-bold text-slate-800">
                             {format(new Date(entry.createdAt), 'd MMM yy')}
@@ -610,22 +785,14 @@ export function PartyReportView() {
                             ব্যালেন্স {formatCurrency(Math.abs(bal))}
                           </span>
                         </div>
-                        {/* MIDDLE: YOU_GAVE amount (green) */}
-                        <div className="text-center">
-                          {isGave && (
-                            <span className="text-[13px] font-extrabold text-emerald-600">
-                              {formatCurrency(entry.amount)}
-                            </span>
-                          )}
-                        </div>
-                        {/* RIGHT: YOU_GOT amount (red) */}
-                        <div className="text-right">
-                          {!isGave && (
-                            <span className="text-[13px] font-extrabold text-red-600">
-                              {formatCurrency(entry.amount)}
-                            </span>
-                          )}
-                        </div>
+
+                        {/* RIGHT: amount */}
+                        <p className={cn(
+                          'text-[14px] font-extrabold',
+                          isGave ? 'text-emerald-600' : 'text-red-600',
+                        )}>
+                          {formatCurrency(entry.amount)}
+                        </p>
                       </div>
                     );
                   })}
@@ -638,10 +805,9 @@ export function PartyReportView() {
 
       {/* ══ Sticky footer buttons ══ */}
       <div className="absolute bottom-0 left-0 right-0 px-3 pt-3 pb-[calc(0.75rem+var(--safe-bottom))] bg-white border-t border-slate-200 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.08)] z-20 flex gap-3">
-        {/* Outline PDF button */}
         <button
           type="button"
-          onClick={handlePdf}
+          onClick={() => setPendingAction('pdf')}
           disabled={isPdfBusy || isShareBusy}
           className="flex-1 h-12 flex items-center justify-center gap-2 rounded-xl border-2 border-[#004B93] text-[#004B93] font-extrabold text-[14px] active:scale-[0.98] transition-all disabled:opacity-60 bg-white"
         >
@@ -651,10 +817,9 @@ export function PartyReportView() {
           }
           {isPdfBusy ? 'তৈরি হচ্ছে…' : 'PDF ডাউনলোড'}
         </button>
-        {/* Filled share button */}
         <button
           type="button"
-          onClick={handleShare}
+          onClick={() => setPendingAction('share')}
           disabled={isPdfBusy || isShareBusy}
           className="flex-1 h-12 flex items-center justify-center gap-2 rounded-xl bg-[#004B93] text-white font-extrabold text-[14px] active:scale-[0.98] transition-all disabled:opacity-60"
         >
@@ -666,7 +831,7 @@ export function PartyReportView() {
         </button>
       </div>
 
-      {/* Period drawer */}
+      {/* ══ Period drawer ══ */}
       <ReportPeriodDrawer
         open={isPeriodOpen}
         onOpenChange={setIsPeriodOpen}
@@ -679,6 +844,32 @@ export function PartyReportView() {
           }
         }}
       />
+
+      {/* ══ Bengali Calendar Modal ══ */}
+      {calendarFor === 'start' && (
+        <BengaliCalendarModal
+          value={startDate}
+          onConfirm={d => { setStartDate(d); setPeriod('CUSTOM_RANGE'); setCalendarFor(null); }}
+          onCancel={() => setCalendarFor(null)}
+          onClear={() => { setStartDate(null); setCalendarFor(null); }}
+        />
+      )}
+      {calendarFor === 'end' && (
+        <BengaliCalendarModal
+          value={endDate}
+          onConfirm={d => { setEndDate(d); setPeriod('CUSTOM_RANGE'); setCalendarFor(null); }}
+          onCancel={() => setCalendarFor(null)}
+          onClear={() => { setEndDate(null); setCalendarFor(null); }}
+        />
+      )}
+
+      {/* ══ Report Options Sheet ══ */}
+      <ReportOptionsSheet
+        open={pendingAction !== null}
+        onClose={() => setPendingAction(null)}
+        onConfirm={handleOptionsConfirm}
+      />
+
     </div>
   );
 }
