@@ -245,7 +245,7 @@ export function PartyReportView() {
     return `<!DOCTYPE html><html lang="bn"><head><meta charset="UTF-8"/>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Arial','Noto Sans Bengali','Hind Siliguri',sans-serif;background:#f0f4f8;color:#1e293b}
+  body{font-family:'Noto Sans Bengali','Hind Siliguri','Arial',sans-serif;background:#f0f4f8;color:#1e293b}
   .page{background:#fff;width:760px;margin:0 auto;box-shadow:0 2px 12px rgba(0,0,0,.10)}
 </style>
 </head><body>
@@ -331,6 +331,15 @@ export function PartyReportView() {
   };
 
   const generatePdfBlob = async (): Promise<Blob> => {
+    // Ensure Noto Sans Bengali (already imported in index.html) is fully
+    // loaded before html2canvas captures the off-screen div, so Bengali
+    // glyphs render correctly rather than falling back to a box character.
+    await Promise.allSettled([
+      document.fonts.load('400 14px "Noto Sans Bengali"'),
+      document.fonts.load('600 14px "Noto Sans Bengali"'),
+      document.fonts.load('700 14px "Noto Sans Bengali"'),
+    ]);
+
     const container = document.createElement('div');
     container.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:#fff;padding-bottom:40px;';
     container.innerHTML = buildPdfHtml();
