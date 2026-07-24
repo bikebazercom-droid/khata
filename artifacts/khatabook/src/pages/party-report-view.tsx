@@ -784,9 +784,12 @@ export function PartyReportView() {
                           <p className="text-[13px] font-bold text-slate-800">
                             {format(new Date(entry.createdAt), 'd MMM yy')}
                           </p>
-                          <span className="inline-block mt-1 bg-slate-200/70 text-slate-500 text-[10px] font-semibold px-2 py-0.5 rounded-md">
-                            ব্যালেন্স {formatCurrency(Math.abs(bal))}
-                          </span>
+                          <p className={cn(
+                            'text-[11px] font-semibold mt-0.5',
+                            bal >= 0 ? 'text-emerald-600' : 'text-red-500',
+                          )}>
+                            জের: {formatCurrency(Math.abs(bal))}
+                          </p>
                         </div>
 
                         {/* Col 2: debit amount — always pink bg, amount shown only for YOU_GOT */}
