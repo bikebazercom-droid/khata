@@ -435,7 +435,7 @@ export function PartyView() {
                             'text-[11px] font-semibold mt-0.5',
                             entry.balanceAfter >= 0 ? 'text-emerald-500' : 'text-red-500',
                           )}>
-                            জের: {formatCurrency(Math.abs(entry.balanceAfter))}
+                            ব্যালেন্স: {formatCurrency(Math.abs(entry.balanceAfter))}
                           </p>
                           {entry.description ? (
                             <p className="text-[11px] font-semibold text-slate-400 mt-0.5 truncate max-w-[180px]">
