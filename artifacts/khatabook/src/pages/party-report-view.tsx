@@ -340,18 +340,34 @@ export function PartyReportView() {
     });
   }, [allEntries, period, startDate, endDate]);
 
+  const gave     = useMemo(() => dateFiltered.reduce((s, e) => e.type === 'YOU_GAVE' ? s + e.amount : s, 0), [dateFiltered]);
+  const received = useMemo(() => dateFiltered.reduce((s, e) => e.type === 'YOU_GOT'  ? s + e.amount : s, 0), [dateFiltered]);
+  const net      = gave - received;
+  const isGet    = net > 0;
+
+  // Must be defined before runningBalances (which depends on it)
+  const openingBalance = useMemo(() => {
+    const range = resolveDateRange(period, startDate, endDate);
+    if (!range) return 0;
+    return allEntries
+      .filter(e => new Date(e.createdAt).getTime() < range.start.getTime())
+      .reduce((s, e) => s + (e.type === 'YOU_GAVE' ? e.amount : -e.amount), 0);
+  }, [allEntries, period, startDate, endDate]);
+
   const runningBalances = useMemo(() => {
     const sorted = [...dateFiltered].sort(
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     );
-    let bal = 0;
+    // Start from opening balance so the badge always shows the real
+    // cumulative balance (matching the Khatabook-style screenshot).
+    let bal = openingBalance;
     const map = new Map<string, number>();
     for (const e of sorted) {
       bal += e.type === 'YOU_GAVE' ? e.amount : -e.amount;
       map.set(e.id, bal);
     }
     return map;
-  }, [dateFiltered]);
+  }, [dateFiltered, openingBalance]);
 
   const filtered = useMemo(() => {
     const q    = search.toLowerCase().trim();
@@ -361,19 +377,6 @@ export function PartyReportView() {
     if (!q) return list;
     return list.filter(e => (e.description ?? '').toLowerCase().includes(q));
   }, [dateFiltered, search]);
-
-  const gave     = useMemo(() => dateFiltered.reduce((s, e) => e.type === 'YOU_GAVE' ? s + e.amount : s, 0), [dateFiltered]);
-  const received = useMemo(() => dateFiltered.reduce((s, e) => e.type === 'YOU_GOT'  ? s + e.amount : s, 0), [dateFiltered]);
-  const net      = gave - received;
-  const isGet    = net > 0;
-
-  const openingBalance = useMemo(() => {
-    const range = resolveDateRange(period, startDate, endDate);
-    if (!range) return 0;
-    return allEntries
-      .filter(e => new Date(e.createdAt).getTime() < range.start.getTime())
-      .reduce((s, e) => s + (e.type === 'YOU_GAVE' ? e.amount : -e.amount), 0);
-  }, [allEntries, period, startDate, endDate]);
 
   const loading = partyLoading || entriesLoading;
   const curLbl  = PERIOD_LABELS[period];
@@ -764,35 +767,45 @@ export function PartyReportView() {
               ) : (
                 <div className="rounded-xl overflow-hidden border border-slate-100 bg-white shadow-sm mb-4">
                   {filtered.map((entry, idx) => {
-                    const isGave = entry.type === 'YOU_GAVE';
-                    const bal    = runningBalances.get(entry.id) ?? 0;
-                    const rowBg  = idx % 2 === 1 ? 'bg-[#FEF2F2]' : 'bg-white';
+                    // YOU_GOT  = আপনি দিয়েছেন (debit)  → pink row + pink debit cell
+                    // YOU_GAVE = আপনি পেয়েছেন (credit) → white row + white credit cell
+                    const isGave   = entry.type === 'YOU_GAVE';
+                    const bal      = runningBalances.get(entry.id) ?? 0;
+                    const leftBg   = isGave ? 'bg-white' : 'bg-[#FEF2F2]';
+                    const isLast   = idx === filtered.length - 1;
                     return (
                       <div
                         key={entry.id}
-                        className={cn(
-                          'flex items-center justify-between px-4 py-3',
-                          rowBg,
-                          idx < filtered.length - 1 && 'border-b border-slate-100',
-                        )}
+                        className={cn('grid', !isLast && 'border-b border-slate-100')}
+                        style={{ gridTemplateColumns: '1fr 5.5rem 5.5rem' }}
                       >
-                        {/* LEFT: date + running balance */}
-                        <div>
+                        {/* Col 1: date + running balance — pink if debit, white if credit */}
+                        <div className={cn('px-3 py-3', leftBg)}>
                           <p className="text-[13px] font-bold text-slate-800">
                             {format(new Date(entry.createdAt), 'd MMM yy')}
                           </p>
-                          <span className="inline-block mt-1 bg-slate-100 text-slate-500 text-[10px] font-semibold px-2 py-0.5 rounded-md">
+                          <span className="inline-block mt-1 bg-slate-200/70 text-slate-500 text-[10px] font-semibold px-2 py-0.5 rounded-md">
                             ব্যালেন্স {formatCurrency(Math.abs(bal))}
                           </span>
                         </div>
 
-                        {/* RIGHT: amount */}
-                        <p className={cn(
-                          'text-[14px] font-extrabold',
-                          isGave ? 'text-emerald-600' : 'text-red-600',
-                        )}>
-                          {formatCurrency(entry.amount)}
-                        </p>
+                        {/* Col 2: debit amount — always pink bg, amount shown only for YOU_GOT */}
+                        <div className="bg-[#FEF2F2] flex items-center justify-end px-3 py-3">
+                          {!isGave && (
+                            <span className="text-[13px] font-extrabold text-red-600">
+                              {formatCurrency(entry.amount)}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Col 3: credit amount — always white bg, amount shown only for YOU_GAVE */}
+                        <div className="bg-white flex items-center justify-end px-3 py-3">
+                          {isGave && (
+                            <span className="text-[13px] font-extrabold text-emerald-600">
+                              {formatCurrency(entry.amount)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
