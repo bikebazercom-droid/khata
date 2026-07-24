@@ -788,7 +788,7 @@ export function PartyReportView() {
                             'text-[11px] font-semibold mt-0.5',
                             bal >= 0 ? 'text-emerald-600' : 'text-red-500',
                           )}>
-                            জের: {formatCurrency(Math.abs(bal))}
+                            ব্যালেন্স: {formatCurrency(Math.abs(bal))}
                           </p>
                         </div>
 
