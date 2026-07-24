@@ -465,11 +465,13 @@ export function PartyView() {
                             </button>
                           )}
                         </div>
-                        <div className={cn('w-20 h-full flex items-center justify-center py-3', isGave ? 'bg-[#FFF5F5]' : 'bg-white')}>
+                        {/* আপনি দিয়েছেন — always pink/red bg */}
+                        <div className="w-20 h-full flex items-center justify-center py-3 bg-[#FFF5F5]">
                           {isGave && (
                             <span className="text-sm font-extrabold text-red-700">{formatCurrency(entry.amount)}</span>
                           )}
                         </div>
+                        {/* আপনি পেয়েছেন — always white bg */}
                         <div className="w-20 h-full flex items-center justify-end py-3 pr-4 bg-white">
                           {!isGave && (
                             <span className="text-sm font-extrabold text-emerald-600">{formatCurrency(entry.amount)}</span>
