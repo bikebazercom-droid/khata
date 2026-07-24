@@ -134,56 +134,199 @@ export function PartyReportView() {
   const net      = gave - received;
   const isGet    = party ? party.balanceType === 'YOU_WILL_GET' : net > 0;
 
+  // Opening balance = running total of ALL entries BEFORE the current date window.
+  // For the "ALL" period this is always zero (no entries precede the window).
+  const openingBalance = useMemo(() => {
+    const range = resolveDateRange(period, startDate, endDate);
+    if (!range) return 0;
+    return allEntries
+      .filter(e => new Date(e.createdAt).getTime() < range.start.getTime())
+      .reduce((s, e) => s + (e.type === 'YOU_GAVE' ? e.amount : -e.amount), 0);
+  }, [allEntries, period, startDate, endDate]);
+
   const loading = partyLoading || entriesLoading;
   const curLbl  = PERIOD_LABELS[period];
 
   // ── PDF generation ───────────────────────────────────────────────────────────
+  // Layout matches the screenshot:
+  //   • Navy header bar: party name (left) + "বাংলা খাতা" (right)
+  //   • White body: title, date range, 4-col summary, transaction table
+  //   • Table columns: তারিখ | ডেবিট(-) | ক্রেডিট(+) | ব্যালেন্স
+  //     – YOU_GAVE → ক্রেডিট(+) (party owes you more)
+  //     – YOU_GOT  → ডেবিট(-)  (party owes you less)
+  //     – running balance shown as "X.XX Cr" or "X.XX Dr"
+  //   • Navy footer strip
 
   const buildPdfHtml = () => {
     const name  = party?.name  ?? '';
     const phone = party?.phone ?? '';
-    const rows  = filtered.map(e => {
-      const isGave = e.type === 'YOU_GAVE';
-      const bal    = runningBalances.get(e.id) ?? 0;
-      return `<tr>
-        <td style="padding:8px 10px;border:1px solid #e2e8f0;font-size:13px;">${format(new Date(e.createdAt), 'd MMM yy')}<br/>
-          <span style="font-size:10px;color:#94a3b8;background:#f1f5f9;padding:1px 6px;border-radius:4px;">ব্যালেন্স ৳${Math.abs(bal).toFixed(2)}</span>
-        </td>
-        <td style="padding:8px 10px;border:1px solid #e2e8f0;text-align:right;background:#fef9f9;color:#16a34a;font-weight:700;font-size:13px;">${isGave  ? `৳${e.amount.toFixed(2)}` : ''}</td>
-        <td style="padding:8px 10px;border:1px solid #e2e8f0;text-align:right;background:#f9fef9;color:#dc2626;font-weight:700;font-size:13px;">${!isGave ? `৳${e.amount.toFixed(2)}` : ''}</td>
+    const now   = new Date();
+
+    // Period label for the PDF sub-heading
+    const range = resolveDateRange(period, startDate, endDate);
+    const periodStr = (() => {
+      if (!range) return 'সকল এন্ট্রি';
+      const s = format(range.start, 'd MMMM yyyy', { locale: bn });
+      const e = format(range.end,   'd MMMM yyyy', { locale: bn });
+      return s === e ? s : `${s} - ${e}`;
+    })();
+
+    // Helper: balance → "1,234.00 Cr" / "1,234.00 Dr"
+    const fmtBal = (b: number) =>
+      `${Math.abs(b).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${b >= 0 ? 'Cr' : 'Dr'}`;
+
+    // Helper: amount → "1,234.00"
+    const fmtAmt = (a: number) =>
+      a.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    // Build PDF rows: entries sorted oldest→newest, grouped by day.
+    // Each date group gets a full-width header row.
+    const ascEntries = [...dateFiltered].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
+
+    let runBal = openingBalance;
+    let tableRows = '';
+    let lastDayKey = '';
+    let isFirstGroup = true;
+
+    for (const e of ascEntries) {
+      const dayKey  = format(new Date(e.createdAt), 'yyyy-MM-dd');
+      const isGave  = e.type === 'YOU_GAVE';   // shown in ক্রেডিট(+)
+      runBal += isGave ? e.amount : -e.amount;
+
+      // Date group header row
+      if (dayKey !== lastDayKey) {
+        const dayLabel = format(new Date(e.createdAt), 'd MMMM yyyy', { locale: bn });
+        const openingNote = isFirstGroup
+          ? ` <span style="font-weight:400;color:#64748b;font-size:11px;">(ওপেনিং ব্যালেন্স: ${fmtBal(openingBalance)})</span>`
+          : '';
+        tableRows += `<tr style="background:#f1f5f9;">
+          <td colspan="4" style="padding:7px 10px;border:1px solid #cbd5e1;font-weight:700;font-size:12px;">${dayLabel}${openingNote}</td>
+        </tr>`;
+        lastDayKey = dayKey;
+        isFirstGroup = false;
+      }
+
+      const shortDate = format(new Date(e.createdAt), 'dd/MM');
+      const debitCell  = isGave
+        ? '<td style="padding:7px 10px;border:1px solid #e2e8f0;background:#fef2f2;"></td>'
+        : `<td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:right;background:#fef2f2;font-size:12px;">${fmtAmt(e.amount)}</td>`;
+      const creditCell = isGave
+        ? `<td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:right;background:#f0fdf4;font-size:12px;">${fmtAmt(e.amount)}</td>`
+        : '<td style="padding:7px 10px;border:1px solid #e2e8f0;background:#f0fdf4;"></td>';
+      const balColor   = runBal >= 0 ? '#166534' : '#991b1b';
+
+      tableRows += `<tr>
+        <td style="padding:7px 10px;border:1px solid #e2e8f0;font-size:12px;">${shortDate}</td>
+        ${debitCell}
+        ${creditCell}
+        <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:right;font-size:12px;font-weight:600;color:${balColor};">${fmtBal(runBal)}</td>
       </tr>`;
-    }).join('');
+    }
+
+    if (!tableRows) {
+      tableRows = `<tr><td colspan="4" style="padding:16px;text-align:center;color:#94a3b8;border:1px solid #e2e8f0;">কোনো লেনদেন নেই</td></tr>`;
+    }
+
+    // Totals row
+    const netColor = net >= 0 ? '#166534' : '#991b1b';
+    tableRows += `<tr style="background:#f8fafc;font-weight:700;">
+      <td style="padding:8px 10px;border:1px solid #cbd5e1;font-size:12px;">সর্বমোট</td>
+      <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;background:#fef2f2;font-size:12px;">${fmtAmt(received)}</td>
+      <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;background:#f0fdf4;font-size:12px;">${fmtAmt(gave)}</td>
+      <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:${netColor};">${fmtBal(net)}</td>
+    </tr>`;
+
+    const timeStr = format(now, 'h:mm a');
+    const dateStr = format(now, 'd MMMM yy', { locale: bn });
+    const openBalColor = openingBalance >= 0 ? '#166534' : '#991b1b';
+
     return `<!DOCTYPE html><html lang="bn"><head><meta charset="UTF-8"/>
 <style>
-  body{font-family:Arial,'Noto Sans Bengali',sans-serif;margin:0;padding:24px;color:#1e293b;font-size:13px}
-  h1{font-size:18px;color:#004B93;margin:0 0 4px}
-  .sub{color:#64748b;font-size:11px;margin-bottom:18px}
-  .summary{display:flex;gap:10px;margin-bottom:18px}
-  .scard{flex:1;border:1px solid #e2e8f0;border-radius:8px;padding:10px;text-align:center}
-  .slbl{font-size:11px;color:#64748b;margin-bottom:3px}
-  .sval{font-size:15px;font-weight:700}
-  table{width:100%;border-collapse:collapse}
-  th{background:#004B93;color:#fff;padding:8px 10px;font-size:12px;text-align:left}
-  td{vertical-align:middle}
-  tr:last-child td{border-bottom:1px solid #e2e8f0}
-  .ft{margin-top:22px;text-align:center;font-size:11px;color:#94a3b8}
-</style></head><body>
-<h1>📒 ${name} এর রিপোর্ট</h1>
-<div class="sub">${phone} · সময়কাল: ${curLbl} · তৈরি: ${format(new Date(),'d MMM yyyy')}</div>
-<div class="summary">
-  <div class="scard"><div class="slbl">মোট ব্যালেন্স</div><div class="sval" style="color:${isGet?'#16a34a':'#dc2626'}">৳${Math.abs(net).toFixed(2)}</div></div>
-  <div class="scard"><div class="slbl">আপনি দিয়েছেন</div><div class="sval" style="color:#16a34a">৳${gave.toFixed(2)}</div></div>
-  <div class="scard"><div class="slbl">আপনি পেয়েছেন</div><div class="sval" style="color:#dc2626">৳${received.toFixed(2)}</div></div>
-</div>
-<table>
-  <thead><tr>
-    <th>তারিখ</th>
-    <th style="text-align:right;background:#fef9f9;color:#16a34a">আপনি দিয়েছেন</th>
-    <th style="text-align:right;background:#f9fef9;color:#dc2626">আপনি পেয়েছেন</th>
-  </tr></thead>
-  <tbody>${rows || '<tr><td colspan="3" style="padding:16px;text-align:center;color:#94a3b8;border:1px solid #e2e8f0">কোনো লেনদেন নেই</td></tr>'}</tbody>
-</table>
-<div class="ft">বাংলা খাতা — সম্পূর্ণ নিরাপদ ও সুরক্ষিত ✔️</div>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Arial','Noto Sans Bengali','Hind Siliguri',sans-serif;background:#f0f4f8;color:#1e293b}
+  .page{background:#fff;width:760px;margin:0 auto;box-shadow:0 2px 12px rgba(0,0,0,.10)}
+</style>
+</head><body>
+<div class="page">
+
+  <!-- ══ 1. Navy Header ══ -->
+  <div style="background:#003366;display:flex;justify-content:space-between;align-items:center;padding:14px 22px;color:#fff;">
+    <span style="font-size:16px;font-weight:700;">${name}</span>
+    <span style="font-size:15px;font-weight:700;">📒 বাংলা খাতা</span>
+  </div>
+
+  <!-- ══ 2. White content ══ -->
+  <div style="padding:26px 28px;">
+
+    <!-- Title -->
+    <div style="text-align:center;margin-bottom:18px;">
+      <div style="font-size:18px;font-weight:700;color:#1e293b;">${phone || name} এর স্টেটমেন্ট</div>
+      ${phone ? `<div style="font-size:12px;color:#64748b;margin-top:3px;">ফোন নম্বর: ${phone}</div>` : ''}
+      <div style="font-size:12px;color:#64748b;margin-top:2px;">(${periodStr})</div>
+    </div>
+
+    <!-- 4-col summary -->
+    <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;margin-bottom:16px;">
+      <tr>
+        <td style="padding:12px 14px;border:1px solid #e2e8f0;width:25%;vertical-align:top;">
+          <div style="font-size:11px;color:#64748b;margin-bottom:5px;">ওপেনিং ব্যালেন্স</div>
+          <div style="font-size:15px;font-weight:700;color:${openBalColor};">৳${fmtBal(openingBalance)}</div>
+          ${range ? `<div style="font-size:10px;color:#94a3b8;margin-top:3px;">(on ${format(range.start,'d MMMM yyyy',{locale:bn})})</div>` : ''}
+        </td>
+        <td style="padding:12px 14px;border:1px solid #e2e8f0;width:25%;vertical-align:top;">
+          <div style="font-size:11px;color:#64748b;margin-bottom:5px;">মোট খরচ(-)</div>
+          <div style="font-size:15px;font-weight:700;color:#1e293b;">৳${fmtAmt(received)}</div>
+        </td>
+        <td style="padding:12px 14px;border:1px solid #e2e8f0;width:25%;vertical-align:top;">
+          <div style="font-size:11px;color:#64748b;margin-bottom:5px;">মোট জমা(+)</div>
+          <div style="font-size:15px;font-weight:700;color:#1e293b;">৳${fmtAmt(gave)}</div>
+        </td>
+        <td style="padding:12px 14px;border:1px solid #e2e8f0;width:25%;vertical-align:top;">
+          <div style="font-size:11px;color:#64748b;margin-bottom:5px;">মোট ব্যালেন্স</div>
+          <div style="font-size:15px;font-weight:700;color:${netColor};">৳${fmtBal(net)}</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:3px;">(${phone || name} ${net >= 0 ? 'পাবে' : 'দেবে'})</div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Entry count -->
+    <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:#374151;">
+      এন্ট্রির সংখ্যা: ${dateFiltered.length} (${curLbl})
+    </div>
+
+    <!-- Transaction table -->
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;">
+      <thead>
+        <tr style="background:#f8fafc;">
+          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:left;font-size:12px;color:#374151;font-weight:700;width:18%;">তারিখ</th>
+          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:#374151;font-weight:700;background:#fef2f2;width:26%;">ডেবিট (-)</th>
+          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:#374151;font-weight:700;background:#f0fdf4;width:26%;">ক্রেডিট (+)</th>
+          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:#374151;font-weight:700;width:30%;">ব্যালেন্স</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+
+    <!-- Creation time + page number -->
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;margin-top:8px;">
+      <span>রিপোর্টটি তৈরির সময় : ${timeStr} | ${dateStr}</span>
+      <span>Page 1 of 1</span>
+    </div>
+
+  </div><!-- /content -->
+
+  <!-- ══ 3. Navy Footer ══ -->
+  <div style="background:#003366;color:#fff;padding:12px 22px;display:flex;justify-content:space-between;align-items:center;font-size:12px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span>এখনই বাংলা খাতা ব্যবহার শুরু করুন</span>
+      <span style="background:#fff;color:#003366;padding:3px 10px;font-weight:700;border-radius:3px;font-size:11px;">ইনস্টল করুন</span>
+    </div>
+    <div style="font-size:11px;opacity:0.8;">নিয়ম ও শর্তাবলী প্রযোজ্য</div>
+  </div>
+
+</div><!-- /page -->
 </body></html>`;
   };
 
