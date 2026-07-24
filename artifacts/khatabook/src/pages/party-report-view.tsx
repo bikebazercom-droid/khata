@@ -243,10 +243,13 @@ export function PartyReportView() {
     const openBalColor = openingBalance >= 0 ? '#166534' : '#991b1b';
 
     return `<!DOCTYPE html><html lang="bn"><head><meta charset="UTF-8"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Noto Sans Bengali','Hind Siliguri','Arial',sans-serif;background:#f0f4f8;color:#1e293b}
-  .page{background:#fff;width:760px;margin:0 auto;box-shadow:0 2px 12px rgba(0,0,0,.10)}
+  body{font-family:'Noto Sans Bengali',sans-serif;background:#e8ecf1;color:#1e293b;padding:24px 0 40px}
+  .page{background:#fff;width:740px;margin:0 auto;box-shadow:0 2px 16px rgba(0,0,0,.15)}
 </style>
 </head><body>
 <div class="page">
@@ -330,38 +333,70 @@ export function PartyReportView() {
 </body></html>`;
   };
 
-  const generatePdfBlob = async (): Promise<Blob> => {
-    // Ensure Noto Sans Bengali (already imported in index.html) is fully
-    // loaded before html2canvas captures the off-screen div, so Bengali
-    // glyphs render correctly rather than falling back to a box character.
-    await Promise.allSettled([
-      document.fonts.load('400 14px "Noto Sans Bengali"'),
-      document.fonts.load('600 14px "Noto Sans Bengali"'),
-      document.fonts.load('700 14px "Noto Sans Bengali"'),
-    ]);
+  const generatePdfBlob = (): Promise<Blob> =>
+    new Promise((resolve, reject) => {
+      // Use an isolated iframe so the full HTML document (with its own
+      // <head>/<style> and Noto Sans Bengali font link) renders correctly
+      // without interference from the main app's Tailwind/Inter styles.
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText =
+        'position:fixed;left:-9999px;top:0;width:820px;height:1200px;border:none;visibility:hidden;';
+      document.body.appendChild(iframe);
 
-    const container = document.createElement('div');
-    container.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:#fff;padding-bottom:40px;';
-    container.innerHTML = buildPdfHtml();
-    document.body.appendChild(container);
-    try {
-      const canvas = await html2canvas(container, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfW = 210, pdfH = 297;
-      const imgH = (canvas.height * pdfW) / canvas.width;
-      let yOffset = 0, first = true;
-      while (yOffset < imgH) {
-        if (!first) pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 0, -yOffset, pdfW, imgH);
-        yOffset += pdfH;
-        first = false;
-      }
-      return pdf.output('blob');
-    } finally {
-      document.body.removeChild(container);
-    }
-  };
+      const cleanup = () => {
+        if (document.body.contains(iframe)) document.body.removeChild(iframe);
+      };
+
+      iframe.onload = async () => {
+        try {
+          const iframeDoc = iframe.contentDocument!;
+
+          // Wait for Noto Sans Bengali to finish loading inside the iframe
+          await Promise.allSettled([
+            iframeDoc.fonts.load('400 14px "Noto Sans Bengali"'),
+            iframeDoc.fonts.load('700 14px "Noto Sans Bengali"'),
+          ]);
+
+          // Give the browser an extra frame to finish painting
+          await new Promise(r => setTimeout(r, 300));
+
+          const target = iframeDoc.body;
+          const canvas = await html2canvas(target, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#e8ecf1',
+            logging: false,
+            windowWidth: 820,
+          });
+
+          const imgData = canvas.toDataURL('image/jpeg', 0.95);
+          const pdf = new jsPDF('p', 'mm', 'a4');
+          const pdfW = 210, pdfH = 297;
+          const imgH = (canvas.height * pdfW) / canvas.width;
+          let yOffset = 0, first = true;
+          while (yOffset < imgH) {
+            if (!first) pdf.addPage();
+            pdf.addImage(imgData, 'JPEG', 0, -yOffset, pdfW, imgH);
+            yOffset += pdfH;
+            first = false;
+          }
+          resolve(pdf.output('blob'));
+        } catch (err) {
+          reject(err);
+        } finally {
+          cleanup();
+        }
+      };
+
+      iframe.onerror = (e) => { cleanup(); reject(e); };
+
+      // Write the full HTML document into the iframe
+      const iframeDoc = iframe.contentDocument!;
+      iframeDoc.open();
+      iframeDoc.write(buildPdfHtml());
+      iframeDoc.close();
+    });
 
   const pdfFilename = () =>
     `Banglakhata_${(party?.name ?? 'Report').replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
