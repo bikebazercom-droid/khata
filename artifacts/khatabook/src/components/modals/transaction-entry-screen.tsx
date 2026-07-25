@@ -23,7 +23,7 @@ import {
 import { ChevronLeft, Camera, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { cn, evaluateCalculatorExpression, formatCurrency, formatExpressionForDisplay, trimNumberForExpression } from '@/lib/utils';
+import { cn, evaluateCalculatorExpression, formatCurrency, formatExpressionForDisplay, toBengaliDigits, trimNumberForExpression } from '@/lib/utils';
 import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic';
 import { CameraCaptureModal } from '@/components/modals/camera-capture-modal';
 import { scanDocument } from '@/lib/document-scan';
@@ -208,6 +208,10 @@ export function TransactionEntryScreen({
   // visibility flag to keep in sync.
   const [memoryHistory, setMemoryHistory] = useState<string[]>([]);
   const isMemoryActive = memoryHistory.length > 0;
+  // Remembers the last "500×100 = 50000" formula text so the sub-bar keeps
+  // showing it after = resolves the expression to a plain number.
+  // Cleared the moment any new key is pressed.
+  const [lastFormulaText, setLastFormulaText] = useState('');
   const clearMemory = useCallback(() => {
     memoryValueRef.current = 0;
     setMemoryValue(0);
@@ -283,18 +287,44 @@ export function TransactionEntryScreen({
 
   const liveResult = useMemo(() => {
     if (!expression) return 0;
-    return evaluateCalculatorExpression(expression);
+    return evaluateCalculatorExpression(expression) ?? 0;
   }, [expression]);
 
-  // Pre-computed once per expression/result change rather than re-formatted
-  // inline in JSX on every render (e.g. from unrelated state like
-  // `description` or `dueDate` edits) — keeps the render loop free of string
-  // work while typing.
+  // Split expression into:
+  //   accumulatedExpr — everything up to and including the last operator
+  //                     e.g. "500+200+" → "500+200+",  "500+" → "500+"
+  //   currentOperand  — whatever the user is typing right now (after last op)
+  //                     e.g. "500+200"  → "200",        "500+" → ""
+  // A leading '-' (negative literal) is never treated as an operator here.
+  const [currentOperand, accumulatedExpr] = useMemo(() => {
+    if (!expression) return ['', ''];
+    let lastOpIdx = -1;
+    for (let i = expression.length - 1; i > 0; i--) {
+      const c = expression[i];
+      if (c === '+' || c === '-' || c === '*' || c === '/') {
+        lastOpIdx = i;
+        break;
+      }
+    }
+    if (lastOpIdx === -1) return [expression, ''];
+    return [expression.slice(lastOpIdx + 1), expression.slice(0, lastOpIdx + 1)];
+  }, [expression]);
+
+  // Sub-bar formula text — always shows the full expression + live result
+  // e.g. "500× = 500", "500×100 = 50000", and after = stays as "500×100 = 50000".
   const formulaPreviewText = useMemo(() => {
-    const base = expression ? formatExpressionForDisplay(expression) : '0';
-    const suffix = hasFormula && liveResult !== null ? ` = ${trimNumberForExpression(liveResult)}` : '';
-    return `${base}${suffix}`;
-  }, [expression, hasFormula, liveResult]);
+    const toDisplay = (s: string) => toBengaliDigits(formatExpressionForDisplay(s));
+    if (!expression) return toBengaliDigits(lastFormulaText);
+    const displayExpr = toDisplay(expression);
+    // Evaluate — strip trailing operator for partial expressions
+    const directResult = evaluateCalculatorExpression(expression);
+    const partialResult =
+      directResult !== null
+        ? directResult
+        : evaluateCalculatorExpression(expression.replace(/[+\-*/]+$/, ''));
+    if (partialResult === null) return displayExpr;
+    return `${displayExpr} = ${toBengaliDigits(trimNumberForExpression(partialResult))}`;
+  }, [expression, lastFormulaText]);
 
   // True when any editable field differs from the entry's original saved value.
   // Only meaningful in edit mode — always false in create mode.
@@ -330,13 +360,43 @@ export function TransactionEntryScreen({
     description, dueDate, billImage,
   ]);
 
-  // Once memory logs exist, the big header amount tracks the running memory
-  // total rather than whatever is currently being typed for the next entry —
-  // the typed expression still gets its own live preview bar below.
+  // The authoritative amount used for saving and the header title — always
+  // the fully-evaluated expression result, or the memory total.
   const displayAmount = memoryHistory.length > 0 ? memoryValue : (liveResult ?? 0);
-  // Whether the amount currently parses to something worth saving — drives
-  // the "পরিমাণ লিখুন" placeholder, the formula sub-bar, and the SAVE button.
-  const isActive = memoryHistory.length > 0 ? memoryValue !== 0 : expression.length > 0 && displayAmount !== 0;
+
+  // Classic calculator big-display — mirrors the reference screenshots:
+  //   Memory mode           → formatted running total (e.g. ৳1,500)
+  //   No operator yet       → formatted number being typed (e.g. ৳500)
+  //   Operator just pressed → number + operator symbol  (e.g. ৳500×)
+  //                           currentOperand is "" in this state
+  //   Second operand typing → formatted second operand  (e.g. ৳100)
+  const bigDisplayText = useMemo(() => {
+    if (memoryHistory.length > 0) return formatCurrency(memoryValue);
+    if (!expression) return null;
+
+    if (accumulatedExpr) {
+      if (currentOperand !== '') {
+        // Second operand is being typed — show only it
+        const num = parseFloat(currentOperand);
+        return formatCurrency(isNaN(num) ? 0 : num);
+      }
+      // Operator was just pressed — show "৳500×"
+      // accumulatedExpr ends with the operator char (+, -, *, /)
+      const opChar = accumulatedExpr.slice(-1);
+      const opSymbol = opChar === '*' ? '×' : opChar === '/' ? '÷' : opChar === '-' ? '−' : '+';
+      const numPart = accumulatedExpr.slice(0, -1);
+      // Evaluate the accumulated number part (handles chained ops like 500+200)
+      const num = evaluateCalculatorExpression(numPart) ?? parseFloat(numPart);
+      return `${formatCurrency(isNaN(num) ? 0 : num)}${opSymbol}`;
+    }
+
+    // No operator — plain number
+    const num = parseFloat(expression);
+    return formatCurrency(isNaN(num) ? 0 : num);
+  }, [memoryHistory.length, memoryValue, expression, accumulatedExpr, currentOperand]);
+
+  // isActive: true whenever there's something meaningful to save
+  const isActive = memoryHistory.length > 0 ? memoryValue !== 0 : expression.length > 0;
   // Whether the metadata panel should be shown — persistent once triggered,
   // unlike `isActive` which can flip back off as the formula is edited.
   const showMetadata = hasInteracted;
@@ -424,9 +484,14 @@ export function TransactionEntryScreen({
         setShowError(true);
         return;
       }
+      // Save the formula so sub-bar keeps showing "500×100 = 50000" after =
+      const formulaDisplay = formatExpressionForDisplay(expressionRef.current);
+      setLastFormulaText(`${formulaDisplay} = ${trimNumberForExpression(result)}`);
       setExpression(trimNumberForExpression(result));
       return;
     }
+    // Any key other than = clears the saved formula (new calculation starts)
+    setLastFormulaText('');
     if (value === 'M+' || value === 'M-') {
       // Evaluate whatever expression is currently typed; an empty or
       // invalid expression is treated as 0 rather than blocking the memory
@@ -751,7 +816,7 @@ export function TransactionEntryScreen({
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden shrink-0">
           <div className="px-4 py-5">
             <span className={cn('text-3xl font-extrabold tracking-tight', isGet ? 'text-emerald-600' : 'text-red-500')}>
-              {formatCurrency(displayAmount)}
+              {bigDisplayText ?? formatCurrency(0)}
             </span>
             {!isActive && <p className="text-xs font-semibold text-slate-400 mt-1">পরিমাণ লিখুন</p>}
           </div>

@@ -384,9 +384,9 @@ export function PartyReportView() {
   // ── PDF generation ────────────────────────────────────────────────────────
 
   const buildPdfHtml = () => {
-    const name   = party?.name  ?? '';
-    const phone  = party?.phone ?? '';
-    const now    = new Date();
+    const name  = party?.name  ?? '';
+    const phone = party?.phone ?? '';
+    const now   = new Date();
 
     const range     = resolveDateRange(period, startDate, endDate);
     const periodStr = (() => {
@@ -396,10 +396,15 @@ export function PartyReportView() {
       return s === e ? s : `${s} - ${e}`;
     })();
 
-    const fmtBal = (b: number) =>
-      `${Math.abs(b).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${b >= 0 ? 'Cr' : 'Dr'}`;
+    // Plain amount — no currency symbol (used inside table cells)
     const fmtAmt = (a: number) =>
-      a.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      Math.abs(a).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // Balance with Dr/Cr suffix:
+    //   positive = party owes you (Dr — party is debited)
+    //   negative = you owe party (Cr — party is credited)
+    const fmtBal = (b: number) =>
+      `${fmtAmt(b)} ${b >= 0 ? 'Dr' : 'Cr'}`;
+    const balClr = (b: number) => b >= 0 ? '#b91c1c' : '#166534';
 
     const ascEntries = [...dateFiltered].sort(
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
@@ -411,36 +416,44 @@ export function PartyReportView() {
     let isFirstGroup = true;
 
     for (const e of ascEntries) {
-      const dayKey  = format(new Date(e.createdAt), 'yyyy-MM-dd');
-      const isGave  = e.type === 'YOU_GAVE';
+      const dayKey = format(new Date(e.createdAt), 'yyyy-MM-dd');
+      const isGave = e.type === 'YOU_GAVE';
       runBal += isGave ? e.amount : -e.amount;
 
       if (dayKey !== lastDayKey) {
-        const dayLabel    = format(new Date(e.createdAt), 'd MMMM yyyy', { locale: bn });
-        const openingNote = isFirstGroup
-          ? ` <span style="font-weight:400;color:#64748b;font-size:11px;">(ওপেনিং ব্যালেন্স: ${fmtBal(openingBalance)})</span>`
-          : '';
+        const dayLabel = format(new Date(e.createdAt), 'd MMMM yyyy', { locale: bn });
+        // Opening balance note on the right of the first group header
+        const openNote = isFirstGroup
+          ? `<td style="border:0;text-align:right;font-weight:400;color:#64748b;font-size:11px;white-space:nowrap;">(ওপেনিং ব্যালেন্স: ${fmtAmt(openingBalance)})</td>`
+          : '<td style="border:0;"></td>';
         tableRows += `<tr style="background:#f1f5f9;">
-          <td colspan="4" style="padding:7px 10px;border:1px solid #cbd5e1;font-weight:700;font-size:12px;">${dayLabel}${openingNote}</td>
+          <td colspan="4" style="padding:0;border:1px solid #cbd5e1;">
+            <table style="width:100%;border-collapse:collapse;"><tr>
+              <td style="border:0;padding:7px 10px;font-weight:700;font-size:12px;">${dayLabel}</td>
+              ${openNote}
+            </tr></table>
+          </td>
         </tr>`;
         lastDayKey   = dayKey;
         isFirstGroup = false;
       }
 
-      const shortDate  = format(new Date(e.createdAt), 'dd/MM');
+      const shortDate = format(new Date(e.createdAt), 'dd/MM');
+      // Reference convention:
+      //   YOU_GAVE (আপনি দিয়েছেন) → ডেবিট(-) = খরচ column
+      //   YOU_GOT  (আপনি পেয়েছেন) → ক্রেডিট(+) = জমা column
       const debitCell  = isGave
-        ? '<td style="padding:7px 10px;border:1px solid #e2e8f0;background:#fef2f2;"></td>'
-        : `<td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:right;background:#fef2f2;font-size:12px;">${fmtAmt(e.amount)}</td>`;
+        ? `<td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:right;background:#fef2f2;font-size:12px;">${fmtAmt(e.amount)}</td>`
+        : '<td style="padding:7px 10px;border:1px solid #e2e8f0;background:#fef2f2;"></td>';
       const creditCell = isGave
-        ? `<td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:right;background:#f0fdf4;font-size:12px;">${fmtAmt(e.amount)}</td>`
-        : '<td style="padding:7px 10px;border:1px solid #e2e8f0;background:#f0fdf4;"></td>';
-      const balColor   = runBal >= 0 ? '#166534' : '#991b1b';
+        ? '<td style="padding:7px 10px;border:1px solid #e2e8f0;background:#f0fdf4;"></td>'
+        : `<td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:right;background:#f0fdf4;font-size:12px;">${fmtAmt(e.amount)}</td>`;
 
       tableRows += `<tr>
         <td style="padding:7px 10px;border:1px solid #e2e8f0;font-size:12px;">${shortDate}</td>
         ${debitCell}
         ${creditCell}
-        <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:right;font-size:12px;font-weight:600;color:${balColor};">${fmtBal(runBal)}</td>
+        <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:right;font-size:12px;font-weight:600;color:${balClr(runBal)};">${fmtBal(runBal)}</td>
       </tr>`;
     }
 
@@ -448,17 +461,23 @@ export function PartyReportView() {
       tableRows = `<tr><td colspan="4" style="padding:16px;text-align:center;color:#94a3b8;border:1px solid #e2e8f0;">কোনো লেনদেন নেই</td></tr>`;
     }
 
-    const netColor     = net >= 0 ? '#166534' : '#991b1b';
-    const openBalColor = openingBalance >= 0 ? '#166534' : '#991b1b';
+    // Totals row: gave → ডেবিট(-), received → ক্রেডিট(+)
     tableRows += `<tr style="background:#f8fafc;font-weight:700;">
       <td style="padding:8px 10px;border:1px solid #cbd5e1;font-size:12px;">সর্বমোট</td>
-      <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;background:#fef2f2;font-size:12px;">${fmtAmt(received)}</td>
-      <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;background:#f0fdf4;font-size:12px;">${fmtAmt(gave)}</td>
-      <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:${netColor};">${fmtBal(net)}</td>
+      <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;background:#fef2f2;font-size:12px;">${fmtAmt(gave)}</td>
+      <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;background:#f0fdf4;font-size:12px;">${fmtAmt(received)}</td>
+      <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:${balClr(net)};">${fmtBal(net)}</td>
     </tr>`;
 
-    const timeStr = format(now, 'h:mm a');
-    const dateStr = format(now, 'd MMMM yy', { locale: bn });
+    const timeStr  = format(now, 'h:mm a');
+    const dateDay  = format(now, 'd', { locale: bn });
+    const dateMon  = format(now, 'MMMM', { locale: bn });
+    const dateYr   = format(now, 'yy');
+    const dateStr  = `${dateDay} ${dateMon}'${dateYr}`;
+
+    const openBalClr    = balClr(openingBalance);
+    const netClr        = balClr(net);
+    const partyRelation = net >= 0 ? `${name} দেবে` : `${name} পাবে`;
 
     return `<!DOCTYPE html><html lang="bn"><head><meta charset="UTF-8"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -472,45 +491,55 @@ export function PartyReportView() {
 </head><body>
 <div class="page">
 
+  <!-- Header -->
   <div style="background:#003366;display:flex;justify-content:space-between;align-items:center;padding:14px 22px;color:#fff;">
     <span style="font-size:16px;font-weight:700;">${name}</span>
-    <span style="font-size:15px;font-weight:700;">📒 বাংলা খাতা</span>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:20px;">📒</span>
+      <span style="font-size:15px;font-weight:700;">বাংলা খাতা</span>
+    </div>
   </div>
 
+  <!-- Body -->
   <div style="padding:26px 28px;">
-    <div style="text-align:center;margin-bottom:18px;">
-      <div style="font-size:18px;font-weight:700;color:#1e293b;">${phone || name} এর স্টেটমেন্ট</div>
-      ${phone ? `<div style="font-size:12px;color:#64748b;margin-top:3px;">ফোন নম্বর: ${phone}</div>` : ''}
-      <div style="font-size:12px;color:#64748b;margin-top:2px;">(${periodStr})</div>
+
+    <!-- Title -->
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:18px;font-weight:700;color:#1e293b;">${name} এর স্টেটমেন্ট</div>
+      ${phone ? `<div style="font-size:12px;color:#64748b;margin-top:4px;">ফোন নম্বর: ${phone}</div>` : ''}
+      <div style="font-size:12px;color:#64748b;margin-top:3px;">(${periodStr})</div>
     </div>
 
-    <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;margin-bottom:16px;">
+    <!-- Summary box -->
+    <table style="width:100%;border-collapse:collapse;border:1px solid #cbd5e1;margin-bottom:18px;">
       <tr>
-        <td style="padding:12px 14px;border:1px solid #e2e8f0;width:25%;vertical-align:top;">
+        <td style="padding:12px 14px;border-right:1px solid #cbd5e1;width:25%;vertical-align:top;">
           <div style="font-size:11px;color:#64748b;margin-bottom:5px;">ওপেনিং ব্যালেন্স</div>
-          <div style="font-size:15px;font-weight:700;color:${openBalColor};">৳${fmtBal(openingBalance)}</div>
+          <div style="font-size:15px;font-weight:700;color:${openBalClr};">৳${fmtAmt(openingBalance)}</div>
           ${range ? `<div style="font-size:10px;color:#94a3b8;margin-top:3px;">(on ${format(range.start,'d MMMM yyyy',{locale:bn})})</div>` : ''}
         </td>
-        <td style="padding:12px 14px;border:1px solid #e2e8f0;width:25%;vertical-align:top;">
+        <td style="padding:12px 14px;border-right:1px solid #cbd5e1;width:25%;vertical-align:top;">
           <div style="font-size:11px;color:#64748b;margin-bottom:5px;">মোট খরচ(-)</div>
-          <div style="font-size:15px;font-weight:700;color:#1e293b;">৳${fmtAmt(received)}</div>
-        </td>
-        <td style="padding:12px 14px;border:1px solid #e2e8f0;width:25%;vertical-align:top;">
-          <div style="font-size:11px;color:#64748b;margin-bottom:5px;">মোট জমা(+)</div>
           <div style="font-size:15px;font-weight:700;color:#1e293b;">৳${fmtAmt(gave)}</div>
         </td>
-        <td style="padding:12px 14px;border:1px solid #e2e8f0;width:25%;vertical-align:top;">
+        <td style="padding:12px 14px;border-right:1px solid #cbd5e1;width:25%;vertical-align:top;">
+          <div style="font-size:11px;color:#64748b;margin-bottom:5px;">মোট জমা(+)</div>
+          <div style="font-size:15px;font-weight:700;color:#1e293b;">৳${fmtAmt(received)}</div>
+        </td>
+        <td style="padding:12px 14px;width:25%;vertical-align:top;">
           <div style="font-size:11px;color:#64748b;margin-bottom:5px;">মোট ব্যালেন্স</div>
-          <div style="font-size:15px;font-weight:700;color:${netColor};">৳${fmtBal(net)}</div>
-          <div style="font-size:10px;color:#94a3b8;margin-top:3px;">(${phone || name} ${net >= 0 ? 'পাবে' : 'দেবে'})</div>
+          <div style="font-size:15px;font-weight:700;color:${netClr};">৳${fmtBal(net)}</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:3px;">(${partyRelation})</div>
         </td>
       </tr>
     </table>
 
+    <!-- Entry count -->
     <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:#374151;">
       এন্ট্রির সংখ্যা: ${dateFiltered.length} (${curLbl})
     </div>
 
+    <!-- Transaction table -->
     <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;">
       <thead>
         <tr style="background:#f8fafc;">
@@ -523,18 +552,23 @@ export function PartyReportView() {
       <tbody>${tableRows}</tbody>
     </table>
 
-    <div style="display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;margin-top:8px;">
-      <span>রিপোর্টটি তৈরির সময় : ${timeStr} | ${dateStr}</span>
+    <!-- Footer line -->
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;margin-top:6px;">
+      <span>রিপোর্ট তৈরি হয়েছে : ${timeStr} | ${dateStr}</span>
       <span>Page 1 of 1</span>
     </div>
+
   </div>
 
+  <!-- Bottom banner -->
   <div style="background:#003366;color:#fff;padding:12px 22px;display:flex;justify-content:space-between;align-items:center;font-size:12px;">
     <div style="display:flex;align-items:center;gap:10px;">
       <span>এখনই বাংলা খাতা ব্যবহার শুরু করুন</span>
       <span style="background:#fff;color:#003366;padding:3px 10px;font-weight:700;border-radius:3px;font-size:11px;">ইনস্টল করুন</span>
     </div>
-    <div style="font-size:11px;opacity:0.8;">নিয়ম ও শর্তাবলী প্রযোজ্য</div>
+    <div style="text-align:right;font-size:11px;opacity:0.85;">
+      ${phone ? `📞 ${phone}` : ''}<br/>নিয়ম ও শর্তাবলী প্রযোজ্য
+    </div>
   </div>
 
 </div>
@@ -555,11 +589,22 @@ export function PartyReportView() {
       iframe.onload = async () => {
         try {
           const iframeDoc = iframe.contentDocument!;
+
+          // 1. Wait for the iframe's font-loading queue to settle
+          await iframeDoc.fonts.ready;
+
+          // 2. Explicitly request every weight used in the PDF
           await Promise.allSettled([
-            iframeDoc.fonts.load('400 14px "Noto Sans Bengali"'),
-            iframeDoc.fonts.load('700 14px "Noto Sans Bengali"'),
+            iframeDoc.fonts.load('400 16px "Noto Sans Bengali"'),
+            iframeDoc.fonts.load('600 16px "Noto Sans Bengali"'),
+            iframeDoc.fonts.load('700 16px "Noto Sans Bengali"'),
+            iframeDoc.fonts.load('900 16px "Noto Sans Bengali"'),
           ]);
-          await new Promise(r => setTimeout(r, 300));
+
+          // 3. Verify the font actually loaded (CDN might be slow/blocked).
+          //    If it hasn't loaded yet, wait up to 3 s more before capturing.
+          const bengaliReady = iframeDoc.fonts.check('700 16px "Noto Sans Bengali"');
+          await new Promise(r => setTimeout(r, bengaliReady ? 200 : 3000));
 
           const canvas  = await html2canvas(iframeDoc.body, {
             scale: 2, useCORS: true, allowTaint: true,

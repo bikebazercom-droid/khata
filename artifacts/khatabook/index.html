@@ -1,6 +1,15 @@
 <!DOCTYPE html>
 <html lang="bn">
   <head>
+    <script>
+      // Suppress errors thrown by browser extensions (e.g. MetaMask)
+      // so they don't appear in Vite's runtime-error overlay.
+      window.addEventListener('error', function (e) {
+        if (e.filename && e.filename.startsWith('chrome-extension://')) {
+          e.stopImmediatePropagation();
+        }
+      }, true);
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Banglakhata - Digital Ledger</title>
