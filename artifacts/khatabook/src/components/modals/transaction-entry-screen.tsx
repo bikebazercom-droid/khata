@@ -23,7 +23,7 @@ import {
 import { ChevronLeft, Camera, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { cn, evaluateCalculatorExpression, formatCurrency, formatExpressionForDisplay, toBengaliDigits, trimNumberForExpression } from '@/lib/utils';
+import { cn, evaluateCalculatorExpression, formatCurrency, formatCurrencyTyping, formatExpressionForDisplay, toBengaliDigits, trimNumberForExpression } from '@/lib/utils';
 import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic';
 import { CameraCaptureModal } from '@/components/modals/camera-capture-modal';
 import { scanDocument } from '@/lib/document-scan';
@@ -376,11 +376,15 @@ export function TransactionEntryScreen({
 
     if (accumulatedExpr) {
       if (currentOperand !== '') {
-        // Second operand is being typed — show only it
+        // Second operand is being typed — mirror exactly what the user typed.
+        // formatCurrencyTyping shows only as many decimal places as typed
+        // (e.g. "0.5" → "৳০.৫", not "৳০.৫০") so trailing zeros never appear
+        // unless the user explicitly pressed that digit.
         const num = parseFloat(currentOperand);
-        return formatCurrency(isNaN(num) ? 0 : num);
+        const base = formatCurrencyTyping(currentOperand, isNaN(num) ? 0 : num);
+        return currentOperand.endsWith('.') ? base + '.' : base;
       }
-      // Operator was just pressed — show "৳500×"
+      // Operator was just pressed — show "৳500×".
       // accumulatedExpr ends with the operator char (+, -, *, /)
       const opChar = accumulatedExpr.slice(-1);
       const opSymbol = opChar === '*' ? '×' : opChar === '/' ? '÷' : opChar === '-' ? '−' : '+';
@@ -390,9 +394,11 @@ export function TransactionEntryScreen({
       return `${formatCurrency(isNaN(num) ? 0 : num)}${opSymbol}`;
     }
 
-    // No operator — plain number
+    // No operator — plain number being typed.
+    // Use formatCurrencyTyping so "0.5" shows as "৳০.৫", not "৳০.৫০".
     const num = parseFloat(expression);
-    return formatCurrency(isNaN(num) ? 0 : num);
+    const base = formatCurrencyTyping(expression, isNaN(num) ? 0 : num);
+    return expression.endsWith('.') ? base + '.' : base;
   }, [memoryHistory.length, memoryValue, expression, accumulatedExpr, currentOperand]);
 
   // isActive: true whenever there's something meaningful to save
@@ -537,7 +543,8 @@ export function TransactionEntryScreen({
           prev.lastIndexOf('/'),
         );
         const currentOperand = prev.slice(lastOpIdx + 1);
-        if (currentOperand.includes('.')) return prev; // already has decimal
+        if (currentOperand.includes('.')) return prev;   // already has decimal — block
+        if (currentOperand === '') return prev + '0.';   // empty operand → "0." auto-prepend
         return prev + '.';
       });
       return;

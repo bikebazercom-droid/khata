@@ -48,6 +48,29 @@ export function formatCurrency(amount: number): string {
 }
 
 /**
+ * Like formatCurrency, but for the live calculator big-display while the user
+ * is still typing an operand. Shows exactly as many decimal places as the user
+ * has already typed — no automatic trailing-zero padding.
+ *
+ * Examples:
+ *   ("0.5",  0.5)  → "৳০.৫"   (not "৳০.৫০")
+ *   ("0.50", 0.5)  → "৳০.৫০"  (user typed the trailing zero)
+ *   ("100",  100)  → "৳১০০"
+ *   ("0.",   0)    → "৳০."     (caller must append trailing dot separately)
+ */
+export function formatCurrencyTyping(rawStr: string, amount: number): string {
+  if (isNaN(amount)) return '৳০';
+  const dotIdx = rawStr.indexOf('.');
+  // Exact number of decimal digits the user has typed so far (capped at 2)
+  const decDigits = dotIdx === -1 ? 0 : Math.min(rawStr.length - dotIdx - 1, 2);
+  const formatted = new Intl.NumberFormat('en-IN', {
+    minimumFractionDigits: decDigits,
+    maximumFractionDigits: 2,
+  }).format(Math.abs(amount));
+  return `৳${toBengaliDigits(formatted)}`;
+}
+
+/**
  * Evaluates an expression typed into the custom on-screen calculator keypad
  * (e.g. "10+5+40*5/10%"), using classic sequential four-function-calculator
  * semantics rather than algebraic operator precedence — i.e. operations are
@@ -101,8 +124,12 @@ export function evaluateCalculatorExpression(raw: string): number | null {
   const isOperator = (t: string) => t === '+' || t === '-' || t === '*' || t === '/';
   if (isOperator(tokens[0])) return null;
 
+  // Round to 2 decimal places after every operation to eliminate
+  // floating-point noise (e.g. 0.1 + 0.2 → 0.30000000000000004 → 0.30).
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+
   const firstToken = tokens[0];
-  let acc = firstToken.endsWith('%') ? parseFloat(firstToken) / 100 : parseFloat(firstToken);
+  let acc = firstToken.endsWith('%') ? r2(parseFloat(firstToken) / 100) : parseFloat(firstToken);
   if (!Number.isFinite(acc)) return null;
 
   for (let i = 1; i < tokens.length; i += 2) {
@@ -116,23 +143,17 @@ export function evaluateCalculatorExpression(raw: string): number | null {
 
     const value = isPercent
       ? op === '+' || op === '-'
-        ? acc * (rawNum / 100) // percent of the running total for +/-
-        : rawNum / 100 // literal fraction for */÷
+        ? r2(acc * (rawNum / 100)) // percent of the running total for +/-
+        : r2(rawNum / 100)         // literal fraction for */÷
       : rawNum;
 
     switch (op) {
-      case '+':
-        acc += value;
-        break;
-      case '-':
-        acc -= value;
-        break;
-      case '*':
-        acc *= value;
-        break;
+      case '+': acc = r2(acc + value); break;
+      case '-': acc = r2(acc - value); break;
+      case '*': acc = r2(acc * value); break;
       case '/':
         if (value === 0) return null;
-        acc /= value;
+        acc = r2(acc / value);
         break;
     }
   }
