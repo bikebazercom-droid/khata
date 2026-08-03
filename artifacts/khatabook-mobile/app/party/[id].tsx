@@ -26,6 +26,7 @@ import {
   useGetParty,
   useListLedgerEntries,
   useCreateLedgerEntry,
+  useListParties,
   useSendPaymentReminder,
   usePatchLedgerEntry,
   useDeleteLedgerEntry,
@@ -124,11 +125,22 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
   const uploadRef = useRef<Promise<string | null> | null>(null);
   const createEntry = useCreateLedgerEntry();
 
+  // Transfer / adjustment state
+  const [isTransferMode, setIsTransferMode] = useState(false);
+  const [transferPartyId, setTransferPartyId] = useState<string | null>(null);
+  const [transferSearch, setTransferSearch] = useState('');
+  const { data: allParties = [] } = useListParties(
+    { search: transferSearch || undefined },
+    { query: { enabled: isTransferMode } },
+  );
+  const transferPartyOptions = allParties.filter((p) => p.id !== partyId);
+
   useEffect(() => { if (visible) setType(initialType); }, [visible, initialType]);
 
   function reset() {
     setAmount(''); setDescription(''); setType(initialType);
     setBillImageUri(null); uploadRef.current = null;
+    setIsTransferMode(false); setTransferPartyId(null); setTransferSearch('');
   }
 
   async function pickImage() {
@@ -179,18 +191,33 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
       Alert.alert('ভুল পরিমাণ', 'শূন্যের বেশি একটি বৈধ পরিমাণ লিখুন।');
       return;
     }
+    if (isTransferMode && !transferPartyId) {
+      Alert.alert('কাস্টমার বেছে নিন', 'অ্যাডজাস্টমেন্টের জন্য একটি কাস্টমার নির্বাচন করুন।');
+      return;
+    }
     try {
       const pending = uploadRef.current; uploadRef.current = null;
       const objectPath = pending ? await pending : null;
       await createEntry.mutateAsync({
         partyId,
-        data: { type, amount: parsed, description: description.trim() || undefined, billImage: objectPath ?? undefined },
+        data: {
+          type,
+          amount: parsed,
+          description: description.trim() || undefined,
+          billImage: objectPath ?? undefined,
+          isTransfer: isTransferMode || undefined,
+          transferPartyId: isTransferMode ? transferPartyId : undefined,
+        },
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       qc.invalidateQueries({ queryKey: [`/api/parties/${partyId}/ledger-entries`] });
       qc.invalidateQueries({ queryKey: [`/api/parties/${partyId}`] });
       qc.invalidateQueries({ queryKey: ['/api/dashboard/summary'] });
       qc.invalidateQueries({ queryKey: ['/api/parties'] });
+      if (transferPartyId) {
+        qc.invalidateQueries({ queryKey: [`/api/parties/${transferPartyId}/ledger-entries`] });
+        qc.invalidateQueries({ queryKey: [`/api/parties/${transferPartyId}`] });
+      }
       reset(); onSuccess(); onClose();
     } catch {
       Alert.alert('Error', 'লেনদেন রেকর্ড করা যায়নি। আবার চেষ্টা করুন।');
@@ -301,6 +328,51 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
                 {billImageUri ? 'ছবি পরিবর্তন করুন' : 'বিল ছবি সংযুক্ত করুন'}
               </Text>
             </TouchableOpacity>
+          </View>
+
+          {/* Transfer / adjustment toggle */}
+          <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: colors.radius, marginBottom: 16, overflow: 'hidden' }}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => { setIsTransferMode(v => !v); setTransferPartyId(null); setTransferSearch(''); }}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, backgroundColor: colors.card }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Feather name="repeat" size={15} color="#3b82f6" />
+                <Text style={{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: colors.foreground }}>অন্য কাস্টমারের সাথে অ্যাডজাস্ট</Text>
+              </View>
+              {/* Toggle pill */}
+              <View style={{ width: 40, height: 24, borderRadius: 12, backgroundColor: isTransferMode ? '#3b82f6' : colors.border, justifyContent: 'center', paddingHorizontal: 2 }}>
+                <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff', alignSelf: isTransferMode ? 'flex-end' : 'flex-start', elevation: 2, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 2 }} />
+              </View>
+            </TouchableOpacity>
+
+            {isTransferMode && (
+              <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: 12, paddingBottom: 10 }}>
+                <TextInput
+                  value={transferSearch}
+                  onChangeText={setTransferSearch}
+                  placeholder="কার সাথে অ্যাডজাস্ট হবে?"
+                  placeholderTextColor={colors.mutedForeground}
+                  style={{ backgroundColor: colors.background, borderRadius: 8, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.foreground, marginTop: 10, marginBottom: 6 }}
+                />
+                <ScrollView style={{ maxHeight: 120 }} nestedScrollEnabled>
+                  {transferPartyOptions.length === 0 ? (
+                    <Text style={{ fontSize: 12, color: colors.mutedForeground, textAlign: 'center', paddingVertical: 8 }}>কোনো কাস্টমার পাওয়া যায়নি</Text>
+                  ) : transferPartyOptions.map((p) => (
+                    <TouchableOpacity
+                      key={p.id}
+                      activeOpacity={0.75}
+                      onPress={() => setTransferPartyId(p.id)}
+                      style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 9, borderRadius: 8, marginBottom: 3, backgroundColor: transferPartyId === p.id ? '#3b82f6' : colors.background }}
+                    >
+                      <Text style={{ flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium', color: transferPartyId === p.id ? '#fff' : colors.foreground }} numberOfLines={1}>{p.name}</Text>
+                      {p.phone ? <Text style={{ fontSize: 11, color: transferPartyId === p.id ? 'rgba(255,255,255,0.7)' : colors.mutedForeground }}>{p.phone}</Text> : null}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
           </View>
 
           <TouchableOpacity
@@ -456,6 +528,7 @@ function LedgerRow({ entry, colors, onPress }: LedgerRowProps) {
 
   const descFallback = isGave ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন';
   const typeTag = isGave ? '▲ আপনি দিয়েছেন' : '▼ আপনি পেয়েছেন';
+  const isTransfer = entry.isTransfer;
 
   const s = StyleSheet.create({
     row: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
@@ -475,6 +548,12 @@ function LedgerRow({ entry, colors, onPress }: LedgerRowProps) {
           <Text style={s.desc} numberOfLines={2}>{entry.description || descFallback}</Text>
           <Text style={s.meta}>{dateLine}</Text>
           <Text style={[s.tag, { color: isGave ? colors.willGet : colors.willGive }]}>{typeTag}</Text>
+          {isTransfer && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 }}>
+              <Feather name="repeat" size={10} color="#3b82f6" />
+              <Text style={{ fontSize: 10, fontFamily: 'Inter_600SemiBold', color: '#3b82f6' }}>ট্রান্সফার</Text>
+            </View>
+          )}
           {imgSrc ? (
             <TouchableOpacity onPress={() => setLightboxOpen(true)} activeOpacity={0.85}>
               <Image source={imgSrc} style={s.thumb} resizeMode="cover" />

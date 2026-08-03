@@ -86,6 +86,12 @@ export interface LedgerEntry {
   /** @nullable */
   dueDate: string | null;
   createdAt: string;
+  /** Whether this entry is part of a cross-customer transfer/adjustment. */
+  isTransfer: boolean;
+  /** The other party involved in the transfer (if isTransfer is true). @nullable */
+  transferPartyId: string | null;
+  /** ID of the paired counter-entry created for the other party. @nullable */
+  linkedEntryId: string | null;
 }
 
 export interface LedgerEntryInput {
@@ -102,6 +108,10 @@ export interface LedgerEntryInput {
   billImage?: string | null;
   /** @nullable */
   dueDate?: string | null;
+  /** Set to true to auto-create a counter-entry for transferPartyId. */
+  isTransfer?: boolean;
+  /** The other party UUID for cross-customer transfer. @nullable */
+  transferPartyId?: string | null;
 }
 
 export interface DashboardSummary {

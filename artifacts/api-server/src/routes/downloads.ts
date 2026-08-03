@@ -14,25 +14,20 @@
 import { Router } from "express";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 
 const router = Router();
 
-const DOWNLOADS_DIR = path.join(process.cwd(), "public/downloads");
+// Resolve relative to the compiled bundle (dist/index.mjs → ../public/downloads)
+// so the path is correct in both dev (cwd = artifacts/api-server) and production
+// (cwd = workspace root, bundle at artifacts/api-server/dist/index.mjs).
+const __dirname   = path.dirname(fileURLToPath(import.meta.url));
+const DOWNLOADS_DIR = path.resolve(__dirname, "../public/downloads");
 const APK_PATH     = path.join(DOWNLOADS_DIR, "banglakhata.apk");
 const WINDOWS_PATH = path.join(DOWNLOADS_DIR, "banglakhata-windows.exe");
 const MAC_PATH     = path.join(DOWNLOADS_DIR, "banglakhata-mac.dmg");
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-const PLACEHOLDER_THRESHOLD = 1024; // bytes — stubs created at startup are ≤1 KB
-
-function isPlaceholder(filePath: string): boolean {
-  try {
-    return fs.statSync(filePath).size <= PLACEHOLDER_THRESHOLD;
-  } catch {
-    return true;
-  }
-}
 
 function sendBinary(
   req: any,
@@ -43,14 +38,6 @@ function sendBinary(
 ) {
   if (!fs.existsSync(filePath)) {
     res.status(404).json({ error: `${filename} not found`, available: false });
-    return;
-  }
-  if (isPlaceholder(filePath)) {
-    res.status(503).json({
-      error: "Software binary update in progress. Please check back shortly.",
-      available: false,
-      placeholder: true,
-    });
     return;
   }
   res.setHeader("Content-Type", contentType);
@@ -93,9 +80,9 @@ router.get("/download/:platform", (req, res) => {
 // ── Info ──────────────────────────────────────────────────────────────────────
 
 router.get("/downloads/info", (_req, res) => {
-  const apkAvailable     = fs.existsSync(APK_PATH)     && !isPlaceholder(APK_PATH);
-  const windowsAvailable = fs.existsSync(WINDOWS_PATH) && !isPlaceholder(WINDOWS_PATH);
-  const macAvailable     = fs.existsSync(MAC_PATH)     && !isPlaceholder(MAC_PATH);
+  const apkAvailable     = fs.existsSync(APK_PATH);
+  const windowsAvailable = fs.existsSync(WINDOWS_PATH);
+  const macAvailable     = fs.existsSync(MAC_PATH);
 
   res.json({
     androidStoreUrl:  process.env.ANDROID_STORE_URL ?? null,

@@ -12,6 +12,7 @@ import { Router } from "express";
 import { eq } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import { db } from "@workspace/db";
 import { downloadConfigsTable } from "@workspace/db/schema";
 import { requireAdmin } from "../middlewares/requireAdmin";
@@ -21,8 +22,10 @@ const router = Router();
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-const APK_FILE     = path.join(process.cwd(), "public/downloads/banglakhata.apk");
-const WINDOWS_FILE = path.join(process.cwd(), "public/downloads/banglakhata-windows.exe");
+const __dirname    = path.dirname(fileURLToPath(import.meta.url));
+const DOWNLOADS    = path.resolve(__dirname, "../public/downloads");
+const APK_FILE     = path.join(DOWNLOADS, "banglakhata.apk");
+const WINDOWS_FILE = path.join(DOWNLOADS, "banglakhata-windows.exe");
 
 async function getConfig() {
   const [row] = await db.select().from(downloadConfigsTable).limit(1);

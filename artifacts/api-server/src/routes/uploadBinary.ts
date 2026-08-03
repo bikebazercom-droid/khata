@@ -8,12 +8,14 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from "url";
 import { requireAdmin } from "../middlewares/requireAdmin";
 import { logger } from "../lib/logger";
 
 const router = Router();
 
-const DOWNLOADS_DIR = path.join(process.cwd(), "public/downloads");
+const __dirname     = path.dirname(fileURLToPath(import.meta.url));
+const DOWNLOADS_DIR = path.resolve(__dirname, "../public/downloads");
 
 // Map accepted field names to their fixed filenames on disk.
 const FILE_MAP: Record<string, string> = {

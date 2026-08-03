@@ -11,6 +11,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useCreateLedgerEntry,
+  useListParties,
   LedgerEntryType,
   getListLedgerEntriesQueryKey,
   getGetPartyQueryKey,
@@ -20,7 +21,7 @@ import {
   type Party,
   type DashboardSummary,
 } from '@workspace/api-client-react';
-import { ChevronLeft, Camera, X } from 'lucide-react';
+import { ChevronLeft, Camera, X, ArrowLeftRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { cn, evaluateCalculatorExpression, formatCurrency, formatCurrencyTyping, formatExpressionForDisplay, toBengaliDigits, trimNumberForExpression } from '@/lib/utils';
@@ -152,6 +153,9 @@ export function TransactionEntryScreen({
           billImage: data.billImage ?? null,
           dueDate: data.dueDate ?? null,
           createdAt: new Date().toISOString(),
+          isTransfer: data.isTransfer ?? false,
+          transferPartyId: data.transferPartyId ?? null,
+          linkedEntryId: null,
         };
         queryClient.setQueryData<LedgerEntry[]>(entriesKey, (old) => [optimisticEntry, ...(old ?? [])]);
 
@@ -182,7 +186,7 @@ export function TransactionEntryScreen({
         queryClient.setQueryData(context.partiesKey, context.previousParties);
         queryClient.setQueryData(context.summaryKey, context.previousSummary);
       },
-      onSettled: (_data, _err, { partyId }) => {
+      onSettled: (_data, _err, { partyId, data }) => {
         // Silent background reconciliation — replaces the optimistic
         // temp-id entry / estimated balances with the server's real data
         // without ever blocking or flashing a loading state.
@@ -190,6 +194,11 @@ export function TransactionEntryScreen({
         queryClient.invalidateQueries({ queryKey: getGetPartyQueryKey(partyId) });
         queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+        // For transfer entries, also refresh the counter-party's data.
+        if (data.transferPartyId) {
+          queryClient.invalidateQueries({ queryKey: getListLedgerEntriesQueryKey(data.transferPartyId) });
+          queryClient.invalidateQueries({ queryKey: getGetPartyQueryKey(data.transferPartyId) });
+        }
       },
     },
   });
@@ -277,6 +286,18 @@ export function TransactionEntryScreen({
   // back down to zero. In edit mode it starts open immediately so all fields
   // are visible without requiring a keypad interaction first.
   const [hasInteracted, setHasInteracted] = useState(isEditMode);
+
+  // ── Transfer / adjustment state (create mode only) ────────────────────────
+  const [isTransferMode, setIsTransferMode] = useState(false);
+  const [transferPartyId, setTransferPartyId] = useState<string | null>(null);
+  const [transferSearch, setTransferSearch] = useState('');
+
+  // Fetch party list for the transfer dropdown (only when toggle is on).
+  const { data: transferPartyList = [] } = useListParties(
+    { search: transferSearch || undefined },
+    { query: { enabled: isTransferMode && !isEditMode } },
+  );
+  const transferPartyOptions = transferPartyList.filter((p) => p.id !== partyId);
 
   // Controls the "unsaved changes" confirmation dialog shown when the user
   // presses back with a dirty edit-mode form.
@@ -727,6 +748,15 @@ export function TransactionEntryScreen({
       return;
     }
 
+    // Validate transfer selection before doing anything else.
+    if (isTransferMode && !transferPartyId) {
+      toast.warning('কাস্টমার বেছে নিন', {
+        description: 'অ্যাডজাস্টমেন্টের জন্য একটি কাস্টমার নির্বাচন করুন।',
+        duration: 3000,
+      });
+      return;
+    }
+
     // Optimistic UI: close the entry screen immediately so the user never
     // waits. The memory log is scoped to this transaction entry, so it's
     // cleared the moment the amount is handed off.
@@ -783,6 +813,8 @@ export function TransactionEntryScreen({
             // cloud storage, NOT the local base64 data URL.
             billImage: objectPath,
             dueDate: dueDate || undefined,
+            isTransfer: isTransferMode || undefined,
+            transferPartyId: isTransferMode ? transferPartyId : undefined,
           },
         });
 
@@ -797,7 +829,7 @@ export function TransactionEntryScreen({
         // Do not save a pending upload record since the entry itself wasn't created.
       }
     })();
-  }, [memoryHistory.length, memoryValue, expression, createEntry, partyId, type, description, dueDate, clearMemory, onClose]);
+  }, [memoryHistory.length, memoryValue, expression, createEntry, partyId, type, description, dueDate, clearMemory, onClose, isTransferMode, transferPartyId]);
 
   return (
     <div className="absolute inset-0 z-50 bg-[#f8fafc] flex flex-col">
@@ -866,7 +898,7 @@ export function TransactionEntryScreen({
           aria-hidden={!showMetadata}
           className={cn(
             'overflow-hidden transition-[max-height,opacity] duration-300 ease-in-out shrink-0',
-            showMetadata ? 'max-h-[320px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
+            showMetadata ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
           )}
         >
           <div className="flex flex-col gap-3 pt-0.5">
@@ -926,6 +958,76 @@ export function TransactionEntryScreen({
                 </button>
               )}
             </div>
+
+            {/* Transfer / adjustment toggle — create mode only */}
+            {!isEditMode && (
+              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                {/* Toggle row */}
+                <button
+                  type="button"
+                  tabIndex={showMetadata ? 0 : -1}
+                  onClick={() => {
+                    setIsTransferMode((v) => !v);
+                    setTransferPartyId(null);
+                    setTransferSearch('');
+                  }}
+                  className="w-full flex items-center justify-between px-4 py-3 active:bg-slate-50 transition-colors"
+                >
+                  <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <ArrowLeftRight className="w-4 h-4 text-blue-500 shrink-0" />
+                    অন্য কাস্টমারের সাথে অ্যাডজাস্ট করুন
+                  </span>
+                  <div className={cn(
+                    'w-10 h-6 rounded-full shrink-0 transition-colors duration-200 flex items-center px-0.5',
+                    isTransferMode ? 'bg-blue-500' : 'bg-slate-300',
+                  )}>
+                    <div className={cn(
+                      'w-5 h-5 rounded-full bg-white shadow transition-transform duration-200',
+                      isTransferMode ? 'translate-x-4' : 'translate-x-0',
+                    )} />
+                  </div>
+                </button>
+
+                {/* Party search + list — only when toggle is on */}
+                {isTransferMode && (
+                  <div className="px-3 pb-3 border-t border-slate-100">
+                    <input
+                      value={transferSearch}
+                      onChange={(e) => setTransferSearch(e.target.value)}
+                      placeholder="কার সাথে অ্যাডজাস্ট হবে?"
+                      tabIndex={showMetadata ? 0 : -1}
+                      className="w-full h-9 px-3 rounded-lg bg-slate-50 border border-slate-200 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 mt-2.5 mb-2"
+                    />
+                    <div className="max-h-[108px] overflow-y-auto space-y-1">
+                      {transferPartyOptions.length === 0 && (
+                        <p className="text-xs text-slate-400 text-center py-2">কোনো কাস্টমার পাওয়া যায়নি</p>
+                      )}
+                      {transferPartyOptions.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          tabIndex={showMetadata ? 0 : -1}
+                          onClick={() => setTransferPartyId(p.id)}
+                          className={cn(
+                            'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left',
+                            transferPartyId === p.id
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-slate-50 text-slate-700 active:bg-slate-100',
+                          )}
+                        >
+                          <span className="flex-1 truncate">{p.name}</span>
+                          {p.phone && (
+                            <span className={cn('text-xs shrink-0', transferPartyId === p.id ? 'text-blue-100' : 'text-slate-400')}>
+                              {p.phone}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -1,0 +1,47 @@
+Cross-Customer Direct Transfer / Adjustment Feature
+
+Goal:
+Implement a "Customer-to-Customer Direct Transfer" feature in the transaction entry form so a user can automatically credit one customer's account while debiting another customer's account in a single form submission.
+
+1. Database Schema Changes (packages/db or DB migrations):
+In the transactions table, add optional fields for tracking transfer entries:
+
+is_transfer: boolean (default: false)
+
+transfer_customer_id: uuid / integer (nullable, references customers.id)
+
+linked_transaction_id: uuid / integer (nullable, self-references transactions.id for double-entry tracking)
+
+2. Backend API Logic (artifacts/api-server):
+Create or update the Transaction Creation Endpoint (e.g., POST /api/transactions) to support transfer mode.
+
+Wrap the creation logic inside a Database Transaction (db.transaction) to guarantee atomicity:
+
+Primary Entry: Insert transaction for Customer A (Current active customer, e.g., Bablu) with the selected type (GIVE / GET).
+
+Counter Entry: If is_transfer is true and transfer_customer_id is provided (e.g., Rahim):
+
+Automatically insert an inverse transaction for Customer B.
+
+If Customer A got GIVE (দিয়েছি), Customer B gets GET (পেয়েছি), and vice versa.
+
+Link both transactions using linked_transaction_id and set is_transfer = true.
+
+Auto-append notes like: "Adjusted with [Customer B Name]" and "Adjusted from [Customer A Name]".
+
+3. Frontend UI Modifications (khatabook and khatabook-mobile):
+Transaction Entry Modal / Form:
+
+Add a toggle switch or checkbox: "অন্য কাস্টমারের সাথে অ্যাডজাস্ট করুন" (Transfer/Adjustment).
+
+When toggled ON:
+
+Show a searchable Customer Dropdown labeled "কার সাথে অ্যাডজাস্ট হবে?" (Select Target Customer). Filter out the current customer from this list.
+
+Keep the Amount, Date, Note, and Bill attachment fields as they are.
+
+On form submit, send isTransfer: true and transferCustomerId to the API.
+
+Transaction List View:
+
+Display a subtle transfer icon (e.g., ⇄ or RepeatIcon) next to transfer entries in the ledger history so users know this was an automated cross-customer adjustment.

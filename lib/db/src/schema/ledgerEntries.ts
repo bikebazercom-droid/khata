@@ -6,6 +6,8 @@ import {
   date,
   timestamp,
   pgEnum,
+  boolean,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -30,6 +32,16 @@ export const ledgerEntriesTable = pgTable("ledger_entries", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
+  // Cross-customer transfer / adjustment fields
+  isTransfer: boolean("is_transfer").notNull().default(false),
+  transferPartyId: uuid("transfer_party_id").references(
+    () => partiesTable.id,
+    { onDelete: "set null" },
+  ),
+  linkedEntryId: uuid("linked_entry_id").references(
+    (): AnyPgColumn => ledgerEntriesTable.id,
+    { onDelete: "set null" },
+  ),
 });
 
 export const insertLedgerEntrySchema = createInsertSchema(

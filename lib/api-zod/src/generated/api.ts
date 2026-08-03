@@ -162,7 +162,10 @@ export const ListLedgerEntriesResponseItem = zod.object({
   "billReference": zod.string().nullable(),
   "billImage": zod.string().nullable().describe('Scanned bill\/receipt image stored as a cloud storage object path (e.g. \/objects\/uploads\/uuid). Legacy rows may hold a base64 data URL during migration.'),
   "dueDate": zod.coerce.date().nullable(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "isTransfer": zod.boolean(),
+  "transferPartyId": zod.string().nullable(),
+  "linkedEntryId": zod.string().nullable()
 })
 export const ListLedgerEntriesResponse = zod.array(ListLedgerEntriesResponseItem)
 
@@ -185,7 +188,9 @@ export const CreateLedgerEntryBody = zod.object({
   "description": zod.string().optional(),
   "billReference": zod.string().nullish(),
   "billImage": zod.string().nullish().describe('Cloud storage object path for the scanned bill\/receipt image (e.g. \/objects\/uploads\/uuid).'),
-  "dueDate": zod.coerce.date().nullish()
+  "dueDate": zod.coerce.date().nullish(),
+  "isTransfer": zod.boolean().optional(),
+  "transferPartyId": zod.string().nullish()
 })
 
 export const CreateLedgerEntryResponse = zod.object({
@@ -197,7 +202,10 @@ export const CreateLedgerEntryResponse = zod.object({
   "billReference": zod.string().nullable(),
   "billImage": zod.string().nullable().describe('Scanned bill\/receipt image stored as a cloud storage object path (e.g. \/objects\/uploads\/uuid). Legacy rows may hold a base64 data URL during migration.'),
   "dueDate": zod.coerce.date().nullable(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "isTransfer": zod.boolean(),
+  "transferPartyId": zod.string().nullable(),
+  "linkedEntryId": zod.string().nullable()
 })
 
 

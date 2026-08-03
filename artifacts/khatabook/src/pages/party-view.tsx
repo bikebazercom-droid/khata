@@ -21,6 +21,7 @@ import {
   MessageSquareText,
   Plus,
   Loader2,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -428,8 +429,13 @@ export function PartyView() {
                         style={{ animationDelay: `${i * 30}ms` }}
                       >
                         <div className="min-w-0 py-3 pl-4">
-                          <p className="text-[12px] font-bold text-slate-700">
+                          <p className="text-[12px] font-bold text-slate-700 flex items-center gap-1.5 flex-wrap">
                             {format(new Date(`${entryDateKey(entry)}T00:00:00`), 'd MMM yy', { locale: bnLocale })} • {format(new Date(entry.createdAt as string), 'HH:mm')}
+                            {entry.isTransfer && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 text-[9px] font-bold">
+                                <ArrowLeftRight className="w-2.5 h-2.5" />ট্রান্সফার
+                              </span>
+                            )}
                           </p>
                           <p className={cn(
                             'text-[11px] font-semibold mt-0.5',

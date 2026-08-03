@@ -262,8 +262,114 @@ router.post(
       return;
     }
 
-    const { type, amount, description, billReference, billImage, dueDate } = body.data;
+    const { type, amount, description, billReference, billImage, dueDate, isTransfer, transferPartyId } = body.data;
 
+    // ── TRANSFER MODE: atomic double-entry across two parties ─────────────────
+    if (isTransfer && transferPartyId) {
+      const [transferParty] = await db
+        .select()
+        .from(partiesTable)
+        .where(
+          and(
+            eq(partiesTable.id, transferPartyId),
+            eq(partiesTable.businessId, businessId),
+          ),
+        );
+
+      if (!transferParty) {
+        res.status(404).json({ error: "Transfer party not found" });
+        return;
+      }
+
+      const counterType: "YOU_GAVE" | "YOU_GOT" = type === "YOU_GAVE" ? "YOU_GOT" : "YOU_GAVE";
+      const primaryDesc = description?.trim()
+        ? `${description.trim()} — অ্যাডজাস্ট করা হয়েছে ${transferParty.name}-এর সাথে`
+        : `অ্যাডজাস্ট করা হয়েছে ${transferParty.name}-এর সাথে`;
+      const counterDesc = `অ্যাডজাস্ট করা হয়েছে ${party.name}-এর সাথে`;
+
+      // eslint-disable-next-line prefer-const
+      let primaryEntry!: typeof ledgerEntriesTable.$inferSelect;
+      // eslint-disable-next-line prefer-const
+      let counterEntry!: typeof ledgerEntriesTable.$inferSelect;
+
+      const now = new Date();
+
+      await db.transaction(async (tx) => {
+        // Insert both entries first (without linkedEntryId — we don't know the
+        // counter ID yet when inserting the primary entry).
+        [primaryEntry] = await tx
+          .insert(ledgerEntriesTable)
+          .values({
+            partyId: party.id,
+            type,
+            amount: amount.toFixed(2),
+            description: primaryDesc,
+            billReference: billReference ?? null,
+            billImage: billImage ?? null,
+            dueDate: toDateOnlyString(dueDate ?? null),
+            isTransfer: true,
+            transferPartyId,
+          })
+          .returning();
+
+        [counterEntry] = await tx
+          .insert(ledgerEntriesTable)
+          .values({
+            partyId: transferPartyId,
+            type: counterType,
+            amount: amount.toFixed(2),
+            description: counterDesc,
+            isTransfer: true,
+            transferPartyId: party.id,
+          })
+          .returning();
+
+        // Cross-link both entries now that both IDs are known.
+        await tx
+          .update(ledgerEntriesTable)
+          .set({ linkedEntryId: counterEntry!.id })
+          .where(eq(ledgerEntriesTable.id, primaryEntry!.id));
+        await tx
+          .update(ledgerEntriesTable)
+          .set({ linkedEntryId: primaryEntry!.id })
+          .where(eq(ledgerEntriesTable.id, counterEntry!.id));
+
+        // Update party A balance
+        const partyASigned = toSignedBalance(party);
+        const partyADelta = type === "YOU_GAVE" ? amount : -amount;
+        const partyABalance = fromSignedBalance(partyASigned + partyADelta);
+        await tx
+          .update(partiesTable)
+          .set({ ...partyABalance, lastTransactionAt: now })
+          .where(eq(partiesTable.id, party.id));
+
+        // Update party B balance
+        const partyBSigned = toSignedBalance(transferParty);
+        const partyBDelta = counterType === "YOU_GAVE" ? amount : -amount;
+        const partyBBalance = fromSignedBalance(partyBSigned + partyBDelta);
+        await tx
+          .update(partiesTable)
+          .set({ ...partyBBalance, lastTransactionAt: now })
+          .where(eq(partiesTable.id, transferPartyId));
+      });
+
+      // Reflect the linked IDs in the in-memory objects (update queries don't
+      // return rows without .returning(), so we patch them manually here).
+      const primaryEntryFinal = { ...primaryEntry!, linkedEntryId: counterEntry!.id };
+
+      broadcast(businessId, { type: "ledger.created", payload: { partyId: party.id, entryId: primaryEntry!.id } });
+      broadcast(businessId, { type: "ledger.created", payload: { partyId: transferPartyId, entryId: counterEntry!.id } });
+
+      res.status(201).json(
+        CreateLedgerEntryResponse.parse({
+          ...primaryEntryFinal,
+          amount: Number(primaryEntryFinal.amount),
+        }),
+      );
+      return;
+    }
+
+    // ── NORMAL MODE ───────────────────────────────────────────────────────────
     const currentSigned = toSignedBalance(party);
     const delta = type === "YOU_GAVE" ? amount : -amount;
     const nextSigned = currentSigned + delta;
