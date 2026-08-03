@@ -444,7 +444,7 @@ export function PartyView() {
                             ব্যালেন্স: {formatCurrency(Math.abs(entry.balanceAfter))}
                           </p>
                           {entry.description ? (
-                            <p className="text-[11px] font-semibold text-slate-400 mt-0.5 truncate max-w-[180px]">
+                            <p className="text-[11px] font-semibold text-slate-400 mt-0.5 truncate">
                               {entry.description}
                             </p>
                           ) : null}

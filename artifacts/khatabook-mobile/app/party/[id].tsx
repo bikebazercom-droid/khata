@@ -130,9 +130,10 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
   const [isTransferMode, setIsTransferMode] = useState(false);
   const [transferPartyId, setTransferPartyId] = useState<string | null>(null);
   const [transferSearch, setTransferSearch] = useState('');
+  const transferSearchParams = { search: transferSearch || undefined };
   const { data: allParties = [] } = useListParties(
-    { search: transferSearch || undefined },
-    { query: { enabled: isTransferMode } },
+    transferSearchParams,
+    { query: { enabled: isTransferMode, queryKey: ['/api/parties', 'transfer', transferSearch] } },
   );
   const transferPartyOptions = allParties.filter((p) => p.id !== partyId);
 
@@ -229,7 +230,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
 
   const s = StyleSheet.create({
     overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-    sheet: { backgroundColor: colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingTop: 12, paddingBottom: Platform.OS === 'ios' ? 44 : 24 },
+    sheet: { backgroundColor: colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12 },
     handle: { width: 36, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
     title: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: colors.foreground, marginBottom: 16 },
     typeRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
@@ -239,15 +240,15 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
     currency: { fontSize: 22, fontFamily: 'Inter_700Bold', color: isGave ? colors.willGet : colors.willGive, marginRight: 6 },
     amountInput: { flex: 1, fontSize: 28, fontFamily: 'Inter_700Bold', color: isGave ? colors.willGet : colors.willGive, padding: 0 },
     descInput: { backgroundColor: colors.card, borderRadius: colors.radius, borderWidth: 1, borderColor: colors.border, padding: 14, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.foreground, marginBottom: 12 },
-    attachRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
-    attachBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 14, borderRadius: colors.radius, borderWidth: 1.5, borderColor: colors.border, borderStyle: 'dashed' },
+    attachRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+    attachBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 14, borderRadius: colors.radius, borderWidth: 1.5, borderColor: colors.border, borderStyle: 'dashed' },
     attachBtnText: { fontSize: 13, fontFamily: 'Inter_500Medium', color: colors.mutedForeground },
     thumbWrapper: { position: 'relative' },
-    thumb: { width: 56, height: 56, borderRadius: 8, backgroundColor: colors.card },
-    thumbRemove: { position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: 9, backgroundColor: colors.destructive, alignItems: 'center', justifyContent: 'center' },
-    submitBtn: { borderRadius: colors.radius, padding: 16, alignItems: 'center' },
+    thumb: { width: 52, height: 52, borderRadius: 8, backgroundColor: colors.card },
+    thumbRemove: { position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: 10, backgroundColor: colors.destructive, alignItems: 'center', justifyContent: 'center' },
+    submitBtn: { borderRadius: colors.radius, paddingVertical: 16, paddingHorizontal: 12, alignItems: 'center', minHeight: 54 },
     submitText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#fff' },
-    cancelBtn: { padding: 12, alignItems: 'center', marginTop: 6 },
+    cancelBtn: { paddingVertical: 14, alignItems: 'center', marginTop: 4 },
     cancelText: { color: colors.mutedForeground, fontSize: 15, fontFamily: 'Inter_500Medium' },
   });
 
@@ -258,11 +259,20 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={s.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView
+        style={s.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'android' ? 24 : 0}
+      >
         <View style={s.sheet}>
           <View style={s.handle} />
           <Text style={s.title} numberOfLines={2}>{titleText}</Text>
 
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ paddingBottom: Platform.OS === 'ios' ? 44 : 24 }}
+          >
           {/* Type toggle */}
           <View style={s.typeRow}>
             <TouchableOpacity
@@ -317,7 +327,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
                 <TouchableOpacity
                   style={s.thumbRemove}
                   onPress={() => { setBillImageUri(null); uploadRef.current = null; }}
-                  hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+                  hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
                 >
                   <Feather name="x" size={11} color="#fff" />
                 </TouchableOpacity>
@@ -331,46 +341,104 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
             </TouchableOpacity>
           </View>
 
-          {/* Transfer / adjustment toggle */}
-          <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: colors.radius, marginBottom: 16, overflow: 'hidden' }}>
+          {/* ── Transfer / adjustment section ─────────────────────────── */}
+          <View style={{
+            borderRadius: colors.radius,
+            marginBottom: 16,
+            overflow: 'hidden',
+            borderWidth: 2,
+            borderColor: isTransferMode ? '#3b82f6' : '#dbeafe',
+            backgroundColor: isTransferMode ? '#eff6ff' : '#f8faff',
+          }}>
+            {/* Header row — always visible */}
             <TouchableOpacity
-              activeOpacity={0.8}
+              activeOpacity={0.75}
               onPress={() => { setIsTransferMode(v => !v); setTransferPartyId(null); setTransferSearch(''); }}
-              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, backgroundColor: colors.card }}
+              style={{ flexDirection: 'row', alignItems: 'center', minHeight: 56, paddingHorizontal: 14, paddingVertical: 12 }}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Feather name="repeat" size={15} color="#3b82f6" />
-                <Text style={{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: colors.foreground }}>অন্য কাস্টমারের সাথে অ্যাডজাস্ট</Text>
+              {/* Blue icon badge */}
+              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: isTransferMode ? '#3b82f6' : '#bfdbfe', alignItems: 'center', justifyContent: 'center', marginRight: 12, flexShrink: 0 }}>
+                <Feather name="repeat" size={18} color={isTransferMode ? '#fff' : '#3b82f6'} />
+              </View>
+              {/* Label + subtitle */}
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <Text style={{ fontSize: 14, fontFamily: 'Inter_700Bold', color: isTransferMode ? '#1d4ed8' : '#1e3a5f' }}>
+                  অ্যাডজাস্টমেন্ট
+                </Text>
+                <Text style={{ fontSize: 11, fontFamily: 'Inter_400Regular', color: isTransferMode ? '#3b82f6' : '#64748b', marginTop: 1 }} numberOfLines={1}>
+                  {isTransferMode && transferPartyId
+                    ? `✓ কাস্টমার নির্বাচিত হয়েছে`
+                    : 'অন্য কাস্টমারের সাথে অ্যাডজাস্ট করুন'}
+                </Text>
               </View>
               {/* Toggle pill */}
-              <View style={{ width: 40, height: 24, borderRadius: 12, backgroundColor: isTransferMode ? '#3b82f6' : colors.border, justifyContent: 'center', paddingHorizontal: 2 }}>
-                <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff', alignSelf: isTransferMode ? 'flex-end' : 'flex-start', elevation: 2, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 2 }} />
+              <View style={{ width: 48, height: 28, borderRadius: 14, backgroundColor: isTransferMode ? '#3b82f6' : '#cbd5e1', justifyContent: 'center', paddingHorizontal: 3, flexShrink: 0 }}>
+                <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff', alignSelf: isTransferMode ? 'flex-end' : 'flex-start', elevation: 3, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 3 }} />
               </View>
             </TouchableOpacity>
 
+            {/* Expanded: search + party list */}
             {isTransferMode && (
-              <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: 12, paddingBottom: 10 }}>
+              <View style={{ borderTopWidth: 1.5, borderTopColor: '#bfdbfe', paddingHorizontal: 12, paddingBottom: 12, backgroundColor: '#fff' }}>
                 <TextInput
                   value={transferSearch}
                   onChangeText={setTransferSearch}
-                  placeholder="কার সাথে অ্যাডজাস্ট হবে?"
-                  placeholderTextColor={colors.mutedForeground}
-                  style={{ backgroundColor: colors.background, borderRadius: 8, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.foreground, marginTop: 10, marginBottom: 6 }}
+                  placeholder="কাস্টমারের নাম লিখুন…"
+                  placeholderTextColor="#94a3b8"
+                  style={{
+                    backgroundColor: '#f1f5f9',
+                    borderRadius: 10,
+                    borderWidth: 1.5,
+                    borderColor: '#bfdbfe',
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    fontSize: 14,
+                    fontFamily: 'Inter_400Regular',
+                    color: '#0f172a',
+                    marginTop: 12,
+                    marginBottom: 8,
+                  }}
                 />
-                <ScrollView style={{ maxHeight: 120 }} nestedScrollEnabled>
+                <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
                   {transferPartyOptions.length === 0 ? (
-                    <Text style={{ fontSize: 12, color: colors.mutedForeground, textAlign: 'center', paddingVertical: 8 }}>কোনো কাস্টমার পাওয়া যায়নি</Text>
-                  ) : transferPartyOptions.map((p) => (
-                    <TouchableOpacity
-                      key={p.id}
-                      activeOpacity={0.75}
-                      onPress={() => setTransferPartyId(p.id)}
-                      style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 9, borderRadius: 8, marginBottom: 3, backgroundColor: transferPartyId === p.id ? '#3b82f6' : colors.background }}
-                    >
-                      <Text style={{ flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium', color: transferPartyId === p.id ? '#fff' : colors.foreground }} numberOfLines={1}>{p.name}</Text>
-                      {p.phone ? <Text style={{ fontSize: 11, color: transferPartyId === p.id ? 'rgba(255,255,255,0.7)' : colors.mutedForeground }}>{p.phone}</Text> : null}
-                    </TouchableOpacity>
-                  ))}
+                    <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+                      <Feather name="users" size={20} color="#94a3b8" />
+                      <Text style={{ fontSize: 12, color: '#94a3b8', fontFamily: 'Inter_400Regular', marginTop: 6 }}>কোনো কাস্টমার পাওয়া যায়নি</Text>
+                    </View>
+                  ) : transferPartyOptions.map((p) => {
+                    const selected = transferPartyId === p.id;
+                    return (
+                      <TouchableOpacity
+                        key={p.id}
+                        activeOpacity={0.75}
+                        onPress={() => setTransferPartyId(p.id)}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          minHeight: 50,
+                          paddingHorizontal: 12,
+                          paddingVertical: 10,
+                          borderRadius: 10,
+                          marginBottom: 4,
+                          backgroundColor: selected ? '#3b82f6' : '#f8fafc',
+                          borderWidth: 1.5,
+                          borderColor: selected ? '#2563eb' : '#e2e8f0',
+                        }}
+                      >
+                        {/* Avatar initial */}
+                        <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: selected ? 'rgba(255,255,255,0.25)' : '#dbeafe', alignItems: 'center', justifyContent: 'center', marginRight: 10, flexShrink: 0 }}>
+                          <Text style={{ fontSize: 13, fontFamily: 'Inter_700Bold', color: selected ? '#fff' : '#3b82f6' }}>
+                            {p.name.slice(0, 1).toUpperCase()}
+                          </Text>
+                        </View>
+                        <Text style={{ flex: 1, fontSize: 14, fontFamily: 'Inter_600SemiBold', color: selected ? '#fff' : '#0f172a', marginRight: 8 }} numberOfLines={1} ellipsizeMode="tail">{p.name}</Text>
+                        {p.phone ? (
+                          <Text style={{ fontSize: 11, flexShrink: 0, color: selected ? 'rgba(255,255,255,0.75)' : '#64748b', fontFamily: 'Inter_400Regular' }} numberOfLines={1}>{p.phone}</Text>
+                        ) : null}
+                        {selected && <Feather name="check-circle" size={16} color="#fff" style={{ marginLeft: 6, flexShrink: 0 }} />}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </ScrollView>
               </View>
             )}
@@ -390,6 +458,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
           <TouchableOpacity style={s.cancelBtn} onPress={() => { reset(); onClose(); }}>
             <Text style={s.cancelText}>বাতিল</Text>
           </TouchableOpacity>
+          </ScrollView>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -449,16 +518,20 @@ function ReminderSheet({ visible, partyId, partyName, partyPhone, onClose }: Rem
     title: { fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.foreground, marginBottom: 4 },
     subtitle: { fontSize: 13, color: colors.mutedForeground, fontFamily: 'Inter_400Regular', marginBottom: 20 },
     msgBox: { backgroundColor: colors.card, borderRadius: colors.radius, borderWidth: 1.5, borderColor: colors.border, padding: 14, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.foreground, minHeight: 120, textAlignVertical: 'top', marginBottom: 20 },
-    sendBtn: { borderRadius: colors.radius, padding: 16, alignItems: 'center', backgroundColor: colors.primary, flexDirection: 'row', justifyContent: 'center', gap: 8 },
+    sendBtn: { borderRadius: colors.radius, paddingVertical: 16, paddingHorizontal: 12, alignItems: 'center', backgroundColor: colors.primary, flexDirection: 'row', justifyContent: 'center', gap: 8, minHeight: 54 },
     sendBtnText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#fff' },
-    cancelBtn: { padding: 12, alignItems: 'center', marginTop: 6 },
+    cancelBtn: { paddingVertical: 14, alignItems: 'center', marginTop: 4 },
     cancelText: { color: colors.mutedForeground, fontSize: 15, fontFamily: 'Inter_500Medium' },
   });
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={s.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={s.sheet}>
+      <KeyboardAvoidingView
+        style={s.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'android' ? 24 : 0}
+      >
+        <View style={[s.sheet, { paddingBottom: Platform.OS === 'ios' ? 44 : 24 }]}>
           <View style={s.handle} />
           <Text style={s.title}>রিমাইন্ডার পাঠান</Text>
           <Text style={s.subtitle}>{partyName}</Text>
@@ -532,12 +605,12 @@ function LedgerRow({ entry, colors, onPress }: LedgerRowProps) {
   const isTransfer = entry.isTransfer;
 
   const s = StyleSheet.create({
-    row: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
-    dot: { width: 10, height: 10, borderRadius: 5, marginTop: 5, marginRight: 12, backgroundColor: isGave ? colors.willGet : colors.willGive },
+    row: { flexDirection: 'row', alignItems: 'flex-start', minHeight: 64, paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
+    dot: { width: 10, height: 10, borderRadius: 5, marginTop: 5, marginRight: 12, flexShrink: 0, backgroundColor: isGave ? colors.willGet : colors.willGive },
     desc: { fontSize: 14, fontFamily: 'Inter_500Medium', color: colors.foreground, flex: 1 },
     meta: { fontSize: 12, color: colors.mutedForeground, fontFamily: 'Inter_400Regular', marginTop: 2 },
     tag: { fontSize: 11, fontFamily: 'Inter_600SemiBold', marginTop: 3 },
-    amount: { fontSize: 16, fontFamily: 'Inter_700Bold', textAlign: 'right' },
+    amount: { fontSize: 16, fontFamily: 'Inter_700Bold', textAlign: 'right', flexShrink: 0, paddingLeft: 10, maxWidth: '38%' },
     thumb: { width: 44, height: 44, borderRadius: 6, marginTop: 6, backgroundColor: colors.card },
   });
 

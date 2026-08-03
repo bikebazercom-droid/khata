@@ -853,11 +853,11 @@ export function TransactionEntryScreen({
       <div className="flex-1 min-h-0 flex flex-col justify-start px-3 py-3 gap-3 overflow-hidden">
         {/* Amount card + live formula sub-bar */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden shrink-0">
-          <div className="px-4 py-5">
-            <span className={cn('text-3xl font-extrabold tracking-tight', isGet ? 'text-emerald-600' : 'text-red-500')}>
+          <div className="px-4 py-3 flex items-center gap-3">
+            <span className={cn('text-2xl font-extrabold tracking-tight', isGet ? 'text-emerald-600' : 'text-red-500')}>
               {bigDisplayText ?? formatCurrency(0)}
             </span>
-            {!isActive && <p className="text-xs font-semibold text-slate-400 mt-1">পরিমাণ লিখুন</p>}
+            {!isActive && <p className="text-sm font-semibold text-slate-400">পরিমাণ লিখুন</p>}
           </div>
           {/* Live memory history list: every M+/M- entry logged this session,
               newest at the bottom, scrollable once it grows past a few
@@ -910,124 +910,6 @@ export function TransactionEntryScreen({
               placeholder="বিস্তারিত লিখুন (পণ্য, বিল নং, পরিমাণ ইত্যাদি)"
               className="w-full h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
-
-            {/* Date + attach bills */}
-            <div className="grid grid-cols-2 gap-3 -mt-1.5">
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                tabIndex={showMetadata ? 0 : -1}
-                className="h-11 px-3 rounded-xl bg-white border border-slate-200 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20"
-              />
-              {billImage ? (
-                <div className="h-11 flex items-center justify-end gap-2">
-                  <div className="relative h-11 w-11 shrink-0">
-                    <img
-                      src={billImage}
-                      alt="সংযুক্ত বিল"
-                      className="w-full h-full rounded-xl object-cover border border-slate-200"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setBillImage(null)}
-                      aria-label="বিল সংযুক্তি সরান"
-                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-sm active:scale-90 transition-transform"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    tabIndex={showMetadata ? 0 : -1}
-                    onClick={handleAttachClick}
-                    aria-label="আরও বিল যুক্ত করুন"
-                    className="h-11 w-11 shrink-0 rounded-xl bg-emerald-500 text-white flex items-center justify-center active:scale-[0.95] transition-transform"
-                  >
-                    <Camera className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  tabIndex={showMetadata ? 0 : -1}
-                  onClick={handleAttachClick}
-                  className="h-11 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-600 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
-                >
-                  <Camera className="w-4 h-4" /> বিল সংযুক্ত করুন
-                </button>
-              )}
-            </div>
-
-            {/* Transfer / adjustment toggle — create mode only */}
-            {!isEditMode && (
-              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                {/* Toggle row */}
-                <button
-                  type="button"
-                  tabIndex={showMetadata ? 0 : -1}
-                  onClick={() => {
-                    setIsTransferMode((v) => !v);
-                    setTransferPartyId(null);
-                    setTransferSearch('');
-                  }}
-                  className="w-full flex items-center justify-between px-4 py-3 active:bg-slate-50 transition-colors"
-                >
-                  <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                    <ArrowLeftRight className="w-4 h-4 text-blue-500 shrink-0" />
-                    অন্য কাস্টমারের সাথে অ্যাডজাস্ট করুন
-                  </span>
-                  <div className={cn(
-                    'w-10 h-6 rounded-full shrink-0 transition-colors duration-200 flex items-center px-0.5',
-                    isTransferMode ? 'bg-blue-500' : 'bg-slate-300',
-                  )}>
-                    <div className={cn(
-                      'w-5 h-5 rounded-full bg-white shadow transition-transform duration-200',
-                      isTransferMode ? 'translate-x-4' : 'translate-x-0',
-                    )} />
-                  </div>
-                </button>
-
-                {/* Party search + list — only when toggle is on */}
-                {isTransferMode && (
-                  <div className="px-3 pb-3 border-t border-slate-100">
-                    <input
-                      value={transferSearch}
-                      onChange={(e) => setTransferSearch(e.target.value)}
-                      placeholder="কার সাথে অ্যাডজাস্ট হবে?"
-                      tabIndex={showMetadata ? 0 : -1}
-                      className="w-full h-9 px-3 rounded-lg bg-slate-50 border border-slate-200 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 mt-2.5 mb-2"
-                    />
-                    <div className="max-h-[108px] overflow-y-auto space-y-1">
-                      {transferPartyOptions.length === 0 && (
-                        <p className="text-xs text-slate-400 text-center py-2">কোনো কাস্টমার পাওয়া যায়নি</p>
-                      )}
-                      {transferPartyOptions.map((p) => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          tabIndex={showMetadata ? 0 : -1}
-                          onClick={() => setTransferPartyId(p.id)}
-                          className={cn(
-                            'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left',
-                            transferPartyId === p.id
-                              ? 'bg-blue-500 text-white'
-                              : 'bg-slate-50 text-slate-700 active:bg-slate-100',
-                          )}
-                        >
-                          <span className="flex-1 truncate">{p.name}</span>
-                          {p.phone && (
-                            <span className={cn('text-xs shrink-0', transferPartyId === p.id ? 'text-blue-100' : 'text-slate-400')}>
-                              {p.phone}
-                            </span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -1043,6 +925,117 @@ export function TransactionEntryScreen({
           <div className="w-10 h-10 rounded-full border-4 border-white/30 border-t-white animate-spin" />
           <p className="text-white text-sm font-semibold">স্ক্যানিং হচ্ছে...</p>
         </div>
+      )}
+
+      {/* ── Toolbar: date · bill · adjustment — shown after first key press ─── */}
+      {showMetadata && (
+      <div className="px-3 pb-2 shrink-0 space-y-2">
+        {/* Row 1: date + bill */}
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            className="h-11 px-3 rounded-xl bg-white border border-slate-200 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20"
+          />
+          {billImage ? (
+            <div className="h-11 flex items-center justify-end gap-2">
+              <div className="relative h-11 w-11 shrink-0">
+                <img src={billImage} alt="সংযুক্ত বিল" className="w-full h-full rounded-xl object-cover border border-slate-200" />
+                <button
+                  type="button"
+                  onClick={() => setBillImage(null)}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-sm active:scale-90 transition-transform"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={handleAttachClick}
+                className="h-11 flex-1 rounded-xl bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 active:scale-[0.97] transition-transform"
+              >
+                <Camera className="w-4 h-4" /> পরিবর্তন
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleAttachClick}
+              className="h-11 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-600 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+            >
+              <Camera className="w-4 h-4" /> বিল সংযুক্ত করুন
+            </button>
+          )}
+        </div>
+
+        {/* Row 2: adjustment toggle — create mode only */}
+        {!isEditMode && (
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            {/* Compact toggle row */}
+            <button
+              type="button"
+              onClick={() => { setIsTransferMode((v) => !v); setTransferPartyId(null); setTransferSearch(''); }}
+              className="w-full h-11 flex items-center justify-between px-4 active:bg-slate-50 transition-colors"
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold text-slate-700 min-w-0">
+                <ArrowLeftRight className="w-4 h-4 text-blue-500 shrink-0" />
+                <span className="truncate">
+                  {isTransferMode && transferPartyId
+                    ? `⇄ ${transferPartyOptions.find(p => p.id === transferPartyId)?.name ?? 'নির্বাচিত'}`
+                    : 'অ্যাডজাস্টমেন্ট'}
+                </span>
+              </span>
+              {/* Toggle pill */}
+              <div className={cn(
+                'w-10 h-6 rounded-full shrink-0 ml-3 transition-colors duration-200 flex items-center px-0.5',
+                isTransferMode ? 'bg-blue-500' : 'bg-slate-300',
+              )}>
+                <div className={cn(
+                  'w-5 h-5 rounded-full bg-white shadow transition-transform duration-200',
+                  isTransferMode ? 'translate-x-4' : 'translate-x-0',
+                )} />
+              </div>
+            </button>
+
+            {/* Customer list — only when toggle is ON */}
+            {isTransferMode && (
+              <div className="border-t border-slate-100 px-3 pb-3">
+                <input
+                  value={transferSearch}
+                  onChange={(e) => setTransferSearch(e.target.value)}
+                  placeholder="কাস্টমারের নাম লিখুন…"
+                  autoFocus
+                  className="w-full h-9 px-3 mt-2.5 mb-2 rounded-lg bg-slate-50 border border-slate-200 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400/30"
+                />
+                <div className="max-h-[120px] overflow-y-auto space-y-1">
+                  {transferPartyOptions.length === 0 && (
+                    <p className="text-xs text-slate-400 text-center py-2">কোনো কাস্টমার পাওয়া যায়নি</p>
+                  )}
+                  {transferPartyOptions.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setTransferPartyId(p.id)}
+                      className={cn(
+                        'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-left transition-colors',
+                        transferPartyId === p.id ? 'bg-blue-500 text-white' : 'bg-slate-50 text-slate-700 active:bg-slate-100',
+                      )}
+                    >
+                      <span className="flex-1 truncate">{p.name}</span>
+                      {p.phone && (
+                        <span className={cn('text-xs shrink-0', transferPartyId === p.id ? 'text-blue-100' : 'text-slate-400')}>
+                          {p.phone}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       )}
 
       {/* SAVE button, fixed above keypad — disabled while the amount isn't a valid non-zero total */}

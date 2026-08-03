@@ -114,6 +114,19 @@ export interface LedgerEntryInput {
   transferPartyId?: string | null;
 }
 
+export interface LedgerEntryPatch {
+  type?: LedgerEntryType;
+  /** @exclusiveMinimum 0 */
+  amount?: number;
+  description?: string;
+  /** @nullable */
+  billReference?: string | null;
+  /** @nullable */
+  billImage?: string | null;
+  /** @nullable */
+  dueDate?: string | null;
+}
+
 export interface DashboardSummary {
   youWillGet: number;
   youWillGive: number;

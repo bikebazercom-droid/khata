@@ -39,6 +39,7 @@ import type {
   HealthStatus,
   LedgerEntry,
   LedgerEntryInput,
+  LedgerEntryPatch,
   ListAdminBusinessesParams,
   ListAdminTransactionsParams,
   ListAdminUsersParams,
@@ -1914,4 +1915,100 @@ export const useSendPaymentReminder = <TError = ErrorType<void>,
       > => {
       return useMutation(getSendPaymentReminderMutationOptions(options));
     }
+
+// ─── Patch ledger entry ───────────────────────────────────────────────────────
+
+export const getPatchLedgerEntryUrl = (partyId: string, entryId: string) =>
+  `/api/parties/${partyId}/ledger-entries/${entryId}`;
+
+export const patchLedgerEntry = async (
+  partyId: string,
+  entryId: string,
+  ledgerEntryPatch: LedgerEntryPatch,
+  options?: RequestInit,
+): Promise<LedgerEntry> =>
+  customFetch<LedgerEntry>(getPatchLedgerEntryUrl(partyId, entryId), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(ledgerEntryPatch),
+  });
+
+export const getPatchLedgerEntryMutationOptions = <TError = ErrorType<void>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof patchLedgerEntry>>, TError, { partyId: string; entryId: string; data: BodyType<LedgerEntryPatch> }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseMutationOptions<Awaited<ReturnType<typeof patchLedgerEntry>>, TError, { partyId: string; entryId: string; data: BodyType<LedgerEntryPatch> }, TContext> => {
+  const mutationKey = ['patchLedgerEntry'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+  const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchLedgerEntry>>, { partyId: string; entryId: string; data: BodyType<LedgerEntryPatch> }> = (props) => {
+    const { partyId, entryId, data } = props ?? {};
+    return patchLedgerEntry(partyId, entryId, data, requestOptions);
+  };
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PatchLedgerEntryMutationResult = NonNullable<Awaited<ReturnType<typeof patchLedgerEntry>>>;
+export type PatchLedgerEntryMutationBody = BodyType<LedgerEntryPatch>;
+export type PatchLedgerEntryMutationError = ErrorType<void>;
+
+/** @summary Partially update a ledger entry */
+export const usePatchLedgerEntry = <TError = ErrorType<void>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof patchLedgerEntry>>, TError, { partyId: string; entryId: string; data: BodyType<LedgerEntryPatch> }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseMutationResult<Awaited<ReturnType<typeof patchLedgerEntry>>, TError, { partyId: string; entryId: string; data: BodyType<LedgerEntryPatch> }, TContext> =>
+  useMutation(getPatchLedgerEntryMutationOptions(options));
+
+// ─── Delete ledger entry ──────────────────────────────────────────────────────
+
+export const getDeleteLedgerEntryUrl = (partyId: string, entryId: string) =>
+  `/api/parties/${partyId}/entries/${entryId}`;
+
+export const deleteLedgerEntry = async (
+  partyId: string,
+  entryId: string,
+  options?: RequestInit,
+): Promise<void> =>
+  customFetch<void>(getDeleteLedgerEntryUrl(partyId, entryId), {
+    ...options,
+    method: 'DELETE',
+  });
+
+export const getDeleteLedgerEntryMutationOptions = <TError = ErrorType<void>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof deleteLedgerEntry>>, TError, { partyId: string; entryId: string }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseMutationOptions<Awaited<ReturnType<typeof deleteLedgerEntry>>, TError, { partyId: string; entryId: string }, TContext> => {
+  const mutationKey = ['deleteLedgerEntry'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+  const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteLedgerEntry>>, { partyId: string; entryId: string }> = (props) => {
+    const { partyId, entryId } = props ?? {};
+    return deleteLedgerEntry(partyId, entryId, requestOptions);
+  };
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteLedgerEntryMutationResult = NonNullable<Awaited<ReturnType<typeof deleteLedgerEntry>>>;
+export type DeleteLedgerEntryMutationError = ErrorType<void>;
+
+/** @summary Delete a ledger entry (and its linked transfer counter-entry if present) */
+export const useDeleteLedgerEntry = <TError = ErrorType<void>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof deleteLedgerEntry>>, TError, { partyId: string; entryId: string }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseMutationResult<Awaited<ReturnType<typeof deleteLedgerEntry>>, TError, { partyId: string; entryId: string }, TContext> =>
+  useMutation(getDeleteLedgerEntryMutationOptions(options));
 
