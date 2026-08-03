@@ -464,6 +464,61 @@ describe("DELETE /parties/:partyId/entries/:entryId — cross-business transfer"
   });
 });
 
+// ─── Test 4a: Normal-entry atomicity — mid-transaction failure leaves entry and balance intact ──
+
+describe("DELETE /parties/:partyId/entries/:entryId — normal entry atomicity on failure", () => {
+  it("leaves both the entry and the balance unchanged when the transaction is rolled back", async () => {
+    /**
+     * Strategy: spy on db.transaction and force a rollback by throwing after
+     * the real Postgres transaction runs.  The entry and balance must both be
+     * unchanged — proving that the normal-entry delete path is transactional.
+     */
+    const dbModule = await import("@workspace/db");
+    const db = dbModule.db;
+
+    // Party with a known balance.
+    const party = await createParty({ name: "Normal Atomic", signedBalance: 350 });
+    const entry = await createEntry({ partyId: party.id, type: "YOU_GAVE", amount: 350 });
+
+    const originalTransaction = db.transaction.bind(db);
+    let callCount = 0;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const forcedRollbackImpl: any = async (callback: (tx: unknown) => Promise<void>) => {
+      callCount++;
+      try {
+        await originalTransaction(async (tx) => {
+          await callback(tx);
+          throw new Error("__FORCED_ROLLBACK__");
+        });
+      } catch (err: unknown) {
+        if (err instanceof Error && err.message !== "__FORCED_ROLLBACK__") {
+          throw err;
+        }
+        // swallow — Postgres transaction is already rolled back
+      }
+    };
+    vi.spyOn(db, "transaction").mockImplementationOnce(forcedRollbackImpl);
+
+    const app = makeApp(businessId);
+
+    await request(app)
+      .delete(`/parties/${party.id}/entries/${entry.id}`)
+      .expect(200);
+
+    expect(callCount).toBe(1);
+
+    // Entry must still exist (transaction was rolled back).
+    expect(await fetchEntry(entry.id)).not.toBeNull();
+
+    // Balance must be unchanged at +350.
+    const updated = await fetchParty(party.id);
+    expect(toSigned(updated!)).toBeCloseTo(350, 2);
+
+    vi.restoreAllMocks();
+  });
+});
+
 // ─── Test 4: Atomicity — mid-transaction failure rolls everything back ────────
 
 describe("DELETE /parties/:partyId/entries/:entryId — atomicity on failure", () => {

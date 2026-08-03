@@ -632,14 +632,16 @@ router.delete(
     const nextSigned = currentSigned - delta;
     const { currentBalance, balanceType } = fromSignedBalance(nextSigned);
 
-    await db
-      .delete(ledgerEntriesTable)
-      .where(eq(ledgerEntriesTable.id, entryId));
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(ledgerEntriesTable)
+        .where(eq(ledgerEntriesTable.id, entryId));
 
-    await db
-      .update(partiesTable)
-      .set({ currentBalance, balanceType })
-      .where(eq(partiesTable.id, partyId));
+      await tx
+        .update(partiesTable)
+        .set({ currentBalance, balanceType })
+        .where(eq(partiesTable.id, partyId));
+    });
 
     broadcast(businessId, { type: "ledger.deleted", payload: { partyId, entryId } });
 
