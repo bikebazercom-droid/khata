@@ -321,6 +321,149 @@ describe("DELETE /parties/:partyId/entries/:entryId — transfer with missing co
   });
 });
 
+// ─── Test 5: Cross-business transfer — counter entry must NOT be touched ──────
+
+describe("DELETE /parties/:partyId/entries/:entryId — cross-business transfer", () => {
+  let otherBusinessId: string;
+
+  beforeAll(async () => {
+    const [biz] = await testDb
+      .insert(businessesTable)
+      .values({ name: "Other Business Cross-Biz" })
+      .returning();
+    otherBusinessId = biz!.id;
+  });
+
+  afterAll(async () => {
+    // Cascade-delete parties (and thus entries) for the other business.
+    await testDb
+      .delete(partiesTable)
+      .where(eq(partiesTable.businessId, otherBusinessId));
+    await testDb
+      .delete(businessesTable)
+      .where(eq(businessesTable.id, otherBusinessId));
+  });
+
+  it(
+    "deletes the primary entry and reverses its balance, " +
+    "but leaves the counter entry and its party balance untouched",
+    async () => {
+      // The request is authenticated as businessId (Business A).
+      const app = makeApp(businessId);
+
+      // Party A belongs to Business A (the authenticated business).
+      const partyA = await createParty({ name: "Cross-Biz A", signedBalance: 500 });
+
+      // Party B belongs to Business B (a completely different business).
+      const [partyB] = await testDb
+        .insert(partiesTable)
+        .values({
+          businessId: otherBusinessId,
+          name: "Cross-Biz B",
+          phone: "",
+          role: "CUSTOMER",
+          currentBalance: "500.00",
+          balanceType: "YOU_WILL_GIVE",
+        })
+        .returning();
+
+      // Primary entry on Party A.
+      const entryA = await createEntry({
+        partyId: partyA.id,
+        type: "YOU_GAVE",
+        amount: 500,
+        isTransfer: true,
+        transferPartyId: partyB!.id,
+      });
+
+      // Counter entry on Party B (different business).
+      const [entryB] = await testDb
+        .insert(ledgerEntriesTable)
+        .values({
+          partyId: partyB!.id,
+          type: "YOU_GOT",
+          amount: "500.00",
+          description: "cross-biz counter",
+          isTransfer: true,
+          transferPartyId: partyA.id,
+        })
+        .returning();
+
+      await crossLink(entryA.id, entryB!.id);
+
+      // Delete the primary entry as Business A.
+      const res = await request(app)
+        .delete(`/parties/${partyA.id}/entries/${entryA.id}`)
+        .expect(200);
+
+      expect(res.body).toEqual({ success: true });
+
+      // Primary entry must be gone.
+      expect(await fetchEntry(entryA.id)).toBeNull();
+
+      // Primary party balance must be reversed: was +500, YOU_GAVE 500 → 0.
+      const updatedA = await fetchParty(partyA.id);
+      expect(toSigned(updatedA!)).toBeCloseTo(0, 2);
+
+      // Counter entry on Business B must still exist — no cross-business deletion.
+      expect(await fetchEntry(entryB!.id)).not.toBeNull();
+
+      // Party B balance must be untouched — Business A cannot modify Business B.
+      const updatedB = await fetchParty(partyB!.id);
+      expect(toSigned(updatedB!)).toBeCloseTo(-500, 2);
+    },
+  );
+
+  it("never updates party rows belonging to a different business", async () => {
+    const app = makeApp(businessId);
+
+    const partyA2 = await createParty({ name: "Cross-Biz A2", signedBalance: 250 });
+    const [partyB2] = await testDb
+      .insert(partiesTable)
+      .values({
+        businessId: otherBusinessId,
+        name: "Cross-Biz B2",
+        phone: "",
+        role: "CUSTOMER",
+        currentBalance: "250.00",
+        balanceType: "YOU_WILL_GIVE",
+      })
+      .returning();
+
+    const entryA2 = await createEntry({
+      partyId: partyA2.id,
+      type: "YOU_GAVE",
+      amount: 250,
+      isTransfer: true,
+      transferPartyId: partyB2!.id,
+    });
+    const [entryB2] = await testDb
+      .insert(ledgerEntriesTable)
+      .values({
+        partyId: partyB2!.id,
+        type: "YOU_GOT",
+        amount: "250.00",
+        description: "cross-biz counter 2",
+        isTransfer: true,
+        transferPartyId: partyA2.id,
+      })
+      .returning();
+    await crossLink(entryA2.id, entryB2!.id);
+
+    // Record Party B2's balance before the delete.
+    const partyB2Before = await fetchParty(partyB2!.id);
+    const balanceBefore = toSigned(partyB2Before!);
+
+    await request(app)
+      .delete(`/parties/${partyA2.id}/entries/${entryA2.id}`)
+      .expect(200);
+
+    // Party B2 balance must not have changed at all.
+    const partyB2After = await fetchParty(partyB2!.id);
+    expect(toSigned(partyB2After!)).toBeCloseTo(balanceBefore, 2);
+  });
+});
+
 // ─── Test 4: Atomicity — mid-transaction failure rolls everything back ────────
 
 describe("DELETE /parties/:partyId/entries/:entryId — atomicity on failure", () => {
