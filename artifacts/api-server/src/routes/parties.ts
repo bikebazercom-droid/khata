@@ -555,6 +555,76 @@ router.delete(
       return;
     }
 
+    // ── TRANSFER: also delete the linked counter-entry atomically ────────────
+    if (entry.isTransfer && entry.linkedEntryId) {
+      const linkedEntryId = entry.linkedEntryId;
+
+      const [linkedEntry] = await db
+        .select()
+        .from(ledgerEntriesTable)
+        .where(eq(ledgerEntriesTable.id, linkedEntryId));
+
+      const linkedPartyId = linkedEntry?.partyId ?? null;
+
+      const [linkedParty] = linkedPartyId
+        ? await db
+            .select()
+            .from(partiesTable)
+            .where(
+              and(
+                eq(partiesTable.id, linkedPartyId),
+                eq(partiesTable.businessId, businessId),
+              ),
+            )
+        : [];
+
+      await db.transaction(async (tx) => {
+        // Reverse primary party's balance.
+        const primarySigned = toSignedBalance(party);
+        const primaryDelta = entry.type === "YOU_GAVE" ? Number(entry.amount) : -Number(entry.amount);
+        const primaryBalance = fromSignedBalance(primarySigned - primaryDelta);
+        await tx
+          .update(partiesTable)
+          .set(primaryBalance)
+          .where(eq(partiesTable.id, partyId));
+
+        // Delete primary entry.
+        await tx
+          .delete(ledgerEntriesTable)
+          .where(eq(ledgerEntriesTable.id, entryId));
+
+        // Reverse linked party's balance and delete its entry (if it exists).
+        if (linkedEntry && linkedParty) {
+          const linkedSigned = toSignedBalance(linkedParty);
+          const linkedDelta =
+            linkedEntry.type === "YOU_GAVE"
+              ? Number(linkedEntry.amount)
+              : -Number(linkedEntry.amount);
+          const linkedBalance = fromSignedBalance(linkedSigned - linkedDelta);
+          await tx
+            .update(partiesTable)
+            .set(linkedBalance)
+            .where(eq(partiesTable.id, linkedPartyId!));
+
+          await tx
+            .delete(ledgerEntriesTable)
+            .where(eq(ledgerEntriesTable.id, linkedEntryId));
+        }
+      });
+
+      broadcast(businessId, { type: "ledger.deleted", payload: { partyId, entryId } });
+      if (linkedEntry && linkedPartyId) {
+        broadcast(businessId, {
+          type: "ledger.deleted",
+          payload: { partyId: linkedPartyId, entryId: linkedEntryId },
+        });
+      }
+
+      res.json({ success: true });
+      return;
+    }
+
+    // ── NORMAL (non-transfer) entry ───────────────────────────────────────────
     // Reverse this entry's effect on the running balance.
     // YOU_GAVE originally added +amount; YOU_GOT added -amount.
     const currentSigned = toSignedBalance(party);
