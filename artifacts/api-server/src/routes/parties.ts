@@ -672,11 +672,13 @@ router.delete("/parties/:partyId", async (req, res): Promise<void> => {
     return;
   }
 
-  await db
-    .delete(ledgerEntriesTable)
-    .where(eq(ledgerEntriesTable.partyId, party.id));
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(ledgerEntriesTable)
+      .where(eq(ledgerEntriesTable.partyId, party.id));
 
-  await db.delete(partiesTable).where(eq(partiesTable.id, party.id));
+    await tx.delete(partiesTable).where(eq(partiesTable.id, party.id));
+  });
 
   broadcast(businessId, { type: 'party.deleted', payload: { partyId: party.id } });
 

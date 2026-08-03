@@ -519,6 +519,64 @@ describe("DELETE /parties/:partyId/entries/:entryId — normal entry atomicity o
   });
 });
 
+// ─── Test 6: DELETE /parties/:partyId — atomicity on mid-operation failure ────
+
+describe("DELETE /parties/:partyId — atomicity on failure", () => {
+  it("leaves both the party row and its ledger entries intact when the transaction is rolled back", async () => {
+    /**
+     * Strategy: spy on db.transaction and force a rollback by throwing after
+     * the real Postgres transaction runs.  Both the party row and its entries
+     * must remain unchanged — proving the party delete path is transactional.
+     */
+    const dbModule = await import("@workspace/db");
+    const db = dbModule.db;
+
+    // Create a party with two entries.
+    const party = await createParty({ name: "Party Delete Atomic", signedBalance: 100 });
+    const entry1 = await createEntry({ partyId: party.id, type: "YOU_GAVE", amount: 60 });
+    const entry2 = await createEntry({ partyId: party.id, type: "YOU_GOT", amount: 40 });
+
+    const originalTransaction = db.transaction.bind(db);
+    let callCount = 0;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const forcedRollbackImpl: any = async (callback: (tx: unknown) => Promise<void>) => {
+      callCount++;
+      try {
+        await originalTransaction(async (tx) => {
+          await callback(tx);
+          throw new Error("__FORCED_ROLLBACK__");
+        });
+      } catch (err: unknown) {
+        if (err instanceof Error && err.message !== "__FORCED_ROLLBACK__") {
+          throw err;
+        }
+        // swallow — Postgres transaction is already rolled back
+      }
+    };
+    vi.spyOn(db, "transaction").mockImplementationOnce(forcedRollbackImpl);
+
+    const app = makeApp(businessId);
+
+    // The mock swallows the forced error so the handler still returns 200;
+    // what matters is that Postgres rolled back.
+    await request(app)
+      .delete(`/parties/${party.id}`)
+      .expect(200);
+
+    expect(callCount).toBe(1);
+
+    // Party row must still exist.
+    expect(await fetchParty(party.id)).not.toBeNull();
+
+    // Both ledger entries must still exist.
+    expect(await fetchEntry(entry1.id)).not.toBeNull();
+    expect(await fetchEntry(entry2.id)).not.toBeNull();
+
+    vi.restoreAllMocks();
+  });
+});
+
 // ─── Test 4: Atomicity — mid-transaction failure rolls everything back ────────
 
 describe("DELETE /parties/:partyId/entries/:entryId — atomicity on failure", () => {
