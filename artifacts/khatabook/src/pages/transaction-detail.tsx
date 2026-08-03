@@ -14,6 +14,7 @@ import {
   type Party,
   type DashboardSummary,
 } from '@workspace/api-client-react';
+import { ArrowRight } from 'lucide-react';
 import { TransactionEntryScreen } from '@/components/modals/transaction-entry-screen';
 import { ChevronLeft, Trash2, Cloud } from 'lucide-react';
 import { format } from 'date-fns';
@@ -55,14 +56,23 @@ export function TransactionDetailPage() {
   });
   const { data: settings } = useGetBusinessSettings();
 
+  const entry = entries.find((e) => e.id === entryId);
+
+  // Eagerly resolve the transfer party name once we have the entry
+  const transferPartyId = entry?.transferPartyId ?? '';
+  const { data: transferParty } = useGetParty(transferPartyId, {
+    query: {
+      enabled: !!(entry?.isTransfer && transferPartyId),
+      queryKey: getGetPartyQueryKey(transferPartyId),
+    },
+  });
+
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   // Ref for the shareable receipt card
   const receiptCardRef = useRef<HTMLDivElement>(null);
-
-  const entry = entries.find((e) => e.id === entryId);
   const storeName = settings?.storeName || 'Banglakhata';
   const isGave = entry?.type === 'YOU_GAVE';
   const imageSrc = billImageSrc(entry?.billImage ?? null);
@@ -319,6 +329,44 @@ export function TransactionDetailPage() {
               </p>
             </button>
           </div>
+        )}
+
+        {/* ── Transfer / linked-party card ────────────────────────── */}
+        {entry.isTransfer && transferPartyId && (
+          <button
+            type="button"
+            onClick={() => navigate(`/party/${transferPartyId}`)}
+            className="w-full text-left bg-white rounded-lg overflow-hidden active:bg-blue-50 transition-colors"
+            style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid #DBEAFE' }}
+          >
+            <div className="px-4 pt-3 pb-1">
+              <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#9CA3AF' }}>
+                কার সাথে অ্যাডজাস্ট?
+              </p>
+            </div>
+            <div className="flex items-center justify-between px-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex items-center justify-center shrink-0 text-white font-bold text-sm"
+                  style={{ backgroundColor: '#3B82F6', width: 36, height: 36, borderRadius: '50%' }}
+                >
+                  {(transferParty?.name ?? '…').slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-[15px] font-semibold" style={{ color: '#1F2937' }}>
+                    {transferParty?.name ?? '…'}
+                  </p>
+                  {transferParty?.phone && (
+                    <p className="text-[12px]" style={{ color: '#6B7280' }}>{transferParty.phone}</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-1" style={{ color: '#2563EB' }}>
+                <span className="text-[13px] font-semibold">খাতা দেখুন</span>
+                <ArrowRight className="w-4 h-4" />
+              </div>
+            </div>
+          </button>
         )}
 
         {/* ── 3. Info block 1: SMS status ─────────────────────────── */}

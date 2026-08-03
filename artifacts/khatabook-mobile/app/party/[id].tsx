@@ -30,6 +30,7 @@ import {
   useSendPaymentReminder,
   usePatchLedgerEntry,
   useDeleteLedgerEntry,
+  getGetPartyQueryKey,
 } from '@workspace/api-client-react';
 import type { LedgerEntry, Party } from '@workspace/api-client-react';
 import { useColors } from '@/hooks/useColors';
@@ -598,11 +599,18 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
+  const router = useRouter();
 
   const [entry, setEntry] = useState(init);
   const [isEditing, setIsEditing] = useState(false);
   const [editAmount, setEditAmount] = useState(String(init.amount));
   const [editDesc, setEditDesc] = useState(init.description || '');
+
+  // Resolve the other side of a transfer entry
+  const transferPartyId = entry.isTransfer ? (entry.transferPartyId ?? '') : '';
+  const { data: transferParty } = useGetParty(transferPartyId, {
+    query: { enabled: !!transferPartyId, queryKey: getGetPartyQueryKey(transferPartyId) },
+  });
 
   useEffect(() => {
     if (visible) {
@@ -755,6 +763,34 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
               <Text style={s.editBtnText}>এন্ট্রি এডিট করুন</Text>
             </TouchableOpacity>
           </View>
+
+          {/* Transfer / linked-party card */}
+          {entry.isTransfer && transferPartyId ? (
+            <TouchableOpacity
+              style={[s.infoCard, { flexDirection: 'row', alignItems: 'center', gap: 14 }]}
+              activeOpacity={0.75}
+              onPress={() => { onClose(); router.push(`/party/${transferPartyId}`); }}
+            >
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#3B82F6', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 14 }}>
+                  {(transferParty?.name ?? '…').slice(0, 2).toUpperCase()}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, color: '#9CA3AF', fontFamily: 'Inter_500Medium', marginBottom: 2 }}>কার সাথে অ্যাডজাস্ট?</Text>
+                <Text style={{ fontSize: 15, fontFamily: 'Inter_600SemiBold', color: '#1E293B' }} numberOfLines={1}>
+                  {transferParty?.name ?? '…'}
+                </Text>
+                {transferParty?.phone ? (
+                  <Text style={{ fontSize: 12, color: '#64748B', fontFamily: 'Inter_400Regular', marginTop: 1 }}>{transferParty.phone}</Text>
+                ) : null}
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Text style={{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: '#2563EB' }}>খাতা দেখুন</Text>
+                <Feather name="arrow-right" size={15} color="#2563EB" />
+              </View>
+            </TouchableOpacity>
+          ) : null}
 
           {/* SMS card */}
           <View style={s.infoCard}>
