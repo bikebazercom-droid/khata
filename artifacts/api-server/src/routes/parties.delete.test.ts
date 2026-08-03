@@ -519,6 +519,149 @@ describe("DELETE /parties/:partyId/entries/:entryId — normal entry atomicity o
   });
 });
 
+// ─── Test 5: DELETE /parties/:partyId — bill photo cleanup in object storage ──
+
+describe("DELETE /parties/:partyId — bill photo cleanup", () => {
+  it("calls deleteObjectEntity for every /objects/ path attached to the party's entries", async () => {
+    const { ObjectStorageService } = await import("../lib/objectStorage");
+    const deleteSpy = vi
+      .spyOn(ObjectStorageService.prototype, "deleteObjectEntity")
+      .mockResolvedValue(undefined);
+
+    const app = makeApp(businessId);
+
+    const party = await createParty({ name: "Photo Cleanup Party", signedBalance: 0 });
+
+    // Insert entries directly with billImage paths so we bypass the API
+    // schema restriction (isTransfer is a test-only field here).
+    const [entry1] = await testDb
+      .insert(ledgerEntriesTable)
+      .values({
+        partyId: party.id,
+        type: "YOU_GAVE",
+        amount: "100.00",
+        description: "entry with photo 1",
+        billImage: "/objects/uploads/uuid-aaa",
+      })
+      .returning();
+
+    const [entry2] = await testDb
+      .insert(ledgerEntriesTable)
+      .values({
+        partyId: party.id,
+        type: "YOU_GOT",
+        amount: "50.00",
+        description: "entry with photo 2",
+        billImage: "/objects/uploads/uuid-bbb",
+      })
+      .returning();
+
+    // Entry without a bill image — should not trigger a storage call.
+    const [entry3] = await testDb
+      .insert(ledgerEntriesTable)
+      .values({
+        partyId: party.id,
+        type: "YOU_GAVE",
+        amount: "25.00",
+        description: "entry without photo",
+        billImage: null,
+      })
+      .returning();
+
+    const res = await request(app)
+      .delete(`/parties/${party.id}`)
+      .expect(200);
+
+    expect(res.body).toMatchObject({ success: true, id: party.id });
+
+    // Party and all entries must be gone.
+    expect(await fetchParty(party.id)).toBeNull();
+    expect(await fetchEntry(entry1!.id)).toBeNull();
+    expect(await fetchEntry(entry2!.id)).toBeNull();
+    expect(await fetchEntry(entry3!.id)).toBeNull();
+
+    // Storage must have been asked to delete exactly the two /objects/ paths.
+    const deletedPaths = deleteSpy.mock.calls.map((c) => c[0]).sort();
+    expect(deletedPaths).toEqual([
+      "/objects/uploads/uuid-aaa",
+      "/objects/uploads/uuid-bbb",
+    ]);
+
+    vi.restoreAllMocks();
+  });
+
+  it("still returns 200 and completes the DB delete even when storage deletion fails", async () => {
+    const { ObjectStorageService } = await import("../lib/objectStorage");
+    vi.spyOn(ObjectStorageService.prototype, "deleteObjectEntity").mockRejectedValue(
+      new Error("storage unavailable"),
+    );
+
+    const app = makeApp(businessId);
+
+    const party = await createParty({ name: "Storage Fail Party", signedBalance: 0 });
+    await testDb.insert(ledgerEntriesTable).values({
+      partyId: party.id,
+      type: "YOU_GAVE",
+      amount: "10.00",
+      description: "entry with photo",
+      billImage: "/objects/uploads/uuid-ccc",
+    });
+
+    // Storage failure must not bubble up as an HTTP error.
+    const res = await request(app)
+      .delete(`/parties/${party.id}`)
+      .expect(200);
+
+    expect(res.body).toMatchObject({ success: true, id: party.id });
+
+    // DB row must be gone despite the storage failure.
+    expect(await fetchParty(party.id)).toBeNull();
+
+    vi.restoreAllMocks();
+  });
+
+  it("does NOT call deleteObjectEntity when the DB transaction throws", async () => {
+    // When `db.transaction` propagates an error the handler must not proceed to
+    // storage deletion — the entries still exist and their objects must stay intact.
+    const { ObjectStorageService } = await import("../lib/objectStorage");
+    const deleteSpy = vi
+      .spyOn(ObjectStorageService.prototype, "deleteObjectEntity")
+      .mockResolvedValue(undefined);
+
+    const dbModule = await import("@workspace/db");
+    const db = dbModule.db;
+
+    const party = await createParty({ name: "Rollback Photo Party", signedBalance: 0 });
+    await testDb.insert(ledgerEntriesTable).values({
+      partyId: party.id,
+      type: "YOU_GAVE",
+      amount: "10.00",
+      description: "entry with photo",
+      billImage: "/objects/uploads/uuid-ddd",
+    });
+
+    // Make db.transaction throw so the handler surfaces a 500 error and never
+    // reaches the post-commit storage cleanup block.
+    const dbTransactionSpy = vi
+      .spyOn(db, "transaction")
+      .mockRejectedValueOnce(new Error("__DB_ERROR__"));
+
+    const app = makeApp(businessId);
+    // Handler must propagate the DB error as a 500.
+    await request(app).delete(`/parties/${party.id}`).expect(500);
+
+    expect(dbTransactionSpy).toHaveBeenCalledTimes(1);
+
+    // Storage must NOT have been touched — the transaction never committed.
+    expect(deleteSpy).not.toHaveBeenCalled();
+
+    // Party row must still exist (transaction was never committed).
+    expect(await fetchParty(party.id)).not.toBeNull();
+
+    vi.restoreAllMocks();
+  });
+});
+
 // ─── Test 6: DELETE /parties/:partyId — atomicity on mid-operation failure ────
 
 describe("DELETE /parties/:partyId — atomicity on failure", () => {

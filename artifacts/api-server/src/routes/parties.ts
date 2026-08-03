@@ -63,6 +63,7 @@ import {
   toDateOnlyString,
   toSignedBalance,
 } from "../lib/khatabook";
+import { ObjectStorageService } from "../lib/objectStorage";
 import { type AuthenticatedRequest } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();
@@ -672,6 +673,17 @@ router.delete("/parties/:partyId", async (req, res): Promise<void> => {
     return;
   }
 
+  // Collect bill image paths BEFORE deleting entries so we know what to clean
+  // up from object storage after the DB transaction succeeds.
+  const entriesWithImages = await db
+    .select({ billImage: ledgerEntriesTable.billImage })
+    .from(ledgerEntriesTable)
+    .where(eq(ledgerEntriesTable.partyId, party.id));
+
+  const billImagePaths = entriesWithImages
+    .map((e) => e.billImage)
+    .filter((p): p is string => typeof p === "string" && p.startsWith("/objects/"));
+
   await db.transaction(async (tx) => {
     await tx
       .delete(ledgerEntriesTable)
@@ -679,6 +691,25 @@ router.delete("/parties/:partyId", async (req, res): Promise<void> => {
 
     await tx.delete(partiesTable).where(eq(partiesTable.id, party.id));
   });
+
+  // DB transaction committed — now delete the associated bill photos from
+  // object storage.  We do this post-commit so a storage failure cannot leave
+  // the database in a partially-deleted state.  Each deletion is attempted
+  // independently so a single failure doesn't block the rest.
+  if (billImagePaths.length > 0) {
+    const storageService = new ObjectStorageService();
+    const results = await Promise.allSettled(
+      billImagePaths.map((p) => storageService.deleteObjectEntity(p)),
+    );
+    results.forEach((result, i) => {
+      if (result.status === "rejected") {
+        req.log?.error(
+          { err: result.reason, objectPath: billImagePaths[i] },
+          "Failed to delete bill photo from storage during party delete",
+        );
+      }
+    });
+  }
 
   broadcast(businessId, { type: 'party.deleted', payload: { partyId: party.id } });
 

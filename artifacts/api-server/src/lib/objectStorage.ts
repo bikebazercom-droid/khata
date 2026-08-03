@@ -209,6 +209,44 @@ export class ObjectStorageService {
       requestedPermission: requestedPermission ?? ObjectPermission.READ,
     });
   }
+
+  /**
+   * Delete an object entity from storage by its normalized path (e.g.
+   * `/objects/uploads/<uuid>`). Resolves silently if the object does not exist.
+   * Throws for any other storage error.
+   */
+  async deleteObjectEntity(objectPath: string): Promise<void> {
+    if (!objectPath.startsWith('/objects/')) {
+      return;
+    }
+
+    const parts = objectPath.slice(1).split('/');
+    if (parts.length < 2) {
+      return;
+    }
+
+    const entityId = parts.slice(1).join('/');
+    let entityDir = this.getPrivateObjectDir();
+    if (!entityDir.endsWith('/')) {
+      entityDir = `${entityDir}/`;
+    }
+    const objectEntityPath = `${entityDir}${entityId}`;
+    const { bucketName, objectName } = parseObjectPath(objectEntityPath);
+    const bucket = objectStorageClient.bucket(bucketName);
+    const objectFile = bucket.file(objectName);
+
+    try {
+      await objectFile.delete();
+    } catch (err: unknown) {
+      // GCS returns a 404-style error when the object is already gone — treat
+      // that as success so a double-delete doesn't surface as a failure.
+      const code = (err as { code?: number })?.code;
+      if (code === 404) {
+        return;
+      }
+      throw err;
+    }
+  }
 }
 
 function parseObjectPath(path: string): {
