@@ -614,6 +614,123 @@ describe("DELETE /parties/:partyId/entries/:entryId — bill photo cleanup", () 
   });
 });
 
+// ─── Test 5b: DELETE /parties/:partyId/entries/:entryId — transfer bill photo cleanup ──
+
+describe("DELETE /parties/:partyId/entries/:entryId — transfer bill photo cleanup", () => {
+  it("calls deleteObjectEntity for both the primary and counter-entry bill photos", async () => {
+    const { ObjectStorageService } = await import("../lib/objectStorage");
+    const deleteSpy = vi
+      .spyOn(ObjectStorageService.prototype, "deleteObjectEntity")
+      .mockResolvedValue(undefined);
+
+    const app = makeApp(businessId);
+
+    const partyA = await createParty({ name: "Transfer Photo A", signedBalance: 250 });
+    const partyB = await createParty({ name: "Transfer Photo B", signedBalance: -250 });
+
+    // Insert both entries directly so we can attach billImage paths.
+    const [entryA] = await testDb
+      .insert(ledgerEntriesTable)
+      .values({
+        partyId: partyA.id,
+        type: "YOU_GAVE",
+        amount: "250.00",
+        description: "transfer with photo A",
+        isTransfer: true,
+        transferPartyId: partyB.id,
+        billImage: "/objects/uploads/uuid-transfer-primary",
+      })
+      .returning();
+
+    const [entryB] = await testDb
+      .insert(ledgerEntriesTable)
+      .values({
+        partyId: partyB.id,
+        type: "YOU_GOT",
+        amount: "250.00",
+        description: "transfer with photo B",
+        isTransfer: true,
+        transferPartyId: partyA.id,
+        billImage: "/objects/uploads/uuid-transfer-counter",
+      })
+      .returning();
+
+    await crossLink(entryA!.id, entryB!.id);
+
+    const res = await request(app)
+      .delete(`/parties/${partyA.id}/entries/${entryA!.id}`)
+      .expect(200);
+
+    expect(res.body).toEqual({ success: true });
+
+    // Both DB entries must be gone.
+    expect(await fetchEntry(entryA!.id)).toBeNull();
+    expect(await fetchEntry(entryB!.id)).toBeNull();
+
+    // Storage must have been asked to delete both /objects/ paths.
+    const deletedPaths = deleteSpy.mock.calls.map((c) => c[0]).sort();
+    expect(deletedPaths).toEqual([
+      "/objects/uploads/uuid-transfer-counter",
+      "/objects/uploads/uuid-transfer-primary",
+    ]);
+
+    vi.restoreAllMocks();
+  });
+
+  it("still returns 200 when storage deletion fails for the counter-entry photo", async () => {
+    const { ObjectStorageService } = await import("../lib/objectStorage");
+    vi.spyOn(ObjectStorageService.prototype, "deleteObjectEntity").mockRejectedValue(
+      new Error("storage unavailable"),
+    );
+
+    const app = makeApp(businessId);
+
+    const partyA = await createParty({ name: "Transfer Photo Fail A", signedBalance: 100 });
+    const partyB = await createParty({ name: "Transfer Photo Fail B", signedBalance: -100 });
+
+    const [entryA] = await testDb
+      .insert(ledgerEntriesTable)
+      .values({
+        partyId: partyA.id,
+        type: "YOU_GAVE",
+        amount: "100.00",
+        description: "transfer photo fail A",
+        isTransfer: true,
+        transferPartyId: partyB.id,
+        billImage: "/objects/uploads/uuid-transfer-fail-primary",
+      })
+      .returning();
+
+    const [entryB] = await testDb
+      .insert(ledgerEntriesTable)
+      .values({
+        partyId: partyB.id,
+        type: "YOU_GOT",
+        amount: "100.00",
+        description: "transfer photo fail B",
+        isTransfer: true,
+        transferPartyId: partyA.id,
+        billImage: "/objects/uploads/uuid-transfer-fail-counter",
+      })
+      .returning();
+
+    await crossLink(entryA!.id, entryB!.id);
+
+    // Storage failure must not bubble up as an HTTP error.
+    const res = await request(app)
+      .delete(`/parties/${partyA.id}/entries/${entryA!.id}`)
+      .expect(200);
+
+    expect(res.body).toEqual({ success: true });
+
+    // Both DB entries must be gone despite the storage failure.
+    expect(await fetchEntry(entryA!.id)).toBeNull();
+    expect(await fetchEntry(entryB!.id)).toBeNull();
+
+    vi.restoreAllMocks();
+  });
+});
+
 // ─── Test 5: DELETE /parties/:partyId — bill photo cleanup in object storage ──
 
 describe("DELETE /parties/:partyId — bill photo cleanup", () => {
