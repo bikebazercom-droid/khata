@@ -593,6 +593,57 @@ describe("DELETE /parties/:partyId/entries/:entryId — bill photo cleanup", () 
     vi.restoreAllMocks();
   });
 
+  it("calls req.log.error with the objectPath when storage deletion fails for a normal entry", async () => {
+    const { ObjectStorageService } = await import("../lib/objectStorage");
+    vi.spyOn(ObjectStorageService.prototype, "deleteObjectEntity").mockRejectedValue(
+      new Error("storage unavailable"),
+    );
+
+    const logError = vi.fn();
+
+    // Build an app that attaches a mock logger to req so we can assert that
+    // the fire-and-forget .catch() actually invokes req.log.error.
+    const appWithLogger = express();
+    appWithLogger.use(express.json());
+    appWithLogger.use((req: Request, _res: Response, next: NextFunction) => {
+      (req as unknown as AuthenticatedRequest).businessId = businessId;
+      (req as unknown as AuthenticatedRequest).userId = "test-user";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (req as any).log = { error: logError };
+      next();
+    });
+    appWithLogger.use(partiesRouter);
+
+    const party = await createParty({ name: "Log Error Normal Delete Party", signedBalance: 300 });
+
+    const [entry] = await testDb
+      .insert(ledgerEntriesTable)
+      .values({
+        partyId: party.id,
+        type: "YOU_GAVE",
+        amount: "300.00",
+        description: "entry with photo for log test",
+        billImage: "/objects/uploads/uuid-log-normal-delete",
+      })
+      .returning();
+
+    await request(appWithLogger)
+      .delete(`/parties/${party.id}/entries/${entry!.id}`)
+      .expect(200);
+
+    // The deletion uses fire-and-forget (.catch()), so the callback may not
+    // have run yet when the HTTP response arrives.  Drain the microtask / I/O
+    // queue to allow the rejected Promise's .catch() to execute.
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(logError).toHaveBeenCalledOnce();
+    expect(logError.mock.calls[0][0]).toMatchObject({
+      objectPath: "/objects/uploads/uuid-log-normal-delete",
+    });
+
+    vi.restoreAllMocks();
+  });
+
   it("does NOT call deleteObjectEntity when the entry has no bill photo", async () => {
     const { ObjectStorageService } = await import("../lib/objectStorage");
     const deleteSpy = vi
@@ -726,6 +777,75 @@ describe("DELETE /parties/:partyId/entries/:entryId — transfer bill photo clea
     // Both DB entries must be gone despite the storage failure.
     expect(await fetchEntry(entryA!.id)).toBeNull();
     expect(await fetchEntry(entryB!.id)).toBeNull();
+
+    vi.restoreAllMocks();
+  });
+
+  it("calls req.log.error with each objectPath when storage deletion fails for a transfer entry", async () => {
+    const { ObjectStorageService } = await import("../lib/objectStorage");
+    vi.spyOn(ObjectStorageService.prototype, "deleteObjectEntity").mockRejectedValue(
+      new Error("storage unavailable"),
+    );
+
+    const logError = vi.fn();
+
+    // Build an app with a mock logger attached to req.
+    // The transfer DELETE path uses Promise.allSettled (awaited), so req.log.error
+    // is called before the response is sent — no microtask drain needed.
+    const appWithLogger = express();
+    appWithLogger.use(express.json());
+    appWithLogger.use((req: Request, _res: Response, next: NextFunction) => {
+      (req as unknown as AuthenticatedRequest).businessId = businessId;
+      (req as unknown as AuthenticatedRequest).userId = "test-user";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (req as any).log = { error: logError };
+      next();
+    });
+    appWithLogger.use(partiesRouter);
+
+    const partyA = await createParty({ name: "Transfer Log Error A", signedBalance: 150 });
+    const partyB = await createParty({ name: "Transfer Log Error B", signedBalance: -150 });
+
+    const [entryA] = await testDb
+      .insert(ledgerEntriesTable)
+      .values({
+        partyId: partyA.id,
+        type: "YOU_GAVE",
+        amount: "150.00",
+        description: "transfer log error A",
+        isTransfer: true,
+        transferPartyId: partyB.id,
+        billImage: "/objects/uploads/uuid-log-transfer-primary",
+      })
+      .returning();
+
+    const [entryB] = await testDb
+      .insert(ledgerEntriesTable)
+      .values({
+        partyId: partyB.id,
+        type: "YOU_GOT",
+        amount: "150.00",
+        description: "transfer log error B",
+        isTransfer: true,
+        transferPartyId: partyA.id,
+        billImage: "/objects/uploads/uuid-log-transfer-counter",
+      })
+      .returning();
+
+    await crossLink(entryA!.id, entryB!.id);
+
+    await request(appWithLogger)
+      .delete(`/parties/${partyA.id}/entries/${entryA!.id}`)
+      .expect(200);
+
+    // Promise.allSettled is awaited before res.json(), so both error log calls
+    // have already happened by the time the response arrives.
+    expect(logError).toHaveBeenCalledTimes(2);
+    const loggedPaths = logError.mock.calls.map((c) => (c[0] as { objectPath: string }).objectPath).sort();
+    expect(loggedPaths).toEqual([
+      "/objects/uploads/uuid-log-transfer-counter",
+      "/objects/uploads/uuid-log-transfer-primary",
+    ]);
 
     vi.restoreAllMocks();
   });

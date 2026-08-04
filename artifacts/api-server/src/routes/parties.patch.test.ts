@@ -190,6 +190,48 @@ describe("PATCH ledger-entry — bill photo replacement cleanup", () => {
     vi.restoreAllMocks();
   });
 
+  it("calls req.log.error with the objectPath when storage deletion fails", async () => {
+    const { ObjectStorageService } = await import("../lib/objectStorage");
+    vi.spyOn(ObjectStorageService.prototype, "deleteObjectEntity").mockRejectedValue(
+      new Error("storage unavailable"),
+    );
+
+    const logError = vi.fn();
+
+    // Build an app that attaches a mock logger to req so we can spy on
+    // req.log.error calls that happen inside the fire-and-forget .catch().
+    const appWithLogger = express();
+    appWithLogger.use(express.json());
+    appWithLogger.use((req: Request, _res: Response, next: NextFunction) => {
+      (req as unknown as AuthenticatedRequest).businessId = businessId;
+      (req as unknown as AuthenticatedRequest).userId = "test-user";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (req as any).log = { error: logError };
+      next();
+    });
+    appWithLogger.use(partiesRouter);
+
+    const party = await createParty("Log Error Patch Party");
+    const entry = await createEntry(party.id, "/objects/uploads/log-old-uuid");
+
+    await request(appWithLogger)
+      .patch(`/parties/${party.id}/ledger-entries/${entry.id}`)
+      .send({ billImage: "/objects/uploads/log-new-uuid" })
+      .expect(200);
+
+    // The deletion is fire-and-forget (.catch()), so it may not have run yet
+    // when the response arrives.  Drain the microtask / I/O queue once to let
+    // the rejected Promise's .catch() callback execute.
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(logError).toHaveBeenCalledOnce();
+    expect(logError.mock.calls[0][0]).toMatchObject({
+      objectPath: "/objects/uploads/log-old-uuid",
+    });
+
+    vi.restoreAllMocks();
+  });
+
   it("does NOT call deleteObjectEntity when billImage is absent from the request body", async () => {
     const { ObjectStorageService } = await import("../lib/objectStorage");
     const deleteSpy = vi
