@@ -952,6 +952,68 @@ describe("DELETE /parties/:partyId — bill photo cleanup", () => {
     vi.restoreAllMocks();
   });
 
+  it("calls req.log.error once per rejected path when storage deletion fails for a party with multiple bill photos", async () => {
+    const { ObjectStorageService } = await import("../lib/objectStorage");
+    vi.spyOn(ObjectStorageService.prototype, "deleteObjectEntity").mockRejectedValue(
+      new Error("storage unavailable"),
+    );
+
+    const logError = vi.fn();
+
+    // Build an app that attaches a mock logger to req so we can assert that
+    // req.log.error is invoked for every rejected storage deletion.
+    // The party-delete handler awaits Promise.allSettled before calling
+    // res.json(), so all req.log.error calls have already happened by the
+    // time the HTTP response is received — no microtask drain is needed.
+    const appWithLogger = express();
+    appWithLogger.use(express.json());
+    appWithLogger.use((req: Request, _res: Response, next: NextFunction) => {
+      (req as unknown as AuthenticatedRequest).businessId = businessId;
+      (req as unknown as AuthenticatedRequest).userId = "test-user";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (req as any).log = { error: logError };
+      next();
+    });
+    appWithLogger.use(partiesRouter);
+
+    const party = await createParty({ name: "Multi Photo Log Error Party", signedBalance: 0 });
+
+    // Insert two entries with distinct bill-image paths.
+    await testDb.insert(ledgerEntriesTable).values({
+      partyId: party.id,
+      type: "YOU_GAVE",
+      amount: "50.00",
+      description: "photo entry 1",
+      billImage: "/objects/uploads/uuid-bulk-log-aaa",
+    });
+    await testDb.insert(ledgerEntriesTable).values({
+      partyId: party.id,
+      type: "YOU_GOT",
+      amount: "75.00",
+      description: "photo entry 2",
+      billImage: "/objects/uploads/uuid-bulk-log-bbb",
+    });
+
+    const res = await request(appWithLogger)
+      .delete(`/parties/${party.id}`)
+      .expect(200);
+
+    expect(res.body).toMatchObject({ success: true, id: party.id });
+
+    // req.log.error must have been called once per rejected path.
+    expect(logError).toHaveBeenCalledTimes(2);
+
+    const loggedPaths = logError.mock.calls
+      .map((c) => (c[0] as { objectPath: string }).objectPath)
+      .sort();
+    expect(loggedPaths).toEqual([
+      "/objects/uploads/uuid-bulk-log-aaa",
+      "/objects/uploads/uuid-bulk-log-bbb",
+    ]);
+
+    vi.restoreAllMocks();
+  });
+
   it("does NOT call deleteObjectEntity when the DB transaction throws", async () => {
     // When `db.transaction` propagates an error the handler must not proceed to
     // storage deletion — the entries still exist and their objects must stay intact.
