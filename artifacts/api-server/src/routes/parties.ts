@@ -482,6 +482,26 @@ router.patch(
       .where(eq(ledgerEntriesTable.id, params.data.entryId))
       .returning();
 
+    // If billImage was replaced or nulled out, delete the superseded object
+    // from storage.  We do this after the DB update so a storage failure cannot
+    // leave the database in an inconsistent state.  The deletion is attempted
+    // fire-and-forget so a storage error never blocks the PATCH response.
+    const billImageReplaced =
+      body.data.billImage !== undefined &&          // caller sent billImage
+      entry.billImage !== null &&                    // entry previously had a photo
+      entry.billImage !== body.data.billImage &&    // the value actually changed
+      entry.billImage.startsWith("/objects/");       // it is a managed object path
+
+    if (billImageReplaced) {
+      const storageService = new ObjectStorageService();
+      storageService.deleteObjectEntity(entry.billImage!).catch((err: unknown) => {
+        req.log?.error(
+          { err, objectPath: entry.billImage },
+          "Failed to delete superseded bill photo from storage during entry patch",
+        );
+      });
+    }
+
     // If the amount or direction changed we must recompute the party's
     // running balance: reverse the old entry's effect, apply the new one.
     const amountChanged = body.data.amount !== undefined;
