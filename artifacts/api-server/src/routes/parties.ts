@@ -633,6 +633,26 @@ router.delete(
         }
       });
 
+      // DB transaction committed — delete any bill photos from storage.
+      // Done post-commit so a storage failure cannot leave the DB inconsistent.
+      const transferBillImagePaths = [entry.billImage, linkedEntry?.billImage ?? null]
+        .filter((p): p is string => typeof p === "string" && p.startsWith("/objects/"));
+
+      if (transferBillImagePaths.length > 0) {
+        const storageService = new ObjectStorageService();
+        const results = await Promise.allSettled(
+          transferBillImagePaths.map((p) => storageService.deleteObjectEntity(p)),
+        );
+        results.forEach((result, i) => {
+          if (result.status === "rejected") {
+            req.log?.error(
+              { err: result.reason, objectPath: transferBillImagePaths[i] },
+              "Failed to delete bill photo from storage during transfer entry delete",
+            );
+          }
+        });
+      }
+
       broadcast(businessId, { type: "ledger.deleted", payload: { partyId, entryId } });
       if (linkedEntry && linkedPartyId) {
         broadcast(businessId, {
@@ -663,6 +683,18 @@ router.delete(
         .set({ currentBalance, balanceType })
         .where(eq(partiesTable.id, partyId));
     });
+
+    // DB transaction committed — delete any attached bill photo from storage.
+    // Done post-commit so a storage failure cannot leave the DB inconsistent.
+    if (entry.billImage && entry.billImage.startsWith("/objects/")) {
+      const storageService = new ObjectStorageService();
+      storageService.deleteObjectEntity(entry.billImage).catch((err: unknown) => {
+        req.log?.error(
+          { err, objectPath: entry.billImage },
+          "Failed to delete bill photo from storage during entry delete",
+        );
+      });
+    }
 
     broadcast(businessId, { type: "ledger.deleted", payload: { partyId, entryId } });
 

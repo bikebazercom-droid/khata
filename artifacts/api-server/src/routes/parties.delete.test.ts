@@ -519,6 +519,101 @@ describe("DELETE /parties/:partyId/entries/:entryId — normal entry atomicity o
   });
 });
 
+// ─── Test 5a: DELETE /parties/:partyId/entries/:entryId — bill photo cleanup ──
+
+describe("DELETE /parties/:partyId/entries/:entryId — bill photo cleanup", () => {
+  it("calls deleteObjectEntity for the /objects/ path attached to a normal entry", async () => {
+    const { ObjectStorageService } = await import("../lib/objectStorage");
+    const deleteSpy = vi
+      .spyOn(ObjectStorageService.prototype, "deleteObjectEntity")
+      .mockResolvedValue(undefined);
+
+    const app = makeApp(businessId);
+
+    const party = await createParty({ name: "Single Entry Photo Party", signedBalance: 100 });
+
+    // Insert entry directly so we can attach a billImage path.
+    const [entry] = await testDb
+      .insert(ledgerEntriesTable)
+      .values({
+        partyId: party.id,
+        type: "YOU_GAVE",
+        amount: "100.00",
+        description: "entry with photo",
+        billImage: "/objects/uploads/uuid-single-111",
+      })
+      .returning();
+
+    const res = await request(app)
+      .delete(`/parties/${party.id}/entries/${entry!.id}`)
+      .expect(200);
+
+    expect(res.body).toEqual({ success: true });
+
+    // Entry must be gone.
+    expect(await fetchEntry(entry!.id)).toBeNull();
+
+    // Storage must have been asked to delete the bill photo.
+    expect(deleteSpy).toHaveBeenCalledWith("/objects/uploads/uuid-single-111");
+
+    vi.restoreAllMocks();
+  });
+
+  it("still returns 200 and deletes the DB entry even when storage deletion fails", async () => {
+    const { ObjectStorageService } = await import("../lib/objectStorage");
+    vi.spyOn(ObjectStorageService.prototype, "deleteObjectEntity").mockRejectedValue(
+      new Error("storage unavailable"),
+    );
+
+    const app = makeApp(businessId);
+
+    const party = await createParty({ name: "Single Entry Storage Fail", signedBalance: 200 });
+
+    const [entry] = await testDb
+      .insert(ledgerEntriesTable)
+      .values({
+        partyId: party.id,
+        type: "YOU_GAVE",
+        amount: "200.00",
+        description: "entry with photo",
+        billImage: "/objects/uploads/uuid-single-222",
+      })
+      .returning();
+
+    // Storage failure must not bubble up as an HTTP error.
+    const res = await request(app)
+      .delete(`/parties/${party.id}/entries/${entry!.id}`)
+      .expect(200);
+
+    expect(res.body).toEqual({ success: true });
+
+    // DB entry must be gone despite the storage failure.
+    expect(await fetchEntry(entry!.id)).toBeNull();
+
+    vi.restoreAllMocks();
+  });
+
+  it("does NOT call deleteObjectEntity when the entry has no bill photo", async () => {
+    const { ObjectStorageService } = await import("../lib/objectStorage");
+    const deleteSpy = vi
+      .spyOn(ObjectStorageService.prototype, "deleteObjectEntity")
+      .mockResolvedValue(undefined);
+
+    const app = makeApp(businessId);
+
+    const party = await createParty({ name: "Single Entry No Photo", signedBalance: 50 });
+    const entry = await createEntry({ partyId: party.id, type: "YOU_GAVE", amount: 50 });
+
+    await request(app)
+      .delete(`/parties/${party.id}/entries/${entry.id}`)
+      .expect(200);
+
+    expect(deleteSpy).not.toHaveBeenCalled();
+
+    vi.restoreAllMocks();
+  });
+});
+
 // ─── Test 5: DELETE /parties/:partyId — bill photo cleanup in object storage ──
 
 describe("DELETE /parties/:partyId — bill photo cleanup", () => {
