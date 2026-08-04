@@ -49,6 +49,11 @@ const PatchLedgerEntryBody = {
     if (x.type !== undefined && x.type !== "YOU_GAVE" && x.type !== "YOU_GOT") {
       return { success: false, error: { message: "type must be YOU_GAVE or YOU_GOT" } };
     }
+    if (x.billImage !== undefined && x.billImage !== null) {
+      if (typeof x.billImage !== "string" || !x.billImage.startsWith("/objects/")) {
+        return { success: false, error: { message: "billImage must start with /objects/" } };
+      }
+    }
     return { success: true, data: x as PatchLedgerEntryBodyData };
   },
 };
@@ -245,6 +250,13 @@ router.post(
     const body = CreateLedgerEntryBody.safeParse(req.body);
     if (!body.success) {
       res.status(400).json({ error: body.error.message });
+      return;
+    }
+
+    // Validate that billImage, when provided, always carries the /objects/ prefix
+    // so that the cleanup path (which checks for this prefix) is guaranteed to fire.
+    if (body.data.billImage != null && !body.data.billImage.startsWith("/objects/")) {
+      res.status(400).json({ error: "billImage must start with /objects/" });
       return;
     }
 
