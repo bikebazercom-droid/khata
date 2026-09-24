@@ -11,6 +11,9 @@ import { formatDistanceToNow } from 'date-fns';
 import { bn as bnLocale } from 'date-fns/locale';
 
 type TabType = 'parties' | 'staff' | 'activity';
+const isValidWorkerIdentity = (identity: string) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identity.trim()) ||
+  /^(?:\+?88)?01[3-9]\d{8}$/.test(identity.trim());
 
 export function AccessPage() {
   const [, navigate] = useLocation();
@@ -345,19 +348,15 @@ function AddWorkerDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
   const createWorker = useCreateWorker();
 
   const handleAdd = () => {
-    if (!identity.trim()) return;
+    if (!isValidWorkerIdentity(identity)) return;
     const isEmail = identity.includes('@');
-    if (!isEmail) {
-      toast.error('এসএমএস সেটআপ এখনও বাকি। শুধুমাত্র ভেরিফাইড ইমেইল ব্যবহার করুন।');
-      return;
-    }
     createWorker.mutate({
-      email: isEmail ? identity : undefined,
-      phone: !isEmail ? identity : undefined,
+      email: isEmail ? identity.trim() : undefined,
+      phone: !isEmail ? identity.trim() : undefined,
       partyIds: [],
     }, {
       onSuccess: () => {
-        toast.success("স্টাফ যোগ করা হয়েছে। নির্দেশিকা নিজে শেয়ার করুন, কোনো ইমেইল পাঠানো হয়নি।");
+        toast.success("স্টাফ যোগ করা হয়েছে। অ্যাপের লিংক ও সাইন-ইন নির্দেশিকা নিজে শেয়ার করুন।");
         onOpenChange(false);
         setIdentity('');
       },
@@ -372,25 +371,25 @@ function AddWorkerDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
       <DialogContent className="max-w-sm rounded-2xl p-0 overflow-hidden gap-0">
         <DialogHeader className="p-5 pb-4 border-b border-slate-100 bg-slate-50/50">
           <DialogTitle className="text-lg font-extrabold text-slate-900">নতুন স্টাফ যোগ করুন</DialogTitle>
-          <p className="text-xs font-medium text-slate-500 mt-1">ইমেইল দিয়ে স্টাফ যুক্ত করুন। (এসএমএস সেটআপ এখনও বাকি)</p>
+          <p className="text-xs font-medium text-slate-500 mt-1">স্টাফের ইমেইল বা বাংলাদেশি ফোন নম্বর দিন।</p>
         </DialogHeader>
         <div className="p-5">
           <div className="space-y-4">
             <div>
-              <label className="text-xs font-bold text-slate-700 mb-1.5 block">স্টাফ ইমেইল</label>
+              <label className="text-xs font-bold text-slate-700 mb-1.5 block">স্টাফের ইমেইল বা ফোন</label>
               <Input
                 value={identity}
                 onChange={(e) => setIdentity(e.target.value)}
-                placeholder="email@example.com"
+                placeholder="email@example.com অথবা 01712345678"
                 className="h-12 bg-slate-50"
               />
             </div>
             <div className="bg-blue-50 p-3.5 rounded-xl border border-blue-100 flex flex-col gap-2">
               <p className="text-[11.5px] leading-relaxed text-blue-900 font-bold">
-                স্বয়ংক্রিয় কোনো ইমেইল পাঠানো হয় না। আপনাকে নিজে অ্যাপের লিংক ও নির্দেশিকা স্টাফের সাথে শেয়ার করতে হবে।
+                আপনাকে নিজে অ্যাপের লিংক ও নির্দেশিকা স্টাফের সাথে শেয়ার করতে হবে। ফোন দিয়ে সাইন-ইন করলে যাচাইকরণ কোড SMS-এ যাবে।
               </p>
               <p className="text-[11px] leading-relaxed text-blue-800 font-medium">
-                লক্ষ্য রাখবেন, স্টাফকে ঠিক এই ইমেইলটি ব্যবহার করেই অ্যাপে সাইন-ইন বা নতুন অ্যাকাউন্ট খুলতে হবে। অন্য ইমেইল ব্যবহার করলে তারা অ্যাক্সেস পাবেন না।
+                স্টাফকে ঠিক এই ইমেইল বা ফোন নম্বর দিয়েই অ্যাপে সাইন-ইন করতে হবে। অন্য পরিচয়ে তারা অ্যাক্সেস পাবেন না।
               </p>
             </div>
           </div>
@@ -399,7 +398,7 @@ function AddWorkerDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
           <Button
             className="w-full h-12 rounded-xl bg-[#1B3A6B] hover:bg-[#142d55] font-bold text-sm"
             onClick={handleAdd}
-            disabled={createWorker.isPending || !identity.trim() || !identity.includes('@')}
+            disabled={createWorker.isPending || !isValidWorkerIdentity(identity)}
           >
             {createWorker.isPending ? "যোগ করা হচ্ছে..." : "যুক্ত করুন"}
           </Button>
@@ -541,19 +540,15 @@ function PartyAccessDialog({ party, workers, open, onOpenChange }: { party: any;
   const assignedWorkers = workers.filter(w => w.partyIds.includes(party.id));
 
   const handleInvite = () => {
-    if (!identity.trim()) return;
+    if (!isValidWorkerIdentity(identity)) return;
     const isEmail = identity.includes('@');
-    if (!isEmail) {
-      toast.error('এসএমএস সেটআপ এখনও বাকি। শুধুমাত্র ভেরিফাইড ইমেইল ব্যবহার করুন।');
-      return;
-    }
     createWorker.mutate({
-      email: isEmail ? identity : undefined,
-      phone: !isEmail ? identity : undefined,
+      email: isEmail ? identity.trim() : undefined,
+      phone: !isEmail ? identity.trim() : undefined,
       partyIds: [party.id], // Assign directly to this party
     }, {
       onSuccess: () => {
-        toast.success("স্টাফ যোগ করা হয়েছে। নির্দেশিকা নিজে শেয়ার করুন, কোনো ইমেইল পাঠানো হয়নি।");
+        toast.success("স্টাফ যোগ করা হয়েছে। অ্যাপের লিংক ও সাইন-ইন নির্দেশিকা নিজে শেয়ার করুন।");
         setIdentity('');
       },
       onError: (err: any) => {
@@ -619,12 +614,12 @@ function PartyAccessDialog({ party, workers, open, onOpenChange }: { party: any;
               <Input
                 value={identity}
                 onChange={(e) => setIdentity(e.target.value)}
-                placeholder="email@example.com"
+                placeholder="email@example.com অথবা 01712345678"
                 className="h-10 bg-slate-50"
               />
               <Button
                 onClick={handleInvite}
-                disabled={createWorker.isPending || !identity.trim() || !identity.includes('@')}
+                disabled={createWorker.isPending || !isValidWorkerIdentity(identity)}
                 className="h-10 px-4 bg-[#1B3A6B] hover:bg-[#142d55] shrink-0"
               >
                 {createWorker.isPending ? "অপেক্ষা করুন..." : "যুক্ত করুন"}
@@ -632,7 +627,7 @@ function PartyAccessDialog({ party, workers, open, onOpenChange }: { party: any;
             </div>
             <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 flex flex-col gap-1.5 mt-1">
               <p className="text-[11px] leading-relaxed text-blue-900 font-bold">
-                কোনো ইমেইল পাঠানো হবে না। আপনাকে নিজে স্টাফকে এই ইমেইল দিয়ে অ্যাপে সাইন-ইন করতে বলতে হবে।
+                আপনাকে নিজে অ্যাপের লিংক শেয়ার করতে হবে। স্টাফকে এই ইমেইল বা ফোন দিয়ে সাইন-ইন করতে বলুন; ফোনে যাচাইকরণ কোড SMS-এ যাবে।
               </p>
             </div>
           </div>

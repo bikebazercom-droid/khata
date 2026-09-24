@@ -4,10 +4,11 @@
  * These are intentionally public (no requireAuth middleware). They either
  * issue a session or verify identity.
  *
- * OTP delivery remains disabled until a real SMS provider is configured.
+ * OTPs are only usable after the SMS provider accepts delivery.
  */
 import { Router, type IRouter, type Request, type Response } from "express";
 import { eq, and, gt } from "drizzle-orm";
+import { createHmac, randomInt } from "node:crypto";
 import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
 import {
@@ -24,6 +25,7 @@ import {
   requireAuth,
   type AuthenticatedRequest,
 } from "../middlewares/requireAuth";
+import { sendOtpSms } from "../services/sms";
 
 const router: IRouter = Router();
 
@@ -51,6 +53,23 @@ const sendOtpIpLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: "Too many OTP requests from this IP. Please wait 15 minutes before trying again." },
 });
+
+const sendOtpPhoneLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 3,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => {
+    const raw = typeof req.body?.phone === "string" ? req.body.phone.trim() : "";
+    return `phone:${normalizeBdPhone(raw) ?? (raw || "unknown")}`;
+  },
+  message: { error: "Too many codes requested for this phone. Please try again later." },
+});
+
+function otpDigest(phone: string, code: string): string {
+  return createHmac("sha256", process.env.SESSION_SECRET!)
+    .update(`${phone}:${code}`).digest("hex");
+}
 
 /**
  * Verify-OTP (IP): 10 attempts per IP per 15 minutes.
@@ -90,6 +109,7 @@ const verifyOtpPhoneLimiter = rateLimit({
 router.post(
   "/auth/phone/send-otp",
   sendOtpIpLimiter,
+  sendOtpPhoneLimiter,
   async (req: Request, res: Response): Promise<void> => {
     const { phone } = req.body ?? {};
     if (typeof phone !== "string" || !phone.trim()) {
@@ -105,8 +125,23 @@ router.post(
       return;
     }
 
-    // Never create or report an OTP unless a delivery provider actually sends it.
-    res.status(503).json({ error: "Phone sign-in is unavailable: SMS delivery is not configured" });
+    const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
+    const [record] = await db.transaction(async (tx) => {
+      await tx.delete(otpCodesTable).where(eq(otpCodesTable.phone, normalized));
+      return tx.insert(otpCodesTable).values({
+        phone: normalized,
+        code: otpDigest(normalized, code),
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      }).returning({ id: otpCodesTable.id });
+    });
+    try {
+      await sendOtpSms(normalized, code);
+    } catch {
+      await db.delete(otpCodesTable).where(eq(otpCodesTable.id, record!.id));
+      res.status(503).json({ error: "Could not send the SMS code. Please try again later." });
+      return;
+    }
+    res.json({ success: true });
   },
 );
 
@@ -135,7 +170,7 @@ router.post(
       .where(
         and(
           eq(otpCodesTable.phone, normalized),
-          eq(otpCodesTable.code, code.trim()),
+          eq(otpCodesTable.code, otpDigest(normalized, code.trim())),
           eq(otpCodesTable.verified, false),
           gt(otpCodesTable.expiresAt, new Date()),
         ),
@@ -147,11 +182,20 @@ router.post(
       return;
     }
 
-    // Mark OTP as used.
-    await db
+    // Consume atomically: two requests with the same code cannot each claim
+    // an invitation or create a different account.
+    const [consumed] = await db
       .update(otpCodesTable)
       .set({ verified: true })
-      .where(eq(otpCodesTable.id, record.id));
+      .where(and(
+        eq(otpCodesTable.id, record.id),
+        eq(otpCodesTable.verified, false),
+        gt(otpCodesTable.expiresAt, new Date()),
+      )).returning({ id: otpCodesTable.id });
+    if (!consumed) {
+      res.status(401).json({ error: "Invalid or expired code" });
+      return;
+    }
 
     // JIT provision the user + business.
     const user = await getOrCreatePhoneUser(normalized);

@@ -1,6 +1,10 @@
 import express, { type Request, type Response, type NextFunction } from "express";
 import request from "supertest";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+vi.mock("../services/sms", () => ({
+  ensureSmsReady: vi.fn().mockRejectedValue(new Error("SMS provider unavailable")),
+  sendOtpSms: vi.fn(),
+}));
 import {
   appUsersTable, businessSettingsTable, businessesTable, db, ledgerEntriesTable, partiesTable,
   userBusinessesTable, workerInvitesTable, workerPartyAssignmentsTable,
@@ -170,7 +174,7 @@ describe("owner worker invitation authorization", () => {
     expect(duplicate.body.error).toBe("This identity cannot be invited");
   });
 
-  it("rejects a pending email invitation regardless of business and disables phone invites", async () => {
+  it("rejects a pending email invitation regardless of business and fails closed when SMS is unavailable", async () => {
     const app = makeApp(businessId);
     const otherPending = await db.insert(workerInvitesTable).values({
       businessId: otherBusinessId,

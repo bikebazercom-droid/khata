@@ -5,6 +5,7 @@ import {
   workerPartyAssignmentsTable,
 } from "@workspace/db";
 import { type AuthenticatedRequest } from "../middlewares/requireAuth";
+import { ensureSmsReady } from "../services/sms";
 
 const router: IRouter = Router();
 
@@ -135,10 +136,12 @@ router.post("/owner/workers", async (req, res): Promise<void> => {
     return;
   }
   if (phone) {
-    res.status(503).json({
-      error: "Phone worker invitations are unavailable until SMS delivery is configured",
-    });
-    return;
+    try {
+      await ensureSmsReady();
+    } catch {
+      res.status(503).json({ error: "Phone invitations are unavailable because SMS delivery is not ready" });
+      return;
+    }
   }
   const parties = partyIds.length
     ? await db.select({ id: partiesTable.id }).from(partiesTable).where(and(
