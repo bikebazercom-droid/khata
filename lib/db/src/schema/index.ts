@@ -8,5 +8,6 @@ export * from "./staffPersonnel";
 export * from "./staffDeploymentLogs";
 export * from "./staffDestinations";
 export * from "./userBusinesses";
+export * from "./workerAccess";
 export * from "./adminOtpConfig";
 export * from "./downloadConfigs";

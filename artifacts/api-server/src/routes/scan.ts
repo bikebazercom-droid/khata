@@ -143,7 +143,7 @@ If no transactions are found in the image, return {"items":[]}.`,
               confidence: (["high", "medium", "low"] as const).includes(i.confidence as "high" | "medium" | "low")
                 ? (i.confidence as "high" | "medium" | "low")
                 : "low",
-            }))
+              } as ParsedItem))
             .filter((i) => i.amount > 0);
         }
       } catch {
@@ -158,7 +158,7 @@ If no transactions are found in the image, return {"items":[]}.`,
 // ── POST /api/scan/bulk-save ──────────────────────────────────────────────────
 // Bulk-saves confirmed scan results across multiple parties in one transaction.
 router.post("/scan/bulk-save", async (req, res): Promise<void> => {
-  const { businessId } = req as unknown as AuthenticatedRequest;
+  const { businessId, userId } = req as unknown as AuthenticatedRequest;
 
   const body = req.body as unknown;
   if (
@@ -246,6 +246,9 @@ router.post("/scan/bulk-save", async (req, res): Promise<void> => {
         .insert(ledgerEntriesTable)
         .values({
           partyId: item.partyId,
+          createdByUserId: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)
+            ? userId
+            : null,
           type: item.type,
           amount: item.amount.toFixed(2),
           description: item.note ?? "",

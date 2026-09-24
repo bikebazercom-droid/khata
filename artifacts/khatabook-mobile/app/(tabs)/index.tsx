@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useGetDashboardSummary, useGetBusinessSettings, useListParties } from '@workspace/api-client-react';
 import { useColors } from '@/hooks/useColors';
 import { useLanguage } from '@/lib/i18n';
+import { useAuthRole } from '@/lib/auth-role';
 
 function formatRelativeTime(dateStr: string | null): string {
   if (!dateStr) return '';
@@ -33,17 +34,35 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { t, formatCurrency } = useLanguage();
+  const { identity } = useAuthRole();
 
-  const { data: summary, isLoading: summaryLoading, refetch: refetchSummary } = useGetDashboardSummary();
-  const { data: settings, isLoading: settingsLoading } = useGetBusinessSettings();
-  const { data: customers, refetch: refetchCustomers } = useListParties({ role: 'CUSTOMER' });
-  const { data: suppliers, refetch: refetchSuppliers } = useListParties({ role: 'SUPPLIER' });
+  const isOwner = identity?.role === 'owner';
+  const isStaff = identity?.role === 'staff';
+  const { data: summary, isLoading: summaryLoading, refetch: refetchSummary } = useGetDashboardSummary({
+    query: { enabled: isOwner, queryKey: ['/api/dashboard/summary'] },
+  });
+  const { data: settings, isLoading: settingsLoading } = useGetBusinessSettings({
+    query: { enabled: isOwner, queryKey: ['/api/settings'] },
+  });
+  const { data: customers, refetch: refetchCustomers } = useListParties(
+    { role: 'CUSTOMER' }, { query: { enabled: isOwner, queryKey: ['/api/parties', { role: 'CUSTOMER' }] } },
+  );
+  const { data: suppliers, refetch: refetchSuppliers } = useListParties(
+    { role: 'SUPPLIER' }, { query: { enabled: isOwner, queryKey: ['/api/parties', { role: 'SUPPLIER' }] } },
+  );
+  const { data: assignedParties = [], isLoading: assignedLoading, refetch: refetchAssigned } = useListParties(
+    {}, { query: { enabled: isStaff, queryKey: ['/api/parties', {}] } },
+  );
 
   const [refreshing, setRefreshing] = useState(false);
 
   async function handleRefresh() {
     setRefreshing(true);
-    await Promise.all([refetchSummary(), refetchCustomers(), refetchSuppliers()]);
+    if (isStaff) {
+      await refetchAssigned();
+    } else {
+      await Promise.all([refetchSummary(), refetchCustomers(), refetchSuppliers()]);
+    }
     setRefreshing(false);
   }
 
@@ -137,6 +156,53 @@ export default function HomeScreen() {
     bottomPad: { height: Platform.OS === 'web' ? 84 : 90 },
     loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
   });
+
+  if (isStaff) {
+    return (
+      <View style={s.container}>
+        <View style={s.header}>
+          <Text style={s.storeName}>{identity?.businessName || t('myShop')}</Text>
+          <Text style={s.subtitle}>আপনার জন্য বরাদ্দ করা পার্টি</Text>
+        </View>
+        <ScrollView
+          style={s.scroll}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
+        >
+          <View style={s.section}>
+            {assignedLoading && assignedParties.length === 0 ? (
+              <View style={s.loadingContainer}><ActivityIndicator color={colors.primary} /></View>
+            ) : assignedParties.length === 0 ? (
+              <Text style={s.emptyText}>আপনাকে এখনো কোনো পার্টি বরাদ্দ করা হয়নি।</Text>
+            ) : assignedParties.map(party => {
+              const isGet = party.balanceType === 'YOU_WILL_GET';
+              const initials = party.name.slice(0, 2).toUpperCase();
+              return (
+                <TouchableOpacity
+                  key={party.id}
+                  style={s.partyRow}
+                  activeOpacity={0.7}
+                  onPress={() => router.push(`/party/${party.id}` as any)}
+                >
+                  <View style={[s.avatar, { backgroundColor: party.role === 'CUSTOMER' ? colors.willGetBg : colors.willGiveBg }]}>
+                    <Text style={{ color: party.role === 'CUSTOMER' ? colors.willGet : colors.willGive, fontFamily: 'Inter_700Bold', fontSize: 14 }}>{initials}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.partyName} numberOfLines={1}>{party.name}</Text>
+                    <Text style={s.partyMeta}>{party.role === 'CUSTOMER' ? t('customerLabel') : t('supplierLabel')}</Text>
+                  </View>
+                  <Text style={[s.partyBalance, { color: isGet ? colors.willGet : colors.willGive }]}>
+                    {formatCurrency(party.currentBalance)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <View style={s.bottomPad} />
+        </ScrollView>
+      </View>
+    );
+  }
 
   if (summaryLoading && !summary) {
     return (

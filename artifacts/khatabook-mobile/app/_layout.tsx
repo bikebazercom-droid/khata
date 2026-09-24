@@ -5,6 +5,7 @@ if (typeof global.Buffer === 'undefined') {
 }
 
 import React, { useEffect } from 'react';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -17,12 +18,14 @@ import {
   Inter_700Bold,
   useFonts,
 } from '@expo-google-fonts/inter';
-import { Stack } from 'expo-router';
+import { Redirect, Stack, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { ClerkProvider, ClerkLoaded } from '@clerk/expo';
+import { ClerkProvider, ClerkLoaded, useAuth } from '@clerk/expo';
 import { tokenCache } from '@clerk/expo/token-cache';
 import { setBaseUrl } from '@workspace/api-client-react';
 import { LanguageProvider } from '@/lib/i18n';
+import { AuthRoleProvider, notifyMobileIdentityChanged, useAuthRole } from '@/lib/auth-role';
+import { useColors } from '@/hooks/useColors';
 
 // Set API base URL — Expo bundles run outside the web proxy and need an
 // absolute URL. EXPO_PUBLIC_DOMAIN is injected by the dev script.
@@ -43,6 +46,22 @@ const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 const proxyUrl = process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
 
 function RootLayoutNav() {
+  const segments = useSegments();
+  const { isLoaded, isSignedIn } = useAuth();
+  const { identity, loading, error, unauthorized } = useAuthRole();
+  const isPartyDetail = segments[0] === 'party';
+  const isReport = segments[0] === 'report';
+  const needsIdentity = isPartyDetail || isReport;
+
+  if (needsIdentity) {
+    if (!isLoaded || loading) return null;
+    if (unauthorized || (!isSignedIn && !identity)) {
+      return <Redirect href="/(auth)/sign-in" />;
+    }
+    if (!identity) return <ProtectedRouteError message={error ?? 'অ্যাকাউন্টের অনুমতি যাচাই করা যায়নি।'} />;
+    if (isReport && identity.role === 'staff') return <Redirect href="/(tabs)" />;
+  }
+
   return (
     <Stack>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -56,6 +75,27 @@ function RootLayoutNav() {
         options={{ headerShown: false, presentation: 'card' }}
       />
     </Stack>
+  );
+}
+
+function ProtectedRouteError({ message }: { message: string }) {
+  const colors = useColors();
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: 28 }}>
+      <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 16, textAlign: 'center' }}>
+        অ্যাকাউন্টের অনুমতি যাচাই করা যায়নি
+      </Text>
+      <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular', fontSize: 13, textAlign: 'center', marginTop: 8 }}>
+        {message}
+      </Text>
+      <TouchableOpacity
+        testID="retry-protected-route-auth"
+        onPress={notifyMobileIdentityChanged}
+        style={{ marginTop: 20, paddingHorizontal: 18, paddingVertical: 12, borderRadius: colors.radius, backgroundColor: colors.primary }}
+      >
+        <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_600SemiBold' }}>আবার চেষ্টা করুন</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -85,13 +125,15 @@ export default function RootLayout() {
         <SafeAreaProvider>
           <ErrorBoundary>
             <QueryClientProvider client={queryClient}>
-              <LanguageProvider>
-                <GestureHandlerRootView style={{ flex: 1 }}>
-                  <KeyboardProvider>
-                    <RootLayoutNav />
-                  </KeyboardProvider>
-                </GestureHandlerRootView>
-              </LanguageProvider>
+              <AuthRoleProvider>
+                <LanguageProvider>
+                  <GestureHandlerRootView style={{ flex: 1 }}>
+                    <KeyboardProvider>
+                      <RootLayoutNav />
+                    </KeyboardProvider>
+                  </GestureHandlerRootView>
+                </LanguageProvider>
+              </AuthRoleProvider>
             </QueryClientProvider>
           </ErrorBoundary>
         </SafeAreaProvider>

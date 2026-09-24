@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { getAuth } from "@clerk/express";
-import { eq, isNull, and } from "drizzle-orm";
+import { eq, isNull, and, inArray } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import {
   db,
@@ -9,6 +9,8 @@ import {
   businessSettingsTable,
   partiesTable,
   userBusinessesTable,
+  workerInvitesTable,
+  workerPartyAssignmentsTable,
   type AppUser,
 } from "@workspace/db";
 
@@ -20,6 +22,11 @@ export const SEED_BUSINESS_ID = "00000000-0000-0000-0000-000000000001";
 export interface AuthenticatedRequest extends Request {
   userId: string;
   businessId: string;
+  role: "owner" | "staff";
+  status: "active" | "suspended";
+  authMethod: "clerk" | "phone" | "dev";
+  verifiedEmail?: string;
+  phone?: string;
 }
 
 // ─── Startup migration ───────────────────────────────────────────────────────
@@ -63,17 +70,78 @@ async function linkUserBusiness(userId: string, businessId: string) {
     .onConflictDoNothing();
 }
 
+async function claimWorkerInvite(identity: { email?: string; phone?: string; clerkUserId?: string }) {
+  return db.transaction(async (tx) => {
+    const identityCondition = identity.email
+      ? eq(workerInvitesTable.email, identity.email)
+      : eq(workerInvitesTable.phone, identity.phone!);
+    const [invite] = await tx.select().from(workerInvitesTable)
+      .where(and(identityCondition, eq(workerInvitesTable.status, "pending")))
+      .for("update").limit(1);
+    if (!invite) return null;
+    const [staff] = await tx.insert(appUsersTable).values({
+      clerkUserId: identity.clerkUserId,
+      verifiedEmail: identity.email,
+      phone: identity.phone,
+      businessId: invite.businessId,
+      role: "staff",
+    }).returning();
+    await tx.insert(userBusinessesTable)
+      .values({ userId: staff!.id, businessId: invite.businessId }).onConflictDoNothing();
+    const eligiblePartyIds = invite.partyIds.length
+      ? await tx.select({ id: partiesTable.id }).from(partiesTable).where(and(
+        eq(partiesTable.businessId, invite.businessId),
+        inArray(partiesTable.id, invite.partyIds),
+      ))
+      : [];
+    if (eligiblePartyIds.length) {
+      await tx.insert(workerPartyAssignmentsTable).values(eligiblePartyIds.map(({ id }) => ({
+        userId: staff!.id, partyId: id,
+      }))).onConflictDoNothing();
+    }
+    const [claimedInvite] = await tx.update(workerInvitesTable).set({
+      status: "claimed",
+      claimedAt: new Date(),
+      claimedUserId: staff!.id,
+    }).where(and(
+      eq(workerInvitesTable.id, invite.id),
+      eq(workerInvitesTable.status, "pending"),
+    )).returning({ id: workerInvitesTable.id });
+    if (!claimedInvite) throw new Error("Worker invitation is no longer pending");
+    return staff!;
+  });
+}
+
 export async function getOrCreateClerkUser(
   clerkUserId: string,
+  verifiedEmail?: string,
 ): Promise<AppUser> {
   const [existing] = await db
     .select()
     .from(appUsersTable)
     .where(eq(appUsersTable.clerkUserId, clerkUserId));
   if (existing) {
+    if (verifiedEmail && existing.verifiedEmail !== verifiedEmail) {
+      const [updated] = await db.update(appUsersTable)
+        .set({ verifiedEmail }).where(eq(appUsersTable.id, existing.id)).returning();
+      await linkUserBusiness(existing.id, existing.businessId);
+      return updated!;
+    }
     // Ensure the user_businesses entry exists (idempotent backfill)
     await linkUserBusiness(existing.id, existing.businessId);
     return existing;
+  }
+
+  if (!verifiedEmail) {
+    throw new Error("A verified Clerk email is required to provision a new account");
+  }
+
+  if (verifiedEmail) {
+    const [existingEmail] = await db.select({ id: appUsersTable.id }).from(appUsersTable)
+      .where(eq(appUsersTable.verifiedEmail, verifiedEmail)).limit(1);
+    if (existingEmail) throw new Error("Verified email is already linked to another user");
+    const staff = await claimWorkerInvite({ email: verifiedEmail, clerkUserId });
+    if (staff) return staff;
   }
 
   const [seedOwner] = await db
@@ -96,7 +164,7 @@ export async function getOrCreateClerkUser(
 
   const [user] = await db
     .insert(appUsersTable)
-    .values({ clerkUserId, businessId, role: "owner" })
+    .values({ clerkUserId, verifiedEmail, businessId, role: "owner" })
     .returning();
   await linkUserBusiness(user!.id, businessId);
   return user!;
@@ -113,6 +181,9 @@ export async function getOrCreatePhoneUser(
     await linkUserBusiness(existing.id, existing.businessId);
     return existing;
   }
+
+  const staff = await claimWorkerInvite({ phone });
+  if (staff) return staff;
 
   const [seedOwner] = await db
     .select()
@@ -151,6 +222,12 @@ async function resolveBusinessId(
   user: AppUser,
   req: Request,
 ): Promise<string> {
+  const [ownMembership] = await db.select().from(userBusinessesTable).where(and(
+    eq(userBusinessesTable.userId, user.id),
+    eq(userBusinessesTable.businessId, user.businessId),
+  )).limit(1);
+  if (!ownMembership) throw new Error("Business membership required");
+  if (user.role === "staff") return user.businessId;
   const requested = req.headers["x-business-id"] as string | undefined;
   if (!requested || requested === user.businessId) return user.businessId;
 
@@ -176,8 +253,9 @@ const COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 interface PhoneSessionPayload {
   userId: string;
-  businessId: string;
+  businessId?: string;
   phone: string;
+  sessionVersion: number;
 }
 
 export function issuePhoneSession(
@@ -217,7 +295,7 @@ export async function requireAuth(
   next: NextFunction,
 ): Promise<void> {
   // ── 0. Development bypass — NEVER active when NODE_ENV=production ──────────
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV !== "production" && process.env.DEV_AUTH_BYPASS === "true") {
     try {
       // Ensure a stable dev user exists (idempotent, uses fixed UUID).
       await db
@@ -230,6 +308,9 @@ export async function requireAuth(
         .onConflictDoNothing();
       (req as AuthenticatedRequest).userId = DEV_USER_ID;
       (req as AuthenticatedRequest).businessId = SEED_BUSINESS_ID;
+      (req as AuthenticatedRequest).role = "owner";
+      (req as AuthenticatedRequest).status = "active";
+      (req as AuthenticatedRequest).authMethod = "dev";
       return next();
     } catch (err) {
       console.warn("[requireAuth] dev-bypass setup error — falling through to real auth:", err);
@@ -241,9 +322,18 @@ export async function requireAuth(
   const clerkAuth = getAuth(req);
   if (clerkAuth?.userId) {
     try {
-      const user = await getOrCreateClerkUser(clerkAuth.userId);
+      const verifiedEmail = await getVerifiedClerkEmail(clerkAuth.userId);
+      const user = await getOrCreateClerkUser(clerkAuth.userId, verifiedEmail ?? undefined);
+      if (user.status !== "active") {
+        res.status(403).json({ error: "Account suspended" });
+        return;
+      }
       (req as AuthenticatedRequest).userId = user.id;
       (req as AuthenticatedRequest).businessId = await resolveBusinessId(user, req);
+      (req as AuthenticatedRequest).role = user.role;
+      (req as AuthenticatedRequest).status = user.status;
+      (req as AuthenticatedRequest).authMethod = "clerk";
+      (req as AuthenticatedRequest).verifiedEmail = verifiedEmail ?? undefined;
       return next();
     } catch (err) {
       console.error("[requireAuth] Clerk JIT provision error:", err);
@@ -254,28 +344,56 @@ export async function requireAuth(
 
   // ── 2. Try phone session cookie ──
   const cookieToken = (req as any).cookies?.[COOKIE_NAME];
-  if (cookieToken) {
-    const payload = verifyPhoneSession(cookieToken);
+  const bearerHeader = req.headers.authorization;
+  const bearerToken = bearerHeader?.startsWith("Bearer ") ? bearerHeader.slice(7) : undefined;
+  if (cookieToken || bearerToken) {
+    const token = cookieToken || bearerToken!;
+    const payload = verifyPhoneSession(token);
     if (payload) {
-      const fakeUser = { id: payload.userId, businessId: payload.businessId } as AppUser;
-      (req as AuthenticatedRequest).userId = payload.userId;
-      (req as AuthenticatedRequest).businessId = await resolveBusinessId(fakeUser, req);
-      return next();
-    }
-  }
-
-  // ── 3. Try phone session Bearer token (mobile clients) ──
-  const authHeader = req.headers.authorization;
-  if (authHeader?.startsWith("Bearer ")) {
-    const bearerToken = authHeader.slice(7);
-    const payload = verifyPhoneSession(bearerToken);
-    if (payload) {
-      const fakeUser = { id: payload.userId, businessId: payload.businessId } as AppUser;
-      (req as AuthenticatedRequest).userId = payload.userId;
-      (req as AuthenticatedRequest).businessId = await resolveBusinessId(fakeUser, req);
+      const [user] = await db.select().from(appUsersTable).where(eq(appUsersTable.id, payload.userId)).limit(1);
+      if (!user || user.status !== "active" || user.phone !== payload.phone ||
+          user.phoneSessionVersion !== payload.sessionVersion) {
+        res.status(401).json({ error: "Invalid or revoked session" });
+        return;
+      }
+      const [membership] = await db.select().from(userBusinessesTable).where(and(
+        eq(userBusinessesTable.userId, user.id),
+        eq(userBusinessesTable.businessId, user.businessId),
+      )).limit(1);
+      if (!membership) {
+        res.status(403).json({ error: "Business membership required" });
+        return;
+      }
+      (req as AuthenticatedRequest).userId = user.id;
+      (req as AuthenticatedRequest).businessId = user.businessId;
+      (req as AuthenticatedRequest).role = user.role;
+      (req as AuthenticatedRequest).status = user.status;
+      (req as AuthenticatedRequest).authMethod = "phone";
+      (req as AuthenticatedRequest).phone = user.phone ?? undefined;
       return next();
     }
   }
 
   res.status(401).json({ error: "Unauthorized" });
+}
+
+async function getVerifiedClerkEmail(clerkUserId: string): Promise<string | null> {
+  const secret = process.env.CLERK_SECRET_KEY;
+  if (!secret) return null;
+  try {
+    const response = await fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(clerkUserId)}`, {
+      headers: { Authorization: `Bearer ${secret}` },
+    });
+    if (!response.ok) return null;
+    const user = await response.json() as {
+      email_addresses?: Array<{ id: string; email_address: string; verification?: { status?: string } }>;
+      primary_email_address_id?: string;
+    };
+    const item = user.email_addresses?.find((email) =>
+      email.id === user.primary_email_address_id && email.verification?.status === "verified",
+    ) ?? user.email_addresses?.find((email) => email.verification?.status === "verified");
+    return item?.email_address.trim().toLowerCase() ?? null;
+  } catch {
+    return null;
+  }
 }

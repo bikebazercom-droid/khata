@@ -15,6 +15,7 @@ import { TransactionDetailPage } from '@/pages/transaction-detail';
 import { ReportView } from '@/pages/report-view';
 import { PartyReportView } from '@/pages/party-report-view';
 import { StaffDeploymentPage } from '@/pages/staff-deployment';
+import { AccessPage } from '@/pages/access';
 import { LandingPage } from '@/pages/landing';
 import { SignInPage } from '@/pages/sign-in';
 import { SignUpPage } from '@/pages/sign-up';
@@ -148,16 +149,7 @@ const queryClient = new QueryClient({
 });
 
 // ── Seed the QueryClient with last-session data before the first render ───────
-//
-// restoreCache() reads the localStorage snapshot synchronously and calls
-// queryClient.setQueryData() for every stored query key. This means the
-// very first render of HomeView, PartyView, etc. already has data —
-// no spinner, no blank screen, even when the network is slow or offline.
-//
-// persistCache() subscribes to the cache and writes each successful fetch
-// to localStorage so the next session can restore from it.
-restoreCache(queryClient);
-persistCache(queryClient);
+// (Removed persisted query restore to prevent cross-account cache leak)
 
 // ─── Real-time sync ───────────────────────────────────────────────────────────
 
@@ -178,28 +170,35 @@ function RealtimeSyncManager() {
 
 // ─── Invalidate cache on user change ──────────────────────────────────────────
 
-function ClerkCacheInvalidator() {
+function AuthCacheInvalidator() {
   const { addListener } = useClerk();
   const qc = useQueryClient();
+  const { userId } = useAppAuth();
   const prevUserIdRef = useRef<string | null | undefined>(undefined);
 
+  // Clear cache when clerk user changes
   useEffect(() => {
     const unsub = addListener(({ user }) => {
-      const userId = user?.id ?? null;
-      if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== userId) {
+      const clerkUserId = user?.id ?? null;
+      if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== clerkUserId) {
         qc.clear();
-        if (userId === null) {
-          // User signed out — clear both the optimistic auth cache and the
-          // persisted query cache so a different user signing in never sees
-          // the previous session's data during the optimistic-render window.
-          clearAuthCache();
-          clearPersistedCache();
-        }
+        clearAuthCache();
+        clearPersistedCache();
       }
-      prevUserIdRef.current = userId;
+      prevUserIdRef.current = clerkUserId;
     });
     return unsub;
   }, [addListener, qc]);
+
+  // Clear cache when any userId changes (clerk or phone)
+  const prevAppUserIdRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (prevAppUserIdRef.current !== undefined && prevAppUserIdRef.current !== userId) {
+      qc.clear();
+      clearPersistedCache();
+    }
+    prevAppUserIdRef.current = userId;
+  }, [userId, qc]);
 
   return null;
 }
@@ -216,60 +215,48 @@ function ClerkCacheInvalidator() {
  * The real check still runs in the background — if it fails (session expired),
  * we clear the cache and redirect to sign-in seamlessly.
  */
-function useAppAuth() {
-  const { isLoaded, isSignedIn: clerkSignedIn } = useAuth();
+export function useAppAuth() {
+  const { isLoaded, isSignedIn: clerkSignedIn, userId: clerkUserId } = useAuth();
 
-  // Read once at mount — synchronous, ~0 ms, avoids any re-render on change.
-  const [cachedAuth] = useState(() => readAuthCache());
-
-  // Only call /me when Clerk says we're NOT signed in — avoids a redundant
-  // round-trip for Clerk users. In dev bypass mode the query is always
-  // disabled so no real network call is made, but the hook itself must still
-  // be called unconditionally to satisfy React's rules of hooks.
-  const enabled = !import.meta.env.DEV && isLoaded && !clerkSignedIn;
-  const { data: phoneAuth, isLoading: phoneLoading } = useQuery({
-    queryKey: ['auth-me'],
+  // Resolve the server-side role even in development; a Clerk session alone
+  // does not establish the user's business permissions.
+  const devBypass = import.meta.env.DEV && import.meta.env.VITE_DEV_AUTH_BYPASS === 'true';
+  const enabled = isLoaded && !devBypass;
+  const { data: authData, isLoading: authLoading } = useQuery({
+    queryKey: ['auth-me', clerkUserId],
     queryFn: fetchMe,
     enabled,
     staleTime: 60_000,
     retry: false,
   });
 
-  // Whether we have a definitive answer from both auth paths.
-  const authSettled = isLoaded && (!enabled || !phoneLoading);
+  // Whether we have a definitive answer from auth paths.
+  // We need authData to settle for the role.
+  const authSettled = isLoaded && (!enabled || !authLoading);
 
-  const realAuth = clerkSignedIn || (enabled && !!phoneAuth?.userId);
+  const realAuth = enabled && !!authData?.userId;
 
-  // If settled, use the real answer. If still loading but we have a cache
-  // hit, optimistically report authenticated so the UI renders immediately.
-  const isAuthenticated = authSettled ? realAuth : (cachedAuth !== null);
+  // We MUST gate rendering on authoritative /auth/me to avoid cross-account leak
+  const isAuthenticated = authSettled ? realAuth : false;
 
-  // Only block with a loading state if we have no cache and haven't settled.
-  const isLoading = !authSettled && cachedAuth === null;
+  // Block rendering until auth has settled authoritatively
+  const isLoading = !authSettled;
 
-  // Persist / clear the cache whenever auth settles.
-  useEffect(() => {
-    // In dev bypass mode there is no real session to persist.
-    if (import.meta.env.DEV) return;
-    if (!authSettled) return;
-    if (realAuth) {
-      writeAuthCache(clerkSignedIn ? 'clerk' : 'phone');
-    } else {
-      // Session expired or user logged out — evict the optimistic cache.
-      clearAuthCache();
-    }
-  }, [authSettled, realAuth, clerkSignedIn]);
+  // Role info: NEVER default to 'owner'. Require the true role from /me.
+  const role = authData?.role || "staff";
 
   // ── Development bypass — returned AFTER all hooks so hook order is stable ──
-  // import.meta.env.DEV is a Vite build-time constant: true in dev mode,
-  // false (and tree-shaken away) in production builds. The API server has a
-  // matching NODE_ENV !== 'production' guard so every API call succeeds
-  // without a real auth token during local development.
-  if (import.meta.env.DEV) {
-    return { isAuthenticated: true, isLoading: false, authMethod: 'dev' as const };
+  if (devBypass) {
+    return { isAuthenticated: true, isLoading: false, authMethod: 'dev' as const, role: 'owner' as const, userId: 'dev-user' };
   }
 
-  return { isAuthenticated, isLoading, authMethod: clerkSignedIn ? 'clerk' : (phoneAuth ? 'phone' : null) };
+  return {
+    isAuthenticated,
+    isLoading,
+    authMethod: clerkSignedIn ? 'clerk' : (authData ? 'phone' : null),
+    role,
+    userId: authData?.userId,
+  };
 }
 
 // ─── Branded splash (first-visit only) ───────────────────────────────────────
@@ -296,12 +283,39 @@ function AppSplash() {
 // ─── Protected wrapper ────────────────────────────────────────────────────────
 
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAppAuth();
+  const { isAuthenticated, isLoading, role } = useAppAuth();
+  const [location] = useLocation();
 
   if (isLoading) return <AppSplash />;
 
   if (!isAuthenticated) {
     return <Redirect to="/sign-in" />;
+  }
+
+  // Staff restricted routing
+  if (role === 'staff') {
+    const isAllowed = location === '/' || (location.startsWith('/party/') && location.split('/').length === 3);
+    if (!isAllowed) {
+      return <Redirect to="/" />;
+    }
+  }
+
+  return <MainLayout>{children}</MainLayout>;
+}
+
+// ─── Owner Protected wrapper ──────────────────────────────────────────────────
+
+function OwnerLayout({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading, role } = useAppAuth();
+
+  if (isLoading) return <AppSplash />;
+
+  if (!isAuthenticated) {
+    return <Redirect to="/sign-in" />;
+  }
+
+  if (role === 'staff') {
+    return <Redirect to="/" />;
   }
 
   return <MainLayout>{children}</MainLayout>;
@@ -351,7 +365,7 @@ function AppRouter() {
       <QueryClientProvider client={queryClient}>
         <LanguageProvider>
         <ConnectionStateProvider>
-        <ClerkCacheInvalidator />
+        <AuthCacheInvalidator />
         <RealtimeSyncManager />
         <TooltipProvider>
           <Switch>
@@ -361,25 +375,30 @@ function AppRouter() {
             <Route path="/sign-in/*?" component={SignInPage} />
             <Route path="/sign-up/*?" component={SignUpPage} />
             {/* Protected */}
+            <Route path="/access">
+              <OwnerLayout>
+                <AccessPage />
+              </OwnerLayout>
+            </Route>
             <Route path="/party/:partyId/entry/:entryId">
               {() => (
-                <ProtectedLayout>
+                <OwnerLayout>
                   <TransactionDetailPage />
-                </ProtectedLayout>
+                </OwnerLayout>
               )}
             </Route>
             <Route path="/party/:id/report">
               {() => (
-                <ProtectedLayout>
+                <OwnerLayout>
                   <PartyReportView />
-                </ProtectedLayout>
+                </OwnerLayout>
               )}
             </Route>
             <Route path="/party/:id/profile">
               {() => (
-                <ProtectedLayout>
+                <OwnerLayout>
                   <PartyProfileView />
-                </ProtectedLayout>
+                </OwnerLayout>
               )}
             </Route>
             <Route path="/party/:id">
@@ -390,14 +409,14 @@ function AppRouter() {
               )}
             </Route>
             <Route path="/reports">
-              <ProtectedLayout>
+              <OwnerLayout>
                 <ReportView />
-              </ProtectedLayout>
+              </OwnerLayout>
             </Route>
             <Route path="/staff-deployment">
-              <ProtectedLayout>
+              <OwnerLayout>
                 <StaffDeploymentPage />
-              </ProtectedLayout>
+              </OwnerLayout>
             </Route>
             <Route component={NotFound} />
           </Switch>

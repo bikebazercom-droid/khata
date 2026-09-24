@@ -31,6 +31,8 @@ import type { Party } from '@workspace/api-client-react';
 import { useColors } from '@/hooks/useColors';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '@/lib/i18n';
+import { Redirect } from 'expo-router';
+import { useAuthRole } from '@/lib/auth-role';
 
 const API_BASE = process.env.EXPO_PUBLIC_DOMAIN
   ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
@@ -636,6 +638,7 @@ export default function PartiesScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const { t } = useLanguage();
+  const { identity } = useAuthRole();
   const [activeTab, setActiveTab] = useState<Tab>('CUSTOMER');
   const [search, setSearch] = useState('');
   const [showAddSheet, setShowAddSheet] = useState(false);
@@ -645,7 +648,7 @@ export default function PartiesScreen() {
   const { data: parties = [], isLoading, refetch } = useListParties({
     role: activeTab,
     search: search || undefined,
-  });
+  }, { query: { enabled: identity?.role === 'owner', queryKey: ['/api/parties', { role: activeTab, search: search || undefined }] } });
 
   async function handleRefresh() {
     setRefreshing(true);
@@ -729,6 +732,8 @@ export default function PartiesScreen() {
   const noResultsBody = search
     ? t('tryDifferentSearch')
     : isCustomer ? '+ চাপুন প্রথম কাস্টমার যোগ করতে' : '+ চাপুন প্রথম সাপ্লায়ার যোগ করতে';
+
+  if (identity?.role === 'staff') return <Redirect href="/" />;
 
   return (
     <View style={s.container}>

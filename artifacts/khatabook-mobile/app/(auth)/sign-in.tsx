@@ -19,6 +19,8 @@ import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { notifyMobileIdentityChanged } from '@/lib/auth-role';
+import { customFetch } from '@/lib/api-transport';
 
 // Preload browser on Android to reduce auth load time
 WebBrowser.maybeCompleteAuthSession();
@@ -54,10 +56,6 @@ export default function SignInScreen() {
   const [phoneLoading, setPhoneLoading] = useState(false);
   const [needsMfaCode, setNeedsMfaCode] = useState(false);
   const [mfaCode, setMfaCode] = useState('');
-
-  const baseUrl = process.env.EXPO_PUBLIC_DOMAIN
-    ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
-    : '';
 
   // ─── Email / password sign-in ───────────────────────────────────────────────
 
@@ -127,13 +125,11 @@ export default function SignInScreen() {
     if (!phone.trim()) return;
     setPhoneLoading(true);
     try {
-      const res = await fetch(`${baseUrl}/api/auth/phone/send-otp`, {
+      await customFetch<{ success: boolean }>('/api/auth/phone/send-otp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: phone.trim() }),
+        responseType: 'json',
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? 'Failed to send OTP');
       setOtpSent(true);
     } catch (err: any) {
       Alert.alert('Error', err.message);
@@ -146,17 +142,16 @@ export default function SignInScreen() {
     if (!otp.trim()) return;
     setPhoneLoading(true);
     try {
-      const res = await fetch(`${baseUrl}/api/auth/phone/verify-otp`, {
+      const body = await customFetch<{ token?: string }>('/api/auth/phone/verify-otp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: phone.trim(), code: otp.trim() }),
+        responseType: 'json',
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? 'Invalid OTP');
       if (!body.token) throw new Error('Server did not return a session token');
       // Store the phone session JWT in SecureStore so the tabs layout can
       // attach it as a Bearer token on every API request.
       await SecureStore.setItemAsync('phone_session_token', body.token);
+      notifyMobileIdentityChanged();
       router.replace('/(tabs)' as any);
     } catch (err: any) {
       Alert.alert('Error', err.message);

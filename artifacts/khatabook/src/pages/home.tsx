@@ -6,6 +6,7 @@ import { useBusinessContext } from '@/lib/businessContext';
 import {
   useListParties,
   useGetBusinessSettings,
+  getGetBusinessSettingsQueryKey,
   PartyRole,
   DueFilter,
 } from '@workspace/api-client-react';
@@ -22,9 +23,11 @@ import { formatDistanceToNow } from 'date-fns';
 import { bn as bnLocale } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/i18n';
+import { useAppAuth } from '@/App';
 
 export function HomeView() {
   const { openSwitcher, businesses, selectedBusinessId } = useBusinessContext();
+  const { role: userRole } = useAppAuth();
   const activeBusiness = businesses.find((b) => b.id === selectedBusinessId);
   const [role, setRole] = useState<PartyRole>(PartyRole.CUSTOMER);
   const [search, setSearch] = useState('');
@@ -70,7 +73,7 @@ export function HomeView() {
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
-  const { data: settings } = useGetBusinessSettings();
+  const { data: settings } = useGetBusinessSettings({ query: { enabled: userRole === 'owner', queryKey: getGetBusinessSettingsQueryKey() } });
   const { data: summaryParties = [] } = useListParties({ role });
   const { data: rawParties = [] } = useListParties({ role, search, dueFilter: apiDueFilter });
 
@@ -375,39 +378,45 @@ export function HomeView() {
             />
             <button
               type="button"
-              onClick={openSwitcher}
-              className="flex items-center gap-1.5 active:opacity-75 transition-opacity min-w-0"
-              aria-label="বাংলা খাতা পরিবর্তন করুন"
+              onClick={userRole === 'owner' ? openSwitcher : undefined}
+              className={cn("flex items-center gap-1.5 transition-opacity min-w-0", userRole === 'owner' ? "active:opacity-75" : "")}
+              aria-label="বাংলা খাতা"
             >
               <h1 className="font-extrabold tracking-tight text-[15px] text-white truncate max-w-[120px]">
                 {activeBusiness?.name || settings?.storeName || t('loading')}
               </h1>
-              <ChevronRight className="w-3.5 h-3.5 text-white/60 shrink-0 rotate-90" />
+              {userRole === 'owner' && <ChevronRight className="w-3.5 h-3.5 text-white/60 shrink-0 rotate-90" />}
             </button>
-            <button
-              onClick={() => setIsRenameStoreOpen(true)}
-              aria-label="দোকানের নাম সম্পাদনা করুন"
-              className="w-6 h-6 shrink-0 rounded-md flex items-center justify-center text-white/60 active:bg-white/15 active:text-white transition-all"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
+            {userRole === 'owner' && (
+              <button
+                onClick={() => setIsRenameStoreOpen(true)}
+                aria-label="দোকানের নাম সম্পাদনা করুন"
+                className="w-6 h-6 shrink-0 rounded-md flex items-center justify-center text-white/60 active:bg-white/15 active:text-white transition-all"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => navigate('/staff-deployment')}
-              className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-2 rounded-xl active:scale-95 transition-all"
-            >
-              <UserPlus2 className="w-3.5 h-3.5" />
-              {t('addStaff')}
-            </button>
-            <button
-              onClick={() => navigate('/staff-deployment')}
-              aria-label="ডিউটি ফোল্ডার"
-              className="w-9 h-9 rounded-xl bg-white/15 text-white flex items-center justify-center active:scale-95 active:bg-white/25 transition-all"
-            >
-              <FolderOpen className="w-[18px] h-[18px]" />
-            </button>
+            {userRole === 'owner' && (
+              <button
+                onClick={() => navigate('/access')}
+                className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-2 rounded-xl active:scale-95 transition-all"
+              >
+                <UserPlus2 className="w-3.5 h-3.5" />
+                স্টাফ
+              </button>
+            )}
+            {userRole === 'owner' && (
+              <button
+                onClick={() => navigate('/staff-deployment')}
+                aria-label="ডিউটি ফোল্ডার"
+                className="w-9 h-9 rounded-xl bg-white/15 text-white flex items-center justify-center active:scale-95 active:bg-white/25 transition-all"
+              >
+                <FolderOpen className="w-[18px] h-[18px]" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -433,15 +442,17 @@ export function HomeView() {
               {t('supplier')}
             </button>
             <div className="flex-1" />
-            <button
-              type="button"
-              onClick={() => setIsScannerOpen(true)}
-              className="flex items-center gap-1.5 text-white/80 hover:text-white text-[12px] font-bold pb-2.5 pt-1 transition-all active:scale-95"
-              aria-label="বাংলা খাতা স্ক্যান করুন"
-            >
-              <ScanLine className="w-4 h-4" />
-              স্ক্যান
-            </button>
+            {userRole === 'owner' && (
+              <button
+                type="button"
+                onClick={() => setIsScannerOpen(true)}
+                className="flex items-center gap-1.5 text-white/80 hover:text-white text-[12px] font-bold pb-2.5 pt-1 transition-all active:scale-95"
+                aria-label="বাংলা খাতা স্ক্যান করুন"
+              >
+                <ScanLine className="w-4 h-4" />
+                স্ক্যান
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -461,16 +472,20 @@ export function HomeView() {
             </p>
             <p className="text-[9.5px] font-semibold text-slate-400 mt-1 whitespace-nowrap">{t('youWillGet')}</p>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate(`/reports?role=${role === PartyRole.CUSTOMER ? 'customer' : 'supplier'}`)}
-            className="px-1.5 py-3 flex flex-col items-center justify-center gap-1 active:scale-[0.95] transition-all min-w-0"
-          >
-            <span className="flex items-center gap-1 text-[#075E9F] font-bold text-[12px] whitespace-nowrap">
-              {t('viewReport')}
-              <ChevronRight className="w-3.5 h-3.5 shrink-0" />
-            </span>
-          </button>
+          {userRole === 'owner' ? (
+            <button
+              type="button"
+              onClick={() => navigate(`/reports?role=${role === PartyRole.CUSTOMER ? 'customer' : 'supplier'}`)}
+              className="px-1.5 py-3 flex flex-col items-center justify-center gap-1 active:scale-[0.95] transition-all min-w-0"
+            >
+              <span className="flex items-center gap-1 text-[#075E9F] font-bold text-[12px] whitespace-nowrap">
+                {t('viewReport')}
+                <ChevronRight className="w-3.5 h-3.5 shrink-0" />
+              </span>
+            </button>
+          ) : (
+            <div className="px-1.5 py-3 flex flex-col items-center justify-center gap-1 min-w-0" />
+          )}
         </div>
       </div>
 
@@ -499,16 +514,18 @@ export function HomeView() {
             <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
           )}
         </button>
-        <button
-          type="button"
-          onClick={() => { exportFilteredReportToPDF(); }}
-          disabled={isExportingPdf}
-          aria-label="PDF"
-          className="w-14 h-11 shrink-0 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
-        >
-          <FileText className={cn('w-4 h-4', isExportingPdf && 'animate-pulse')} />
-          <span className="text-[9px] font-bold leading-none">{isExportingPdf ? '...' : 'পিডিএফ'}</span>
-        </button>
+        {userRole === 'owner' && (
+          <button
+            type="button"
+            onClick={() => { exportFilteredReportToPDF(); }}
+            disabled={isExportingPdf}
+            aria-label="PDF"
+            className="w-14 h-11 shrink-0 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
+          >
+            <FileText className={cn('w-4 h-4', isExportingPdf && 'animate-pulse')} />
+            <span className="text-[9px] font-bold leading-none">{isExportingPdf ? '...' : 'পিডিএফ'}</span>
+          </button>
+        )}
       </div>
 
       {/* Active-filter summary strip */}
@@ -587,7 +604,8 @@ export function HomeView() {
                 <div className="shrink-0 flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={(e) => handleInstantShare(e, party)}
+                    onClick={userRole === 'owner' ? (e) => handleInstantShare(e, party) : undefined}
+                    disabled={userRole !== 'owner'}
                     className="text-right active:scale-95 transition-transform"
                     aria-label={`${party.name} balance`}
                   >
@@ -613,13 +631,15 @@ export function HomeView() {
       </div>
 
       {/* Floating FAB */}
-      <button
-        onClick={() => setIsAddPartyOpen(true)}
-        className="absolute right-4 bottom-[76px] z-20 flex items-center gap-2 bg-[#F5A623] text-white font-bold text-sm pl-4 pr-5 py-3.5 rounded-full shadow-[0_8px_24px_-6px_rgba(245,166,35,0.55)] active:scale-95 transition-all"
-      >
-        <Plus className="w-4 h-4" />
-        {t('addCustomer')}
-      </button>
+      {userRole === 'owner' && (
+        <button
+          onClick={() => setIsAddPartyOpen(true)}
+          className="absolute right-4 bottom-[76px] z-20 flex items-center gap-2 bg-[#F5A623] text-white font-bold text-sm pl-4 pr-5 py-3.5 rounded-full shadow-[0_8px_24px_-6px_rgba(245,166,35,0.55)] active:scale-95 transition-all"
+        >
+          <Plus className="w-4 h-4" />
+          {t('addCustomer')}
+        </button>
+      )}
 
       {/* Sticky bottom nav */}
       <div className="shrink-0 flex items-stretch border-t border-slate-100 bg-white z-10 pb-[var(--safe-bottom)]">
@@ -627,13 +647,15 @@ export function HomeView() {
           <Users className="w-5 h-5" />
           <span className="text-[10px] font-bold">{t('parties')}</span>
         </button>
-        <button
-          onClick={() => setIsSettingsOpen(true)}
-          className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-slate-400 active:text-slate-600 transition-colors"
-        >
-          <Settings className="w-5 h-5" />
-          <span className="text-[10px] font-bold">{t('settings')}</span>
-        </button>
+        {userRole === 'owner' && (
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-slate-400 active:text-slate-600 transition-colors"
+          >
+            <Settings className="w-5 h-5" />
+            <span className="text-[10px] font-bold">{t('settings')}</span>
+          </button>
+        )}
       </div>
 
       <AddPartyModal open={isAddPartyOpen} onOpenChange={setIsAddPartyOpen} defaultRole={role} />

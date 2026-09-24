@@ -3,3 +3,4 @@
 - [Orval date query-param coercion bug](orval-date-query-param-coercion.md) — generated zod schemas use bare `zod.date()` for `format: date` query params, always failing req.query parsing.
 - [Khatabook auth & multi-tenancy](khatabook-auth-multitenancy.md) — seed business UUID, requireAuth dual-session, drizzle push TTY workaround, lib/db rebuild requirement.
 - [Expo + Clerk Metro config fix](expo-clerk-metro-config.md) — Metro crashes watching @clerk/backend_tmp_* dirs; add blockList pattern to metro.config.js.
+- [Worker invitation identity](worker-invite-identity.md) — one pending invite per verified identity across businesses avoids arbitrary first-sign-in claims.

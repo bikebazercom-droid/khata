@@ -23,6 +23,7 @@ export const ledgerEntriesTable = pgTable("ledger_entries", {
   partyId: uuid("party_id")
     .notNull()
     .references(() => partiesTable.id, { onDelete: "cascade" }),
+  createdByUserId: uuid("created_by_user_id"),
   type: ledgerEntryTypeEnum("type").notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   description: text("description").notNull().default(""),

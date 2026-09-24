@@ -16,7 +16,7 @@ export interface AdminTokenPayload {
 }
 
 export function signAdminToken(): string {
-  return jwt.sign({ sub: "admin" }, ADMIN_SECRET, { expiresIn: "8h" });
+  return jwt.sign({ sub: "admin" }, ADMIN_SECRET!, { expiresIn: "8h" });
 }
 
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {
@@ -27,7 +27,7 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   }
   const token = authHeader.slice(7);
   try {
-    jwt.verify(token, ADMIN_SECRET);
+    jwt.verify(token, ADMIN_SECRET!);
     next();
   } catch {
     res.status(401).json({ error: "Invalid or expired admin token" });

@@ -38,9 +38,16 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
-import { useGetParty, useListLedgerEntries } from '@workspace/api-client-react';
+import {
+  useGetParty,
+  useListLedgerEntries,
+  getGetPartyQueryKey,
+  getListLedgerEntriesQueryKey,
+} from '@workspace/api-client-react';
 import type { LedgerEntry } from '@workspace/api-client-react';
 import { useColors } from '@/hooks/useColors';
+import { useAuthRole } from '@/lib/auth-role';
+import { Redirect } from 'expo-router';
 
 // ─── Bengali helpers ──────────────────────────────────────────────────────────
 
@@ -518,6 +525,7 @@ export default function ReportScreen() {
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
   const colors  = useColors();
+  const { identity } = useAuthRole();
 
   const PRIMARY = colors.primary;   // dark blue
 
@@ -540,8 +548,13 @@ export default function ReportScreen() {
   const [query, setQuery] = useState('');
 
   // Data
-  const { data:party, isLoading:pL } = useGetParty(id!);
-  const { data:entries=[], isLoading:eL } = useListLedgerEntries(id!);
+  const { data:party, isLoading:pL } = useGetParty(id!, {
+    query: { enabled: identity?.role === 'owner', queryKey: getGetPartyQueryKey(id!) },
+  });
+  const { data:entries=[], isLoading:eL } = useListLedgerEntries(id!, {
+    query: { enabled: identity?.role === 'owner', queryKey: getListLedgerEntriesQueryKey(id!) },
+  });
+  if (identity?.role === 'staff') return <Redirect href="/" />;
 
   // Computed display dates (for the header boxes)
   const disp = useMemo(() => displayDates(filter, cStart, cEnd), [filter, cStart, cEnd]);

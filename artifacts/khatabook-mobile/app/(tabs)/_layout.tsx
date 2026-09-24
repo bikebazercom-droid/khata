@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Platform, StyleSheet, useColorScheme, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, useColorScheme, TouchableOpacity, View, Text } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -10,11 +10,33 @@ import { SymbolView } from 'expo-symbols';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import { useLanguage } from '@/lib/i18n';
-import { setAuthTokenGetter } from '@workspace/api-client-react';
 import * as SecureStore from 'expo-secure-store';
+import { notifyMobileIdentityChanged, useAuthRole } from '@/lib/auth-role';
+
+function AuthRoleFailure({ message }: { message: string }) {
+  const colors = useColors();
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: 28 }}>
+      <Feather name="alert-circle" size={32} color={colors.destructive} />
+      <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 16, textAlign: 'center', marginTop: 12 }}>
+        অ্যাকাউন্টের অনুমতি যাচাই করা যায়নি
+      </Text>
+      <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular', fontSize: 13, textAlign: 'center', marginTop: 8 }}>
+        {message}
+      </Text>
+      <TouchableOpacity
+        testID="retry-auth-role"
+        onPress={notifyMobileIdentityChanged}
+        style={{ marginTop: 20, paddingHorizontal: 18, paddingVertical: 12, borderRadius: colors.radius, backgroundColor: colors.primary }}
+      >
+        <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_600SemiBold' }}>আবার চেষ্টা করুন</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
 
 // iOS 26+: NativeTabs with liquid glass (system-level, no custom tokens)
-function NativeTabLayout() {
+function NativeTabLayout({ staff }: { staff: boolean }) {
   const { t } = useLanguage();
   return (
     <NativeTabs>
@@ -22,15 +44,17 @@ function NativeTabLayout() {
         <Icon sf={{ default: 'person.2', selected: 'person.2.fill' }} />
         <Label>{t('parties')}</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="settings">
-        <Icon sf={{ default: 'gear', selected: 'gear' }} />
-        <Label>{t('settings')}</Label>
-      </NativeTabs.Trigger>
+      {!staff ? (
+        <NativeTabs.Trigger name="settings">
+          <Icon sf={{ default: 'gear', selected: 'gear' }} />
+          <Label>{t('settings')}</Label>
+        </NativeTabs.Trigger>
+      ) : null}
     </NativeTabs>
   );
 }
 
-function ClassicTabLayout() {
+function ClassicTabLayout({ staff }: { staff: boolean }) {
   const { t } = useLanguage();
   const colors = useColors();
   const colorScheme = useColorScheme();
@@ -88,6 +112,7 @@ function ClassicTabLayout() {
         options={{
           title: '',
           tabBarButton: () => <View style={{ flex: 1 }} />,
+          href: staff ? null : undefined,
         }}
       />
       {/* Right tab: Settings / সেটিংস */}
@@ -95,6 +120,7 @@ function ClassicTabLayout() {
         name="settings"
         options={{
           title: t('settings'),
+          href: staff ? null : undefined,
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="gear" tintColor={color} size={24} />
@@ -108,61 +134,25 @@ function ClassicTabLayout() {
 }
 
 export default function TabLayout() {
-  const { isSignedIn, getToken, isLoaded } = useAuth();
+  const { isSignedIn, isLoaded } = useAuth();
+  const { identity, loading: roleLoading, error: roleError, unauthorized } = useAuthRole();
 
-  // ── Development bypass ───────────────────────────────────────────────────
-  // __DEV__ is a React Native / Expo build-time constant:
-  //   true  → Expo dev server / Expo Go (development)
-  //   false → production APK / IPA build
-  // The API server has a matching NODE_ENV !== 'production' bypass so all
-  // API calls succeed without a real auth token in development.
-  const isDevBypass = __DEV__;
-
-  // Wire up auth token getter for API requests.
-  // In dev bypass mode we send no token — the server accepts unauthenticated
-  // requests and uses the seed business automatically.
-  useEffect(() => {
-    if (isDevBypass) {
-      setAuthTokenGetter(async () => null);
-      return;
-    }
-    setAuthTokenGetter(async () => {
-      // Try Clerk token first
-      try {
-        const clerkToken = await getToken();
-        if (clerkToken) return clerkToken;
-      } catch {
-        // Clerk not signed in
-      }
-      // Fall back to phone OTP token stored in SecureStore
-      try {
-        const phoneToken = await SecureStore.getItemAsync('phone_session_token');
-        if (phoneToken) return phoneToken;
-      } catch {
-        // SecureStore not available (e.g. web)
-      }
-      return null;
-    });
-  }, [getToken, isDevBypass]);
-
-  // In development, skip the auth gate and go straight to the app.
-  if (isDevBypass) {
-    if (isLiquidGlassAvailable()) return <NativeTabLayout />;
-    return <ClassicTabLayout />;
-  }
-
-  // Wait for Clerk to load before deciding where to send the user
+  // Wait for Clerk to load before deciding where to send the user.
   if (!isLoaded) return null;
+  if (unauthorized) return <Redirect href="/(auth)/sign-in" />;
 
   // Check if user is signed in via Clerk OR has a stored phone token
   if (!isSignedIn) {
     return <PhoneAuthGate />;
   }
 
+  if (roleLoading) return null;
+  if (!identity) return <AuthRoleFailure message={roleError ?? 'আবার চেষ্টা করুন।'} />;
+
   if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
+    return <NativeTabLayout staff={identity.role === 'staff'} />;
   }
-  return <ClassicTabLayout />;
+  return <ClassicTabLayout staff={identity.role === 'staff'} />;
 }
 
 /**
@@ -170,6 +160,7 @@ export default function TabLayout() {
  * If yes, renders the tab layout. If no, redirects to sign-in.
  */
 function PhoneAuthGate() {
+  const { identity, loading: roleLoading, error: roleError, unauthorized } = useAuthRole();
   const [checked, setChecked] = React.useState(false);
   const [hasPhoneToken, setHasPhoneToken] = React.useState(false);
 
@@ -187,7 +178,10 @@ function PhoneAuthGate() {
 
   if (!checked) return null;
   if (!hasPhoneToken) return <Redirect href="/(auth)/sign-in" />;
+  if (unauthorized) return <Redirect href="/(auth)/sign-in" />;
 
-  if (isLiquidGlassAvailable()) return <NativeTabLayout />;
-  return <ClassicTabLayout />;
+  if (roleLoading) return null;
+  if (!identity) return <AuthRoleFailure message={roleError ?? 'আবার চেষ্টা করুন।'} />;
+  if (isLiquidGlassAvailable()) return <NativeTabLayout staff={identity.role === 'staff'} />;
+  return <ClassicTabLayout staff={identity.role === 'staff'} />;
 }

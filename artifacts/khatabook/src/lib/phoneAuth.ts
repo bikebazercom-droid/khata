@@ -7,24 +7,23 @@
  * is active.
  */
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-
 export interface MeResponse {
   userId: string;
   businessId: string;
   businessName?: string;
   phone?: string;
   authMethod: "clerk" | "phone";
+  role?: "owner" | "staff";
 }
 
 export async function fetchMe(): Promise<MeResponse> {
-  const res = await fetch(`${BASE}/api/auth/me`, { credentials: "include" });
+  const res = await fetch(`/api/auth/me`, { credentials: "include" });
   if (!res.ok) throw new Error("not authenticated");
   return res.json() as Promise<MeResponse>;
 }
 
 export async function sendOtp(phone: string): Promise<void> {
-  const res = await fetch(`${BASE}/api/auth/phone/send-otp`, {
+  const res = await fetch(`/api/auth/phone/send-otp`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
@@ -37,7 +36,7 @@ export async function sendOtp(phone: string): Promise<void> {
 }
 
 export async function verifyOtp(phone: string, code: string): Promise<MeResponse> {
-  const res = await fetch(`${BASE}/api/auth/phone/verify-otp`, {
+  const res = await fetch(`/api/auth/phone/verify-otp`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
@@ -51,7 +50,7 @@ export async function verifyOtp(phone: string, code: string): Promise<MeResponse
 }
 
 export async function phoneLogout(): Promise<void> {
-  await fetch(`${BASE}/api/auth/phone/logout`, {
+  await fetch(`/api/auth/phone/logout`, {
     method: "POST",
     credentials: "include",
   });

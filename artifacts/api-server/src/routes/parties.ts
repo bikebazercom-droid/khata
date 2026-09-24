@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { and, desc, eq } from "drizzle-orm";
-import { db, ledgerEntriesTable, partiesTable } from "@workspace/db";
+import { and, desc, eq, inArray } from "drizzle-orm";
+import { db, ledgerEntriesTable, partiesTable, workerPartyAssignmentsTable } from "@workspace/db";
 import { broadcast } from "../lib/eventBus";
 import {
   ListPartiesQueryParams,
@@ -72,17 +72,28 @@ import { ObjectStorageService } from "../lib/objectStorage";
 import { type AuthenticatedRequest } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();
+const isUuid = (value: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 
 router.get("/parties", async (req, res): Promise<void> => {
-  const { businessId } = req as unknown as AuthenticatedRequest;
+  const { businessId, userId, role: userRole } = req as unknown as AuthenticatedRequest;
   const parsed = ListPartiesQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
 
-  const { role, search, dueFilter } = parsed.data;
-  const condition = applyPartyFilters(businessId, role, search);
+  const { role: partyRole, search, dueFilter } = parsed.data;
+  let condition = applyPartyFilters(businessId, partyRole, search);
+  if (userRole === "staff") {
+    const assignments = await db.select({ partyId: workerPartyAssignmentsTable.partyId })
+      .from(workerPartyAssignmentsTable).where(eq(workerPartyAssignmentsTable.userId, userId));
+    if (!assignments.length) {
+      res.json([]);
+      return;
+    }
+    condition = and(condition, inArray(partiesTable.id, assignments.map(({ partyId }) => partyId)))!;
+  }
 
   const rows = await db
     .select()
@@ -240,7 +251,7 @@ router.get(
 router.post(
   "/parties/:partyId/ledger-entries",
   async (req, res): Promise<void> => {
-    const { businessId } = req as unknown as AuthenticatedRequest;
+    const { businessId, userId } = req as unknown as AuthenticatedRequest;
     const params = CreateLedgerEntryParams.safeParse(req.params);
     if (!params.success) {
       res.status(400).json({ error: params.error.message });
@@ -314,6 +325,7 @@ router.post(
           .insert(ledgerEntriesTable)
           .values({
             partyId: party.id,
+            createdByUserId: isUuid(userId) ? userId : null,
             type,
             amount: amount.toFixed(2),
             description: primaryDesc,
@@ -329,6 +341,7 @@ router.post(
           .insert(ledgerEntriesTable)
           .values({
             partyId: transferPartyId,
+            createdByUserId: isUuid(userId) ? userId : null,
             type: counterType,
             amount: amount.toFixed(2),
             description: counterDesc,
@@ -394,6 +407,7 @@ router.post(
       .insert(ledgerEntriesTable)
       .values({
         partyId: party.id,
+        createdByUserId: isUuid(userId) ? userId : null,
         type,
         amount: amount.toFixed(2),
         description: description ?? "",

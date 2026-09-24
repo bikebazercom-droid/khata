@@ -28,6 +28,7 @@ import { cn, evaluateCalculatorExpression, formatCurrency, formatCurrencyTyping,
 import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic';
 import { CameraCaptureModal } from '@/components/modals/camera-capture-modal';
 import { scanDocument } from '@/lib/document-scan';
+import { useAppAuth } from '@/App';
 import { uploadBillImage, billImageSrc, type BillImageUploadResult } from '@/lib/billImageStorage';
 import { savePendingUpload } from '@/lib/pendingUploads';
 
@@ -119,6 +120,7 @@ export function TransactionEntryScreen({
   initialEntry?: LedgerEntry;
 }) {
   const isEditMode = !!initialEntry;
+  const { role: userRole } = useAppAuth();
   const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
   /** Stores the cloud-storage path of the bill image already on the entry so
    *  handleUpdate can keep it unchanged when the user hasn't replaced it. */
@@ -295,7 +297,7 @@ export function TransactionEntryScreen({
   // Fetch party list for the transfer dropdown (only when toggle is on).
   const { data: transferPartyList = [] } = useListParties(
     { search: transferSearch || undefined },
-    { query: { enabled: isTransferMode && !isEditMode } },
+    { query: { enabled: isTransferMode && !isEditMode, queryKey: getListPartiesQueryKey({ search: transferSearch || undefined }) } },
   );
   const transferPartyOptions = transferPartyList.filter((p) => p.id !== partyId);
 
@@ -931,46 +933,48 @@ export function TransactionEntryScreen({
       {showMetadata && (
       <div className="px-3 pb-2 shrink-0 space-y-2">
         {/* Row 1: date + bill */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className={cn("grid gap-2", userRole === 'owner' ? "grid-cols-2" : "grid-cols-1")}>
           <input
             type="date"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
             className="h-11 px-3 rounded-xl bg-white border border-slate-200 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
-          {billImage ? (
-            <div className="h-11 flex items-center justify-end gap-2">
-              <div className="relative h-11 w-11 shrink-0">
-                <img src={billImage} alt="সংযুক্ত বিল" className="w-full h-full rounded-xl object-cover border border-slate-200" />
+          {userRole === 'owner' && (
+            billImage ? (
+              <div className="h-11 flex items-center justify-end gap-2">
+                <div className="relative h-11 w-11 shrink-0">
+                  <img src={billImage} alt="সংযুক্ত বিল" className="w-full h-full rounded-xl object-cover border border-slate-200" />
+                  <button
+                    type="button"
+                    onClick={() => setBillImage(null)}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-sm active:scale-90 transition-transform"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
                 <button
                   type="button"
-                  onClick={() => setBillImage(null)}
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-sm active:scale-90 transition-transform"
+                  onClick={handleAttachClick}
+                  className="h-11 flex-1 rounded-xl bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 active:scale-[0.97] transition-transform"
                 >
-                  <X className="w-3 h-3" />
+                  <Camera className="w-4 h-4" /> পরিবর্তন
                 </button>
               </div>
+            ) : (
               <button
                 type="button"
                 onClick={handleAttachClick}
-                className="h-11 flex-1 rounded-xl bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 active:scale-[0.97] transition-transform"
+                className="h-11 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-600 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
               >
-                <Camera className="w-4 h-4" /> পরিবর্তন
+                <Camera className="w-4 h-4" /> বিল সংযুক্ত করুন
               </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={handleAttachClick}
-              className="h-11 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-600 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
-            >
-              <Camera className="w-4 h-4" /> বিল সংযুক্ত করুন
-            </button>
+            )
           )}
         </div>
 
         {/* Row 2: adjustment toggle — create mode only */}
-        {!isEditMode && (
+        {!isEditMode && userRole === 'owner' && (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
             {/* Compact toggle row */}
             <button

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useLocation } from 'wouter';
 import {
   useListGlobalLedgerEntries,
+  getListGlobalLedgerEntriesQueryKey,
   useGetBusinessSettings,
 } from '@workspace/api-client-react';
 import jsPDF from 'jspdf';
@@ -96,7 +97,14 @@ export function ReportView() {
     startDate: rangeStart,
     endDate: rangeEnd,
     search: search || undefined,
-    partyRole,
+  }, {
+    query: {
+      queryKey: getListGlobalLedgerEntriesQueryKey({
+        startDate: rangeStart,
+        endDate: rangeEnd,
+        search: search || undefined,
+      })
+    }
   });
 
   const totalDebit  = useMemo(() => entries.reduce((s, e) => e.type === 'YOU_GAVE' ? s + e.amount : s, 0), [entries]);

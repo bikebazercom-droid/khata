@@ -17,6 +17,8 @@ import uploadsRouter from "./uploadBinary";
 import downloadsRouter from "./downloads";
 import downloadConfigsRouter from "./downloadConfigs";
 import scanRouter from "./scan";
+import ownerRouter from "./owner";
+import { enforceRoleAccess } from "../middlewares/roleAccess";
 
 const router: IRouter = Router();
 
@@ -29,10 +31,11 @@ router.use(downloadConfigsRouter);
 // Admin routes — use their own JWT auth (adminBearer), not Clerk.
 router.use(adminRouter);
 router.use(adminIsolatedRouter);
-router.use(uploadsRouter);
 
 // All routes below require a valid session (Clerk or phone OTP).
 router.use(requireAuth as any);
+router.use(enforceRoleAccess);
+router.use(uploadsRouter);
 
 // Storage routes — all require auth (upload mints write-capable presigned URLs;
 // object serving requires auth so bill images are only accessible to signed-in users).
@@ -48,5 +51,6 @@ router.use(staffRouter);
 router.use(businessesRouter);
 router.use(userRouter);
 router.use(scanRouter);
+router.use(ownerRouter);
 
 export default router;

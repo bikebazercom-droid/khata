@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, pgEnum, integer } from "drizzle-orm/pg-core";
 import { businessesTable } from "./businesses";
 
 export const userRoleEnum = pgEnum("user_role", ["owner", "staff"]);
@@ -11,6 +11,10 @@ export const appUsersTable = pgTable("app_users", {
   clerkUserId: text("clerk_user_id").unique(),
   /** Set when signed in via custom phone OTP. Null for Clerk-only users. */
   phone: text("phone").unique(),
+  /** Set only from a verified Clerk email address returned by Clerk's API. */
+  verifiedEmail: text("verified_email"),
+  /** Incremented at phone logout to invalidate all previously issued JWTs. */
+  phoneSessionVersion: integer("phone_session_version").notNull().default(0),
   businessId: uuid("business_id")
     .notNull()
     .references(() => businessesTable.id),

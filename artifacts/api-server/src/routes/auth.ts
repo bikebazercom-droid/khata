@@ -4,12 +4,11 @@
  * These are intentionally public (no requireAuth middleware). They either
  * issue a session or verify identity.
  *
- * SMS delivery: currently stores the OTP in the database. Twilio wiring
- * will be added once the Twilio integration is connected.
+ * OTP delivery remains disabled until a real SMS provider is configured.
  */
 import { Router, type IRouter, type Request, type Response } from "express";
 import { eq, and, gt } from "drizzle-orm";
-import { getAuth } from "@clerk/express";
+import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
 import {
   db,
@@ -18,10 +17,11 @@ import {
   businessesTable,
 } from "@workspace/db";
 import {
-  getOrCreateClerkUser,
   getOrCreatePhoneUser,
   issuePhoneSession,
   clearPhoneSession,
+  requireAuth,
+  type AuthenticatedRequest,
 } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();
@@ -35,10 +35,6 @@ function normalizeBdPhone(raw: string): string | null {
   if (/^01[3-9]\d{8}$/.test(digits.replace(/^0/, ""))) return null; // odd length
   if (/^\+?8801[3-9]\d{8}$/.test(raw)) return `+88${digits.slice(digits.length - 11)}`;
   return null;
-}
-
-function generateOtp(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
 }
 
 // ─── Rate limiters ────────────────────────────────────────────────────────────
@@ -108,39 +104,8 @@ router.post(
       return;
     }
 
-    // Per-phone cooldown: reject if an OTP was already issued within the last 60 seconds.
-    // This prevents SMS flooding even when requests come from different IP addresses.
-    const [recent] = await db
-      .select({ createdAt: otpCodesTable.createdAt })
-      .from(otpCodesTable)
-      .where(
-        and(
-          eq(otpCodesTable.phone, normalized),
-          gt(otpCodesTable.createdAt, new Date(Date.now() - 60 * 1000)),
-        ),
-      )
-      .limit(1);
-
-    if (recent) {
-      res.status(429).json({
-        error: "An OTP was already sent to this number. Please wait 60 seconds before requesting a new one.",
-      });
-      return;
-    }
-
-    const code = generateOtp();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-    // Upsert: replace any existing OTP for this phone.
-    await db.delete(otpCodesTable).where(eq(otpCodesTable.phone, normalized));
-    await db.insert(otpCodesTable).values({ phone: normalized, code, expiresAt });
-
-    // TODO: Send via Twilio once connected.
-    // The OTP code is intentionally NOT logged here to prevent credential exposure
-    // in server logs, log aggregators, or the Replit console.
-    console.log(`[OTP] Code issued for ${normalized} (expires ${expiresAt.toISOString()})`);
-
-    res.json({ success: true, phone: normalized });
+    // Never create or report an OTP unless a delivery provider actually sends it.
+    res.status(503).json({ error: "Phone sign-in is unavailable: SMS delivery is not configured" });
   },
 );
 
@@ -189,11 +154,16 @@ router.post(
 
     // JIT provision the user + business.
     const user = await getOrCreatePhoneUser(normalized);
+    if (user.status !== "active") {
+      res.status(403).json({ error: "Account suspended" });
+      return;
+    }
 
     const sessionPayload = {
       userId: user.id,
       businessId: user.businessId,
       phone: normalized,
+      sessionVersion: user.phoneSessionVersion,
     };
 
     issuePhoneSession(res, sessionPayload);
@@ -201,7 +171,6 @@ router.post(
     // Also return the JWT token in the response body so mobile clients
     // (which have no cookie jar) can store it in SecureStore and attach
     // it as a Bearer token on subsequent API requests.
-    const jwt = await import("jsonwebtoken");
     const token = jwt.sign(sessionPayload, process.env.SESSION_SECRET!, { expiresIn: "30d" });
 
     res.json({
@@ -216,49 +185,44 @@ router.post(
 
 // ─── POST /api/auth/phone/logout ──────────────────────────────────────────────
 
-router.post("/auth/phone/logout", (_req: Request, res: Response): Promise<void> => {
+router.post("/auth/phone/logout", async (req: Request, res: Response): Promise<void> => {
+  const token = (req as any).cookies?.phone_session ??
+    (req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.slice(7) : undefined);
+  if (token) {
+    try {
+      const payload = jwt.verify(token, process.env.SESSION_SECRET!) as {
+        userId?: string; phone?: string;
+      };
+      if (payload.userId && payload.phone) {
+        const [user] = await db.select().from(appUsersTable).where(eq(appUsersTable.id, payload.userId)).limit(1);
+        if (user?.phone === payload.phone) {
+          await db.update(appUsersTable)
+            .set({ phoneSessionVersion: user.phoneSessionVersion + 1 })
+            .where(eq(appUsersTable.id, user.id));
+        }
+      }
+    } catch {
+      // Invalid sessions are already unusable; still clear the browser cookie.
+    }
+  }
   clearPhoneSession(res);
   res.json({ success: true });
-  return Promise.resolve();
 });
 
 // ─── GET /api/auth/me ─────────────────────────────────────────────────────────
 
-router.get("/auth/me", async (req: Request, res: Response): Promise<void> => {
-  // Works for both Clerk and phone sessions.
-  const clerkAuth = getAuth(req);
-  if (clerkAuth?.userId) {
-    try {
-      const user = await getOrCreateClerkUser(clerkAuth.userId);
-      const [biz] = await db
-        .select()
-        .from(businessesTable)
-        .where(eq(businessesTable.id, user.businessId));
-      res.json({ userId: user.id, businessId: user.businessId, businessName: biz?.name, authMethod: "clerk" });
-      return;
-    } catch {
-      res.status(500).json({ error: "Auth error" });
-      return;
-    }
-  }
-
-  const token = (req as any).cookies?.phone_session;
-  if (token) {
-    try {
-      const jwt = await import("jsonwebtoken");
-      const payload = jwt.verify(token, process.env.SESSION_SECRET!) as any;
-      const [biz] = await db
-        .select()
-        .from(businessesTable)
-        .where(eq(businessesTable.id, payload.businessId));
-      res.json({ userId: payload.userId, businessId: payload.businessId, businessName: biz?.name, phone: payload.phone, authMethod: "phone" });
-      return;
-    } catch {
-      // invalid/expired — fall through to 401
-    }
-  }
-
-  res.status(401).json({ error: "Not authenticated" });
+router.get("/auth/me", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const auth = req as AuthenticatedRequest;
+  const [business] = await db.select({ name: businessesTable.name }).from(businessesTable)
+    .where(eq(businessesTable.id, auth.businessId)).limit(1);
+  res.json({
+    role: auth.role,
+    businessId: auth.businessId,
+    userId: auth.userId,
+    businessName: business?.name ?? "",
+    authMethod: auth.authMethod,
+    ...(auth.phone ? { phone: auth.phone } : {}),
+  });
 });
 
 export default router;

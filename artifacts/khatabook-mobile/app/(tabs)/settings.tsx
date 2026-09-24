@@ -18,8 +18,9 @@ import { useGetBusinessSettings, useUpdateBusinessSettings } from '@workspace/ap
 import { useColors } from '@/hooks/useColors';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth, useClerk } from '@clerk/expo';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { useLanguage } from '@/lib/i18n';
+import { notifyMobileIdentityChanged, useAuthRole } from '@/lib/auth-role';
 
 export default function SettingsScreen() {
   const colors = useColors();
@@ -27,11 +28,14 @@ export default function SettingsScreen() {
   const qc = useQueryClient();
   const router = useRouter();
   const { t } = useLanguage();
+  const { identity } = useAuthRole();
 
   const { isSignedIn } = useAuth();
   const { signOut } = useClerk();
 
-  const { data: settings, isLoading } = useGetBusinessSettings();
+  const { data: settings, isLoading } = useGetBusinessSettings({
+    query: { enabled: identity?.role === 'owner', queryKey: ['/api/settings'] },
+  });
   const updateSettings = useUpdateBusinessSettings();
 
   const [storeName, setStoreName] = useState('');
@@ -72,6 +76,7 @@ export default function SettingsScreen() {
                 await signOut();
               }
               await SecureStore.deleteItemAsync('phone_session_token').catch(() => {});
+              notifyMobileIdentityChanged();
               const { setAuthTokenGetter } = await import('@workspace/api-client-react');
               setAuthTokenGetter(null);
               router.replace('/(auth)/sign-in' as any);
@@ -158,6 +163,8 @@ export default function SettingsScreen() {
     appVersion: { fontSize: 13, color: colors.mutedForeground, fontFamily: 'Inter_400Regular', marginTop: 2 },
     bottomPad: { height: Platform.OS === 'web' ? 84 : 90 },
   });
+
+  if (identity?.role === 'staff') return <Redirect href="/" />;
 
   return (
     <View style={s.container}>

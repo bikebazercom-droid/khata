@@ -21,7 +21,7 @@ const router = Router();
  * Returns all businesses the current user has access to, with party counts.
  */
 router.get("/businesses", async (req, res) => {
-  const { userId } = req as AuthenticatedRequest;
+  const { userId } = req as unknown as AuthenticatedRequest;
   try {
     // Join user_businesses → businesses, count parties per business
     const memberships = await db
@@ -113,7 +113,7 @@ router.post("/businesses", async (req, res) => {
  * settings, and the business record itself are deleted in one transaction.
  */
 router.delete("/businesses/:id", async (req, res) => {
-  const { userId } = req as AuthenticatedRequest;
+  const { userId } = req as unknown as AuthenticatedRequest;
   const { id: businessId } = req.params;
 
   try {

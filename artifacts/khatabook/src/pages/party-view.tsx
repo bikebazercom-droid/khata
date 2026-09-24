@@ -5,6 +5,7 @@ import {
   useListLedgerEntries,
   useListParties,
   useGetBusinessSettings,
+  getGetBusinessSettingsQueryKey,
   getGetPartyQueryKey,
   getListLedgerEntriesQueryKey,
   LedgerEntryType,
@@ -40,6 +41,7 @@ import { billImageSrc, prefetchImagesForPdf } from '@/lib/billImageStorage';
 import { toast } from 'sonner';
 import { format, isToday } from 'date-fns';
 import { bn as bnLocale } from 'date-fns/locale';
+import { useAppAuth } from '@/App';
 
 /**
  * The entry's real transaction date. Users can backdate/forward-date an
@@ -73,10 +75,11 @@ export function PartyView() {
   const [, params] = useRoute('/party/:id');
   const id = params?.id;
   const [, navigate] = useLocation();
+  const { role: userRole } = useAppAuth();
 
   const { data: party, isLoading: partyLoading } = useGetParty(id || '', { query: { enabled: !!id, queryKey: getGetPartyQueryKey(id || '') } });
   const { data: entries = [], isLoading: entriesLoading } = useListLedgerEntries(id || '', { query: { enabled: !!id, queryKey: getListLedgerEntriesQueryKey(id || '') } });
-  const { data: settings } = useGetBusinessSettings();
+  const { data: settings } = useGetBusinessSettings({ query: { enabled: userRole === 'owner', queryKey: getGetBusinessSettingsQueryKey() } });
   const { data: allParties = [] } = useListParties({});
   const partyNameMap = useMemo(() => Object.fromEntries(allParties.map(p => [p.id, p.name])), [allParties]);
 
@@ -312,11 +315,13 @@ export function PartyView() {
           >
             <ChevronLeft className="w-6 h-6" />
           </Link>
-          {/* Avatar + name — tap to open the profile screen */}
+          {/* Avatar + name — tap to open the profile screen (owner only) */}
           <button
             type="button"
-            onClick={() => navigate(`/party/${id}/profile`)}
-            className="flex items-center gap-3 flex-1 min-w-0 active:opacity-75 transition-all"
+            onClick={() => {
+              if (userRole === 'owner') navigate(`/party/${id}/profile`);
+            }}
+            className={cn("flex items-center gap-3 flex-1 min-w-0 transition-all", userRole === 'owner' ? "active:opacity-75 cursor-pointer" : "cursor-default")}
           >
             <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 text-[#0b57d0]">
               <Plus className="w-5 h-5" strokeWidth={3} />
@@ -353,37 +358,39 @@ export function PartyView() {
       </div>
 
       {/* Action buttons bar */}
-      <div className="bg-white mt-3 shrink-0 border-b border-slate-200 grid grid-cols-3 divide-x divide-slate-100">
-        <button
-          type="button"
-          onClick={() => navigate(`/party/${id}/report`)}
-          className="flex flex-col items-center gap-1 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
-        >
-          <FileDown className="w-5 h-5 text-slate-500" />
-          <span className="text-[11px] font-bold text-slate-600">রিপোর্ট</span>
-        </button>
-        <button
-          type="button"
-          onClick={handleReminderShare}
-          disabled={isGeneratingReminder}
-          className="flex flex-col items-center gap-1 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors disabled:opacity-60"
-        >
-          {isGeneratingReminder ? (
-            <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
-          ) : (
-            <MessageCircle className="w-5 h-5 text-emerald-500" />
-          )}
-          <span className="text-[11px] font-bold text-slate-600">রিমাইন্ডার</span>
-        </button>
-        <button
-          type="button"
-          onClick={handleSms}
-          className="flex flex-col items-center gap-1 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
-        >
-          <MessageSquareText className="w-5 h-5 text-slate-400" />
-          <span className="text-[11px] font-bold text-slate-600">এসএমএস</span>
-        </button>
-      </div>
+      {userRole === 'owner' && (
+        <div className="bg-white mt-3 shrink-0 border-b border-slate-200 grid grid-cols-3 divide-x divide-slate-100">
+          <button
+            type="button"
+            onClick={() => navigate(`/party/${id}/report`)}
+            className="flex flex-col items-center gap-1 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+          >
+            <FileDown className="w-5 h-5 text-slate-500" />
+            <span className="text-[11px] font-bold text-slate-600">রিপোর্ট</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleReminderShare}
+            disabled={isGeneratingReminder}
+            className="flex flex-col items-center gap-1 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors disabled:opacity-60"
+          >
+            {isGeneratingReminder ? (
+              <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
+            ) : (
+              <MessageCircle className="w-5 h-5 text-emerald-500" />
+            )}
+            <span className="text-[11px] font-bold text-slate-600">রিমাইন্ডার</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleSms}
+            className="flex flex-col items-center gap-1 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+          >
+            <MessageSquareText className="w-5 h-5 text-slate-400" />
+            <span className="text-[11px] font-bold text-slate-600">এসএমএস</span>
+          </button>
+        </div>
+      )}
 
       {/* Scrollable ledger area */}
       <div className="flex-1 overflow-y-auto pb-4">
@@ -424,11 +431,18 @@ export function PartyView() {
                       <div
                         key={entry.id}
                         data-entry-card
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => navigate(`/party/${id}/entry/${entry.id}`)}
-                        onKeyDown={(e) => e.key === 'Enter' && navigate(`/party/${id}/entry/${entry.id}`)}
-                        className="bg-white rounded-xl shadow-sm grid grid-cols-[1fr_auto_auto] gap-3 items-center overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both cursor-pointer active:bg-slate-50 transition-colors"
+                        role={userRole === 'owner' ? "button" : undefined}
+                        tabIndex={userRole === 'owner' ? 0 : undefined}
+                        onClick={() => {
+                          if (userRole === 'owner') navigate(`/party/${id}/entry/${entry.id}`);
+                        }}
+                        onKeyDown={(e) => {
+                          if (userRole === 'owner' && e.key === 'Enter') navigate(`/party/${id}/entry/${entry.id}`);
+                        }}
+                        className={cn(
+                          "bg-white rounded-xl shadow-sm grid grid-cols-[1fr_auto_auto] gap-3 items-center overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both transition-colors",
+                          userRole === 'owner' ? "cursor-pointer active:bg-slate-50" : ""
+                        )}
                         style={{ animationDelay: `${i * 30}ms` }}
                       >
                         <div className="min-w-0 py-3 pl-4">

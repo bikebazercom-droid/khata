@@ -36,6 +36,7 @@ import {
 import type { LedgerEntry, Party } from '@workspace/api-client-react';
 import { useColors } from '@/hooks/useColors';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAuthRole } from '@/lib/auth-role';
 
 // ─── Module-level helpers ────────────────────────────────────────────────────
 
@@ -111,11 +112,12 @@ interface TransactionSheetProps {
   initialType?: 'YOU_GAVE' | 'YOU_GOT';
   partyId: string;
   partyName: string;
+  staffMode?: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyName, onClose, onSuccess }: TransactionSheetProps) {
+function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyName, staffMode = false, onClose, onSuccess }: TransactionSheetProps) {
   const colors = useColors();
   const qc = useQueryClient();
   const { getToken } = useAuth();
@@ -134,7 +136,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
   const transferSearchParams = { search: transferSearch || undefined };
   const { data: allParties = [] } = useListParties(
     transferSearchParams,
-    { query: { enabled: isTransferMode, queryKey: ['/api/parties', 'transfer', transferSearch] } },
+    { query: { enabled: isTransferMode && !staffMode, queryKey: ['/api/parties', 'transfer', transferSearch] } },
   );
   const transferPartyOptions = allParties.filter((p) => p.id !== partyId);
 
@@ -207,9 +209,11 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
           type,
           amount: parsed,
           description: description.trim() || undefined,
-          billImage: objectPath ?? undefined,
-          isTransfer: isTransferMode || undefined,
-          transferPartyId: isTransferMode ? transferPartyId : undefined,
+          ...(!staffMode ? {
+            billImage: objectPath ?? undefined,
+            isTransfer: isTransferMode || undefined,
+            transferPartyId: isTransferMode ? transferPartyId : undefined,
+          } : {}),
         },
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -320,8 +324,8 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
             returnKeyType="done"
           />
 
-          {/* Bill photo */}
-          <View style={s.attachRow}>
+          {/* Bill photo: restricted for staff accounts */}
+          {!staffMode ? <View style={s.attachRow}>
             {billImageUri ? (
               <View style={s.thumbWrapper}>
                 <Image source={{ uri: billImageUri }} style={s.thumb} resizeMode="cover" />
@@ -340,10 +344,10 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
                 {billImageUri ? 'ছবি পরিবর্তন করুন' : 'বিল ছবি সংযুক্ত করুন'}
               </Text>
             </TouchableOpacity>
-          </View>
+          </View> : null}
 
           {/* ── Transfer / adjustment section ─────────────────────────── */}
-          <View style={{
+          {!staffMode ? <View style={{
             borderRadius: colors.radius,
             marginBottom: 16,
             overflow: 'hidden',
@@ -443,7 +447,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
                 </ScrollView>
               </View>
             )}
-          </View>
+          </View> : null}
 
           <TouchableOpacity
             style={[s.submitBtn, { backgroundColor: isGave ? colors.willGet : colors.willGive, opacity: createEntry.isPending ? 0.6 : 1 }]}
@@ -579,14 +583,16 @@ interface LedgerRowProps {
   entry: LedgerEntry;
   colors: ReturnType<typeof useColors>;
   onPress?: () => void;
+  allowImages?: boolean;
+  allowTransferLookup?: boolean;
 }
 
-function LedgerRow({ entry, colors, onPress }: LedgerRowProps) {
+function LedgerRow({ entry, colors, onPress, allowImages = true, allowTransferLookup = true }: LedgerRowProps) {
   const { getToken } = useAuth();
   const isGave = entry.type === 'YOU_GAVE';
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
-  const rawSrc = billImageSrc(entry.billImage);
+  const rawSrc = allowImages ? billImageSrc(entry.billImage) : null;
   const [authToken, setAuthToken] = useState<string | null>(null);
   useEffect(() => {
     if (rawSrc && entry.billImage?.startsWith('/objects/')) getToken().then(setAuthToken);
@@ -606,7 +612,7 @@ function LedgerRow({ entry, colors, onPress }: LedgerRowProps) {
   const isTransfer = entry.isTransfer;
   const tpId = isTransfer ? (entry.transferPartyId ?? '') : '';
   const { data: transferParty } = useGetParty(tpId, {
-    query: { enabled: !!tpId, queryKey: getGetPartyQueryKey(tpId) },
+    query: { enabled: allowTransferLookup && !!tpId, queryKey: getGetPartyQueryKey(tpId) },
   });
   const transferPartyName = transferParty?.name ?? '';
   const transferLabel = isGave
@@ -964,6 +970,8 @@ export default function PartyDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { identity } = useAuthRole();
+  const isStaff = identity?.role === 'staff';
 
   const [showSheet, setShowSheet] = useState(false);
   const [pendingType, setPendingType] = useState<'YOU_GAVE' | 'YOU_GOT'>('YOU_GAVE');
@@ -971,8 +979,12 @@ export default function PartyDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<LedgerEntry | null>(null);
 
-  const { data: party, isLoading: partyLoading, refetch: refetchParty } = useGetParty(id!);
-  const { data: entries = [], isLoading: entriesLoading, refetch: refetchEntries } = useListLedgerEntries(id!);
+  const { data: party, isLoading: partyLoading, refetch: refetchParty } = useGetParty(id!, {
+    query: { enabled: !!identity && !!id, queryKey: getGetPartyQueryKey(id!) },
+  });
+  const { data: entries = [], isLoading: entriesLoading, refetch: refetchEntries } = useListLedgerEntries(id!, {
+    query: { enabled: !!identity && !!id, queryKey: getListLedgerEntriesQueryKey(id!) },
+  });
 
   async function handleRefresh() {
     setRefreshing(true);
@@ -1031,7 +1043,9 @@ export default function PartyDetailScreen() {
   const initials = party.name.slice(0, 2).toUpperCase();
   const roleLabel = party.role === 'CUSTOMER' ? 'গ্রাহক' : 'সরবরাহকারী';
 
-  const quickActions = [
+  const quickActions = isStaff ? [
+    { icon: 'edit-3' as const, label: 'এন্ট্রি', onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setPendingType('YOU_GAVE'); setShowSheet(true); } },
+  ] : [
     { icon: 'file-text' as const,      label: 'রিপোর্ট',    onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/report/${id}` as any); } },
     { icon: 'bell' as const,           label: 'রিমাইন্ডার', onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowReminderSheet(true); } },
     { icon: 'edit-3' as const,         label: 'এন্ট্রি',     onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setPendingType('YOU_GAVE'); setShowSheet(true); } },
@@ -1098,7 +1112,7 @@ export default function PartyDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Quick-action row: Report · Reminder · SMS · Entry */}
+        {/* Owner-only report/reminder actions; staff can create standard entries only. */}
         <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 4 }}>
           {quickActions.map(({ icon, label, onPress }) => (
             <TouchableOpacity
@@ -1133,7 +1147,9 @@ export default function PartyDetailScreen() {
               key={entry.id}
               entry={entry}
               colors={colors}
-              onPress={() => setSelectedEntry(entry)}
+              allowImages={!isStaff}
+              allowTransferLookup={!isStaff}
+              onPress={isStaff ? undefined : () => setSelectedEntry(entry)}
             />
           ))
         )}
@@ -1146,19 +1162,20 @@ export default function PartyDetailScreen() {
         initialType={pendingType}
         partyId={id!}
         partyName={party.name}
+        staffMode={isStaff}
         onClose={() => setShowSheet(false)}
         onSuccess={() => { refetchParty(); refetchEntries(); }}
       />
 
-      <ReminderSheet
+      {!isStaff ? <ReminderSheet
         visible={showReminderSheet}
         partyId={id!}
         partyName={party.name}
         partyPhone={party.phone ?? ''}
         onClose={() => setShowReminderSheet(false)}
-      />
+      /> : null}
 
-      {selectedEntry && (
+      {!isStaff && selectedEntry && (
         <EntryDetailSheet
           entry={selectedEntry}
           party={party}
