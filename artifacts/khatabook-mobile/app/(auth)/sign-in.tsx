@@ -104,7 +104,9 @@ export default function SignInScreen() {
     try {
       const { createdSessionId, setActive } = await startSSOFlow({
         strategy: 'oauth_google',
-        redirectUrl: AuthSession.makeRedirectUri(),
+        redirectUrl: AuthSession.makeRedirectUri({
+          native: 'khatabook-mobile://',
+        }),
       });
       if (createdSessionId) {
         setActive!({

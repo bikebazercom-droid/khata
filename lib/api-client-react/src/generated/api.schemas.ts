@@ -399,6 +399,43 @@ page?: number;
 pageSize?: number;
 };
 
+// ─── Bengali Ledger Scanner ───────────────────────────────────────────────────
+
+export type BengaliLedgerItemType = typeof BengaliLedgerItemType[keyof typeof BengaliLedgerItemType];
+export const BengaliLedgerItemType = { YOU_GAVE: 'YOU_GAVE', YOU_GOT: 'YOU_GOT' } as const;
+
+export type BengaliLedgerConfidence = typeof BengaliLedgerConfidence[keyof typeof BengaliLedgerConfidence];
+export const BengaliLedgerConfidence = { high: 'high', medium: 'medium', low: 'low' } as const;
+
+export interface BengaliLedgerItem {
+  partyId: string | null;
+  partyName: string;
+  extractedName: string;
+  amount: number;
+  type: BengaliLedgerItemType;
+  note: string;
+  confidence: BengaliLedgerConfidence;
+}
+
+export interface BengaliLedgerScanResult {
+  items: BengaliLedgerItem[];
+}
+
+export interface BengaliLedgerBulkEntry {
+  partyId: string;
+  amount: number;
+  type: BengaliLedgerItemType;
+  note?: string;
+}
+
+export interface BengaliLedgerBulkSaveInput {
+  entries: BengaliLedgerBulkEntry[];
+}
+
+export interface BengaliLedgerBulkSaveResult {
+  count: number;
+}
+
 export type ListAdminTransactionsParams = {
 startDate?: string;
 endDate?: string;

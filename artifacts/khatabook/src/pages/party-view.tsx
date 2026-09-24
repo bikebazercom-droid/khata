@@ -3,6 +3,7 @@ import { useRoute, Link, useLocation } from 'wouter';
 import {
   useGetParty,
   useListLedgerEntries,
+  useListParties,
   useGetBusinessSettings,
   getGetPartyQueryKey,
   getListLedgerEntriesQueryKey,
@@ -76,6 +77,8 @@ export function PartyView() {
   const { data: party, isLoading: partyLoading } = useGetParty(id || '', { query: { enabled: !!id, queryKey: getGetPartyQueryKey(id || '') } });
   const { data: entries = [], isLoading: entriesLoading } = useListLedgerEntries(id || '', { query: { enabled: !!id, queryKey: getListLedgerEntriesQueryKey(id || '') } });
   const { data: settings } = useGetBusinessSettings();
+  const { data: allParties = [] } = useListParties({});
+  const partyNameMap = useMemo(() => Object.fromEntries(allParties.map(p => [p.id, p.name])), [allParties]);
 
   const [transactionType, setTransactionType] = useState<LedgerEntryType | null>(null);
   const [smsMessage, setSmsMessage] = useState<string | null>(null);
@@ -443,7 +446,16 @@ export function PartyView() {
                           )}>
                             ব্যালেন্স: {formatCurrency(Math.abs(entry.balanceAfter))}
                           </p>
-                          {entry.description ? (
+                          {entry.isTransfer ? (
+                            <p className={cn('text-[11px] font-bold mt-0.5 truncate', isGave ? 'text-red-500' : 'text-emerald-500')}>
+                              {(() => {
+                                const name = entry.transferPartyId ? partyNameMap[entry.transferPartyId] : '';
+                                return isGave
+                                  ? `আমি দিয়েছি${name ? ` — ${name}` : ''}`
+                                  : `আমি পেয়েছি${name ? ` — ${name}` : ''}`;
+                              })()}
+                            </p>
+                          ) : entry.description ? (
                             <p className="text-[11px] font-semibold text-slate-400 mt-0.5 truncate">
                               {entry.description}
                             </p>

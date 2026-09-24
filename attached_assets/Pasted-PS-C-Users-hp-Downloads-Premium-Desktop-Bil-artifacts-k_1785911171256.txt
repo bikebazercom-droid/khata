@@ -1,0 +1,66 @@
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile> Get-Content "$env:USERPROFILE\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile\app.json"
+{
+    "expo":  {
+                 "name":  "BanglaKhata",
+                 "slug":  "khatabook-mobile",
+                 "version":  "1.0.0",
+                 "orientation":  "portrait",
+                 "icon":  "./assets/images/icon.png",
+                 "scheme":  "khatabook-mobile",
+                 "userInterfaceStyle":  "automatic",
+                 "newArchEnabled":  true,
+                 "splash":  {
+                                "image":  "./assets/images/icon.png",
+                                "resizeMode":  "contain",
+                                "backgroundColor":  "#f8fafc"
+                            },
+                 "ios":  {
+                             "supportsTablet":  false,
+                             "bundleIdentifier":  "com.banglakhata.app"
+                         },
+                 "android":  {
+                                 "package":  "com.banglakhata.app",
+                                 "adaptiveIcon":  {
+                                                      "foregroundImage":  "./assets/images/icon.png",
+                                                      "backgroundColor":  "#1B3A6B"
+                                                  },
+                                 "permissions":  [
+
+                                                 ]
+                             },
+                 "web":  {
+                             "favicon":  "./assets/images/icon.png"
+                         },
+                 "plugins":  [
+                                 [
+                                     "expo-router",
+                                     {
+                                         "origin":  "https://replit.com/"
+                                     }
+                                 ],
+                                 "expo-font",
+                                 "expo-web-browser",
+                                 [
+                                     "expo-build-properties",
+                                     {
+                                         "android":  {
+                                                         "packagingOptions":  {
+                                                                                  "excludes":  [
+                                                                                                   "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+                                                                                               ]
+                                                                              }
+                                                     }
+                                     }
+                                 ]
+                             ],
+                 "experiments":  {
+                                     "typedRoutes":  true
+                                 },
+                 "extra":  {
+                               "eas":  {
+                                           "projectId":  "c51bffdf-efa3-4483-a2a7-fd0efabc2f73"
+                                       }
+                           }
+             }
+}
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile>

@@ -1,0 +1,47 @@
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile> cd "$env:USERPROFILE\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile"
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile> pnpm add expo-build-properties
+✓ Lockfile passes supply-chain policies (verified 11m ago)
+../mockup-sandbox                        | [WARN] deprecated recharts@2.15.4
+../khatabook                             | [WARN] deprecated @testing-library/jest-dom@6.10.0
+[WARN] 10 deprecated subdependencies found: @esbuild-kit/core-utils@3.3.2, @esbuild-kit/esm-loader@2.6.5, glob@7.2.3, inflight@1.0.6, node-domexception@1.0.0, rimraf@3.0.2, uuid@3.4.0, uuid@7.0.3, uuid@8.3.2, uuid@9.0.1
+../..                                    | Progress: resolved 1679, reused 0, downloaded 0, added 0, done
+[WARN] Issues with peer dependencies found. Run "pnpm peers check" to list them.
+
+dependencies:
++ expo-build-properties ^57.0.8
+
+../..                                    |   +2 +
+Done in 11.9s using pnpm v11.20.0
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile> $appJson = Get-Content "$env:USERPROFILE\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile\app.json" | ConvertFrom-Json
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile> $plugin = @("expo-build-properties", @{ android = @{ packagingOptions = @{ excludes = @("META-INF/versions/9/OSGI-INF/MANIFEST.MF") } } })
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile> $appJson.expo.plugins += ,$plugin
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile> $appJson | ConvertTo-Json -Depth 10 | Set-Content "$env:USERPROFILE\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile\app.json"
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile> eas build --platform android --profile production
+
+⚠️ Detected that your app uses Expo Go for development, this is not recommended when building production apps.
+Learn more: https://expo.fyi/why-not-build-expo-go-for-production
+To suppress this warning, set EAS_BUILD_NO_EXPO_GO_WARNING=true.
+
+Resolved "production" environment for the build. Learn more: https://docs.expo.dev/eas/environment-variables/#setting-the-environment-for-your-builds
+No environment variables with visibility "Plain text" and "Sensitive" found for the "production" environment on EAS.
+Environment variables loaded from the "production" build profile "env" configuration: EXPO_USE_METRO_WORKSPACE_ROOT.
+
+√ Incremented versionCode from 8 to 9.
+
+
+√ Using remote Android credentials (Expo server)
+√ Using Keystore from configuration: Build Credentials d5p0nERU65 (default)
+
+Compressing project files and uploading to EAS Build. Learn more: https://expo.fyi/eas-build-archive
+√ Compressed project files 4s (13.2 MB)
+√ Uploaded to EAS 6s
+√ Computed project fingerprint
+
+See logs: https://expo.dev/accounts/shakil112233445566778899/projects/khatabook-mobile/builds/838a5e43-c78a-4917-aaf8-3bd4e437da6c
+
+Waiting for build to complete. You can press Ctrl+C to exit.
+× Build failed
+
+🤖 Android build failed:
+Gradle build failed with unknown error. See logs for the "Run gradlew" (https://expo.dev/accounts/shakil112233445566778899/projects/khatabook-mobile/builds/838a5e43-c78a-4917-aaf8-3bd4e437da6c#run-gradlew) phase for more information.
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile>

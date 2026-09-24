@@ -10,10 +10,11 @@ import {
   DueFilter,
 } from '@workspace/api-client-react';
 import { useMemo } from 'react';
-import { Search, Plus, Settings, User, ChevronRight, UserPlus2, SlidersHorizontal, FileText, Users, Pencil, FolderOpen, X } from 'lucide-react';
+import { Search, Plus, Settings, User, ChevronRight, UserPlus2, SlidersHorizontal, FileText, Users, Pencil, FolderOpen, X, ScanLine } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { AddPartyModal } from '@/components/modals/add-party-modal';
+import { BengaliLedgerScanner } from '@/components/modals/bengali-ledger-scanner';
 import { SettingsDrawer, loadShopProfile } from '@/components/modals/settings-drawer';
 import { AddStaffDialog } from '@/components/modals/add-staff-dialog';
 import { RenameStoreDialog } from '@/components/modals/rename-store-dialog';
@@ -67,6 +68,7 @@ export function HomeView() {
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
   const [isRenameStoreOpen, setIsRenameStoreOpen] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   const { data: settings } = useGetBusinessSettings();
   const { data: summaryParties = [] } = useListParties({ role });
@@ -409,7 +411,7 @@ export function HomeView() {
           </div>
         </div>
 
-        {/* Tabs */}
+        {/* Tabs + Scan button */}
         <div className="px-4">
           <div className="flex items-stretch gap-6 border-b border-white/15">
             <button
@@ -429,6 +431,16 @@ export function HomeView() {
               )}
             >
               {t('supplier')}
+            </button>
+            <div className="flex-1" />
+            <button
+              type="button"
+              onClick={() => setIsScannerOpen(true)}
+              className="flex items-center gap-1.5 text-white/80 hover:text-white text-[12px] font-bold pb-2.5 pt-1 transition-all active:scale-95"
+              aria-label="বাংলা খাতা স্ক্যান করুন"
+            >
+              <ScanLine className="w-4 h-4" />
+              স্ক্যান
             </button>
           </div>
         </div>
@@ -739,6 +751,13 @@ export function HomeView() {
             </div>
           </div>
         </div>
+      )}
+
+      {isScannerOpen && (
+        <BengaliLedgerScanner
+          onClose={() => setIsScannerOpen(false)}
+          onSuccess={() => setIsScannerOpen(false)}
+        />
       )}
 
     </div>

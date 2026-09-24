@@ -1,0 +1,91 @@
+Configure
+
+User & authentication
+User & authentication
+SSO connections
+Web3
+Multi-factor
+Waitlist
+Legal
+
+Sessions
+
+Organizations
+
+Billing
+
+Protect
+Account Portal
+Features
+
+Customization
+
+Developers
+Webhooks
+Domains
+Paths
+API keys
+M2M authentication
+OAuth applications
+Native applications
+Integrations
+Instance
+Settings
+API keys
+Updates
+Application
+Settings
+Paths
+Development host
+$DEVHOST
+For development environments, the development host is dynamically detected at runtime. The fallback development host is used for features initiated externally like user impersonation or IdP-initiated SAML.
+
+Fallback development host
+e.g http://localhost:3000
+Application paths
+Specify where to take your users for general application-wide functionality, like the application's homepage.
+
+Home URL
+Specify where your application's homepage lives. Leave blank if it sits on the host's root.
+$DEVHOST
+e.g. /home
+Unauthorized sign in URL
+Specify where to take a user for revoking a sign in from an unrecognized device.
+$DEVHOST
+e.g. /unauthorized-sign-in
+Component paths
+Specify where to take your users for <SignIn />, <SignUp />, <OAuthConsent /> and signing out.
+
+
+<SignIn />
+Specify where to take a user for <SignIn />
+
+Sign-in page on Account Portal
+https://certain-sheepdog-20.accounts.dev/sign-in
+
+Sign-in page on development host
+
+<SignUp />
+Specify where to take a user for <SignUp />
+
+Sign-up page on Account Portal
+https://certain-sheepdog-20.accounts.dev/sign-up
+
+Sign-up page on development host
+
+Signing Out
+Specify where to take a user after they sign out
+
+Sign-in page on Account Portal
+https://certain-sheepdog-20.accounts.dev/sign-in
+
+Page on development host
+
+OAuth consent
+Specify where to send users during an OAuth flow that requires human consent
+
+OAuth consent page on Account Portal
+https://certain-sheepdog-20.accounts.dev/oauth-consent
+
+Page on development host
+Setting component paths via the Dashboard will be deprecated in a future version of Clerk. Please consult the documentation on how to configure these URLs code-side. Learn more

@@ -31,6 +31,7 @@ import {
   usePatchLedgerEntry,
   useDeleteLedgerEntry,
   getGetPartyQueryKey,
+  getListLedgerEntriesQueryKey,
 } from '@workspace/api-client-react';
 import type { LedgerEntry, Party } from '@workspace/api-client-react';
 import { useColors } from '@/hooks/useColors';
@@ -603,6 +604,15 @@ function LedgerRow({ entry, colors, onPress }: LedgerRowProps) {
   const descFallback = isGave ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন';
   const typeTag = isGave ? '▲ আপনি দিয়েছেন' : '▼ আপনি পেয়েছেন';
   const isTransfer = entry.isTransfer;
+  const tpId = isTransfer ? (entry.transferPartyId ?? '') : '';
+  const { data: transferParty } = useGetParty(tpId, {
+    query: { enabled: !!tpId, queryKey: getGetPartyQueryKey(tpId) },
+  });
+  const transferPartyName = transferParty?.name ?? '';
+  const transferLabel = isGave
+    ? `আমি দিয়েছি${transferPartyName ? ` — ${transferPartyName}` : ''}`
+    : `আমি পেয়েছি${transferPartyName ? ` — ${transferPartyName}` : ''}`;
+  const transferLabelColor = isGave ? '#ef4444' : '#10b981';
 
   const s = StyleSheet.create({
     row: { flexDirection: 'row', alignItems: 'flex-start', minHeight: 64, paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
@@ -619,7 +629,9 @@ function LedgerRow({ entry, colors, onPress }: LedgerRowProps) {
       <TouchableOpacity style={s.row} onPress={onPress} activeOpacity={onPress ? 0.7 : 1}>
         <View style={s.dot} />
         <View style={{ flex: 1 }}>
-          <Text style={s.desc} numberOfLines={2}>{entry.description || descFallback}</Text>
+          <Text style={[s.desc, isTransfer ? { color: transferLabelColor, fontFamily: 'Inter_700Bold' } : {}]} numberOfLines={2}>
+            {isTransfer ? transferLabel : (entry.description || descFallback)}
+          </Text>
           <Text style={s.meta}>{dateLine}</Text>
           <Text style={[s.tag, { color: isGave ? colors.willGet : colors.willGive }]}>{typeTag}</Text>
           {isTransfer && (
@@ -1022,7 +1034,6 @@ export default function PartyDetailScreen() {
   const quickActions = [
     { icon: 'file-text' as const,      label: 'রিপোর্ট',    onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/report/${id}` as any); } },
     { icon: 'bell' as const,           label: 'রিমাইন্ডার', onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowReminderSheet(true); } },
-    { icon: 'message-square' as const, label: 'এসএমএস',     onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowReminderSheet(true); } },
     { icon: 'edit-3' as const,         label: 'এন্ট্রি',     onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setPendingType('YOU_GAVE'); setShowSheet(true); } },
   ];
 
@@ -1157,6 +1168,7 @@ export default function PartyDetailScreen() {
           onUpdated={u => { setSelectedEntry(u); refetchParty(); refetchEntries(); }}
         />
       )}
+
     </View>
   );
 }

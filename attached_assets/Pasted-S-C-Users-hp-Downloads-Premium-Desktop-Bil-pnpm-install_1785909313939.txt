@@ -1,0 +1,41 @@
+S C:\Users\hp\Downloads\Premium-Desktop-Bil> pnpm install
+Scope: all 14 workspace projects
+✓ Lockfile passes supply-chain policies (verified 7m ago)
+artifacts/banglakhata-admin              | [WARN] deprecated recharts@2.15.4
+artifacts/khatabook                      | [WARN] deprecated @testing-library/jest-dom@6.10.0
+[WARN] 10 deprecated subdependencies found: @esbuild-kit/core-utils@3.3.2, @esbuild-kit/esm-loader@2.6.5, glob@7.2.3, inflight@1.0.6, node-domexception@1.0.0, rimraf@3.0.2, uuid@3.4.0, uuid@7.0.3, uuid@8.3.2, uuid@9.0.1
+Packages: +3 -3
++++---
+Progress: resolved 1677, reused 1502, downloaded 0, added 3, done
+[WARN] Issues with peer dependencies found. Run "pnpm peers check" to list them.
+Done in 16.2s using pnpm v11.20.0
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil> cd artifacts\khatabook-mobile
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile> eas build --platform android --profile production
+
+⚠️ Detected that your app uses Expo Go for development, this is not recommended when building production apps.
+Learn more: https://expo.fyi/why-not-build-expo-go-for-production
+To suppress this warning, set EAS_BUILD_NO_EXPO_GO_WARNING=true.
+
+Resolved "production" environment for the build. Learn more: https://docs.expo.dev/eas/environment-variables/#setting-the-environment-for-your-builds
+No environment variables with visibility "Plain text" and "Sensitive" found for the "production" environment on EAS.
+Environment variables loaded from the "production" build profile "env" configuration: EXPO_USE_METRO_WORKSPACE_ROOT.
+
+√ Incremented versionCode from 6 to 7.
+
+
+√ Using remote Android credentials (Expo server)
+√ Using Keystore from configuration: Build Credentials d5p0nERU65 (default)
+
+Compressing project files and uploading to EAS Build. Learn more: https://expo.fyi/eas-build-archive
+√ Compressed project files 5s (13.2 MB)
+√ Uploaded to EAS 6s
+√ Computed project fingerprint
+
+See logs: https://expo.dev/accounts/shakil112233445566778899/projects/khatabook-mobile/builds/732dcdf1-fc4e-47f0-a6b4-bb4babd34c24
+
+Waiting for build to complete. You can press Ctrl+C to exit.
+× Build failed
+
+🤖 Android build failed:
+Gradle build failed with unknown error. See logs for the "Run gradlew" (https://expo.dev/accounts/shakil112233445566778899/projects/khatabook-mobile/builds/732dcdf1-fc4e-47f0-a6b4-bb4babd34c24#run-gradlew) phase for more information.
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile>

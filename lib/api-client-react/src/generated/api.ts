@@ -30,6 +30,9 @@ import type {
   AdminUserDetail,
   AdminUserUpdate,
   AdminUsersPage,
+  BengaliLedgerBulkSaveInput,
+  BengaliLedgerBulkSaveResult,
+  BengaliLedgerScanResult,
   BusinessSettings,
   BusinessSettingsUpdate,
   DashboardSummary,
@@ -2011,4 +2014,93 @@ export const useDeleteLedgerEntry = <TError = ErrorType<void>, TContext = unknow
   },
 ): UseMutationResult<Awaited<ReturnType<typeof deleteLedgerEntry>>, TError, { partyId: string; entryId: string }, TContext> =>
   useMutation(getDeleteLedgerEntryMutationOptions(options));
+
+// ─── Bengali Ledger Scanner ───────────────────────────────────────────────────
+
+export const getScanBengaliLedgerUrl = () => `/api/scan/bengali-ledger`;
+
+export const scanBengaliLedger = async (
+  formData: FormData,
+  options?: RequestInit,
+): Promise<BengaliLedgerScanResult> =>
+  customFetch<BengaliLedgerScanResult>(getScanBengaliLedgerUrl(), {
+    ...options,
+    method: 'POST',
+    body: formData,
+  });
+
+export const getScanBengaliLedgerMutationOptions = <TError = ErrorType<ErrorEnvelope>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof scanBengaliLedger>>, TError, { formData: FormData }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseMutationOptions<Awaited<ReturnType<typeof scanBengaliLedger>>, TError, { formData: FormData }, TContext> => {
+  const mutationKey = ['scanBengaliLedger'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+  const mutationFn: MutationFunction<Awaited<ReturnType<typeof scanBengaliLedger>>, { formData: FormData }> = (props) => {
+    const { formData } = props ?? {};
+    return scanBengaliLedger(formData, requestOptions);
+  };
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ScanBengaliLedgerMutationResult = NonNullable<Awaited<ReturnType<typeof scanBengaliLedger>>>;
+export type ScanBengaliLedgerMutationError = ErrorType<ErrorEnvelope>;
+
+export const useScanBengaliLedger = <TError = ErrorType<ErrorEnvelope>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof scanBengaliLedger>>, TError, { formData: FormData }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseMutationResult<Awaited<ReturnType<typeof scanBengaliLedger>>, TError, { formData: FormData }, TContext> =>
+  useMutation(getScanBengaliLedgerMutationOptions(options));
+
+export const getBulkSaveBengaliLedgerUrl = () => `/api/scan/bulk-save`;
+
+export const bulkSaveBengaliLedger = async (
+  data: BodyType<BengaliLedgerBulkSaveInput>,
+  options?: RequestInit,
+): Promise<BengaliLedgerBulkSaveResult> =>
+  customFetch<BengaliLedgerBulkSaveResult>(getBulkSaveBengaliLedgerUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(data),
+  });
+
+export const getBulkSaveBengaliLedgerMutationOptions = <TError = ErrorType<void>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof bulkSaveBengaliLedger>>, TError, { data: BodyType<BengaliLedgerBulkSaveInput> }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseMutationOptions<Awaited<ReturnType<typeof bulkSaveBengaliLedger>>, TError, { data: BodyType<BengaliLedgerBulkSaveInput> }, TContext> => {
+  const mutationKey = ['bulkSaveBengaliLedger'];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+  const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkSaveBengaliLedger>>, { data: BodyType<BengaliLedgerBulkSaveInput> }> = (props) => {
+    const { data } = props ?? {};
+    return bulkSaveBengaliLedger(data, requestOptions);
+  };
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BulkSaveBengaliLedgerMutationResult = NonNullable<Awaited<ReturnType<typeof bulkSaveBengaliLedger>>>;
+export type BulkSaveBengaliLedgerMutationBody = BodyType<BengaliLedgerBulkSaveInput>;
+export type BulkSaveBengaliLedgerMutationError = ErrorType<void>;
+
+export const useBulkSaveBengaliLedger = <TError = ErrorType<void>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<Awaited<ReturnType<typeof bulkSaveBengaliLedger>>, TError, { data: BodyType<BengaliLedgerBulkSaveInput> }, TContext>;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseMutationResult<Awaited<ReturnType<typeof bulkSaveBengaliLedger>>, TError, { data: BodyType<BengaliLedgerBulkSaveInput> }, TContext> =>
+  useMutation(getBulkSaveBengaliLedgerMutationOptions(options));
+
 

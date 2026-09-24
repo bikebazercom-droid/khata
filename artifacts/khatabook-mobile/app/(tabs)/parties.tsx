@@ -12,19 +12,29 @@ import {
   KeyboardAvoidingView,
   Alert,
   ActivityIndicator,
+  ScrollView,
+  Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
+import { useAuth } from '@clerk/expo';
 import {
   useListParties,
   useCreateParty,
+  useBulkSaveBengaliLedger,
+  type BengaliLedgerItem,
 } from '@workspace/api-client-react';
 import type { Party } from '@workspace/api-client-react';
 import { useColors } from '@/hooks/useColors';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '@/lib/i18n';
+
+const API_BASE = process.env.EXPO_PUBLIC_DOMAIN
+  ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
+  : '';
 
 type Tab = 'CUSTOMER' | 'SUPPLIER';
 
@@ -284,6 +294,342 @@ function AddPartySheet({ visible, role, onClose, onSuccess }: AddPartySheetProps
   );
 }
 
+// ─── BengaliLedgerScannerSheet ────────────────────────────────────────────────
+
+interface ScannerSheetProps {
+  visible: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+type ScanStep = 'pick' | 'scanning' | 'review' | 'saving';
+
+interface ReviewItem extends BengaliLedgerItem {
+  _id: string;
+  enabled: boolean;
+  editAmount: string;
+  editType: 'YOU_GAVE' | 'YOU_GOT';
+  editNote: string;
+  resolvedPartyId: string | null;
+  resolvedPartyName: string;
+}
+
+function BengaliLedgerScannerSheet({ visible, onClose, onSuccess }: ScannerSheetProps) {
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
+  const bulkSaveMutation = useBulkSaveBengaliLedger();
+  const { data: allParties = [] } = useListParties({});
+  const insets = useSafeAreaInsets();
+
+  const [step, setStep] = useState<ScanStep>('pick');
+  const [items, setItems] = useState<ReviewItem[]>([]);
+  const [previewUri, setPreviewUri] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showPartyPicker, setShowPartyPicker] = useState<string | null>(null); // item _id
+
+  function handleClose() {
+    setStep('pick'); setItems([]); setPreviewUri(null); setError(null);
+    onClose();
+  }
+
+  async function pickAndScan(source: 'camera' | 'gallery') {
+    let result: ImagePicker.ImagePickerResult;
+    if (source === 'camera') {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') { Alert.alert('অনুমতি দরকার', 'ক্যামেরা ব্যবহারের অনুমতি দিন।'); return; }
+      result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.85 });
+    } else {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') { Alert.alert('অনুমতি দরকার', 'গ্যালারি ব্যবহারের অনুমতি দিন।'); return; }
+      result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.85 });
+    }
+    if (result.canceled || !result.assets?.[0]) return;
+
+    const asset = result.assets[0]!;
+    setPreviewUri(asset.uri);
+    setError(null);
+    setStep('scanning');
+
+    try {
+      const fd = new FormData();
+      fd.append('image', { uri: asset.uri, type: asset.mimeType ?? 'image/jpeg', name: 'ledger.jpg' } as any);
+      const token = await getToken();
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(`${API_BASE}/api/scan/bengali-ledger`, { method: 'POST', headers, body: fd });
+      if (!res.ok) throw new Error('scan failed');
+      const data = await res.json() as { items: BengaliLedgerItem[] };
+
+      if (!data.items?.length) {
+        setError('ছবিতে কোনো লেনদেন পাওয়া যায়নি। স্পষ্ট আলোতে পুনরায় চেষ্টা করুন।');
+        setStep('pick'); return;
+      }
+
+      setItems(data.items.map((item, i) => ({
+        ...item,
+        _id: String(i),
+        enabled: true,
+        editAmount: String(item.amount),
+        editType: item.type as 'YOU_GAVE' | 'YOU_GOT',
+        editNote: item.note ?? '',
+        resolvedPartyId: item.partyId,
+        resolvedPartyName: item.partyName,
+      })));
+      setStep('review');
+    } catch {
+      setError('স্ক্যান করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+      setStep('pick');
+    }
+  }
+
+  function toggle(id: string) {
+    setItems(prev => prev.map(i => i._id === id ? { ...i, enabled: !i.enabled } : i));
+  }
+  function updateItem<K extends keyof ReviewItem>(id: string, field: K, value: ReviewItem[K]) {
+    setItems(prev => prev.map(i => i._id === id ? { ...i, [field]: value } : i));
+  }
+  function reassignParty(itemId: string, partyId: string) {
+    const p = allParties.find(x => x.id === partyId);
+    if (!p) return;
+    setItems(prev => prev.map(i => i._id === itemId ? { ...i, resolvedPartyId: p.id, resolvedPartyName: p.name } : i));
+    setShowPartyPicker(null);
+  }
+
+  async function handleConfirm() {
+    const toSave = items.filter(i => i.enabled && Number(i.editAmount) > 0 && i.resolvedPartyId);
+    if (!toSave.length) { Alert.alert('মনোযোগ', 'কমপক্ষে একটি সম্পূর্ণ এন্ট্রি নির্বাচন করুন।'); return; }
+    setStep('saving');
+    try {
+      await bulkSaveMutation.mutateAsync({
+        data: {
+          entries: toSave.map(i => ({
+            partyId: i.resolvedPartyId!,
+            amount: Number(i.editAmount),
+            type: i.editType,
+            note: i.editNote,
+          })),
+        },
+      });
+      await qc.invalidateQueries({ queryKey: ['/api/parties'] });
+      onSuccess();
+      Alert.alert('সফল!', `${toSave.length}টি হিসাব সেভ হয়েছে।`);
+      handleClose();
+    } catch {
+      Alert.alert('সমস্যা', 'সংরক্ষণ করতে সমস্যা হয়েছে।');
+      setStep('review');
+    }
+  }
+
+  const enabledCount = items.filter(i => i.enabled && Number(i.editAmount) > 0 && i.resolvedPartyId).length;
+
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={handleClose}>
+      <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+        {/* Header */}
+        <View style={{ backgroundColor: '#1B3A6B', paddingTop: insets.top + 12, paddingBottom: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <TouchableOpacity onPress={handleClose} style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }}>
+            <Feather name="x" size={20} color="#fff" />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold' }}>বাংলা খাতা স্ক্যান</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, fontFamily: 'Inter_400Regular' }}>হাতে লেখা খাতা থেকে হিসাব তুলুন</Text>
+          </View>
+          {step === 'review' && (
+            <TouchableOpacity onPress={() => { setStep('pick'); setPreviewUri(null); setItems([]); }}>
+              <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, fontFamily: 'Inter_600SemiBold' }}>নতুন ছবি</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
+          {/* Pick / Scanning */}
+          {(step === 'pick' || step === 'scanning') && (
+            <View style={{ alignItems: 'center', paddingTop: 32, gap: 20 }}>
+              {previewUri && step === 'scanning' && (
+                <Image source={{ uri: previewUri }} style={{ width: '100%', height: 200, borderRadius: 16 }} resizeMode="cover" />
+              )}
+              {step === 'scanning' ? (
+                <>
+                  <ActivityIndicator size="large" color="#1B3A6B" />
+                  <Text style={{ color: '#334155', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>AI বিশ্লেষণ করছে…</Text>
+                  <Text style={{ color: '#94a3b8', fontFamily: 'Inter_400Regular', fontSize: 13, textAlign: 'center' }}>হাতে লেখা নাম ও পরিমাণ চিনছে</Text>
+                </>
+              ) : (
+                <>
+                  <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(27,58,107,0.08)', alignItems: 'center', justifyContent: 'center' }}>
+                    <Feather name="camera" size={30} color="#1B3A6B" />
+                  </View>
+                  <Text style={{ fontSize: 18, fontFamily: 'Inter_700Bold', color: '#0f172a', textAlign: 'center' }}>বাংলা খাতার ছবি তুলুন</Text>
+                  <Text style={{ color: '#64748b', fontFamily: 'Inter_400Regular', fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
+                    হাতে লেখা খাতার ছবি তুলুন — AI সব নাম চিনে সংশ্লিষ্ট হিসাবে যোগ করবে।
+                  </Text>
+                  {error && (
+                    <View style={{ backgroundColor: '#fef2f2', borderRadius: 12, padding: 12, flexDirection: 'row', gap: 8, alignItems: 'flex-start', width: '100%' }}>
+                      <Feather name="alert-circle" size={14} color="#ef4444" style={{ marginTop: 1 }} />
+                      <Text style={{ color: '#ef4444', fontFamily: 'Inter_500Medium', fontSize: 13, flex: 1 }}>{error}</Text>
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={{ backgroundColor: '#1B3A6B', borderRadius: 14, paddingVertical: 14, paddingHorizontal: 32, flexDirection: 'row', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'center' }}
+                    onPress={() => pickAndScan('camera')} activeOpacity={0.8}
+                  >
+                    <Feather name="camera" size={18} color="#fff" />
+                    <Text style={{ color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 15 }}>ক্যামেরা দিয়ে ছবি তুলুন</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{ borderWidth: 2, borderColor: '#1B3A6B', borderRadius: 14, paddingVertical: 13, paddingHorizontal: 32, flexDirection: 'row', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'center' }}
+                    onPress={() => pickAndScan('gallery')} activeOpacity={0.8}
+                  >
+                    <Feather name="image" size={18} color="#1B3A6B" />
+                    <Text style={{ color: '#1B3A6B', fontFamily: 'Inter_700Bold', fontSize: 15 }}>গ্যালারি থেকে ছবি বেছে নিন</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          )}
+
+          {/* Review */}
+          {step === 'review' && (
+            <View style={{ gap: 10 }}>
+              {previewUri && (
+                <Image source={{ uri: previewUri }} style={{ width: '100%', height: 140, borderRadius: 14 }} resizeMode="cover" />
+              )}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <Text style={{ fontSize: 15, fontFamily: 'Inter_700Bold', color: '#0f172a' }}>{items.length}টি লেনদেন পাওয়া গেছে</Text>
+                <Text style={{ fontSize: 12, color: '#94a3b8', fontFamily: 'Inter_400Regular' }}>{enabledCount}টি নির্বাচিত</Text>
+              </View>
+
+              {items.map(item => (
+                <View key={item._id} style={{ backgroundColor: item.enabled ? '#fff' : '#f8fafc', borderRadius: 14, borderWidth: 1, borderColor: item.enabled ? '#e2e8f0' : '#f1f5f9', opacity: item.enabled ? 1 : 0.55, padding: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                    {/* Checkbox */}
+                    <TouchableOpacity onPress={() => toggle(item._id)} style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: item.enabled ? '#1B3A6B' : '#cbd5e1', backgroundColor: item.enabled ? '#1B3A6B' : '#fff', alignItems: 'center', justifyContent: 'center', marginTop: 2 }}>
+                      {item.enabled && <Feather name="check" size={12} color="#fff" />}
+                    </TouchableOpacity>
+
+                    <View style={{ flex: 1, gap: 8 }}>
+                      {/* Party name + confidence */}
+                      <View>
+                        <Text style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'Inter_500Medium' }}>
+                          চিহ্নিত নাম
+                          <Text style={{ color: item.confidence === 'high' ? '#059669' : item.confidence === 'medium' ? '#d97706' : '#ef4444' }}>
+                            {' '}({item.confidence === 'high' ? 'উচ্চ' : item.confidence === 'medium' ? 'মধ্যম' : 'কম'})
+                          </Text>
+                        </Text>
+                        {item.resolvedPartyId ? (
+                          <Text style={{ fontSize: 15, fontFamily: 'Inter_700Bold', color: '#0f172a' }}>{item.resolvedPartyName}</Text>
+                        ) : (
+                          <Text style={{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: '#d97706' }}>⚠️ "{item.extractedName}" — মেলেনি</Text>
+                        )}
+                        {item.extractedName && item.extractedName !== item.resolvedPartyName && (
+                          <Text style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'Inter_400Regular' }}>খাতায়: {item.extractedName}</Text>
+                        )}
+                      </View>
+
+                      {/* Party reassign button */}
+                      <TouchableOpacity
+                        onPress={() => setShowPartyPicker(showPartyPicker === item._id ? null : item._id)}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#f8fafc', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: '#e2e8f0' }}
+                        disabled={!item.enabled}
+                      >
+                        <Feather name="users" size={13} color="#64748b" />
+                        <Text style={{ fontSize: 12, fontFamily: 'Inter_500Medium', color: '#64748b', flex: 1 }} numberOfLines={1}>
+                          {item.resolvedPartyId ? item.resolvedPartyName : '— পার্টি বেছে নিন —'}
+                        </Text>
+                        <Feather name="chevron-down" size={13} color="#94a3b8" />
+                      </TouchableOpacity>
+
+                      {/* Party picker dropdown */}
+                      {showPartyPicker === item._id && (
+                        <View style={{ backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0', maxHeight: 180 }}>
+                          <ScrollView nestedScrollEnabled>
+                            {allParties.map(p => (
+                              <TouchableOpacity
+                                key={p.id}
+                                onPress={() => reassignParty(item._id, p.id)}
+                                style={{ paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9', flexDirection: 'row', gap: 8, alignItems: 'center' }}
+                              >
+                                <Feather name="user" size={13} color="#64748b" />
+                                <Text style={{ fontSize: 13, fontFamily: 'Inter_500Medium', color: '#334155', flex: 1 }}>{p.name}</Text>
+                                <Text style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'Inter_400Regular' }}>
+                                  {p.role === 'CUSTOMER' ? 'গ্রাহক' : 'সরবরাহকারী'}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </ScrollView>
+                        </View>
+                      )}
+
+                      {/* Type toggle + Amount */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={{ flexDirection: 'row', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#e2e8f0' }}>
+                          <TouchableOpacity disabled={!item.enabled} onPress={() => updateItem(item._id, 'editType', 'YOU_GAVE')} style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: item.editType === 'YOU_GAVE' ? '#ef4444' : '#fff' }}>
+                            <Text style={{ fontSize: 11, fontFamily: 'Inter_700Bold', color: item.editType === 'YOU_GAVE' ? '#fff' : '#94a3b8' }}>দিয়েছি</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity disabled={!item.enabled} onPress={() => updateItem(item._id, 'editType', 'YOU_GOT')} style={{ paddingHorizontal: 10, paddingVertical: 6, backgroundColor: item.editType === 'YOU_GOT' ? '#10b981' : '#fff' }}>
+                            <Text style={{ fontSize: 11, fontFamily: 'Inter_700Bold', color: item.editType === 'YOU_GOT' ? '#fff' : '#94a3b8' }}>পেয়েছি</Text>
+                          </TouchableOpacity>
+                        </View>
+                        <TextInput
+                          keyboardType="numeric"
+                          editable={item.enabled}
+                          value={item.editAmount}
+                          onChangeText={v => updateItem(item._id, 'editAmount', v)}
+                          style={{ flex: 1, textAlign: 'right', fontSize: 18, fontFamily: 'Inter_700Bold', color: '#0f172a', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingBottom: 2 }}
+                          placeholder="০" placeholderTextColor="#cbd5e1"
+                        />
+                      </View>
+
+                      {/* Note */}
+                      <TextInput
+                        editable={item.enabled}
+                        value={item.editNote}
+                        onChangeText={v => updateItem(item._id, 'editNote', v)}
+                        placeholder="বিবরণ (ঐচ্ছিক)" placeholderTextColor="#cbd5e1"
+                        style={{ fontSize: 12, color: '#475569', fontFamily: 'Inter_400Regular', borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 2 }}
+                      />
+                    </View>
+                  </View>
+                </View>
+              ))}
+
+              {items.some(i => !i.resolvedPartyId) && (
+                <View style={{ backgroundColor: '#fffbeb', borderRadius: 12, padding: 12, flexDirection: 'row', gap: 8, borderWidth: 1, borderColor: '#fde68a' }}>
+                  <Feather name="alert-circle" size={14} color="#d97706" style={{ marginTop: 1 }} />
+                  <Text style={{ color: '#92400e', fontFamily: 'Inter_500Medium', fontSize: 12, flex: 1 }}>কিছু নাম মেলেনি। ওপরের বাটনে চেপে পার্টি বেছে দিন অথবা সেই এন্ট্রিগুলো বাতিল করুন।</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Saving */}
+          {step === 'saving' && (
+            <View style={{ alignItems: 'center', paddingTop: 60, gap: 16 }}>
+              <ActivityIndicator size="large" color="#1B3A6B" />
+              <Text style={{ color: '#334155', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>সংরক্ষণ করা হচ্ছে…</Text>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Confirm button */}
+        {step === 'review' && (
+          <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, paddingBottom: insets.bottom + 16, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
+            <TouchableOpacity
+              onPress={handleConfirm}
+              disabled={enabledCount === 0}
+              style={{ backgroundColor: '#1B3A6B', borderRadius: 14, paddingVertical: 15, alignItems: 'center', opacity: enabledCount === 0 ? 0.5 : 1 }}
+              activeOpacity={0.8}
+            >
+              <Text style={{ color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 15 }}>সব হিসাব নিশ্চিত ও সেভ করুন ({enabledCount}টি)</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    </Modal>
+  );
+}
+
+// ─── PartiesScreen ────────────────────────────────────────────────────────────
+
 export default function PartiesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -293,6 +639,7 @@ export default function PartiesScreen() {
   const [activeTab, setActiveTab] = useState<Tab>('CUSTOMER');
   const [search, setSearch] = useState('');
   const [showAddSheet, setShowAddSheet] = useState(false);
+  const [showScanSheet, setShowScanSheet] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const { data: parties = [], isLoading, refetch } = useListParties({
@@ -388,6 +735,17 @@ export default function PartiesScreen() {
       <View style={s.header}>
         <View style={s.titleRow}>
           <Text style={s.title}>{t('partiesTitle')}</Text>
+          {/* Scan button */}
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1.5, borderColor: colors.primary, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 7, marginRight: 8 }}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setShowScanSheet(true);
+            }}
+          >
+            <Feather name="camera" size={14} color={colors.primary} />
+            <Text style={{ fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary }}>স্ক্যান</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={s.addBtn}
             onPress={() => {
@@ -462,6 +820,12 @@ export default function PartiesScreen() {
           refetch();
           qc.invalidateQueries({ queryKey: ['/api/dashboard/summary'] });
         }}
+      />
+
+      <BengaliLedgerScannerSheet
+        visible={showScanSheet}
+        onClose={() => setShowScanSheet(false)}
+        onSuccess={() => refetch()}
       />
     </View>
   );

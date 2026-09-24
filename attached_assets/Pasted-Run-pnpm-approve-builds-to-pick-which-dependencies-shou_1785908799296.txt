@@ -1,0 +1,42 @@
+Run "pnpm approve-builds" to pick which dependencies should be allowed to run scripts.
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil> pnpm approve-builds
+√ Choose which packages to build (Press <space> to select, <a> to toggle all, <i> to invert selection) @clerk/shared, browser-tabs-lock, bufferutil, core-js, esbuild, utf-8-validate
+√ The next packages will now be built: @clerk/shared, browser-tabs-lock, bufferutil, core-js, esbuild, utf-8-validate.
+Do you approve? Yes
+node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild: Running postinstall script, done in 2.8s
+node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild: Running postinstall script, done in 1.1s
+node_modules/.pnpm/esbuild@0.18.20/node_modules/esbuild: Running postinstall script, done in 2.7s
+node_modules/.pnpm/bufferutil@4.1.0/node_modules/bufferutil: Running install script, done in 396ms
+node_modules/.pnpm/utf-8-validate@6.0.6/node_modules/utf-8-validate: Running install script, done in 414ms
+node_modules/.pnpm/@clerk+shared@3.47.8_react-_d43637bfe4014d0b0c61ca38a56e7489/node_modules/@clerk/shared: Running postinstall script, done in 185ms
+node_modules/.pnpm/core-js@3.49.0/node_modules/core-js: Running postinstall script, done in 170ms
+node_modules/.pnpm/browser-tabs-lock@1.3.0/node_modules/browser-tabs-lock: Running postinstall script, done in 163ms
+node_modules/.pnpm/core-js@3.47.0/node_modules/core-js: Running postinstall script, done in 145ms
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil> cd artifacts\khatabook-mobile
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile> eas build --platform android --profile production
+√ Which account should own this project? » shakil112233445566778899
+√ Existing EAS project found for @shakil112233445566778899/khatabook-mobile (id = c51bffdf-efa3-4483-a2a7-fd0efabc2f73). Configure this project? ... yes
+√ Linked local project to EAS project c51bffdf-efa3-4483-a2a7-fd0efabc2f73
+Resolved "production" environment for the build. Learn more: https://docs.expo.dev/eas/environment-variables/#setting-the-environment-for-your-builds
+No environment variables with visibility "Plain text" and "Sensitive" found for the "production" environment on EAS.
+Environment variables loaded from the "production" build profile "env" configuration: EXPO_USE_METRO_WORKSPACE_ROOT.
+
+√ Incremented versionCode from 5 to 6.
+
+
+√ Using remote Android credentials (Expo server)
+√ Using Keystore from configuration: Build Credentials d5p0nERU65 (default)
+
+Compressing project files and uploading to EAS Build. Learn more: https://expo.fyi/eas-build-archive
+√ Compressed project files 5s (13.2 MB)
+√ Uploaded to EAS 4s
+√ Computed project fingerprint
+
+See logs: https://expo.dev/accounts/shakil112233445566778899/projects/khatabook-mobile/builds/ebc4da53-8132-49c0-8e19-c4299ca4fdcc
+
+Waiting for build to complete. You can press Ctrl+C to exit.
+× Build failed
+
+🤖 Android build failed:
+Unknown error. See logs of the Bundle JavaScript build phase for more information.
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile>

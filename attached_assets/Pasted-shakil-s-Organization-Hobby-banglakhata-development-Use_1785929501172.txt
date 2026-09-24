@@ -1,0 +1,141 @@
+shakil's Organization
+Hobby
+
+banglakhata
+
+development
+
+User avatar
+
+Overview
+Users
+Organizations
+Billing
+Logs
+Configure
+
+development
+
+Find...
+Ctrl
+K
+Configure
+
+User & authentication
+User & authentication
+SSO connections
+Web3
+Multi-factor
+Waitlist
+Legal
+
+Sessions
+Sessions
+JWT templates
+
+Organizations
+Settings
+Roles & Permissions
+
+Billing
+Settings
+Subscription plans
+
+Protect
+Restrictions
+Rules
+Account Portal
+Features
+
+Customization
+Avatars
+Emails
+SMS
+
+Developers
+Webhooks
+Domains
+Paths
+API keys
+M2M authentication
+OAuth applications
+Native applications
+Integrations
+Instance
+Settings
+API keys
+Updates
+Application
+Settings
+Sessions
+Session lifetime
+Set session duration limits for the long lived cookie by configuring the inactivity timeout or the maximum lifetime. Learn more
+
+You should be aware of browser limitations that may cause users to be signed out before the configured maximum lifetime, even when this feature is disabled.
+
+Maximum lifetime
+Pro
+Set the maximum lifetime duration for a session
+7
+
+days
+Set duration between 5 minutes and 10 years
+
+
+Inactivity timeout
+Pro
+Set the inactivity timeout for a session
+
+Multi-session handling
+Pro
+Allow users to be signed into more than one account at a time. Users may switch the active account by opening the User Button and selecting the desired account. Learn more
+
+Customize session token
+Augment your session tokens by adding custom claims. Learn more
+
+Name
+__session
+Claims
+1
+Insert shortcodes
+
+
+user.id
+
+user.external_id
+
+user.first_name
+
+user.last_name
+
+user.full_name
+
+user.username
+
+user.created_at
+
+user.updated_at
+
+user.last_sign_in_at
+
+user.primary_email_address
+
+user.primary_phone_number
+
+user.primary_web3_wallet
+
+user.email_verified
+
+user.phone_number_verified
+
+user.image_url
+
+user.has_image
+
+user.two_factor_enabled
+
+user.public_metadata
+
+user.unsafe_metadata
+Clerk automatically includes standard claims in your session tokens for common use cases and third-party compatibility.
+Not sure how template syntax works? Learn how it helps you customize your JWTs.

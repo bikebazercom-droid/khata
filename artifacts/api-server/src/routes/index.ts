@@ -16,6 +16,7 @@ import adminIsolatedRouter from "./adminIsolated";
 import uploadsRouter from "./uploadBinary";
 import downloadsRouter from "./downloads";
 import downloadConfigsRouter from "./downloadConfigs";
+import scanRouter from "./scan";
 
 const router: IRouter = Router();
 
@@ -46,5 +47,6 @@ router.use(eventsRouter);
 router.use(staffRouter);
 router.use(businessesRouter);
 router.use(userRouter);
+router.use(scanRouter);
 
 export default router;

@@ -1,0 +1,68 @@
+PS C:\Windows\system32> cd "$env:USERPROFILE\Downloads\Premium-Desktop-Bil"
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil> npm install -g pnpm
+
+changed 1 package in 4s
+
+1 package is looking for funding
+  run `npm fund` for details
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil> pnpm install
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides". See https://pnpm.io/settings for the new home of each setting.
+Scope: all 14 workspace projects
+✓ Lockfile passes supply-chain policies (verified 14m ago)
+Lockfile is up to date, resolution step is skipped
+Already up to date
+Done in 3.3s using pnpm v11.20.0
+√ Do you want to continue? ... yes
+Waiting for browser login...mium-Desktop-Bil\artifacts\khatabook-mobile> eas login
+If your browser doesn't automatically open, visit this link to log in: https://expo.dev/login?client_id=eas-cli&redirect_uri=http://localhost:65226/auth/callback&response_type=code&code_challenge=Suf8BieDvgzrpvTcuJDlenLHvWyhc45LOqRwyDX3_cw&code_challenge_method=S256&state=3faUv6S5aUymgloNgVrsz0EHUAGzrdDSu8RlSEyOxus&confirm_account=true
+Logged in
+√ Incremented versionCode from 2 to 3.
+on
+
+√ Using remote Android credentials (Expo server)opment, this is not recommended when building production apps.
+√ Using Keystore from configuration: Build Credentials t2BiIoYwZj (default)
+To suppress this warning, set EAS_BUILD_NO_EXPO_GO_WARNING=true.
+Compressing project files and uploading to EAS Build. Learn more: https://expo.fyi/eas-build-archive
+√ Compressed project files 4s (12.9 MB)
+√ Uploaded to EAS 12s
+√ Computed project fingerprint
+
+See logs: https://expo.dev/accounts/shakil112233445566778899s-team/projects/khatabook-mobile/builds/02a36bb1-6e64-493e-91a3-eaee01803f91
+
+Waiting for build to complete. You can press Ctrl+C to exit.
+× Build failed
+
+🤖 Android build failed:
+Unknown error. See logs of the Install dependencies build phase for more information.
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile> cd "$env:USERPROFILE\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile"
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile> eas build --platform android --profile production
+Found invalid character in eas.json.
+> 1 | $easJson = @'
+  2 | {
+  3 |   "cli": {
+  4 |     "version": ">= 16.0.0",
+    Error: build command failed.
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile> Set-Content -Path "$env:USERPROFILE\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile\eas.json" -Value '{"cli":{"version":">= 16.0.0","appVersionSource":"remote"},"build":{"development":{"developmentClient":true,"distribution":"internal","android":{"buildType":"apk","gradleCommand":":app:assembleDebug"},"ios":{"simulator":true}},"preview":{"distribution":"internal","android":{"buildType":"apk","gradleCommand":":app:assembleRelease -x lint -x test"},"ios":{"simulator":false},"env":{"GRADLE_OPTS":"-Dorg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m"}},"production":{"autoIncrement":true,"env":{"EXPO_USE_METRO_WORKSPACE_ROOT":"1"},"android":{"buildType":"app-bundle"},"ios":{"simulator":false}}},"submit":{"production":{"android":{"serviceAccountKeyPath":"./google-play-service-account.json","track":"internal"}}}}'
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile> cd "$env:USERPROFILE\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile"
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile> eas build --platform android --profile production
+
+⚠️ Detected that your app uses Expo Go for development, this is not recommended when building production apps.
+Learn more: https://expo.fyi/why-not-build-expo-go-for-production
+To suppress this warning, set EAS_BUILD_NO_EXPO_GO_WARNING=true.
+
+Resolved "production" environment for the build. Learn more: https://docs.expo.dev/eas/environment-variables/#setting-the-environment-for-your-builds
+No environment variables with visibility "Plain text" and "Sensitive" found for the "production" environment on EAS.
+Environment variables loaded from the "production" build profile "env" configuration: EXPO_USE_METRO_WORKSPACE_ROOT.
+
+√ Incremented versionCode from 3 to 4.
+
+
+√ Using remote Android credentials (Expo server)
+√ Compressed project files 5s (12.9 MB)
+√ Uploaded to EAS 13s
+√ Computed project fingerprint
+
+See logs: https://expo.dev/accounts/shakil112233445566778899s-team/projects/khatabook-mobile/builds/35ab7391-4e1e-4e96-8509-f816b5dd7628
+
+Waiting for build to complete. You can press Ctrl+C to exit.
+/ Build queued...

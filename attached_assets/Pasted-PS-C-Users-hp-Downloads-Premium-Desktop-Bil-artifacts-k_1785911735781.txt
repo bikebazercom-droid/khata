@@ -1,0 +1,32 @@
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile> notepad "$env:USERPROFILE\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile\plugins\withPackagingFix.js"
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile> eas build --platform android --profile production
+
+⚠️ Detected that your app uses Expo Go for development, this is not recommended when building production apps.
+Learn more: https://expo.fyi/why-not-build-expo-go-for-production
+To suppress this warning, set EAS_BUILD_NO_EXPO_GO_WARNING=true.
+
+Unable to resolve a valid config plugin for ./plugins/withPackagingFix.
+• No "app.plugin.js" file found in ./plugins/withPackagingFix: config plugins are typically exported from an "app.plugin.js" file in the package root.
+• main export of ./plugins/withPackagingFix does not appear to be a config plugin: the following error was thrown when importing C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile\plugins\withPackagingFix.js: Cannot find module 'C:\Users\hp\Downloads\Premium-Desktop-Bil\node_modules\@expo\config-plugins'
+Require stack:
+- C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile\plugins\withPackagingFix.js
+- C:\Users\hp\AppData\Roaming\npm\node_modules\eas-cli\node_modules\@expo\config-plugins\build\utils\plugin-resolver.js
+- C:\Users\hp\AppData\Roaming\npm\node_modules\eas-cli\node_modules\@expo\config-plugins\build\plugins\withStaticPlugin.js
+- C:\Users\hp\AppData\Roaming\npm\node_modules\eas-cli\node_modules\@expo\config-plugins\build\plugins\withPlugins.js
+- C:\Users\hp\AppData\Roaming\npm\node_modules\eas-cli\node_modules\@expo\config-plugins\build\index.js
+- C:\Users\hp\AppData\Roaming\npm\node_modules\eas-cli\build\build\android\syncProjectConfiguration.js
+- C:\Users\hp\AppData\Roaming\npm\node_modules\eas-cli\build\build\android\build.js
+- C:\Users\hp\AppData\Roaming\npm\node_modules\eas-cli\build\build\runBuildAndSubmit.js
+- C:\Users\hp\AppData\Roaming\npm\node_modules\eas-cli\build\commands\build\index.js
+- C:\Users\hp\AppData\Roaming\npm\node_modules\eas-cli\node_modules\@oclif\core\lib\module-loader.js
+- C:\Users\hp\AppData\Roaming\npm\node_modules\eas-cli\node_modules\@oclif\core\lib\help\index.js
+- C:\Users\hp\AppData\Roaming\npm\node_modules\eas-cli\node_modules\@oclif\core\lib\errors\handle.js
+- C:\Users\hp\AppData\Roaming\npm\node_modules\eas-cli\node_modules\@oclif\core\lib\errors\index.js
+- C:\Users\hp\AppData\Roaming\npm\node_modules\eas-cli\node_modules\@oclif\core\lib\config\config.js
+- C:\Users\hp\AppData\Roaming\npm\node_modules\eas-cli\node_modules\@oclif\core\lib\config\index.js
+- C:\Users\hp\AppData\Roaming\npm\node_modules\eas-cli\node_modules\@oclif\core\lib\command.js
+- C:\Users\hp\AppData\Roaming\npm\node_modules\eas-cli\node_modules\@oclif\core\lib\index.js
+- C:\Users\hp\AppData\Roaming\npm\node_modules\eas-cli\bin\run MODULE_NOT_FOUND
+Verify that ./plugins/withPackagingFix includes a config plugin. If it does not, then remove the entry from plugins in your app config file. Learn more: https://docs.expo.dev/guides/config-plugins/
+    Error: build command failed.
+PS C:\Users\hp\Downloads\Premium-Desktop-Bil\artifacts\khatabook-mobile>
