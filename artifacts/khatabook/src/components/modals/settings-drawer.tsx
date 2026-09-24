@@ -27,6 +27,7 @@ import {
 import { phoneLogout } from '@/lib/phoneAuth';
 import { clearAllPendingUploads } from '@/lib/pendingUploads';
 import { useLanguage } from '@/lib/i18n';
+import { useAppAuth } from '@/App';
 
 /** Shape stored in localStorage under PROFILE_KEY */
 export interface ShopProfile {
@@ -68,10 +69,13 @@ export function SettingsDrawer({
   onOpenChange: (open: boolean) => void;
 }) {
   const { t } = useLanguage();
-  const { data: settings } = useGetBusinessSettings();
   const queryClient = useQueryClient();
   const { signOut } = useClerk();
   const { isSignedIn } = useAuth();
+  const { role } = useAppAuth();
+  const { data: settings } = useGetBusinessSettings({
+    query: { enabled: role === 'owner', queryKey: getGetBusinessSettingsQueryKey() },
+  });
   const [, navigate] = useLocation();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -149,6 +153,8 @@ export function SettingsDrawer({
 
       setTimeout(async () => {
         try {
+          // The account no longer exists; another authenticated API call here
+          // would provision a replacement account before Clerk signs out.
           if (isSignedIn) await signOut();
           await phoneLogout().catch(() => {});
         } catch {}
@@ -165,6 +171,7 @@ export function SettingsDrawer({
     if (isLoggingOut) return;
     setIsLoggingOut(true);
     try {
+      await fetch('/api/auth/logout-event', { method: 'POST', credentials: 'include' }).catch(() => {});
       queryClient.clear();
       clearAllPendingUploads();
       if (isSignedIn) await signOut();
@@ -204,39 +211,52 @@ export function SettingsDrawer({
         <div className="px-4 pb-10 space-y-2 overflow-y-auto max-h-[75vh]">
 
           {/* ── Row 1: Profile ──────────────────────────────────────────── */}
-          <div>
-            <button type="button" onClick={() => toggleMenu('profile')} className={rowHeader('profile')}>
-              <span className="flex items-center gap-2">
-                <span>👤</span>
-                <span className={activeMenu === 'profile' ? 'text-white' : 'text-slate-700'}>
-                  {t('profileInfo')}
+          {role === 'owner' && (
+            <div>
+              <button type="button" onClick={() => toggleMenu('profile')} className={rowHeader('profile')}>
+                <span className="flex items-center gap-2">
+                  <span>👤</span>
+                  <span className={activeMenu === 'profile' ? 'text-white' : 'text-slate-700'}>
+                    {t('profileInfo')}
+                  </span>
                 </span>
-              </span>
-              {activeMenu === 'profile'
-                ? <ChevronUp className="w-4 h-4 shrink-0 text-white" />
-                : <ChevronDown className="w-4 h-4 shrink-0 text-slate-400" />}
-            </button>
+                {activeMenu === 'profile'
+                  ? <ChevronUp className="w-4 h-4 shrink-0 text-white" />
+                  : <ChevronDown className="w-4 h-4 shrink-0 text-slate-400" />}
+              </button>
 
-            {activeMenu === 'profile' && (
-              <div className={rowBody}>
-                {profileFields.map(({ field, label, placeholder, type }) => (
-                  <div key={field}>
-                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">{label}</label>
-                    <input
-                      type={type}
-                      placeholder={placeholder}
-                      value={profile[field]}
-                      onChange={e => handleProfileField(field, e.target.value)}
-                      className="w-full px-3 py-2.5 text-[13px] border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]/30 focus:border-[#1B3A6B]"
-                    />
-                  </div>
-                ))}
-                <p className="text-[10px] text-slate-400 pt-1">
-                  {t('deviceOnly')}
-                </p>
-              </div>
-            )}
-          </div>
+              {activeMenu === 'profile' && (
+                <div className={rowBody}>
+                  {profileFields.map(({ field, label, placeholder, type }) => (
+                    <div key={field}>
+                      <label className="block text-[11px] font-semibold text-slate-500 mb-1">{label}</label>
+                      <input
+                        type={type}
+                        placeholder={placeholder}
+                        value={profile[field]}
+                        onChange={e => handleProfileField(field, e.target.value)}
+                        className="w-full px-3 py-2.5 text-[13px] border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]/30 focus:border-[#1B3A6B]"
+                      />
+                    </div>
+                  ))}
+                  <p className="text-[10px] text-slate-400 pt-1">
+                    {t('deviceOnly')}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {role === 'owner' && (
+            <button
+              type="button"
+              onClick={() => { onOpenChange(false); navigate('/access'); }}
+              className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 transition-all active:scale-[0.98]"
+            >
+              <span>খাতা অ্যাক্সেস ও কার্যকলাপ</span>
+              <span aria-hidden="true">›</span>
+            </button>
+          )}
 
           {/* ── Row 2: Auth ─────────────────────────────────────────────── */}
           <div>
@@ -282,19 +302,21 @@ export function SettingsDrawer({
           </div>
 
           {/* ── Row 4: Delete Account ───────────────────────────────────── */}
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={() => setShowDeleteConfirm(true)}
-              className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-red-200 bg-red-50 text-red-600 font-bold text-sm transition-all active:scale-[0.98] hover:bg-red-100"
-            >
-              <span className="text-base">🗑️</span>
-              {t('deleteAccount')}
-            </button>
-            <p className="text-[10px] text-slate-400 mt-1.5 px-1">
-              {t('deleteAccountHint')}
-            </p>
-          </div>
+          {role === 'owner' && (
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border border-red-200 bg-red-50 text-red-600 font-bold text-sm transition-all active:scale-[0.98] hover:bg-red-100"
+              >
+                <span className="text-base">🗑️</span>
+                {t('deleteAccount')}
+              </button>
+              <p className="text-[10px] text-slate-400 mt-1.5 px-1">
+                {t('deleteAccountHint')}
+              </p>
+            </div>
+          )}
 
         </div>
       </DrawerContent>

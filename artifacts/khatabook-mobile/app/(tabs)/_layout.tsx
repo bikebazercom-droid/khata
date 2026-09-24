@@ -44,12 +44,10 @@ function NativeTabLayout({ staff }: { staff: boolean }) {
         <Icon sf={{ default: 'person.2', selected: 'person.2.fill' }} />
         <Label>{t('parties')}</Label>
       </NativeTabs.Trigger>
-      {!staff ? (
-        <NativeTabs.Trigger name="settings">
-          <Icon sf={{ default: 'gear', selected: 'gear' }} />
-          <Label>{t('settings')}</Label>
-        </NativeTabs.Trigger>
-      ) : null}
+      <NativeTabs.Trigger name="settings">
+        <Icon sf={{ default: 'gear', selected: 'gear' }} />
+        <Label>{t('settings')}</Label>
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
@@ -120,7 +118,6 @@ function ClassicTabLayout({ staff }: { staff: boolean }) {
         name="settings"
         options={{
           title: t('settings'),
-          href: staff ? null : undefined,
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="gear" tintColor={color} size={24} />

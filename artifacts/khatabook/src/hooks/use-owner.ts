@@ -13,6 +13,26 @@ export interface Worker {
   identity: string; // phone or email
   status: 'active' | 'suspended' | 'pending';
   partyIds: string[];
+  lastLogin: string | null;
+  lastLogout: string | null;
+  invitedAt: string | null;
+}
+
+export interface ActivityEntry {
+  id: string;
+  partyId: string;
+  partyName: string;
+  partyRole: string;
+  actorId: string;
+  actorIdentity: string;
+  type: string;
+  amount: number | null;
+  description: string;
+  createdAt: string;
+}
+
+export interface ActivityResponse {
+  entries: ActivityEntry[];
 }
 
 export interface CreateWorkerPayload {
@@ -58,6 +78,24 @@ export function useOwnerWorkers() {
       const data = await res.json();
       return data.workers || [];
     },
+  });
+}
+
+export function useOwnerActivity() {
+  const { selectedBusinessId } = useBusinessContext();
+  return useQuery({
+    queryKey: ['owner-activity', selectedBusinessId],
+    queryFn: async (): Promise<ActivityResponse> => {
+      const res = await fetch(`/api/owner/activity`, {
+        credentials: "include",
+        headers: {
+          'X-Business-Id': selectedBusinessId || ''
+        }
+      });
+      if (!res.ok) throw new Error('Failed to fetch activity');
+      return res.json();
+    },
+    staleTime: 60 * 1000, // finite freshness
   });
 }
 

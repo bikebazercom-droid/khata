@@ -18,9 +18,10 @@ import { useGetBusinessSettings, useUpdateBusinessSettings } from '@workspace/ap
 import { useColors } from '@/hooks/useColors';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth, useClerk } from '@clerk/expo';
-import { Redirect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useLanguage } from '@/lib/i18n';
 import { notifyMobileIdentityChanged, useAuthRole } from '@/lib/auth-role';
+import { customFetch } from '@/lib/api-transport';
 
 export default function SettingsScreen() {
   const colors = useColors();
@@ -70,19 +71,30 @@ export default function SettingsScreen() {
           text: t('signOutLabel'),
           style: 'destructive',
           onPress: async () => {
+            // Record the explicit sign-out while the existing bearer token is
+            // still available. Telemetry is best-effort and must never block
+            // clearing the local session.
             try {
-              qc.clear();
-              if (isSignedIn) {
-                await signOut();
-              }
-              await SecureStore.deleteItemAsync('phone_session_token').catch(() => {});
-              notifyMobileIdentityChanged();
-              const { setAuthTokenGetter } = await import('@workspace/api-client-react');
-              setAuthTokenGetter(null);
-              router.replace('/(auth)/sign-in' as any);
-            } catch (err: any) {
-              Alert.alert('Error', err?.message ?? 'Could not sign out');
+              await customFetch('/api/auth/logout-event', {
+                method: 'POST',
+                responseType: 'json',
+                headers: identity?.businessId ? { 'X-Business-Id': identity.businessId } : undefined,
+                body: JSON.stringify({}),
+              });
+            } catch {
+              // Sign-out remains available when event reporting is offline.
             }
+            qc.clear();
+            try {
+              if (isSignedIn) await signOut();
+            } catch {
+              // Continue clearing any fallback mobile session and navigate out.
+            }
+            await SecureStore.deleteItemAsync('phone_session_token').catch(() => {});
+            notifyMobileIdentityChanged();
+            const { setAuthTokenGetter } = await import('@workspace/api-client-react');
+            setAuthTokenGetter(null);
+            router.replace('/(auth)/sign-in' as any);
           },
         },
       ],
@@ -164,8 +176,6 @@ export default function SettingsScreen() {
     bottomPad: { height: Platform.OS === 'web' ? 84 : 90 },
   });
 
-  if (identity?.role === 'staff') return <Redirect href="/" />;
-
   return (
     <View style={s.container}>
       <View style={s.header}>
@@ -173,40 +183,52 @@ export default function SettingsScreen() {
       </View>
       <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}>
 
-        {/* BUSINESS section */}
-        <Text style={[s.sectionLabel, { marginTop: 4 }]}>{t('businessSection')}</Text>
-        <View style={s.card}>
-          {/* Store name row */}
-          <View style={s.row}>
-            <Text style={s.rowLabel}>{t('storeNameLabel')}</Text>
-            {!editing && (
-              <>
-                {isLoading ? (
-                  <ActivityIndicator size="small" color={colors.mutedForeground} />
-                ) : (
-                  <Text style={s.rowValue} numberOfLines={1}>{settings?.storeName || '—'}</Text>
+        {identity?.role === 'owner' && (
+          <>
+            {/* BUSINESS section */}
+            <Text style={[s.sectionLabel, { marginTop: 4 }]}>{t('businessSection')}</Text>
+            <View style={s.card}>
+              <View style={s.row}>
+                <Text style={s.rowLabel}>{t('storeNameLabel')}</Text>
+                {!editing && (
+                  <>
+                    {isLoading ? (
+                      <ActivityIndicator size="small" color={colors.mutedForeground} />
+                    ) : (
+                      <Text style={s.rowValue} numberOfLines={1}>{settings?.storeName || '—'}</Text>
+                    )}
+                    <TouchableOpacity onPress={() => setEditing(true)} style={{ marginLeft: 10 }}>
+                      <Feather name="edit-2" size={16} color={colors.mutedForeground} />
+                    </TouchableOpacity>
+                  </>
                 )}
-                <TouchableOpacity onPress={() => setEditing(true)} style={{ marginLeft: 10 }}>
-                  <Feather name="edit-2" size={16} color={colors.mutedForeground} />
-                </TouchableOpacity>
-              </>
-            )}
-            {editing && (
-              <TextInput
-                style={s.input}
-                value={storeName}
-                onChangeText={setStoreName}
-                autoFocus
-                returnKeyType="done"
-                onSubmitEditing={handleSave}
-                textAlign="right"
-              />
-            )}
-          </View>
+                {editing && (
+                  <TextInput
+                    style={s.input}
+                    value={storeName}
+                    onChangeText={setStoreName}
+                    autoFocus
+                    returnKeyType="done"
+                    onSubmitEditing={handleSave}
+                    textAlign="right"
+                  />
+                )}
+              </View>
+              <TouchableOpacity
+                style={[s.row, s.rowBorder]}
+                onPress={() => router.push('/access' as any)}
+                activeOpacity={0.7}
+                testID="settings-access"
+              >
+                <Text style={s.rowLabel}>খাতার অ্যাক্সেস</Text>
+                <Feather name="users" size={18} color={colors.primary} />
+                <Feather name="chevron-right" size={18} color={colors.mutedForeground} style={{ marginLeft: 8 }} />
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
 
-        </View>
-
-        {editing && (
+        {identity?.role === 'owner' && editing && (
           <>
             <TouchableOpacity
               style={[s.saveBtn, updateSettings.isPending && { opacity: 0.6 }]}

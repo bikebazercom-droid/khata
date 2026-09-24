@@ -83,10 +83,15 @@ router.delete(
             .delete(staffDestinationsTable)
             .where(inArray(staffDestinationsTable.businessId, bizIds));
 
-          // 7. Wipe the join table, then the business rows.
+          // 7. Wipe memberships and identities before businesses, since
+          // app_users.business_id has a restrictive foreign key.
           await tx
             .delete(userBusinessesTable)
             .where(inArray(userBusinessesTable.businessId, bizIds));
+
+          await tx
+            .delete(appUsersTable)
+            .where(inArray(appUsersTable.businessId, bizIds));
 
           await tx
             .delete(businessesTable)

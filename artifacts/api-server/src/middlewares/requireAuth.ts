@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import {
   db,
   appUsersTable,
+  appUserLoginSessionsTable,
   businessesTable,
   businessSettingsTable,
   partiesTable,
@@ -334,6 +335,18 @@ export async function requireAuth(
       (req as AuthenticatedRequest).status = user.status;
       (req as AuthenticatedRequest).authMethod = "clerk";
       (req as AuthenticatedRequest).verifiedEmail = verifiedEmail ?? undefined;
+      if (clerkAuth.sessionId) {
+        await db.transaction(async (tx) => {
+          const [newSession] = await tx.insert(appUserLoginSessionsTable).values({
+            userId: user.id,
+            sessionId: clerkAuth.sessionId!,
+          }).onConflictDoNothing().returning({ sessionId: appUserLoginSessionsTable.sessionId });
+          if (newSession) {
+            await tx.update(appUsersTable).set({ lastLogin: new Date() })
+              .where(eq(appUsersTable.id, user.id));
+          }
+        });
+      }
       return next();
     } catch (err) {
       console.error("[requireAuth] Clerk JIT provision error:", err);

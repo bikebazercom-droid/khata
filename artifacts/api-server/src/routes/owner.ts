@@ -1,12 +1,23 @@
-import { Router, type IRouter } from "express";
-import { and, eq, inArray } from "drizzle-orm";
+import { Router, type IRouter, type NextFunction, type Request, type Response } from "express";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import {
-  appUsersTable, db, partiesTable, workerInvitesTable,
+  appUsersTable, db, ledgerEntriesTable, partiesTable, workerInvitesTable,
   workerPartyAssignmentsTable,
 } from "@workspace/db";
 import { type AuthenticatedRequest } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();
+
+function requireOwner(req: Request, res: Response, next: NextFunction): void {
+  const auth = req as AuthenticatedRequest;
+  if (auth.status !== "active" || auth.role !== "owner") {
+    res.status(403).json({ error: "Owner access required" });
+    return;
+  }
+  next();
+}
+
+router.use("/owner", requireOwner);
 
 function normalizePhone(value: string): string | null {
   const digits = value.replace(/\D/g, "");
@@ -33,14 +44,29 @@ router.get("/owner/workers", async (req, res): Promise<void> => {
     eq(workerInvitesTable.businessId, businessId),
     eq(workerInvitesTable.status, "pending"),
   ));
+  const pendingPartyIds = [...new Set(pending.flatMap((invite) => invite.partyIds))];
+  const ownedPendingParties = pendingPartyIds.length
+    ? await db.select({ id: partiesTable.id }).from(partiesTable).where(and(
+      eq(partiesTable.businessId, businessId),
+      inArray(partiesTable.id, pendingPartyIds),
+    ))
+    : [];
+  const ownedPendingPartyIds = new Set(ownedPendingParties.map((party) => party.id));
   const workers = await Promise.all(users.map(async (user) => {
     const assignments = await db.select({ partyId: workerPartyAssignmentsTable.partyId })
-      .from(workerPartyAssignmentsTable).where(eq(workerPartyAssignmentsTable.userId, user.id));
+      .from(workerPartyAssignmentsTable)
+      .innerJoin(partiesTable, eq(workerPartyAssignmentsTable.partyId, partiesTable.id))
+      .where(and(
+        eq(workerPartyAssignmentsTable.userId, user.id),
+        eq(partiesTable.businessId, businessId),
+      ));
     return {
       id: user.id,
       identity: user.verifiedEmail ?? user.phone ?? "unknown",
       status: user.status,
       partyIds: assignments.map((item) => item.partyId),
+      lastLogin: user.lastLogin?.toISOString() ?? null,
+      lastLogout: user.lastLogout?.toISOString() ?? null,
     };
   }));
   res.json({ workers: [
@@ -49,9 +75,49 @@ router.get("/owner/workers", async (req, res): Promise<void> => {
       id: invite.id,
       identity: invite.email ?? invite.phone,
       status: "pending" as const,
-      partyIds: invite.partyIds,
+      partyIds: invite.partyIds.filter((partyId) => ownedPendingPartyIds.has(partyId)),
+      invitedAt: invite.createdAt.toISOString(),
     })),
   ] });
+});
+
+router.get("/owner/activity", async (req, res): Promise<void> => {
+  const { businessId } = req as AuthenticatedRequest;
+  const entries = await db.select({
+    id: ledgerEntriesTable.id,
+    partyId: partiesTable.id,
+    partyName: partiesTable.name,
+    partyRole: partiesTable.role,
+    actorId: appUsersTable.id,
+    actorIdentity: appUsersTable.verifiedEmail,
+    actorPhone: appUsersTable.phone,
+    type: ledgerEntriesTable.type,
+    amount: ledgerEntriesTable.amount,
+    description: ledgerEntriesTable.description,
+    createdAt: ledgerEntriesTable.createdAt,
+  }).from(ledgerEntriesTable)
+    .innerJoin(partiesTable, eq(ledgerEntriesTable.partyId, partiesTable.id))
+    .innerJoin(appUsersTable, eq(ledgerEntriesTable.createdByUserId, appUsersTable.id))
+    .where(and(
+      eq(partiesTable.businessId, businessId),
+      eq(appUsersTable.businessId, businessId),
+      eq(appUsersTable.role, "staff"),
+      eq(ledgerEntriesTable.isTransfer, false),
+    ))
+    .orderBy(desc(ledgerEntriesTable.createdAt), desc(ledgerEntriesTable.id))
+    .limit(50);
+  res.json({ entries: entries.map((entry) => ({
+    id: entry.id,
+    partyId: entry.partyId,
+    partyName: entry.partyName,
+    partyRole: entry.partyRole,
+    actorId: entry.actorId,
+    actorIdentity: entry.actorIdentity ?? entry.actorPhone ?? "unknown",
+    type: entry.type,
+    amount: Number(entry.amount),
+    description: entry.description,
+    createdAt: entry.createdAt.toISOString(),
+  })) });
 });
 
 router.post("/owner/workers", async (req, res): Promise<void> => {

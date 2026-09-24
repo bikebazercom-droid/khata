@@ -158,6 +158,8 @@ router.post(
       res.status(403).json({ error: "Account suspended" });
       return;
     }
+    await db.update(appUsersTable).set({ lastLogin: new Date() })
+      .where(eq(appUsersTable.id, user.id));
 
     const sessionPayload = {
       userId: user.id,
@@ -191,13 +193,14 @@ router.post("/auth/phone/logout", async (req: Request, res: Response): Promise<v
   if (token) {
     try {
       const payload = jwt.verify(token, process.env.SESSION_SECRET!) as {
-        userId?: string; phone?: string;
+        userId?: string; phone?: string; sessionVersion?: number;
       };
       if (payload.userId && payload.phone) {
         const [user] = await db.select().from(appUsersTable).where(eq(appUsersTable.id, payload.userId)).limit(1);
-        if (user?.phone === payload.phone) {
+        if (user?.phone === payload.phone &&
+            user.phoneSessionVersion === payload.sessionVersion) {
           await db.update(appUsersTable)
-            .set({ phoneSessionVersion: user.phoneSessionVersion + 1 })
+            .set({ phoneSessionVersion: user.phoneSessionVersion + 1, lastLogout: new Date() })
             .where(eq(appUsersTable.id, user.id));
         }
       }
@@ -207,6 +210,17 @@ router.post("/auth/phone/logout", async (req: Request, res: Response): Promise<v
   }
   clearPhoneSession(res);
   res.json({ success: true });
+});
+
+// Called only by an explicit user-initiated sign-out action. Session expiry and
+// ordinary auth failures must never update lastLogout.
+router.post("/auth/logout-event", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const auth = req as AuthenticatedRequest;
+  await db.update(appUsersTable).set({ lastLogout: new Date() }).where(and(
+    eq(appUsersTable.id, auth.userId),
+    eq(appUsersTable.businessId, auth.businessId),
+  ));
+  res.status(204).end();
 });
 
 // ─── GET /api/auth/me ─────────────────────────────────────────────────────────

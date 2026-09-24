@@ -31,3 +31,17 @@ description: Architecture and gotchas for the khatabook multi-user cloud account
 
 **Why:** drizzle-kit has no --yes flag that skips the TTY requirement for constraint prompts.
 **How to apply:** Any future schema change with UNIQUE constraints on tables with existing rows must go through a raw SQL migration script.
+
+## Truthful sign-in and sign-out reporting
+
+Count a Clerk sign-in once when a verified session is first observed, not on every authenticated request. Only show a sign-out timestamp after the client explicitly reports the user's sign-out action; never derive it from session expiry or inactivity. Do not label this as live online presence.
+
+**Why:** Frequent API requests otherwise make a last-login timestamp look current when no new sign-in occurred, and an expired session is not evidence of intentional sign-out.
+**How to apply:** Keep session-level idempotency for sign-in observations, and distinguish explicit sign-out events from automatic expiration anywhere owner access activity is displayed.
+
+## Account deletion must be the final authenticated API action
+
+After deleting an account, do not send any further authenticated app API requests while its Clerk session is still valid. Sign out with the client SDK directly. Delete user identities before their businesses inside the deletion transaction.
+
+**Why:** Auth middleware provisions a replacement identity when it sees a valid Clerk session without an app user; business deletion also has a restrictive identity foreign key.
+**How to apply:** When changing deletion or logout flows, keep logout reporting before deletion only, and assert deletion leaves no user or business behind.

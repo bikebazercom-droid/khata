@@ -399,22 +399,30 @@ export function HomeView() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {userRole === 'owner' && (
+            {userRole === 'owner' ? (
+              <>
+                <button
+                  onClick={() => navigate('/access')}
+                  className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-2 rounded-xl active:scale-95 transition-all"
+                >
+                  <UserPlus2 className="w-3.5 h-3.5" />
+                  অ্যাক্সেস
+                </button>
+                <button
+                  onClick={() => navigate('/staff-deployment')}
+                  aria-label="ডিউটি ফোল্ডার"
+                  className="w-9 h-9 rounded-xl bg-white/15 text-white flex items-center justify-center active:scale-95 active:bg-white/25 transition-all"
+                >
+                  <FolderOpen className="w-[18px] h-[18px]" />
+                </button>
+              </>
+            ) : (
               <button
-                onClick={() => navigate('/access')}
+                onClick={() => setIsSettingsOpen(true)}
                 className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-2 rounded-xl active:scale-95 transition-all"
               >
-                <UserPlus2 className="w-3.5 h-3.5" />
-                স্টাফ
-              </button>
-            )}
-            {userRole === 'owner' && (
-              <button
-                onClick={() => navigate('/staff-deployment')}
-                aria-label="ডিউটি ফোল্ডার"
-                className="w-9 h-9 rounded-xl bg-white/15 text-white flex items-center justify-center active:scale-95 active:bg-white/25 transition-all"
-              >
-                <FolderOpen className="w-[18px] h-[18px]" />
+                <Settings className="w-3.5 h-3.5" />
+                সেটিংস
               </button>
             )}
           </div>

@@ -2,21 +2,21 @@ import express, { type Request, type Response, type NextFunction } from "express
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  appUsersTable, businessSettingsTable, businessesTable, db, partiesTable,
+  appUsersTable, businessSettingsTable, businessesTable, db, ledgerEntriesTable, partiesTable,
   userBusinessesTable, workerInvitesTable, workerPartyAssignmentsTable,
 } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import { getOrCreateClerkUser, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import ownerRouter from "./owner";
 
-const makeApp = (businessId: string) => {
+const makeApp = (businessId: string, role: "owner" | "staff" = "owner") => {
   const app = express();
   app.use(express.json());
   app.use((req: Request, _res: Response, next: NextFunction) => {
     const auth = req as unknown as AuthenticatedRequest;
     auth.businessId = businessId;
     auth.userId = "owner-test-user";
-    auth.role = "owner";
+    auth.role = role;
     auth.status = "active";
     auth.authMethod = "dev";
     next();
@@ -31,6 +31,7 @@ describe("owner worker invitation authorization", () => {
   let partyId: string;
   let otherPartyId: string;
   let inviteId: string;
+  let staffId: string;
   const linkedEmail = `linked-${Date.now()}@example.test`;
   const pendingEmail = `pending-${Date.now()}@example.test`;
 
@@ -45,6 +46,25 @@ describe("owner worker invitation authorization", () => {
     ]).returning();
     partyId = party!.id;
     otherPartyId = otherParty!.id;
+    const [staff] = await db.insert(appUsersTable).values({
+      clerkUserId: `owner-activity-staff-${Date.now()}`,
+      verifiedEmail: `activity-staff-${Date.now()}@example.test`,
+      businessId,
+      role: "staff",
+      lastLogin: new Date("2025-01-02T03:04:05Z"),
+      lastLogout: new Date("2025-01-03T03:04:05Z"),
+    }).returning();
+    staffId = staff!.id;
+    await db.insert(workerPartyAssignmentsTable).values([
+      { userId: staffId, partyId },
+      { userId: staffId, partyId: otherPartyId },
+    ]);
+    await db.insert(ledgerEntriesTable).values([
+      { partyId, createdByUserId: staffId, type: "YOU_GAVE", amount: "18.25", description: "Staff entry" },
+      { partyId, createdByUserId: null, type: "YOU_GOT", amount: "1.00", description: "Actorless entry" },
+      { partyId, createdByUserId: staffId, type: "YOU_GOT", amount: "2.00", description: "Transfer entry", isTransfer: true },
+      { partyId: otherPartyId, createdByUserId: staffId, type: "YOU_GOT", amount: "3.00", description: "Other business entry" },
+    ]);
     const [invite] = await db.insert(workerInvitesTable).values({
       businessId, email: pendingEmail, partyIds: [partyId],
     }).returning();
@@ -63,6 +83,9 @@ describe("owner worker invitation authorization", () => {
 
   afterAll(async () => {
     await db.delete(workerInvitesTable).where(inArray(workerInvitesTable.businessId, [businessId, otherBusinessId]));
+    await db.delete(ledgerEntriesTable).where(inArray(ledgerEntriesTable.partyId, [partyId, otherPartyId]));
+    await db.delete(workerPartyAssignmentsTable).where(eq(workerPartyAssignmentsTable.userId, staffId));
+    await db.delete(appUsersTable).where(eq(appUsersTable.id, staffId));
     await db.delete(appUsersTable).where(eq(appUsersTable.businessId, otherBusinessId));
     await db.delete(partiesTable).where(inArray(partiesTable.id, [partyId, otherPartyId]));
     await db.delete(businessesTable).where(inArray(businessesTable.id, [businessId, otherBusinessId]));
@@ -75,6 +98,63 @@ describe("owner worker invitation authorization", () => {
     expect(response.status).toBe(400);
     const [invite] = await db.select().from(workerInvitesTable).where(eq(workerInvitesTable.id, inviteId));
     expect(invite?.partyIds).toEqual([partyId]);
+  });
+
+  it("returns only recent normal staff-authored activity from the current business", async () => {
+    const response = await request(makeApp(businessId)).get("/owner/activity");
+    expect(response.status).toBe(200);
+    expect(response.body.entries).toHaveLength(1);
+    expect(response.body.entries[0]).toMatchObject({
+      partyId,
+      partyName: "Assigned",
+      partyRole: "CUSTOMER",
+      actorId: staffId,
+      actorIdentity: expect.stringMatching(/activity-staff-/),
+      type: "YOU_GAVE",
+      amount: 18.25,
+      description: "Staff entry",
+    });
+    expect(response.body.entries[0].createdAt).toEqual(expect.any(String));
+  });
+
+  it("bounds activity to 50 rows in descending creation order", async () => {
+    const start = new Date("2999-02-01T00:00:00Z").getTime();
+    await db.insert(ledgerEntriesTable).values(Array.from({ length: 52 }, (_, index) => ({
+      partyId,
+      createdByUserId: staffId,
+      type: "YOU_GAVE" as const,
+      amount: "1.00",
+      description: `bounded-${index}`,
+      createdAt: new Date(start + index * 1000),
+    })));
+    const response = await request(makeApp(businessId)).get("/owner/activity");
+    expect(response.status).toBe(200);
+    expect(response.body.entries).toHaveLength(50);
+    expect(response.body.entries[0].description).toBe("bounded-51");
+    expect(response.body.entries[49].description).toBe("bounded-2");
+  });
+
+  it("denies the staff role from owner-only endpoints", async () => {
+    const response = await request(makeApp(businessId, "staff")).get("/owner/activity");
+    expect(response.status).toBe(403);
+  });
+
+  it("includes login/logout timestamps and business-scoped assignments for workers", async () => {
+    const response = await request(makeApp(businessId)).get("/owner/workers");
+    expect(response.status).toBe(200);
+    expect(response.body.workers).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: staffId,
+        partyIds: [partyId],
+        lastLogin: "2025-01-02T03:04:05.000Z",
+        lastLogout: "2025-01-03T03:04:05.000Z",
+      }),
+      expect.objectContaining({
+        identity: pendingEmail,
+        status: "pending",
+        invitedAt: expect.any(String),
+      }),
+    ]));
   });
 
   it("revokes an invite and prevents invitations for identities already linked elsewhere", async () => {

@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, pgEnum, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, pgEnum, integer, primaryKey } from "drizzle-orm/pg-core";
 import { businessesTable } from "./businesses";
 
 export const userRoleEnum = pgEnum("user_role", ["owner", "staff"]);
@@ -27,9 +27,17 @@ export const appUsersTable = pgTable("app_users", {
   deviceMeta: text("device_meta").default(""),
   /** Last successful login timestamp */
   lastLogin: timestamp("last_login", { withTimezone: true }),
+  /** Last explicit sign-out recorded by an authenticated client. */
+  lastLogout: timestamp("last_logout", { withTimezone: true }),
   /** Admin-managed status; suspended users cannot sign in */
   status: userStatusEnum("status").notNull().default("active"),
 });
+
+/** Records the Clerk sessions already counted as successful logins. */
+export const appUserLoginSessionsTable = pgTable("app_user_login_sessions", {
+  userId: uuid("user_id").notNull().references(() => appUsersTable.id, { onDelete: "cascade" }),
+  sessionId: text("session_id").notNull(),
+}, (table) => [primaryKey({ columns: [table.userId, table.sessionId] })]);
 
 export type AppUser = typeof appUsersTable.$inferSelect;
 export type InsertAppUser = typeof appUsersTable.$inferInsert;

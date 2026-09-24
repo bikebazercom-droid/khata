@@ -49,9 +49,10 @@ function RootLayoutNav() {
   const segments = useSegments();
   const { isLoaded, isSignedIn } = useAuth();
   const { identity, loading, error, unauthorized } = useAuthRole();
+  const isAccess = segments[0] === 'access';
   const isPartyDetail = segments[0] === 'party';
   const isReport = segments[0] === 'report';
-  const needsIdentity = isPartyDetail || isReport;
+  const needsIdentity = isAccess || isPartyDetail || isReport;
 
   if (needsIdentity) {
     if (!isLoaded || loading) return null;
@@ -59,6 +60,7 @@ function RootLayoutNav() {
       return <Redirect href="/(auth)/sign-in" />;
     }
     if (!identity) return <ProtectedRouteError message={error ?? 'অ্যাকাউন্টের অনুমতি যাচাই করা যায়নি।'} />;
+    if (isAccess && identity.role !== 'owner') return <Redirect href="/(tabs)" />;
     if (isReport && identity.role === 'staff') return <Redirect href="/(tabs)" />;
   }
 
@@ -66,6 +68,7 @@ function RootLayoutNav() {
     <Stack>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      <Stack.Screen name="access" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen
         name="party/[id]"
         options={{ headerShown: false, presentation: 'card' }}
