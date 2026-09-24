@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "cYpi_iNSv1be4JqskCW8F"
+uri = "file://exports/BanglaKhata-AndroidStudio-Download.html"
+type = "html"
+title = "বাংলা খাতা Android Studio ZIP ডাউনলোড"
+description = "ডাউনলোড বোতামসহ সম্পূর্ণ Android Studio WebView project ZIP; README-তে বাংলায় build নির্দেশনা আছে।"
+logical_id = "aadff175-dc60-4ab3-ab5e-a9a5ae2a789d"
+content_hash = "sha256:3958f7fc5365eb66dbe6195f7258e19955d7331e12c24177475482716dccd505"
+size = 72412
+mtime_ms = 1790259581018
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/aadff175-dc60-4ab3-ab5e-a9a5ae2a789d/098357dd-b2bd-47ee-bcc5-1f3717c19fae"
+storage_version_token = "1790259601952319"
+content_type = "text/html"
