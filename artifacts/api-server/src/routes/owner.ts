@@ -237,7 +237,7 @@ router.patch("/owner/workers/:id", async (req, res): Promise<void> => {
     });
     return;
   }
-  if (inviteResult.kind === "revoked" || inviteResult.kind === "not-found") {
+  if (inviteResult.kind === "revoked") {
     res.status(404).json({ error: "Worker not found" });
     return;
   }

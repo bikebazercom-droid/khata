@@ -41,7 +41,7 @@ Count a Clerk sign-in once when a verified session is first observed, not on eve
 
 ## Account deletion must be the final authenticated API action
 
-After deleting an account, do not send any further authenticated app API requests while its Clerk session is still valid. Sign out with the client SDK directly. Delete user identities before their businesses inside the deletion transaction.
+After deleting an account, do not send any further authenticated app API requests while its Clerk session is still valid. Sign out with the client SDK directly.
 
-**Why:** Auth middleware provisions a replacement identity when it sees a valid Clerk session without an app user; business deletion also has a restrictive identity foreign key.
+**Why:** Auth middleware provisions a replacement identity when it sees a valid Clerk session without an app user.
 **How to apply:** When changing deletion or logout flows, keep logout reporting before deletion only, and assert deletion leaves no user or business behind.
