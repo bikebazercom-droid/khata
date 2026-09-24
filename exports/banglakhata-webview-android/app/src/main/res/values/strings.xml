@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">বাংলা খাতা</string>
+    <string name="choose_file">ফাইল নির্বাচন করুন</string>
+    <string name="file_picker_unavailable">ফাইল নির্বাচন করা যাচ্ছে না</string>
+    <string name="no_app_for_link">এই লিংক খোলার কোনো অ্যাপ পাওয়া যায়নি</string>
+    <string name="download_blocked">নিরাপত্তার জন্য শুধু বাংলা খাতার ফাইল ডাউনলোড করা যাবে</string>
+    <string name="download_started">ডাউনলোড শুরু হয়েছে</string>
+    <string name="download_failed">ডাউনলোড শুরু করা যায়নি</string>
+    <string name="storage_permission_denied">ফাইল সংরক্ষণের অনুমতি প্রয়োজন</string>
+</resources>
