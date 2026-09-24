@@ -37,6 +37,8 @@ export const appUsersTable = pgTable("app_users", {
 export const appUserLoginSessionsTable = pgTable("app_user_login_sessions", {
   userId: uuid("user_id").notNull().references(() => appUsersTable.id, { onDelete: "cascade" }),
   sessionId: text("session_id").notNull(),
+  /** Reject even unexpired Clerk JWTs after an explicit sign-out. */
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
 }, (table) => [primaryKey({ columns: [table.userId, table.sessionId] })]);
 
 export type AppUser = typeof appUsersTable.$inferSelect;

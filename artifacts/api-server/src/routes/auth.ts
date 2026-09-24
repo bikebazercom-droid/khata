@@ -14,6 +14,7 @@ import {
   db,
   otpCodesTable,
   appUsersTable,
+  appUserLoginSessionsTable,
   businessesTable,
 } from "@workspace/db";
 import {
@@ -191,21 +192,24 @@ router.post("/auth/phone/logout", async (req: Request, res: Response): Promise<v
   const token = (req as any).cookies?.phone_session ??
     (req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.slice(7) : undefined);
   if (token) {
+    let payload: { userId?: string; phone?: string; sessionVersion?: number } | null = null;
     try {
-      const payload = jwt.verify(token, process.env.SESSION_SECRET!) as {
+      payload = jwt.verify(token, process.env.SESSION_SECRET!) as {
         userId?: string; phone?: string; sessionVersion?: number;
       };
-      if (payload.userId && payload.phone) {
-        const [user] = await db.select().from(appUsersTable).where(eq(appUsersTable.id, payload.userId)).limit(1);
-        if (user?.phone === payload.phone &&
-            user.phoneSessionVersion === payload.sessionVersion) {
-          await db.update(appUsersTable)
-            .set({ phoneSessionVersion: user.phoneSessionVersion + 1, lastLogout: new Date() })
-            .where(eq(appUsersTable.id, user.id));
-        }
-      }
     } catch {
       // Invalid sessions are already unusable; still clear the browser cookie.
+    }
+    if (payload?.userId && payload.phone) {
+      const [user] = await db.select().from(appUsersTable).where(eq(appUsersTable.id, payload.userId)).limit(1);
+      if (user?.phone === payload.phone &&
+          user.phoneSessionVersion === payload.sessionVersion) {
+        // A DB error must fail the request. The client must keep its credential
+        // and retry rather than claiming the copied token was revoked.
+        await db.update(appUsersTable)
+          .set({ phoneSessionVersion: user.phoneSessionVersion + 1, lastLogout: new Date() })
+          .where(eq(appUsersTable.id, user.id));
+      }
     }
   }
   clearPhoneSession(res);
@@ -216,10 +220,19 @@ router.post("/auth/phone/logout", async (req: Request, res: Response): Promise<v
 // ordinary auth failures must never update lastLogout.
 router.post("/auth/logout-event", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const auth = req as AuthenticatedRequest;
-  await db.update(appUsersTable).set({ lastLogout: new Date() }).where(and(
-    eq(appUsersTable.id, auth.userId),
-    eq(appUsersTable.businessId, auth.businessId),
-  ));
+  await db.transaction(async (tx) => {
+    if (auth.authMethod === "clerk") {
+      if (!auth.clerkSessionId) throw new Error("Missing Clerk session to revoke");
+      await tx.update(appUserLoginSessionsTable).set({ revokedAt: new Date() }).where(and(
+        eq(appUserLoginSessionsTable.userId, auth.userId),
+        eq(appUserLoginSessionsTable.sessionId, auth.clerkSessionId),
+      ));
+    }
+    await tx.update(appUsersTable).set({ lastLogout: new Date() }).where(and(
+      eq(appUsersTable.id, auth.userId),
+      eq(appUsersTable.businessId, auth.businessId),
+    ));
+  });
   res.status(204).end();
 });
 

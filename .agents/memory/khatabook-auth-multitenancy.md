@@ -39,6 +39,13 @@ Count a Clerk sign-in once when a verified session is first observed, not on eve
 **Why:** Frequent API requests otherwise make a last-login timestamp look current when no new sign-in occurred, and an expired session is not evidence of intentional sign-out.
 **How to apply:** Keep session-level idempotency for sign-in observations, and distinguish explicit sign-out events from automatic expiration anywhere owner access activity is displayed.
 
+## Sign-out must invalidate the server session
+
+Do not treat removing a mobile credential or calling a client SDK's sign-out as sufficient proof that a previously copied bearer token is unusable. Revoke phone-session versions or Clerk session IDs server-side, and preserve the local credential when revocation fails so users can retry.
+
+**Why:** Clearing storage affects only one device; old tokens can otherwise keep accessing a ledger until expiry, even though the UI says the user signed out.
+**How to apply:** Test an old bearer token against a protected API route after sign-out. Let retries complete if server revocation succeeded but client SDK sign-out failed.
+
 ## Account deletion must be the final authenticated API action
 
 After deleting an account, do not send any further authenticated app API requests while its Clerk session is still valid. Sign out with the client SDK directly.

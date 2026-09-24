@@ -26,6 +26,7 @@ export interface AuthenticatedRequest extends Request {
   role: "owner" | "staff";
   status: "active" | "suspended";
   authMethod: "clerk" | "phone" | "dev";
+  clerkSessionId?: string;
   verifiedEmail?: string;
   phone?: string;
 }
@@ -323,10 +324,35 @@ export async function requireAuth(
   const clerkAuth = getAuth(req);
   if (clerkAuth?.userId) {
     try {
+      if (!clerkAuth.sessionId) {
+        res.status(401).json({ error: "A Clerk user session is required" });
+        return;
+      }
       const verifiedEmail = await getVerifiedClerkEmail(clerkAuth.userId);
       const user = await getOrCreateClerkUser(clerkAuth.userId, verifiedEmail ?? undefined);
       if (user.status !== "active") {
         res.status(403).json({ error: "Account suspended" });
+        return;
+      }
+      const sessionAllowed = await db.transaction(async (tx) => {
+        const [newSession] = await tx.insert(appUserLoginSessionsTable).values({
+          userId: user.id,
+          sessionId: clerkAuth.sessionId!,
+        }).onConflictDoNothing().returning({ sessionId: appUserLoginSessionsTable.sessionId });
+        const [session] = await tx.select({ revokedAt: appUserLoginSessionsTable.revokedAt })
+          .from(appUserLoginSessionsTable).where(and(
+            eq(appUserLoginSessionsTable.userId, user.id),
+            eq(appUserLoginSessionsTable.sessionId, clerkAuth.sessionId!),
+          )).limit(1);
+        if (session?.revokedAt) return false;
+        if (newSession) {
+          await tx.update(appUsersTable).set({ lastLogin: new Date() })
+            .where(eq(appUsersTable.id, user.id));
+        }
+        return true;
+      });
+      if (!sessionAllowed) {
+        res.status(401).json({ error: "Session signed out" });
         return;
       }
       (req as AuthenticatedRequest).userId = user.id;
@@ -334,19 +360,8 @@ export async function requireAuth(
       (req as AuthenticatedRequest).role = user.role;
       (req as AuthenticatedRequest).status = user.status;
       (req as AuthenticatedRequest).authMethod = "clerk";
+      (req as AuthenticatedRequest).clerkSessionId = clerkAuth.sessionId;
       (req as AuthenticatedRequest).verifiedEmail = verifiedEmail ?? undefined;
-      if (clerkAuth.sessionId) {
-        await db.transaction(async (tx) => {
-          const [newSession] = await tx.insert(appUserLoginSessionsTable).values({
-            userId: user.id,
-            sessionId: clerkAuth.sessionId!,
-          }).onConflictDoNothing().returning({ sessionId: appUserLoginSessionsTable.sessionId });
-          if (newSession) {
-            await tx.update(appUsersTable).set({ lastLogin: new Date() })
-              .where(eq(appUsersTable.id, user.id));
-          }
-        });
-      }
       return next();
     } catch (err) {
       console.error("[requireAuth] Clerk JIT provision error:", err);

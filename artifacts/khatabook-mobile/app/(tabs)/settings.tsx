@@ -22,6 +22,7 @@ import { useRouter } from 'expo-router';
 import { useLanguage } from '@/lib/i18n';
 import { notifyMobileIdentityChanged, useAuthRole } from '@/lib/auth-role';
 import { customFetch } from '@/lib/api-transport';
+import { revokeAndClearMobileSessions } from '@/lib/sign-out';
 
 export default function SettingsScreen() {
   const colors = useColors();
@@ -31,7 +32,7 @@ export default function SettingsScreen() {
   const { t } = useLanguage();
   const { identity } = useAuthRole();
 
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, getToken } = useAuth();
   const { signOut } = useClerk();
 
   const { data: settings, isLoading } = useGetBusinessSettings({
@@ -41,6 +42,7 @@ export default function SettingsScreen() {
 
   const [storeName, setStoreName] = useState('');
   const [editing, setEditing] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
     if (settings?.storeName) setStoreName(settings.storeName);
@@ -62,6 +64,7 @@ export default function SettingsScreen() {
   }
 
   async function handleLogout() {
+    if (isSigningOut) return;
     Alert.alert(
       t('signOutLabel'),
       'আপনি কি সাইন আউট করতে চান?',
@@ -71,30 +74,43 @@ export default function SettingsScreen() {
           text: t('signOutLabel'),
           style: 'destructive',
           onPress: async () => {
-            // Record the explicit sign-out while the existing bearer token is
-            // still available. Telemetry is best-effort and must never block
-            // clearing the local session.
+            setIsSigningOut(true);
             try {
-              await customFetch('/api/auth/logout-event', {
-                method: 'POST',
-                responseType: 'json',
-                headers: identity?.businessId ? { 'X-Business-Id': identity.businessId } : undefined,
-                body: JSON.stringify({}),
+              await revokeAndClearMobileSessions({
+                isClerkSignedIn: !!isSignedIn,
+                readPhoneToken: () => SecureStore.getItemAsync('phone_session_token'),
+                revokePhone: async (phoneToken) => {
+                  await customFetch('/api/auth/phone/logout', {
+                  method: 'POST',
+                  responseType: 'json',
+                  headers: { Authorization: `Bearer ${phoneToken}` },
+                  });
+                },
+                getClerkToken: getToken,
+                revokeClerk: async (clerkToken) => {
+                  await customFetch('/api/auth/logout-event', {
+                    method: 'POST',
+                    responseType: 'json',
+                    headers: {
+                      Authorization: `Bearer ${clerkToken}`,
+                      ...(identity?.businessId ? { 'X-Business-Id': identity.businessId } : {}),
+                    },
+                  });
+                },
+                signOutClerk: signOut,
+                deletePhoneToken: () => SecureStore.deleteItemAsync('phone_session_token'),
               });
+              qc.clear();
+              notifyMobileIdentityChanged();
+              const { setAuthTokenGetter } = await import('@workspace/api-client-react');
+              setAuthTokenGetter(null);
+              router.replace('/(auth)/sign-in' as any);
             } catch {
-              // Sign-out remains available when event reporting is offline.
+              // Keep the credentials and current screen available to retry.
+              Alert.alert('সাইন আউট হয়নি', 'সেশন বন্ধ করা যায়নি। সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।');
+            } finally {
+              setIsSigningOut(false);
             }
-            qc.clear();
-            try {
-              if (isSignedIn) await signOut();
-            } catch {
-              // Continue clearing any fallback mobile session and navigate out.
-            }
-            await SecureStore.deleteItemAsync('phone_session_token').catch(() => {});
-            notifyMobileIdentityChanged();
-            const { setAuthTokenGetter } = await import('@workspace/api-client-react');
-            setAuthTokenGetter(null);
-            router.replace('/(auth)/sign-in' as any);
           },
         },
       ],
@@ -252,9 +268,11 @@ export default function SettingsScreen() {
         {/* ACCOUNT section */}
         <Text style={s.sectionLabel}>{t('accountSection')}</Text>
         <View style={s.card}>
-          <TouchableOpacity style={s.row} onPress={handleLogout} activeOpacity={0.7}>
-            <Text style={[s.rowLabel, { color: '#ef4444' }]}>{t('signOutLabel')}</Text>
-            <Feather name="log-out" size={18} color="#ef4444" />
+          <TouchableOpacity style={s.row} onPress={handleLogout} disabled={isSigningOut} activeOpacity={0.7}>
+            <Text style={[s.rowLabel, { color: '#ef4444' }]}>
+              {isSigningOut ? 'সাইন আউট হচ্ছে…' : t('signOutLabel')}
+            </Text>
+            {isSigningOut ? <ActivityIndicator size="small" color="#ef4444" /> : <Feather name="log-out" size={18} color="#ef4444" />}
           </TouchableOpacity>
         </View>
 
