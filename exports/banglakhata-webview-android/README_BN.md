@@ -50,6 +50,6 @@ APK-টি ফোনে কপি করে খুলুন, অথবা Androi
 - এই অ্যাপটি ওয়েবসাইটের Android shell; এটি React ওয়েবসাইটের source বা server-কে APK-র মধ্যে কপি করে না। ওয়েবসাইট ও ইন্টারনেট চালু থাকতে হবে।
 - ইমেইল/পাসওয়ার্ড বা OTP sign-in ওয়েবসাইটের নিজস্ব service-এর ওপর নির্ভর করে। Google-এর মতো social login WebView-তে provider-এর সীমাবদ্ধতায় কাজ নাও করতে পারে। বাস্তব ফোনে sign-in পরীক্ষা করুন।
 - ছবি/ফাইল আপলোড ডিভাইসের file picker দিয়ে হয়; সরাসরি ক্যামেরা খোলা এই wrapper-এ যোগ করা হয়নি।
-- এই workspace-এ Android SDK/JDK ইনস্টল নেই, তাই এখানে APK compile করা সম্ভব হয়নি। Android Studio-তে Gradle Sync ও Build চালিয়ে প্রকৃত ডিভাইসে পরীক্ষা করুন।
+- Gradle configuration এবং Android API-ভিত্তিক আলাদা পরীক্ষায় Kotlin source compile সফল হয়েছে। এখানে Android SDK নেই বলে পুরো APK assemble করা হয়নি। Android Studio-তে Gradle Sync ও Build চালিয়ে প্রকৃত ডিভাইসে পরীক্ষা করুন।
 
 APK তৈরি ও বাস্তব ডিভাইসে পরীক্ষা না করে কোনো সফটওয়্যারের “১০০% নির্ভুল” কাজ করার নিশ্চয়তা দেওয়া যায় না।

@@ -14,3 +14,17 @@ mtime_ms = 1790259581018
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/aadff175-dc60-4ab3-ab5e-a9a5ae2a789d/098357dd-b2bd-47ee-bcc5-1f3717c19fae"
 storage_version_token = "1790259601952319"
 content_type = "text/html"
+
+[[outputs]]
+id = "W02f_0Wyg-3a9XDgMo68X"
+uri = "file://exports/BanglaKhata-AndroidStudio-Project.zip"
+type = "unspecified"
+title = "BanglaKhata — Android Studio Project ZIP"
+description = "Complete native Android WebView source project with Gradle Wrapper, full-screen layout, Internet permissions, and build instructions."
+logical_id = "5d03c3f6-c655-4efd-967f-f40928c39062"
+content_hash = "sha256:63adc89b933cf6d3d2ed879da8f88c7915dca5a37693568d7b3a86a218e40b30"
+size = 52660
+mtime_ms = 1790404829521
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/5d03c3f6-c655-4efd-967f-f40928c39062/d3177811-0c2e-4c3f-a502-86aedb0d0f52"
+storage_version_token = "1790404838253394"
+content_type = "application/octet-stream"

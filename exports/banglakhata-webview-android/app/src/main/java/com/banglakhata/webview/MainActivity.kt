@@ -11,21 +11,21 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
-import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.webkit.CookieManager
 import android.webkit.DownloadListener
 import android.webkit.URLUtil
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
+import android.webkit.WebChromeClient.FileChooserParams
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.FrameLayout
 import android.widget.ProgressBar
-import android.widget.TextView
 import android.widget.Toast
 
 class MainActivity : Activity() {
@@ -44,35 +44,10 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         window.statusBarColor = Color.rgb(24, 58, 107)
         window.navigationBarColor = Color.rgb(16, 28, 48)
-        window.decorView.systemUiVisibility = 0
-
-        val root = FrameLayout(this).apply {
-            setBackgroundColor(Color.WHITE)
-        }
-        webView = WebView(this)
-        progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
-            isIndeterminate = false
-            max = 100
-            progress = 0
-            progressTintList = android.content.res.ColorStateList.valueOf(Color.rgb(242, 181, 42))
-            progressBackgroundTintList = android.content.res.ColorStateList.valueOf(Color.TRANSPARENT)
-        }
-        root.addView(
-            webView,
-            FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT,
-            ),
-        )
-        root.addView(
-            progressBar,
-            FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(3),
-                Gravity.TOP,
-            ),
-        )
-        setContentView(root)
+        setContentView(R.layout.activity_main)
+        webView = checkNotNull(findViewById<WebView>(R.id.web_view))
+        progressBar = checkNotNull(findViewById<ProgressBar>(R.id.loading_progress))
+        enterFullScreen()
 
         configureWebView()
         if (savedInstanceState == null) {
@@ -172,12 +147,14 @@ class MainActivity : Activity() {
             webView.loadUrl(homeUrl)
             return true
         }
-        if (scheme == "https" && uri.host.equals(homeHost, ignoreCase = true)) return false
+        // HTTPS navigation stays in this WebView, including authentication
+        // redirects. Never bypass SSL errors or permit cleartext HTTP.
+        if (scheme == "https") return false
 
         if (scheme in setOf("tel", "mailto", "sms")) {
             return openExternal(uri)
         }
-        if (scheme == "https" || scheme == "http") {
+        if (scheme == "http") {
             return openExternal(uri)
         }
         return true
@@ -281,6 +258,32 @@ class MainActivity : Activity() {
         super.onPause()
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::webView.isInitialized) webView.onResume()
+        enterFullScreen()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) enterFullScreen()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun enterFullScreen() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.apply {
+                hide(WindowInsets.Type.systemBars())
+                systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else {
+            window.decorView.systemUiVisibility =
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                View.SYSTEM_UI_FLAG_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+        }
+    }
+
     @Deprecated("Use Android system back navigation.")
     override fun onBackPressed() {
         if (::webView.isInitialized && webView.canGoBack()) {
@@ -300,8 +303,6 @@ class MainActivity : Activity() {
         }
         super.onDestroy()
     }
-
-    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     companion object {
         private const val REQUEST_FILE_PICKER = 7101

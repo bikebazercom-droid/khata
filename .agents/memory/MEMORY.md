@@ -4,3 +4,4 @@
 - [Khatabook auth & multi-tenancy](khatabook-auth-multitenancy.md) — seed business UUID, requireAuth dual-session, drizzle push TTY workaround, lib/db rebuild requirement.
 - [Expo + Clerk Metro config fix](expo-clerk-metro-config.md) — Metro crashes watching @clerk/backend_tmp_* dirs; add blockList pattern to metro.config.js.
 - [Worker invitation identity](worker-invite-identity.md) — one pending invite per verified identity across businesses avoids arbitrary first-sign-in claims.
+- [Android export validation](android-export-validation.md) — Gradle task discovery is not source compilation; API-only compiler checks are not APK builds.
