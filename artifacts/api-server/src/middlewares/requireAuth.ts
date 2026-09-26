@@ -372,8 +372,9 @@ export async function requireAuth(
           headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
         });
         if (!response.ok) throw new Error("Could not verify session creation time");
-        const session = await response.json() as { created_at?: number; user_id?: string };
-        if (session.user_id !== clerkAuth.userId || typeof session.created_at !== "number" ||
+        const session = await response.json() as { id?: string; created_at?: number; user_id?: string } | null;
+        if (!session || session.id !== clerkAuth.sessionId || session.user_id !== clerkAuth.userId ||
+          typeof session.created_at !== "number" || !Number.isFinite(session.created_at) ||
           session.created_at <= cutoff.revokedAt.getTime()) {
           res.status(401).json({ error: "Staff access was removed. Please sign in with a new session." });
           return;

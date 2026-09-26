@@ -169,6 +169,7 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
     await db.insert(appUserLoginSessionsTable).values({ userId: staff!.id, sessionId: "old-worker-session", revokedAt: new Date() });
     vi.stubEnv("CLERK_SECRET_KEY", "sk_test_local_fixture");
     vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => new Response(JSON.stringify(String(url).includes("/sessions/") ? {
+      id: String(url).split("/").at(-1),
       user_id: clerk.id,
       created_at: String(url).includes("unseen-old-session") ? 1 : Date.now() + 1000,
     } : {
@@ -203,5 +204,132 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
     const refreshed = await request(app).get("/auth/me").set("Authorization", `Bearer ${token}`);
     expect(refreshed.status).toBe(200);
     expect(refreshed.body.adjustmentPartyIds).toEqual([]);
+  });
+
+  it.each([
+    ["timeout rejection", 500],
+    ["rate limited", 500],
+    ["unavailable", 500],
+    ["invalid JSON", 500],
+    ["null response", 401],
+    ["array response", 401],
+    ["overflow created_at", 401],
+    ["missing created_at", 401],
+    ["null created_at", 401],
+    ["string created_at", 401],
+    ["boolean created_at", 401],
+    ["missing id", 401],
+    ["numeric id", 401],
+    ["wrong id", 401],
+    ["missing user_id", 401],
+    ["numeric user_id", 401],
+    ["wrong user_id", 401],
+    ["at cutoff", 401],
+  ] as const)("fails closed on %s and recovers without reviving old sessions", async (failure, status) => {
+    const previousClerkId = clerk.id;
+    const identity = `provider-failure-${crypto.randomUUID()}`;
+    const fixtureEmail = `${identity}@example.test`;
+    let userId: string | undefined;
+    let inviteId: string | undefined;
+    let recovered = false;
+    let cutoff = 0;
+    const known = `${identity}-known`;
+    const unseen = `${identity}-unseen`;
+    const fresh = `${identity}-fresh`;
+    clerk.id = identity;
+    vi.stubEnv("CLERK_SECRET_KEY", "sk_test_local_fixture");
+    // No passthrough: every provider request must match this isolated identity.
+    const provider = vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (String(url) === `https://api.clerk.com/v1/users/${identity}`) {
+        return new Response(JSON.stringify({
+          primary_email_address_id: "verified",
+          email_addresses: [{ id: "verified", email_address: fixtureEmail, verification: { status: "verified" } }],
+        }));
+      }
+      expect(String(url)).toMatch(new RegExp(`^https://api.clerk.com/v1/sessions/${identity}-(fresh|unseen)$`));
+      const sessionId = String(url).split("/").at(-1)!;
+      const session: Record<string, unknown> = {
+        id: sessionId, user_id: identity, created_at: sessionId === unseen ? cutoff - 1 : cutoff + 1000,
+      };
+      if (!recovered && sessionId === fresh) {
+        if (failure === "timeout rejection") throw new DOMException("Fixture timeout", "TimeoutError");
+        if (failure === "rate limited") return new Response("rate limited", { status: 429 });
+        if (failure === "unavailable") return new Response("unavailable", { status: 503 });
+        if (failure === "invalid JSON") return new Response("{");
+        if (failure === "null response") return new Response("null");
+        if (failure === "array response") return new Response("[]");
+        if (failure === "overflow created_at") {
+          return new Response(`{"id":"${sessionId}","user_id":"${identity}","created_at":1e400}`);
+        }
+        if (failure === "missing created_at") delete session.created_at;
+        if (failure === "null created_at") session.created_at = null;
+        if (failure === "string created_at") session.created_at = String(cutoff + 1000);
+        if (failure === "boolean created_at") session.created_at = true;
+        if (failure === "missing id") delete session.id;
+        if (failure === "numeric id") session.id = 123;
+        if (failure === "wrong id") session.id = "another-session";
+        if (failure === "missing user_id") delete session.user_id;
+        if (failure === "numeric user_id") session.user_id = 123;
+        if (failure === "wrong user_id") session.user_id = "another-user";
+        if (failure === "at cutoff") session.created_at = cutoff;
+      }
+      return new Response(JSON.stringify(session));
+    });
+    try {
+      const created = await request(app).post("/owner/workers").set("Authorization", "Bearer owner")
+        .send({ email: fixtureEmail, partyIds: [a, b], adjustmentPartyIds: [a, b] });
+      expect(created.status).toBe(201);
+      const worker = await getOrCreateClerkUser(identity, fixtureEmail);
+      userId = worker.id;
+      await db.insert(appUserLoginSessionsTable).values({ userId, sessionId: known });
+      expect((await request(app).delete(`/owner/workers/${userId}`).set("Authorization", "Bearer owner")).status).toBe(204);
+      const sessions = await db.select().from(appUserLoginSessionsTable).where(eq(appUserLoginSessionsTable.userId, userId));
+      cutoff = sessions.find((s) => s.sessionId === "worker-access-revoked")!.revokedAt!.getTime();
+      const invited = await request(app).post("/owner/workers").set("Authorization", "Bearer owner")
+        .send({ email: fixtureEmail, partyIds: [a, b], adjustmentPartyIds: [a, b] });
+      expect(invited.status).toBe(201);
+      inviteId = invited.body.id;
+      const ledger = () => db.select().from(ledgerEntriesTable).where(inArray(ledgerEntriesTable.partyId, [a, b]));
+      const before = await ledger();
+      const memberships = await db.select().from(userBusinessesTable).where(eq(userBusinessesTable.userId, userId));
+      const write = (session: string) => request(app).post(`/parties/${a}/ledger-entries`)
+        .set("x-clerk-session", session).send({ type: "YOU_GAVE", amount: 10, isTransfer: true, transferPartyId: b });
+      for (const session of [fresh, known, unseen]) {
+        const denied = await write(session);
+        expect(denied.status).toBe(session === fresh ? status : 401);
+        expect(denied.body.error).toEqual(expect.any(String));
+        const [pending] = await db.select().from(workerInvitesTable).where(eq(workerInvitesTable.id, inviteId!));
+        expect(pending?.status).toBe("pending");
+        const [deleted] = await db.select().from(appUsersTable).where(eq(appUsersTable.id, userId));
+        expect(deleted?.status).toBe("suspended");
+        expect(deleted?.workerAccessDeletedAt).not.toBeNull();
+        expect(deleted?.adjustmentPartyIds).toEqual([]);
+        expect(await db.select().from(workerPartyAssignmentsTable).where(eq(workerPartyAssignmentsTable.userId, userId))).toEqual([]);
+        expect(await db.select().from(userBusinessesTable).where(eq(userBusinessesTable.userId, userId))).toEqual(memberships);
+        expect(await ledger()).toEqual(before);
+      }
+      expect(provider).toHaveBeenCalledWith(`https://api.clerk.com/v1/sessions/${fresh}`, expect.any(Object));
+      recovered = true;
+      expect((await write(fresh)).status).toBe(201);
+      const [claimed] = await db.select().from(workerInvitesTable).where(eq(workerInvitesTable.id, inviteId!));
+      expect(claimed?.status).toBe("claimed");
+      const afterRecovery = await ledger();
+      expect(afterRecovery.length).toBe(before.length + 2);
+      for (const session of [known, unseen]) expect((await write(session)).status).toBe(401);
+      expect(await ledger()).toEqual(afterRecovery);
+      expect((await request(app).get("/auth/me").set("x-clerk-session", fresh)).status).toBe(200);
+    } finally {
+      provider.mockRestore();
+      clerk.id = previousClerkId;
+      // Cleanup also runs on assertion failures; no fixture identity survives a case.
+      await db.delete(workerInvitesTable).where(eq(workerInvitesTable.email, fixtureEmail));
+      if (userId) {
+        await db.delete(ledgerEntriesTable).where(eq(ledgerEntriesTable.createdByUserId, userId));
+        await db.delete(workerPartyAssignmentsTable).where(eq(workerPartyAssignmentsTable.userId, userId));
+        await db.delete(userBusinessesTable).where(eq(userBusinessesTable.userId, userId));
+        await db.delete(appUserLoginSessionsTable).where(eq(appUserLoginSessionsTable.userId, userId));
+        await db.delete(appUsersTable).where(eq(appUsersTable.id, userId));
+      }
+    }
   });
 });
