@@ -235,7 +235,7 @@ paths:
       operationId: createLedgerEntry
       tags: [ledger]
       summary: Record a "You Gave" or "You Got" transaction for a party
-      description: Creates the ledger entry and recalculates the party's balance and balance type.
+      description: Creates the ledger entry and recalculates the party's balance and balance type. A stable clientRequestId makes retries safe within the authenticated actor and business. Reuse with a different payload returns 409. Permissions are checked again on every replay.
       parameters:
         - name: partyId
           in: path
@@ -255,6 +255,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LedgerEntry"
+        "200":
+          description: Idempotent replay of the original source entry without creating another entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LedgerEntry"
+        "409":
+          description: Request ID already used for different entry data
         "404":
           description: Not found
   /parties/{partyId}/ledger-entries/{entryId}:
@@ -455,14 +463,6 @@ paths:
           in: query
           schema:
             type: string
-        - name: loginSource
-          in: query
-          schema:
-            $ref: "#/components/schemas/LoginSource"
-        - name: authProvider
-          in: query
-          schema:
-            $ref: "#/components/schemas/AuthProvider"
         - name: page
           in: query
           schema:
@@ -534,82 +534,6 @@ paths:
         "404":
           description: Not found
 
-  /admin/businesses:
-    get:
-      operationId: listAdminBusinesses
-      tags: [admin]
-      summary: List all businesses / shops
-      security:
-        - adminBearer: []
-      parameters:
-        - name: search
-          in: query
-          schema:
-            type: string
-        - name: page
-          in: query
-          schema:
-            type: integer
-            minimum: 1
-            default: 1
-        - name: pageSize
-          in: query
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 20
-      responses:
-        "200":
-          description: Paginated businesses list
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AdminBusinessesPage"
-
-  /admin/transactions:
-    get:
-      operationId: listAdminTransactions
-      tags: [admin]
-      summary: Global ledger entries across all businesses
-      security:
-        - adminBearer: []
-      parameters:
-        - name: startDate
-          in: query
-          schema:
-            type: string
-            format: date
-        - name: endDate
-          in: query
-          schema:
-            type: string
-            format: date
-        - name: search
-          in: query
-          schema:
-            type: string
-        - name: page
-          in: query
-          schema:
-            type: integer
-            minimum: 1
-            default: 1
-        - name: pageSize
-          in: query
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 20
-      responses:
-        "200":
-          description: Paginated transactions
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AdminTransactionsPage"
-
   /admin/otp-config:
     get:
       operationId: getAdminOtpConfig
@@ -643,6 +567,62 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminOtpConfig"
+
+  /admin/blocked-ips:
+    get:
+      operationId: listBlockedIps
+      tags: [admin]
+      security:
+        - adminBearer: []
+      responses:
+        "200":
+          description: Blocked network addresses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlockedIpsPage"
+    post:
+      operationId: blockIp
+      tags: [admin]
+      security:
+        - adminBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IpBlockInput"
+      responses:
+        "201":
+          description: Network IP blocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IpBlockResult"
+  /admin/blocked-ips/{ip}:
+    delete:
+      operationId: unblockIp
+      tags: [admin]
+      security:
+        - adminBearer: []
+      parameters:
+        - name: ip
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: IP unblocked
+
+  /auth/presence:
+    post:
+      operationId: reportForegroundPresence
+      tags: [auth]
+      summary: Refresh authenticated foreground presence (five-minute window)
+      responses:
+        "204":
+          description: Presence updated
 
   /parties/{partyId}/reminder:
     post:
@@ -842,6 +822,10 @@ components:
         - type
         - amount
       properties:
+        clientRequestId:
+          type: string
+          pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+          description: Stable UUID for retry-safe creation. Scoped to the authenticated actor and business.
         type:
           $ref: "#/components/schemas/LedgerEntryType"
         amount:
@@ -1021,7 +1005,7 @@ components:
 
     AuthProvider:
       type: string
-      enum: [phone_otp, gmail]
+      enum: [phone_otp, clerk]
 
     AdminLoginInput:
       type: object
@@ -1044,51 +1028,39 @@ components:
 
     AdminStats:
       type: object
-      required:
-        - totalUsers
-        - totalBusinesses
-        - totalTransactions
-        - totalTransactionVolume
-        - newUsersToday
-        - newUsersThisWeek
-        - activeUsersThisMonth
-        - usersByLoginSource
-        - usersByAuthProvider
+      required: [totalUsers, activeUsers, newUsersToday, newUsersThisWeek, trends]
       properties:
         totalUsers:
           type: integer
-        totalBusinesses:
+        activeUsers:
           type: integer
-        totalTransactions:
-          type: integer
-        totalTransactionVolume:
-          type: number
         newUsersToday:
           type: integer
         newUsersThisWeek:
           type: integer
-        activeUsersThisMonth:
-          type: integer
-        usersByLoginSource:
-          type: object
-          additionalProperties:
-            type: integer
-        usersByAuthProvider:
-          type: object
-          additionalProperties:
-            type: integer
+        trends:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminTrendDay"
+
+    AdminTrendDay:
+      type: object
+      required: [date, signups, logins]
+      properties:
+        date: { type: string, format: date }
+        signups: { type: integer }
+        logins: { type: integer }
 
     AdminUser:
       type: object
       required:
         - id
         - name
+        - email
         - phone
-        - loginSource
         - authProvider
-        - deviceMeta
         - status
-        - businessCount
+        - isOnline
         - createdAt
         - lastLogin
       properties:
@@ -1096,19 +1068,17 @@ components:
           type: string
         name:
           type: string
+        email:
+          type: ["string", "null"]
         phone:
-          type: string
-        loginSource:
-          $ref: "#/components/schemas/LoginSource"
+          type: ["string", "null"]
         authProvider:
           $ref: "#/components/schemas/AuthProvider"
-        deviceMeta:
-          type: string
         status:
           type: string
           enum: [active, suspended]
-        businessCount:
-          type: integer
+        isOnline:
+          type: boolean
         createdAt:
           type: string
           format: date-time
@@ -1120,12 +1090,25 @@ components:
       allOf:
         - $ref: "#/components/schemas/AdminUser"
         - type: object
-          required: [businesses]
+          required: [loginHistory]
           properties:
-            businesses:
+            loginHistory:
               type: array
               items:
-                $ref: "#/components/schemas/AdminBusinessSummary"
+                $ref: "#/components/schemas/AdminLoginEvent"
+
+    AdminLoginEvent:
+      type: object
+      required: [id, occurredAt, ip, device, authMethod, source]
+      properties:
+        id: { type: string }
+        occurredAt: { type: string, format: date-time }
+        ip:
+          type: ["string", "null"]
+          description: Unavailable unless verified direct or trusted-proxy policy determines a real client IP. Historical values may reflect shared proxies.
+        device: { type: string }
+        authMethod: { type: string }
+        source: { type: string }
 
     AdminUserUpdate:
       type: object
@@ -1150,122 +1133,75 @@ components:
         pageSize:
           type: integer
 
-    AdminBusinessSummary:
-      type: object
-      required: [id, name, partyCount, ledgerCount, createdAt]
-      properties:
-        id:
-          type: string
-        name:
-          type: string
-        partyCount:
-          type: integer
-        ledgerCount:
-          type: integer
-        createdAt:
-          type: string
-          format: date-time
-
-    AdminBusiness:
-      type: object
-      required: [id, name, ownerName, ownerPhone, partyCount, ledgerCount, transactionVolume, createdAt]
-      properties:
-        id:
-          type: string
-        name:
-          type: string
-        ownerName:
-          type: string
-        ownerPhone:
-          type: string
-        partyCount:
-          type: integer
-        ledgerCount:
-          type: integer
-        transactionVolume:
-          type: number
-        createdAt:
-          type: string
-          format: date-time
-
-    AdminBusinessesPage:
-      type: object
-      required: [items, total, page, pageSize]
-      properties:
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/AdminBusiness"
-        total:
-          type: integer
-        page:
-          type: integer
-        pageSize:
-          type: integer
-
-    AdminTransaction:
-      type: object
-      required: [id, businessName, partyName, partyPhone, type, amount, description, createdAt]
-      properties:
-        id:
-          type: string
-        businessName:
-          type: string
-        partyName:
-          type: string
-        partyPhone:
-          type: string
-        type:
-          $ref: "#/components/schemas/LedgerEntryType"
-        amount:
-          type: number
-        description:
-          type: string
-        createdAt:
-          type: string
-          format: date-time
-
-    AdminTransactionsPage:
-      type: object
-      required: [items, total, page, pageSize]
-      properties:
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/AdminTransaction"
-        total:
-          type: integer
-        page:
-          type: integer
-        pageSize:
-          type: integer
-
     AdminOtpConfig:
       type: object
-      required: [gatewayUrl, apiKeyHint, remainingBalance, updatedAt]
+      required: [enabled, sender, updatedAt, twilio, connectionError]
       properties:
-        gatewayUrl:
-          type: string
-        apiKeyHint:
-          type: string
-          description: Last 4 chars of key only — never expose the full key
-        remainingBalance:
-          type: integer
+        enabled: { type: boolean }
+        sender: { type: string }
         updatedAt:
           type: ["string", "null"]
           format: date-time
+        twilio:
+          oneOf:
+            - $ref: "#/components/schemas/TwilioStatus"
+            - type: "null"
+        connectionError: { type: ["string", "null"] }
+
+    TwilioStatus:
+      type: object
+      required: [status, balance, currency, sender, senders]
+      properties:
+        status: { type: string }
+        balance: { type: ["string", "null"] }
+        currency: { type: ["string", "null"] }
+        sender: { type: ["string", "null"] }
+        senders:
+          type: array
+          items: { type: string }
 
     AdminOtpConfigInput:
       type: object
-      required: [gatewayUrl, apiKey, remainingBalance]
+      required: [enabled, sender]
       properties:
-        gatewayUrl:
-          type: string
-        apiKey:
-          type: string
-        remainingBalance:
-          type: integer
-          minimum: 0
+        enabled: { type: boolean }
+        sender: { type: string }
+
+    IpBlockInput:
+      type: object
+      required: [ip]
+      properties:
+        ip: { type: string }
+        reason: { type: string }
+    IpBlockResult:
+      type: object
+      required: [ip]
+      properties:
+        ip: { type: string }
+    BlockedIp:
+      type: object
+      required: [ip, reason, createdAt]
+      properties:
+        ip: { type: string }
+        reason: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+    BlockedIpsPage:
+      type: object
+      required: [items, policy]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/BlockedIp" }
+        policy:
+          $ref: "#/components/schemas/ClientIpPolicy"
+    ClientIpPolicy:
+      type: object
+      required: [configured, mode, clientIpAvailable, message]
+      properties:
+        configured: { type: boolean }
+        mode: { type: string, enum: [trusted_proxy, direct, setup_required] }
+        clientIpAvailable: { type: boolean }
+        message: { type: string }
 
   securitySchemes:
     adminBearer:

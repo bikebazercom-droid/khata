@@ -30,7 +30,7 @@ export async function enforceRoleAccess(req: Request, res: Response, next: NextF
 
   if (req.method === "POST") {
     const body = req.body;
-    const allowed = new Set(["type", "amount", "description", "billReference", "dueDate", "isTransfer", "transferPartyId"]);
+    const allowed = new Set(["type", "amount", "description", "billReference", "dueDate", "isTransfer", "transferPartyId", "clientRequestId"]);
     const validTransfer = body?.isTransfer === true && typeof body.transferPartyId === "string" &&
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.transferPartyId);
     const normal = (body?.isTransfer === undefined || body.isTransfer === false) && body?.transferPartyId == null;

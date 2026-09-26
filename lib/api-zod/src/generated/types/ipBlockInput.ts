@@ -6,4 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type AdminStatsUsersByLoginSource = {[key: string]: number};
+export interface IpBlockInput {
+  ip: string;
+  reason?: string;
+}

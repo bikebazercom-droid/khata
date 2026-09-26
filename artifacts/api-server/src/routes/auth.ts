@@ -7,7 +7,7 @@
  * OTPs are only usable after the SMS provider accepts delivery.
  */
 import { Router, type IRouter, type Request, type Response } from "express";
-import { eq, and, gt, inArray } from "drizzle-orm";
+import { eq, and, gt, inArray, lt } from "drizzle-orm";
 import { createHmac, randomInt } from "node:crypto";
 import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
@@ -16,6 +16,9 @@ import {
   otpCodesTable,
   appUsersTable,
   appUserLoginSessionsTable,
+  userLoginEventsTable,
+  userPresenceTable,
+  adminOtpConfigTable,
   businessesTable,
   workerPartyAssignmentsTable,
   partiesTable,
@@ -28,6 +31,8 @@ import {
   type AuthenticatedRequest,
 } from "../middlewares/requireAuth";
 import { sendOtpSms } from "../services/sms";
+import { clientIp } from "../middlewares/ipBlock";
+import { deviceDescription } from "../lib/authTelemetry";
 
 const router: IRouter = Router();
 
@@ -113,6 +118,12 @@ router.post(
   sendOtpIpLimiter,
   sendOtpPhoneLimiter,
   async (req: Request, res: Response): Promise<void> => {
+    const [config] = await db.select({ enabled: adminOtpConfigTable.enabled })
+      .from(adminOtpConfigTable).limit(1);
+    if (config?.enabled === false) {
+      res.status(503).json({ error: "Phone OTP is temporarily disabled" });
+      return;
+    }
     const { phone } = req.body ?? {};
     if (typeof phone !== "string" || !phone.trim()) {
       res.status(400).json({ error: "phone is required" });
@@ -154,6 +165,12 @@ router.post(
   verifyOtpIpLimiter,
   verifyOtpPhoneLimiter,
   async (req: Request, res: Response): Promise<void> => {
+    const [config] = await db.select({ enabled: adminOtpConfigTable.enabled })
+      .from(adminOtpConfigTable).limit(1);
+    if (config?.enabled === false) {
+      res.status(503).json({ error: "Phone OTP is temporarily disabled" });
+      return;
+    }
     const { phone, code } = req.body ?? {};
     if (typeof phone !== "string" || typeof code !== "string") {
       res.status(400).json({ error: "phone and code are required" });
@@ -206,8 +223,16 @@ router.post(
         ? "Staff access removed. Ask the owner for a new invitation." : "Account suspended" });
       return;
     }
-    await db.update(appUsersTable).set({ lastLogin: new Date() })
-      .where(eq(appUsersTable.id, user.id));
+    await db.transaction(async (tx) => {
+      await tx.update(appUsersTable).set({ lastLogin: new Date() })
+        .where(eq(appUsersTable.id, user.id));
+      await tx.insert(userLoginEventsTable).values({
+        userId: user.id, ip: clientIp(req), device: deviceDescription(req),
+        authMethod: "phone", source: req.get("x-client-platform") === "mobile" ? "mobile" : "web",
+      });
+      await tx.delete(userLoginEventsTable).where(lt(userLoginEventsTable.occurredAt,
+        new Date(Date.now() - 90 * 24 * 60 * 60_000)));
+    });
 
     const sessionPayload = {
       userId: user.id,
@@ -256,6 +281,7 @@ router.post("/auth/phone/logout", async (req: Request, res: Response): Promise<v
         await db.update(appUsersTable)
           .set({ phoneSessionVersion: user.phoneSessionVersion + 1, lastLogout: new Date() })
           .where(eq(appUsersTable.id, user.id));
+        await db.delete(userPresenceTable).where(eq(userPresenceTable.userId, user.id));
       }
     }
   }
@@ -275,11 +301,35 @@ router.post("/auth/logout-event", requireAuth, async (req: Request, res: Respons
         eq(appUserLoginSessionsTable.sessionId, auth.clerkSessionId),
       ));
     }
+    await tx.delete(userPresenceTable).where(auth.authMethod === "clerk"
+      ? and(eq(userPresenceTable.userId, auth.userId),
+        eq(userPresenceTable.sessionId, `clerk:${auth.clerkSessionId}`))
+      : eq(userPresenceTable.userId, auth.userId));
     await tx.update(appUsersTable).set({ lastLogout: new Date() }).where(and(
       eq(appUsersTable.id, auth.userId),
       eq(appUsersTable.businessId, auth.businessId),
     ));
   });
+  res.status(204).end();
+});
+
+// Called only while the app is foregrounded, never by an admin list view or
+// background fetch. Refreshes existing presence without generating login events.
+router.post("/auth/presence", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const auth = req as AuthenticatedRequest;
+  if (auth.authMethod === "dev") { res.status(204).end(); return; }
+  const sessionId = auth.authMethod === "clerk"
+    ? `clerk:${auth.clerkSessionId}`
+    : `phone:${(await db.select({ version: appUsersTable.phoneSessionVersion })
+      .from(appUsersTable).where(eq(appUsersTable.id, auth.userId)).limit(1))[0]?.version}`;
+  await db.insert(userPresenceTable).values({
+    userId: auth.userId, sessionId, lastSeenAt: new Date(),
+  }).onConflictDoUpdate({
+    target: [userPresenceTable.userId, userPresenceTable.sessionId],
+    set: { lastSeenAt: new Date() },
+  });
+  await db.delete(userPresenceTable).where(lt(userPresenceTable.lastSeenAt,
+    new Date(Date.now() - 24 * 60 * 60_000)));
   res.status(204).end();
 });
 

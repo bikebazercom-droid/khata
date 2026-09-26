@@ -7,17 +7,17 @@
  */
 import type { AdminUserStatus } from './adminUserStatus';
 import type { AuthProvider } from './authProvider';
-import type { LoginSource } from './loginSource';
 
 export interface AdminUser {
   id: string;
   name: string;
-  phone: string;
-  loginSource: LoginSource;
+  /** @nullable */
+  email: string | null;
+  /** @nullable */
+  phone: string | null;
   authProvider: AuthProvider;
-  deviceMeta: string;
   status: AdminUserStatus;
-  businessCount: number;
+  isOnline: boolean;
   createdAt: Date;
   /** @nullable */
   lastLogin: Date | null;

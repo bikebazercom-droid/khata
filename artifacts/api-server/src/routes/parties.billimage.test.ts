@@ -46,6 +46,7 @@ function makeApp(businessId: string) {
   app.use((req: Request, _res: Response, next: NextFunction) => {
     (req as unknown as AuthenticatedRequest).businessId = businessId;
     (req as unknown as AuthenticatedRequest).userId = "test-user";
+    (req as unknown as AuthenticatedRequest).role = "owner";
     next();
   });
   app.use(partiesRouter);

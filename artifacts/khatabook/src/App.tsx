@@ -4,7 +4,7 @@ import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from 'wouter';
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { MainLayout } from '@/components/layout/main-layout';
 import { ConnectionStateProvider, useConnectionState } from '@/context/connection-state';
@@ -28,6 +28,8 @@ import { restoreCache, persistCache, clearPersistedCache } from '@/lib/queryPers
 import { BusinessContextProvider } from '@/lib/businessContext';
 import { BusinessSwitcherDrawer } from '@/components/modals/business-switcher-drawer';
 import { LanguageProvider } from '@/lib/i18n';
+import { drainEntries, ENTRY_OUTBOX_CHANGED } from '@/lib/entryOutbox';
+import { useBusinessContext } from '@/lib/businessContext';
 
 // ─── Clerk setup ──────────────────────────────────────────────────────────────
 
@@ -159,9 +161,52 @@ const queryClient = new QueryClient({
  * Must be rendered inside both ClerkProvider and QueryClientProvider.
  */
 function RealtimeSyncManager() {
-  const { isAuthenticated } = useAppAuth();
+  const { isAuthenticated, userId } = useAppAuth();
+  const { selectedBusinessId } = useBusinessContext();
   const { setIsOnline } = useConnectionState();
   useRealtimeSync(isAuthenticated, setIsOnline);
+  const qc = useQueryClient();
+  const activeScope = useRef('');
+  const scope = isAuthenticated && userId ? JSON.stringify([userId, selectedBusinessId]) : '';
+  activeScope.current = scope;
+  useEffect(() => {
+    if (!scope || !userId) return;
+    const run = () => {
+      void drainEntries(userId, selectedBusinessId, () => activeScope.current === scope, () => {
+        if (activeScope.current === scope) void qc.invalidateQueries();
+      }).catch(() => {
+        toast.error('অফলাইন খসড়া পড়া যাচ্ছে না', { description: 'স্টোরেজ অনুমতি পরীক্ষা করুন; পরে আবার সিঙ্ক হবে।' });
+      });
+    };
+    run();
+    window.addEventListener('online', run);
+    window.addEventListener(ENTRY_OUTBOX_CHANGED, run);
+    window.addEventListener('banglakhata-connection-restored', run);
+    document.addEventListener('visibilitychange', run);
+    const interval = window.setInterval(run, 15_000);
+    return () => {
+      window.removeEventListener('online', run);
+      window.removeEventListener(ENTRY_OUTBOX_CHANGED, run);
+      window.removeEventListener('banglakhata-connection-restored', run);
+      document.removeEventListener('visibilitychange', run);
+      window.clearInterval(interval);
+    };
+  }, [scope, userId, selectedBusinessId, qc]);
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const heartbeat = () => {
+      if (document.visibilityState !== 'visible') return;
+      void fetch('/api/auth/presence', { method: 'POST', credentials: 'include' })
+        .catch(() => { /* Transient offline state is not active presence. */ });
+    };
+    heartbeat();
+    const timer = window.setInterval(heartbeat, 60_000);
+    document.addEventListener('visibilitychange', heartbeat);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', heartbeat);
+    };
+  }, [isAuthenticated]);
   // Retry any bill image uploads that failed while offline, once connectivity
   // is restored. Only active when the user is authenticated (API calls need auth).
   useRetryPendingUploads(isAuthenticated);

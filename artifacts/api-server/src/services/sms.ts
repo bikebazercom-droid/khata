@@ -1,4 +1,5 @@
 import { ReplitConnectors } from "@replit/connectors-sdk";
+import { db, adminOtpConfigTable } from "@workspace/db";
 
 const connectors = new ReplitConnectors();
 
@@ -15,20 +16,53 @@ async function twilioJson<T>(path: string, options?: { method: string; body: str
 /** Fail closed if no single unambiguous SMS sender is configured. */
 async function resolveSender(): Promise<{ accountSid: string; from: string }> {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const from = process.env.TWILIO_FROM_NUMBER;
-  if (accountSid && from) return { accountSid, from };
+  const [config] = await db.select({ sender: adminOtpConfigTable.sender }).from(adminOtpConfigTable).limit(1);
+  const from = config?.sender || process.env.TWILIO_FROM_NUMBER;
 
   const accounts = await twilioJson<TwilioList<Account>>("/2010-04-01/Accounts.json?PageSize=20");
   const active = accounts.accounts?.filter((account) => account.status === "active") ?? [];
   if (!accountSid && active.length !== 1) throw new Error("Configure one Twilio account for SMS");
   const sid = accountSid ?? active[0]!.sid;
-  if (from) return { accountSid: sid, from };
   const numbers = await twilioJson<TwilioList<Sender>>(
     `/2010-04-01/Accounts/${encodeURIComponent(sid)}/IncomingPhoneNumbers.json?PageSize=100`,
   );
   const smsNumbers = numbers.incoming_phone_numbers?.filter((number) => number.capabilities?.sms) ?? [];
+  if (from) {
+    if (!smsNumbers.some((number) => number.phone_number === from))
+      throw new Error("The selected Twilio SMS sender does not belong to the connected account");
+    return { accountSid: sid, from };
+  }
   if (smsNumbers.length !== 1) throw new Error("Configure TWILIO_FROM_NUMBER for SMS");
   return { accountSid: sid, from: smsNumbers[0]!.phone_number };
+}
+
+/** Only nonsecret provider facts, retrieved live; unavailable is never presented as zero. */
+export async function getSmsAccountStatus(): Promise<{
+  status: string; balance: string | null; currency: string | null;
+  senders: string[]; sender: string | null;
+}> {
+  const accounts = await twilioJson<TwilioList<Account>>("/2010-04-01/Accounts.json?PageSize=20");
+  const active = accounts.accounts?.filter((a) => a.status === "active") ?? [];
+  const sid = process.env.TWILIO_ACCOUNT_SID ?? (active.length === 1 ? active[0]!.sid : null);
+  if (!sid) throw new Error("Select a Twilio account using server configuration");
+  const account = await twilioJson<Account>(`/2010-04-01/Accounts/${encodeURIComponent(sid)}.json`);
+  const numbers = await twilioJson<TwilioList<Sender>>(
+    `/2010-04-01/Accounts/${encodeURIComponent(sid)}/IncomingPhoneNumbers.json?PageSize=100`);
+  const senders = numbers.incoming_phone_numbers?.filter((n) => n.capabilities?.sms)
+    .map((n) => n.phone_number) ?? [];
+  const [config] = await db.select({ sender: adminOtpConfigTable.sender }).from(adminOtpConfigTable).limit(1);
+  let balance: string | null = null;
+  let currency: string | null = null;
+  try {
+    const result = await twilioJson<{ balance?: string; currency?: string }>(
+      `/2010-04-01/Accounts/${encodeURIComponent(sid)}/Balance.json`);
+    balance = result.balance ?? null;
+    currency = result.currency ?? null;
+  } catch {
+    // Twilio account API may not expose billing scope; show unavailable, not a made-up value.
+  }
+  return { status: account.status, balance, currency, senders,
+    sender: config?.sender || process.env.TWILIO_FROM_NUMBER || (senders.length === 1 ? senders[0]! : null) };
 }
 
 export async function ensureSmsReady(): Promise<void> {

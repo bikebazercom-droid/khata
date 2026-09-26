@@ -147,6 +147,7 @@ export function useRealtimeSync(
     es.addEventListener('connected', () => {
       markOnline();
       void qc.invalidateQueries();
+      window.dispatchEvent(new Event('banglakhata-connection-restored'));
     });
 
     // SSE error (dropped connection / brief blip): start grace timer.

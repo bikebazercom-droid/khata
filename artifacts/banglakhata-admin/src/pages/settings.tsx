@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useAuthGuard, getAdminToken } from "@/lib/auth";
 import { SidebarLayout } from "@/components/layout/sidebar";
-import { useGetAdminOtpConfig, useUpdateAdminOtpConfig, getGetAdminOtpConfigQueryKey } from "@workspace/api-client-react";
+import {
+  useGetAdminOtpConfig, useUpdateAdminOtpConfig, getGetAdminOtpConfigQueryKey,
+  useListBlockedIps, useBlockIp, useUnblockIp, getListBlockedIpsQueryKey,
+} from "@workspace/api-client-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { MessageSquare, Save, KeyRound, Server, Coins, Download, Smartphone, Monitor, Upload, CheckCircle2, FileUp, AlertCircle, Apple } from "lucide-react";
+import { MessageSquare, Save, Download, Smartphone, Monitor, Upload, CheckCircle2, FileUp, AlertCircle, Apple } from "lucide-react";
 import { formatDate } from "@/lib/format";
 
 // ── Download-config types & hook ─────────────────────────────────────────────
@@ -267,18 +270,35 @@ export default function SettingsPage() {
   // ── OTP config ──────────────────────────────────────────────────────────────
   const { data: config, isLoading: otpLoading } = useGetAdminOtpConfig();
   const updateMutation = useUpdateAdminOtpConfig();
+  const { data: blockedIps } = useListBlockedIps();
+  const blockIp = useBlockIp();
+  const unblockIp = useUnblockIp();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [newIp, setNewIp] = useState("");
+  const [ipReason, setIpReason] = useState("");
+  const saveIp = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!blockedIps?.policy.configured || !blockedIps.policy.clientIpAvailable) return;
+    if (!window.confirm(`Block ${newIp}? This may affect everyone on a shared network.`)) return;
+    blockIp.mutate({ data: { ip: newIp, reason: ipReason } }, {
+      onSuccess: () => {
+        setNewIp("");
+        setIpReason("");
+        void queryClient.invalidateQueries({ queryKey: getListBlockedIpsQueryKey() });
+      },
+      onError: () => toast({ variant: "destructive", title: "IP block failed", description: "Check the address and try again." }),
+    });
+  };
 
-  const [gatewayUrl,        setGatewayUrl]        = useState("");
-  const [apiKey,            setApiKey]            = useState("");
-  const [remainingBalance,  setRemainingBalance]  = useState("0");
+  const [otpEnabled, setOtpEnabled] = useState(true);
+  const [otpSender, setOtpSender] = useState("");
   const isInitialized = useRef(false);
 
   useEffect(() => {
     if (config && !isInitialized.current) {
-      setGatewayUrl(config.gatewayUrl);
-      setRemainingBalance(config.remainingBalance.toString());
+      setOtpEnabled(config.enabled);
+      setOtpSender(config.sender);
       isInitialized.current = true;
     }
   }, [config]);
@@ -286,15 +306,14 @@ export default function SettingsPage() {
   const handleOtpSave = (e: React.FormEvent) => {
     e.preventDefault();
     updateMutation.mutate(
-      { data: { gatewayUrl, apiKey, remainingBalance: Number(remainingBalance) } },
+      { data: { enabled: otpEnabled, sender: otpSender } },
       {
         onSuccess: (updated) => {
           queryClient.setQueryData(getGetAdminOtpConfigQueryKey(), updated);
-          setApiKey("");
-          toast({ title: "Configuration Saved", description: "OTP gateway settings updated." });
+          toast({ title: "Configuration Saved", description: "OTP settings updated." });
         },
-        onError: () => {
-          toast({ variant: "destructive", title: "Save Failed", description: "Could not update the OTP configuration." });
+        onError: (error) => {
+          toast({ variant: "destructive", title: "Save Failed", description: error instanceof Error ? error.message : "Could not update the OTP configuration." });
         },
       }
     );
@@ -374,6 +393,34 @@ export default function SettingsPage() {
     <SidebarLayout>
       <div className="space-y-6 max-w-2xl">
         <h2 className="text-2xl font-bold tracking-tight">System Settings</h2>
+        <Card className="shadow-sm border-none bg-white">
+          <CardHeader><CardTitle>Blocked network IPs</CardTitle>
+            <CardDescription>Server-enforced for all sessions and OTP requests when a verified client-IP policy is configured. Shared networks can affect multiple people; blocking an IP is not a permanent device block.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p role="status" className={`rounded p-3 text-sm ${blockedIps?.policy.configured && blockedIps.policy.clientIpAvailable ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
+              {blockedIps?.policy.message ?? "Checking client IP policy…"}
+              {blockedIps?.policy.configured && !blockedIps.policy.clientIpAvailable &&
+                " This request has no verifiable forwarded client IP; blocking is disabled."}
+            </p>
+            <form onSubmit={saveIp} className="flex flex-wrap gap-2">
+              <Input className="flex-1 min-w-40" placeholder="IPv4 or IPv6 address" value={newIp}
+                onChange={e => setNewIp(e.target.value)} disabled={!blockedIps?.policy.clientIpAvailable} required />
+              <Input className="flex-1 min-w-40" placeholder="Reason (optional)" maxLength={500}
+                value={ipReason} onChange={e => setIpReason(e.target.value)} />
+              <Button type="submit" variant="destructive" disabled={blockIp.isPending || !blockedIps?.policy.clientIpAvailable}>Block IP</Button>
+            </form>
+            {blockedIps?.items.length === 0 && <p className="text-sm text-muted-foreground">No blocked IPs.</p>}
+            {blockedIps?.items.map((entry) => <div key={entry.ip} className="flex items-center justify-between gap-2 border-t pt-2 text-sm">
+              <span><strong className="font-mono">{entry.ip}</strong> {entry.reason && `· ${entry.reason}`}</span>
+              <Button type="button" size="sm" variant="outline" disabled={unblockIp.isPending}
+                onClick={() => unblockIp.mutate({ ip: entry.ip }, {
+                  onSuccess: () => { void queryClient.invalidateQueries({ queryKey: getListBlockedIpsQueryKey() }); },
+                  onError: () => toast({ variant: "destructive", title: "Unable to unblock IP" }),
+                })}>Unblock</Button>
+            </div>)}
+          </CardContent>
+        </Card>
 
         {/* ── Download & Store Links ─────────────────────────────────────── */}
         <form onSubmit={handleDlSave}>
@@ -757,52 +804,29 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <CardTitle className="text-lg">OTP Gateway Integration</CardTitle>
-                  <CardDescription>Configure the SMS provider for user authentication</CardDescription>
+                  <CardDescription>Uses the secure connected Twilio account. Credentials are never entered or shown here.</CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-6 pt-4 border-t">
-              <div className="space-y-3">
-                <label className="text-sm font-semibold flex items-center gap-2">
-                  <Server className="w-4 h-4 text-muted-foreground" /> Gateway URL
-                </label>
-                <Input
-                  type="url"
-                  placeholder="https://api.sms-provider.com/v3/send"
-                  value={gatewayUrl}
-                  onChange={e => setGatewayUrl(e.target.value)}
-                  required
-                />
-                <p className="text-xs text-muted-foreground">The endpoint for dispatching SMS messages.</p>
+              {config?.connectionError && <p role="alert" className="text-sm text-amber-700 bg-amber-50 p-3 rounded">{config.connectionError}</p>}
+              <div className="text-sm space-y-2">
+                <p>Twilio account: <strong>{config?.twilio?.status ?? "Unavailable"}</strong></p>
+                <p>Live account balance: <strong>{config?.twilio?.balance != null
+                  ? `${config.twilio.balance} ${config.twilio.currency ?? ""}` : "Unavailable from provider"}</strong></p>
+                <p className="text-xs text-muted-foreground">Balance is in account currency, not remaining SMS messages or prepaid top-up count. No chargeable test message is sent here.</p>
               </div>
-
-              <div className="space-y-3">
-                <label className="text-sm font-semibold flex items-center gap-2">
-                  <KeyRound className="w-4 h-4 text-muted-foreground" /> API Key
-                </label>
-                <div className="flex gap-2 items-center">
-                  <Input
-                    type="password"
-                    placeholder={config?.apiKeyHint ? `••••••••••••${config.apiKeyHint}` : "Enter new API key..."}
-                    value={apiKey}
-                    onChange={e => setApiKey(e.target.value)}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">Leave blank to keep the current key.</p>
-              </div>
-
-              <div className="space-y-3">
-                <label className="text-sm font-semibold flex items-center gap-2">
-                  <Coins className="w-4 h-4 text-muted-foreground" /> Remaining Balance Alert
-                </label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={remainingBalance}
-                  onChange={e => setRemainingBalance(e.target.value)}
-                  required
-                />
-                <p className="text-xs text-muted-foreground">Update the manual remaining balance count (optional).</p>
+              <label className="flex items-center gap-3 text-sm font-medium">
+                <input type="checkbox" checked={otpEnabled} onChange={e => setOtpEnabled(e.target.checked)} />
+                Enable phone OTP sign-in and verification
+              </label>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold">SMS sender</label>
+                <select className="w-full rounded-md border p-2 text-sm bg-white" value={otpSender} onChange={e => setOtpSender(e.target.value)}>
+                  <option value="">Automatic (only when one SMS-capable sender exists)</option>
+                  {config?.twilio?.senders.map((sender) => <option key={sender} value={sender}>{sender}</option>)}
+                </select>
+                <p className="text-xs text-muted-foreground">Only numbers verified as SMS-capable on your connected Twilio account can be selected.</p>
               </div>
             </CardContent>
             <CardFooter className="bg-slate-50 border-t py-4 px-6 flex justify-between items-center rounded-b-xl">

@@ -21,13 +21,11 @@ import type {
 
 import type {
   AdjustmentTarget,
-  AdminBusinessesPage,
   AdminLoginInput,
   AdminLoginResult,
   AdminOtpConfig,
   AdminOtpConfigInput,
   AdminStats,
-  AdminTransactionsPage,
   AdminUserDetail,
   AdminUserUpdate,
   AdminUsersPage,
@@ -35,6 +33,7 @@ import type {
   BengaliLedgerBulkSaveResult,
   BengaliLedgerScanInput,
   BengaliLedgerScanResult,
+  BlockedIpsPage,
   BusinessSettings,
   BusinessSettingsUpdate,
   DashboardSummary,
@@ -42,11 +41,11 @@ import type {
   ErrorEnvelope,
   GlobalLedgerEntry,
   HealthStatus,
+  IpBlockInput,
+  IpBlockResult,
   LedgerEntry,
   LedgerEntryInput,
   LedgerEntryPatch,
-  ListAdminBusinessesParams,
-  ListAdminTransactionsParams,
   ListAdminUsersParams,
   ListGlobalLedgerEntriesParams,
   ListPartiesParams,
@@ -998,7 +997,7 @@ export const getCreateLedgerEntryUrl = (partyId: string,) => {
 }
 
 /**
- * Creates the ledger entry and recalculates the party's balance and balance type.
+ * Creates the ledger entry and recalculates the party's balance and balance type. A stable clientRequestId makes retries safe within the authenticated actor and business. Reuse with a different payload returns 409. Permissions are checked again on every replay.
  * @summary Record a "You Gave" or "You Got" transaction for a party
  */
 export const createLedgerEntry = async (partyId: string,
@@ -1902,174 +1901,6 @@ export const useUpdateAdminUser = <TError = ErrorType<void>,
       return useMutation(getUpdateAdminUserMutationOptions(options));
     }
 
-export const getListAdminBusinessesUrl = (params?: ListAdminBusinessesParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value))
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/api/admin/businesses?${stringifiedParams}` : `/api/admin/businesses`
-}
-
-/**
- * @summary List all businesses / shops
- */
-export const listAdminBusinesses = async (params?: ListAdminBusinessesParams, options?: RequestInit): Promise<AdminBusinessesPage> => {
-
-  return customFetch<AdminBusinessesPage>(getListAdminBusinessesUrl(params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getListAdminBusinessesQueryKey = (params?: ListAdminBusinessesParams,) => {
-    return [
-    `/api/admin/businesses`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getListAdminBusinessesQueryOptions = <TData = Awaited<ReturnType<typeof listAdminBusinesses>>, TError = ErrorType<unknown>>(params?: ListAdminBusinessesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminBusinesses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getListAdminBusinessesQueryKey(params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminBusinesses>>> = ({ signal }) => listAdminBusinesses(params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminBusinesses>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type ListAdminBusinessesQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminBusinesses>>>
-export type ListAdminBusinessesQueryError = ErrorType<unknown>
-
-
-/**
- * @summary List all businesses / shops
- */
-
-export function useListAdminBusinesses<TData = Awaited<ReturnType<typeof listAdminBusinesses>>, TError = ErrorType<unknown>>(
- params?: ListAdminBusinessesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminBusinesses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getListAdminBusinessesQueryOptions(params,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export const getListAdminTransactionsUrl = (params?: ListAdminTransactionsParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value))
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/api/admin/transactions?${stringifiedParams}` : `/api/admin/transactions`
-}
-
-/**
- * @summary Global ledger entries across all businesses
- */
-export const listAdminTransactions = async (params?: ListAdminTransactionsParams, options?: RequestInit): Promise<AdminTransactionsPage> => {
-
-  return customFetch<AdminTransactionsPage>(getListAdminTransactionsUrl(params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getListAdminTransactionsQueryKey = (params?: ListAdminTransactionsParams,) => {
-    return [
-    `/api/admin/transactions`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getListAdminTransactionsQueryOptions = <TData = Awaited<ReturnType<typeof listAdminTransactions>>, TError = ErrorType<unknown>>(params?: ListAdminTransactionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminTransactions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getListAdminTransactionsQueryKey(params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminTransactions>>> = ({ signal }) => listAdminTransactions(params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminTransactions>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type ListAdminTransactionsQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminTransactions>>>
-export type ListAdminTransactionsQueryError = ErrorType<unknown>
-
-
-/**
- * @summary Global ledger entries across all businesses
- */
-
-export function useListAdminTransactions<TData = Awaited<ReturnType<typeof listAdminTransactions>>, TError = ErrorType<unknown>>(
- params?: ListAdminTransactionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminTransactions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getListAdminTransactionsQueryOptions(params,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
 export const getGetAdminOtpConfigUrl = () => {
 
 
@@ -2216,6 +2047,278 @@ export const useUpdateAdminOtpConfig = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateAdminOtpConfigMutationOptions(options));
+    }
+
+export const getListBlockedIpsUrl = () => {
+
+
+
+
+  return `/api/admin/blocked-ips`
+}
+
+export const listBlockedIps = async ( options?: RequestInit): Promise<BlockedIpsPage> => {
+
+  return customFetch<BlockedIpsPage>(getListBlockedIpsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListBlockedIpsQueryKey = () => {
+    return [
+    `/api/admin/blocked-ips`
+    ] as const;
+    }
+
+
+export const getListBlockedIpsQueryOptions = <TData = Awaited<ReturnType<typeof listBlockedIps>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBlockedIps>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListBlockedIpsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBlockedIps>>> = ({ signal }) => listBlockedIps({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBlockedIps>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListBlockedIpsQueryResult = NonNullable<Awaited<ReturnType<typeof listBlockedIps>>>
+export type ListBlockedIpsQueryError = ErrorType<unknown>
+
+
+
+export function useListBlockedIps<TData = Awaited<ReturnType<typeof listBlockedIps>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBlockedIps>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListBlockedIpsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getBlockIpUrl = () => {
+
+
+
+
+  return `/api/admin/blocked-ips`
+}
+
+export const blockIp = async (ipBlockInput: IpBlockInput, options?: RequestInit): Promise<IpBlockResult> => {
+
+  return customFetch<IpBlockResult>(getBlockIpUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(ipBlockInput)
+  }
+);}
+
+
+
+
+
+export const getBlockIpMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof blockIp>>, TError,{data: BodyType<IpBlockInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof blockIp>>, TError,{data: BodyType<IpBlockInput>}, TContext> => {
+
+const mutationKey = ['blockIp'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof blockIp>>, {data: BodyType<IpBlockInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  blockIp(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BlockIpMutationResult = NonNullable<Awaited<ReturnType<typeof blockIp>>>
+    export type BlockIpMutationBody = BodyType<IpBlockInput>
+    export type BlockIpMutationError = ErrorType<unknown>
+
+    export const useBlockIp = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof blockIp>>, TError,{data: BodyType<IpBlockInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof blockIp>>,
+        TError,
+        {data: BodyType<IpBlockInput>},
+        TContext
+      > => {
+      return useMutation(getBlockIpMutationOptions(options));
+    }
+
+export const getUnblockIpUrl = (ip: string,) => {
+
+
+
+
+  return `/api/admin/blocked-ips/${ip}`
+}
+
+export const unblockIp = async (ip: string, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getUnblockIpUrl(ip),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getUnblockIpMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unblockIp>>, TError,{ip: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof unblockIp>>, TError,{ip: string}, TContext> => {
+
+const mutationKey = ['unblockIp'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unblockIp>>, {ip: string}> = (props) => {
+          const {ip} = props ?? {};
+
+          return  unblockIp(ip,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UnblockIpMutationResult = NonNullable<Awaited<ReturnType<typeof unblockIp>>>
+
+    export type UnblockIpMutationError = ErrorType<unknown>
+
+    export const useUnblockIp = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unblockIp>>, TError,{ip: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof unblockIp>>,
+        TError,
+        {ip: string},
+        TContext
+      > => {
+      return useMutation(getUnblockIpMutationOptions(options));
+    }
+
+export const getReportForegroundPresenceUrl = () => {
+
+
+
+
+  return `/api/auth/presence`
+}
+
+/**
+ * @summary Refresh authenticated foreground presence (five-minute window)
+ */
+export const reportForegroundPresence = async ( options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getReportForegroundPresenceUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getReportForegroundPresenceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportForegroundPresence>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reportForegroundPresence>>, TError,void, TContext> => {
+
+const mutationKey = ['reportForegroundPresence'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reportForegroundPresence>>, void> = () => {
+
+
+          return  reportForegroundPresence(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReportForegroundPresenceMutationResult = NonNullable<Awaited<ReturnType<typeof reportForegroundPresence>>>
+
+    export type ReportForegroundPresenceMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Refresh authenticated foreground presence (five-minute window)
+ */
+export const useReportForegroundPresence = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportForegroundPresence>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reportForegroundPresence>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getReportForegroundPresenceMutationOptions(options));
     }
 
 export const getSendPaymentReminderUrl = (partyId: string,) => {

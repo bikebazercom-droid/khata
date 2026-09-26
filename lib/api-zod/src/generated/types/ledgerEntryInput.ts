@@ -8,6 +8,11 @@
 import type { LedgerEntryType } from './ledgerEntryType';
 
 export interface LedgerEntryInput {
+  /**
+     * Stable UUID for retry-safe creation. Scoped to the authenticated actor and business.
+     * @pattern ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$
+     */
+  clientRequestId?: string;
   type: LedgerEntryType;
   /** @exclusiveMinimum 0 */
   amount: number;

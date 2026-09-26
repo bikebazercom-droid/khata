@@ -1,188 +1,105 @@
+import { useState } from "react";
+import { useParams, Link } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  useGetAdminUser, useUpdateAdminUser, getGetAdminUserQueryKey,
+  useBlockIp, useUnblockIp, useListBlockedIps, getListBlockedIpsQueryKey,
+} from "@workspace/api-client-react";
 import { useAuthGuard } from "@/lib/auth";
 import { SidebarLayout } from "@/components/layout/sidebar";
-import { useGetAdminUser, useUpdateAdminUser, getGetAdminUserQueryKey } from "@workspace/api-client-react";
-import { useParams, Link } from "wouter";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, User, Phone, Calendar, Smartphone, Shield, Building2, Ban, CheckCircle2 } from "lucide-react";
-import { formatDate } from "@/lib/format";
-import { useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/components/ui/use-toast";
+import { Input } from "@/components/ui/input";
 
 export default function UserDetailPage() {
   useAuthGuard();
-  const params = useParams();
-  const id = params.id as string;
-  const { data: user, isLoading } = useGetAdminUser(id, { query: { enabled: !!id } });
-  const updateMutation = useUpdateAdminUser();
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  if (isLoading || !user) {
-    return (
-      <SidebarLayout>
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 w-32 bg-muted rounded"></div>
-          <div className="h-64 bg-muted rounded-xl"></div>
-        </div>
-      </SidebarLayout>
-    );
-  }
-
-  const handleToggleStatus = () => {
-    const newStatus = user.status === 'active' ? 'suspended' : 'active';
-    updateMutation.mutate(
-      { userId: id, data: { status: newStatus } },
-      {
-        onSuccess: (updatedUser) => {
-          queryClient.setQueryData(getGetAdminUserQueryKey(id), updatedUser);
-          toast({
-            title: "Status Updated",
-            description: `User has been ${newStatus}.`,
-          });
-        },
-        onError: () => {
-          toast({
-            variant: "destructive",
-            title: "Update Failed",
-            description: "Could not update user status.",
-          });
-        }
-      }
-    );
+  const { id } = useParams<{ id: string }>();
+  const { data: user, isLoading, isError } = useGetAdminUser(id, { query: { queryKey: getGetAdminUserQueryKey(id), enabled: !!id, refetchInterval: 30_000 } });
+  const { data: blocked } = useListBlockedIps();
+  const update = useUpdateAdminUser();
+  const block = useBlockIp();
+  const unblock = useUnblockIp();
+  const qc = useQueryClient();
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: getGetAdminUserQueryKey(id) });
+    void qc.invalidateQueries({ queryKey: getListBlockedIpsQueryKey() });
   };
+  const changeStatus = () => {
+    if (!user) return;
+    update.mutate({ userId: id, data: { status: user.status === "active" ? "suspended" : "active" } },
+      { onSuccess: refresh, onError: () => setError("Could not update user status.") });
+  };
+  const toggleIp = (ip: string) => {
+    setError("");
+    if (blocked?.items.some((item) => item.ip === ip)) {
+      unblock.mutate({ ip }, { onSuccess: refresh, onError: () => setError("Unable to unblock IP.") });
+    } else {
+      if (!window.confirm(`Block network IP ${ip}? This can affect other users on the same shared network.`)) return;
+      block.mutate({ data: { ip, reason } }, { onSuccess: () => { setReason(""); refresh(); },
+        onError: () => setError("Unable to block IP. Check the address and try again.") });
+    }
+  };
+  const fmt = (date: string | null | undefined) => date ? new Date(date).toLocaleString() : "—";
 
-  return (
-    <SidebarLayout>
-      <div className="space-y-6 max-w-5xl">
-        <div className="flex items-center gap-4">
-          <Link href="/users">
-            <Button variant="outline" size="icon" className="h-8 w-8 bg-white">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <h2 className="text-2xl font-bold tracking-tight">User Details</h2>
-          <Badge variant={user.status === 'active' ? 'success' : 'destructive'} className="ml-auto">
-            {user.status}
-          </Badge>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="col-span-1 md:col-span-2 shadow-sm border-none bg-white">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <User className="h-5 w-5 text-primary" /> Profile Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-8">
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground mb-1">Full Name</div>
-                  <div className="text-lg font-semibold">{user.name || "Not provided"}</div>
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground mb-1">Phone Number</div>
-                  <div className="text-lg font-semibold font-mono flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-muted-foreground" /> {user.phone}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground mb-1">Internal ID</div>
-                  <div className="text-sm font-mono bg-slate-100 p-1.5 rounded">{user.id}</div>
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground mb-1">Joined Date</div>
-                  <div className="text-base flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" /> {formatDate(user.createdAt)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground mb-1">Last Login</div>
-                  <div className="text-base">{formatDate(user.lastLogin)}</div>
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground mb-1">Login Info</div>
-                  <div className="flex gap-2">
-                    <Badge variant="secondary" className="uppercase text-[10px]"><Smartphone className="w-3 h-3 mr-1"/> {user.loginSource}</Badge>
-                    <Badge variant="outline" className="uppercase text-[10px]"><Shield className="w-3 h-3 mr-1"/> {user.authProvider}</Badge>
-                  </div>
-                </div>
-                <div className="col-span-1 sm:col-span-2">
-                  <div className="text-sm font-medium text-muted-foreground mb-1">Device Meta</div>
-                  <div className="text-xs font-mono bg-slate-900 text-slate-300 p-3 rounded-md break-all">
-                    {user.deviceMeta || "No data"}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm border-none bg-white h-fit">
-            <CardHeader className="pb-4 border-b">
-              <CardTitle className="text-lg">Administration</CardTitle>
-              <CardDescription>Manage user access</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="space-y-4">
-                <div className="p-4 bg-slate-50 rounded-lg border">
-                  <div className="text-sm font-semibold mb-2">Account Status</div>
-                  <p className="text-xs text-muted-foreground mb-4">
-                    {user.status === 'active' 
-                      ? "User currently has full access to the platform. Suspending will instantly block API access."
-                      : "User is suspended and cannot log in or make API calls."}
-                  </p>
-                  <Button 
-                    variant={user.status === 'active' ? "destructive" : "default"} 
-                    className="w-full"
-                    onClick={handleToggleStatus}
-                    disabled={updateMutation.isPending}
-                  >
-                    {user.status === 'active' ? (
-                      <><Ban className="w-4 h-4 mr-2" /> Suspend User</>
-                    ) : (
-                      <><CheckCircle2 className="w-4 h-4 mr-2" /> Reactivate User</>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="col-span-1 md:col-span-3 space-y-4">
-            <h3 className="text-xl font-bold tracking-tight flex items-center gap-2">
-              <Building2 className="h-6 w-6 text-primary" /> Owned Businesses ({user.businesses?.length || 0})
-            </h3>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {user.businesses?.length === 0 ? (
-                <div className="col-span-full py-8 text-center text-muted-foreground bg-white border rounded-xl border-dashed">
-                  This user hasn't created any businesses yet.
-                </div>
-              ) : (
-                user.businesses?.map((biz) => (
-                  <Card key={biz.id} className="shadow-sm border-slate-200">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base truncate" title={biz.name}>{biz.name}</CardTitle>
-                      <CardDescription className="text-xs">ID: {biz.id.split('-')[0]}...</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">Parties</span>
-                        <span className="font-semibold">{biz.partyCount}</span>
-                      </div>
-                      <div className="flex justify-between items-center text-sm mt-2">
-                        <span className="text-muted-foreground">Ledger Entries</span>
-                        <span className="font-semibold">{biz.ledgerCount}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-            </div>
+  return <SidebarLayout><div className="space-y-6">
+    <div className="flex items-center gap-4"><Link href="/users" className="text-primary hover:underline">← Users</Link>
+      <h1 className="text-2xl font-bold">User details</h1></div>
+    {isLoading && <p>Loading user…</p>}
+    {isError && <p role="alert" className="text-red-600">Unable to load user.</p>}
+    {error && <p role="alert" className="text-red-600">{error}</p>}
+    {user && <>
+      <Card className="border-0 shadow-sm bg-white"><CardHeader><CardTitle>Account</CardTitle></CardHeader>
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+          <div><span className="text-muted-foreground">Name</span><p className="font-semibold">{user.name}</p></div>
+          <div><span className="text-muted-foreground">Email</span><p>{user.email ?? "—"}</p></div>
+          <div><span className="text-muted-foreground">Phone</span><p>{user.phone ?? "—"}</p></div>
+          <div><span className="text-muted-foreground">Authentication</span><p>{user.authProvider}</p></div>
+          <div><span className="text-muted-foreground">Joined</span><p>{fmt(user.createdAt)}</p></div>
+          <div><span className="text-muted-foreground">Last successful login</span><p>{fmt(user.lastLogin)}</p></div>
+          <div><span className="text-muted-foreground">Foreground activity (last 5 min)</span><p>{user.isOnline ? "Online" : "Offline"}</p></div>
+          <div><span className="text-muted-foreground">Status</span><p>{user.status}</p></div>
+          <div className="sm:col-span-2"><span className="text-muted-foreground">User ID</span><p className="font-mono break-all">{user.id}</p></div>
+          <div className="sm:col-span-2"><Button variant={user.status === "active" ? "destructive" : "default"}
+            onClick={changeStatus} disabled={update.isPending}>{user.status === "active" ? "Suspend user" : "Reactivate user"}</Button></div>
+        </CardContent></Card>
+      <Card className="border-0 shadow-sm bg-white">
+        <CardHeader><CardTitle>Successful login history (latest 50 · retained 90 days)</CardTitle></CardHeader>
+        <CardContent>
+          <p className="text-xs text-muted-foreground mb-4">IP restrictions affect everyone on a shared IP, including existing sessions and OTP routes—not a permanent device ban. IPs recorded before a verified policy was configured may belong to a shared proxy. Review them before blocking.</p>
+          <p role="status" className={`text-sm p-3 rounded mb-4 ${blocked?.policy.configured && blocked.policy.clientIpAvailable ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
+            {blocked?.policy.message ?? "Checking client IP policy…"}
+            {blocked?.policy.configured && !blocked.policy.clientIpAvailable && " No verifiable client IP on this request; blocking is disabled."}
+          </p>
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <Input className="max-w-sm" value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)}
+              placeholder="Optional reason for blocking an IP" />
           </div>
-        </div>
-      </div>
-    </SidebarLayout>
-  );
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="border-b text-left text-muted-foreground">
+                {["Time", "IP", "Device / browser", "Method", "Client", "Network access"].map((h) => <th key={h} className="p-2">{h}</th>)}
+              </tr></thead>
+              <tbody>{user.loginHistory.map((event) => {
+                const isBlocked = blocked?.items.some((item) => item.ip === event.ip);
+                return <tr key={event.id} className="border-b">
+                  <td className="p-2 whitespace-nowrap">{fmt(event.occurredAt)}</td>
+                  <td className="p-2 font-mono">{event.ip ?? "Unavailable (client IP policy not verified)"}</td>
+                  <td className="p-2 max-w-xs break-words">{event.device}</td>
+                  <td className="p-2">{event.authMethod}</td>
+                  <td className="p-2">{event.source}</td>
+                  <td className="p-2"><Button size="sm" variant={isBlocked ? "outline" : "destructive"}
+                    disabled={!event.ip || !blocked || (!isBlocked && !blocked.policy.clientIpAvailable) || block.isPending || unblock.isPending}
+                    onClick={() => { if (event.ip) toggleIp(event.ip); }}>
+                    {isBlocked ? "Unblock" : "Block IP"}</Button></td>
+                </tr>;
+              })}</tbody>
+            </table>
+            {!user.loginHistory.length && <p className="py-8 text-center text-muted-foreground">No recorded login events yet. Historical logins before audit activation are not available.</p>}
+          </div>
+        </CardContent>
+      </Card>
+    </>}
+  </div></SidebarLayout>;
 }

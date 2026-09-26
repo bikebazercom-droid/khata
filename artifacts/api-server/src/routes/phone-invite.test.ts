@@ -3,7 +3,7 @@ import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import {
-  appUsersTable, businessesTable, db, otpCodesTable, partiesTable,
+  appUsersTable, businessesTable, db, otpCodesTable, partiesTable, userLoginEventsTable,
   userBusinessesTable, workerInvitesTable, workerPartyAssignmentsTable,
 } from "@workspace/db";
 import { type AuthenticatedRequest } from "../middlewares/requireAuth";
@@ -89,7 +89,8 @@ describe("phone worker invitation and verified first sign-in", () => {
     const wrongCode = code === "000000" ? "999999" : "000000";
     const wrong = await request(app).post("/auth/phone/verify-otp").send({ phone, code: wrongCode });
     expect(wrong.status).toBe(401);
-    const verified = await request(app).post("/auth/phone/verify-otp").send({ phone, code });
+    const verified = await request(app).post("/auth/phone/verify-otp")
+      .set("X-Forwarded-For", "8.8.8.8").send({ phone, code });
     expect(verified.status, verified.text).toBe(200);
     expect(verified.body.token).toEqual(expect.any(String));
     const [staff] = await db.select().from(appUsersTable).where(eq(appUsersTable.phone, normalized));
@@ -102,6 +103,10 @@ describe("phone worker invitation and verified first sign-in", () => {
       .set("Authorization", `Bearer ${verified.body.token}`);
     expect(identity.status).toBe(200);
     expect(identity.body).toMatchObject({ role: "staff", businessId, phone: normalized });
+    await request(app).get("/auth/me").set("Authorization", `Bearer ${verified.body.token}`);
+    expect(await db.select().from(userLoginEventsTable).where(eq(userLoginEventsTable.userId, staff!.id))).toHaveLength(1);
+    const [recorded] = await db.select().from(userLoginEventsTable).where(eq(userLoginEventsTable.userId, staff!.id));
+    expect(recorded?.ip).toBeNull(); // No configured policy; never mistake the proxy socket for a user IP.
     const replay = await request(app).post("/auth/phone/verify-otp").send({ phone, code });
     expect(replay.status).toBe(401);
   });

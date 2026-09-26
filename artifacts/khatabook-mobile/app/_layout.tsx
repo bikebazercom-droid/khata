@@ -26,6 +26,7 @@ import { setBaseUrl } from '@workspace/api-client-react';
 import { LanguageProvider } from '@/lib/i18n';
 import { AuthRoleProvider, notifyMobileIdentityChanged, useAuthRole } from '@/lib/auth-role';
 import { useColors } from '@/hooks/useColors';
+import { LiveEntrySync } from '@/lib/use-live-entry-sync';
 
 // Set API base URL — Expo bundles run outside the web proxy and need an
 // absolute URL. EXPO_PUBLIC_DOMAIN is injected by the dev script.
@@ -129,6 +130,7 @@ export default function RootLayout() {
           <ErrorBoundary>
             <QueryClientProvider client={queryClient}>
               <AuthRoleProvider>
+                <LiveEntrySync />
                 <LanguageProvider>
                   <GestureHandlerRootView style={{ flex: 1 }}>
                     <KeyboardProvider>

@@ -5,17 +5,12 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { AdminStatsUsersByAuthProvider } from './adminStatsUsersByAuthProvider';
-import type { AdminStatsUsersByLoginSource } from './adminStatsUsersByLoginSource';
+import type { AdminTrendDay } from './adminTrendDay';
 
 export interface AdminStats {
   totalUsers: number;
-  totalBusinesses: number;
-  totalTransactions: number;
-  totalTransactionVolume: number;
+  activeUsers: number;
   newUsersToday: number;
   newUsersThisWeek: number;
-  activeUsersThisMonth: number;
-  usersByLoginSource: AdminStatsUsersByLoginSource;
-  usersByAuthProvider: AdminStatsUsersByAuthProvider;
+  trends: AdminTrendDay[];
 }

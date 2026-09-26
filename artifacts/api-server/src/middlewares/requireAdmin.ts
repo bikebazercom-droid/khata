@@ -27,7 +27,8 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   }
   const token = authHeader.slice(7);
   try {
-    jwt.verify(token, ADMIN_SECRET!);
+    const payload = jwt.verify(token, ADMIN_SECRET!) as jwt.JwtPayload;
+    if (payload.sub !== "admin") throw new Error("Not an admin token");
     next();
   } catch {
     res.status(401).json({ error: "Invalid or expired admin token" });

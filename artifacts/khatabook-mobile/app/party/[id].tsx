@@ -25,7 +25,6 @@ import { useAuth } from '@clerk/expo';
 import {
   useGetParty,
   useListLedgerEntries,
-  useCreateLedgerEntry,
   useListParties,
   useListAdjustmentTargets,
   getListAdjustmentTargetsQueryKey,
@@ -40,6 +39,9 @@ import { useColors } from '@/hooks/useColors';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthRole } from '@/lib/auth-role';
 import { canAdjustParty, adjustmentDestinations, validAdjustmentSelection } from '@/lib/adjustment-access';
+import { queueEntry, listEntries, subscribeOutbox, type QueuedEntry } from '@/lib/entry-outbox';
+import { v4 as uuidv4 } from 'uuid';
+import NetInfo from '@react-native-community/netinfo';
 
 // ─── Module-level helpers ────────────────────────────────────────────────────
 
@@ -75,28 +77,6 @@ function billImageSrc(billImage: string | null | undefined): string | null {
   return null;
 }
 
-async function uploadBillImage(
-  localUri: string,
-  getToken: () => Promise<string | null>,
-): Promise<string | null> {
-  try {
-    const res = await fetch(localUri);
-    const blob = await res.blob();
-    const mimeType = blob.type || 'image/jpeg';
-    const token = await getToken();
-    const auth: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-    const metaRes = await fetch(`${API_BASE}/api/storage/uploads/request-url`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...auth },
-      body: JSON.stringify({ name: 'bill.jpg', size: blob.size, contentType: mimeType }),
-    });
-    if (!metaRes.ok) return null;
-    const { uploadURL, objectPath } = (await metaRes.json()) as { uploadURL: string; objectPath: string };
-    const up = await fetch(uploadURL, { method: 'PUT', body: blob, headers: { 'Content-Type': mimeType } });
-    return up.ok ? objectPath : null;
-  } catch { return null; }
-}
-
 function formatDate(d: string): string {
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
@@ -117,21 +97,21 @@ interface TransactionSheetProps {
   partyName: string;
   staffMode?: boolean;
   adjustmentPartyIds: string[];
+  actorId: string;
+  businessId: string;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyName, staffMode = false, adjustmentPartyIds, onClose, onSuccess }: TransactionSheetProps) {
+function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyName, staffMode = false, adjustmentPartyIds, actorId, businessId, onClose, onSuccess }: TransactionSheetProps) {
   const colors = useColors();
-  const qc = useQueryClient();
-  const { getToken } = useAuth();
 
   const [type, setType] = useState<'YOU_GAVE' | 'YOU_GOT'>(initialType);
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [billImageUri, setBillImageUri] = useState<string | null>(null);
-  const uploadRef = useRef<Promise<string | null> | null>(null);
-  const createEntry = useCreateLedgerEntry();
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
 
   // Transfer / adjustment state
   const [isTransferMode, setIsTransferMode] = useState(false);
@@ -154,7 +134,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
 
   function reset() {
     setAmount(''); setDescription(''); setType(initialType);
-    setBillImageUri(null); uploadRef.current = null;
+    setBillImageUri(null);
     setIsTransferMode(false); setTransferPartyId(null); setTransferSearch('');
   }
 
@@ -175,7 +155,6 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
             if (!r.canceled && r.assets[0]) {
               const uri = r.assets[0].uri;
               setBillImageUri(uri);
-              uploadRef.current = uploadBillImage(uri, getToken);
             }
           },
         },
@@ -191,7 +170,6 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
             if (!r.canceled && r.assets[0]) {
               const uri = r.assets[0].uri;
               setBillImageUri(uri);
-              uploadRef.current = uploadBillImage(uri, getToken);
             }
           },
         },
@@ -201,6 +179,11 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
   }
 
   async function handleSubmit() {
+    if (savingRef.current) return;
+    if (!actorId || !businessId) {
+      Alert.alert('পরিচয় যাচাই করা যায়নি', 'আবার লগইন করুন। খসড়া জমা দেওয়া হয়নি।');
+      return;
+    }
     const parsed = parseFloat(amount);
     if (!amount || isNaN(parsed) || parsed <= 0) {
       Alert.alert('ভুল পরিমাণ', 'শূন্যের বেশি একটি বৈধ পরিমাণ লিখুন।');
@@ -215,33 +198,29 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
       return;
     }
     try {
-      const pending = uploadRef.current; uploadRef.current = null;
-      const objectPath = pending ? await pending : null;
-      await createEntry.mutateAsync({
-        partyId,
+      savingRef.current = true;
+      setSaving(true);
+      await queueEntry({
+        id: uuidv4(), actorId, businessId, partyId,
         data: {
           type,
           amount: parsed,
           description: description.trim() || undefined,
-          ...(!staffMode ? { billImage: objectPath ?? undefined } : {}),
           ...(isTransferMode ? {
             isTransfer: isTransferMode || undefined,
             transferPartyId: isTransferMode ? transferPartyId : undefined,
           } : {}),
         },
-      });
+        status: 'pending',
+      }, staffMode ? undefined : billImageUri ?? undefined);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      qc.invalidateQueries({ queryKey: [`/api/parties/${partyId}/ledger-entries`] });
-      qc.invalidateQueries({ queryKey: [`/api/parties/${partyId}`] });
-      qc.invalidateQueries({ queryKey: ['/api/dashboard/summary'] });
-      qc.invalidateQueries({ queryKey: ['/api/parties'] });
-      if (transferPartyId) {
-        qc.invalidateQueries({ queryKey: [`/api/parties/${transferPartyId}/ledger-entries`] });
-        qc.invalidateQueries({ queryKey: [`/api/parties/${transferPartyId}`] });
-      }
+      Alert.alert('এন্ট্রি অপেক্ষমাণ', 'সার্ভার নিশ্চিত করলে মূল হিসাবে যুক্ত হবে। অফলাইনে খসড়াটি এই ডিভাইসে সংরক্ষিত আছে।');
       reset(); onSuccess(); onClose();
     } catch (error) {
-      Alert.alert('লেনদেন সংরক্ষণ করা যায়নি', error instanceof Error ? error.message : 'আবার চেষ্টা করুন।');
+      Alert.alert('খসড়া সংরক্ষণ করা যায়নি', error instanceof Error ? error.message : 'আবার চেষ্টা করুন। ফর্মটি খোলা আছে।');
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   }
 
@@ -345,7 +324,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
                 <Image source={{ uri: billImageUri }} style={s.thumb} resizeMode="cover" />
                 <TouchableOpacity
                   style={s.thumbRemove}
-                  onPress={() => { setBillImageUri(null); uploadRef.current = null; }}
+                  onPress={() => setBillImageUri(null)}
                   hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
                 >
                   <Feather name="x" size={11} color="#fff" />
@@ -466,13 +445,13 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
           </View> : null}
 
           <TouchableOpacity
-            style={[s.submitBtn, { backgroundColor: isGave ? colors.willGet : colors.willGive, opacity: createEntry.isPending ? 0.6 : 1 }]}
+            style={[s.submitBtn, { backgroundColor: isGave ? colors.willGet : colors.willGive, opacity: saving ? 0.6 : 1 }]}
             onPress={handleSubmit}
-            disabled={createEntry.isPending}
+            disabled={saving}
             activeOpacity={0.85}
           >
             <Text style={s.submitText}>
-              {createEntry.isPending ? 'সংরক্ষণ হচ্ছে…' : 'এন্ট্রি নিশ্চিত করুন'}
+              {saving ? 'খসড়া সংরক্ষণ হচ্ছে…' : 'এন্ট্রি নিশ্চিত করুন'}
             </Text>
           </TouchableOpacity>
 
@@ -738,6 +717,11 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
   const dateLabel = `${formatDate(entry.createdAt)} • ${formatTime(entry.createdAt)}`;
 
   async function handleSave() {
+    const connection = await NetInfo.fetch().catch(() => null);
+    if (!connection || connection.isConnected !== true || connection.isInternetReachable === false) {
+      Alert.alert('অফলাইনে সম্পাদনা করা যায় না', 'ইন্টারনেট ফিরে এলে আবার চেষ্টা করুন। ফর্মটি খোলা আছে।');
+      return;
+    }
     const p = parseFloat(editAmount);
     if (!editAmount || isNaN(p) || p <= 0) {
       Alert.alert('ভুল পরিমাণ', 'শূন্যের বেশি একটি বৈধ পরিমাণ লিখুন।');
@@ -759,7 +743,12 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
     }
   }
 
-  function handleDelete() {
+  async function handleDelete() {
+    const connection = await NetInfo.fetch().catch(() => null);
+    if (!connection || connection.isConnected !== true || connection.isInternetReachable === false) {
+      Alert.alert('অফলাইনে মুছতে পারবেন না', 'ইন্টারনেট ফিরে এলে আবার চেষ্টা করুন।');
+      return;
+    }
     Alert.alert(
       'এন্ট্রি মুছুন',
       'এই এন্ট্রিটি স্থায়ীভাবে মুছে যাবে। আপনি কি নিশ্চিত?',
@@ -995,6 +984,23 @@ export default function PartyDetailScreen() {
   const [showReminderSheet, setShowReminderSheet] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<LedgerEntry | null>(null);
+  const [pendingEntries, setPendingEntries] = useState<QueuedEntry[]>([]);
+  const [outboxError, setOutboxError] = useState('');
+
+  useEffect(() => {
+    setPendingEntries([]);
+    setOutboxError('');
+    if (!identity || !id) return;
+    let active = true;
+    const refresh = () => {
+      void listEntries(identity.userId, identity.businessId).then((items) => {
+        if (active) setPendingEntries(items.filter((item) => item.partyId === id));
+      }).catch(() => { if (active) setOutboxError('অফলাইন খসড়া পড়া যাচ্ছে না। ডিভাইস স্টোরেজ পরীক্ষা করুন।'); });
+    };
+    refresh();
+    const unsubscribe = subscribeOutbox(refresh);
+    return () => { active = false; unsubscribe(); };
+  }, [identity?.userId, identity?.businessId, id]);
 
   const { data: party, isLoading: partyLoading, refetch: refetchParty } = useGetParty(id!, {
     query: { enabled: !!identity && !!id, queryKey: getGetPartyQueryKey(id!) },
@@ -1151,6 +1157,28 @@ export default function PartyDetailScreen() {
           </Text>
         </View>
 
+        {outboxError ? <Text accessibilityRole="alert" style={{ color: '#b91c1c', margin: 16 }}>{outboxError}</Text> : null}
+        {pendingEntries.length > 0 && (
+          <View style={{ marginHorizontal: 16, padding: 14, backgroundColor: '#fffbeb', borderRadius: 12, borderWidth: 1, borderColor: '#fcd34d' }}>
+            <Text style={{ color: '#92400e', fontFamily: 'Inter_700Bold', fontSize: 13, marginBottom: 8 }}>
+              অপেক্ষমাণ খসড়া · সার্ভারের ব্যালেন্সে যোগ হয়নি
+            </Text>
+            {pendingEntries.map((draft) => (
+              <View key={draft.id} style={{ borderTopWidth: 1, borderTopColor: '#fde68a', paddingVertical: 8 }}>
+                <Text style={{ color: '#78350f', fontFamily: 'Inter_600SemiBold' }}>
+                  {draft.data.type === 'YOU_GAVE' ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন'}: {fmtCur(draft.data.amount)}
+                  {draft.data.isTransfer ? ' · ⇄ ট্রান্সফার' : ''}
+                </Text>
+                {draft.data.description ? <Text style={{ color: '#92400e', fontSize: 12 }}>{draft.data.description}</Text> : null}
+                <Text accessibilityRole={draft.status === 'rejected' ? 'alert' : undefined}
+                  style={{ color: draft.status === 'rejected' ? '#b91c1c' : '#92400e', fontSize: 12 }}>
+                  {draft.status === 'rejected' ? `সংরক্ষণ প্রত্যাখ্যাত: ${draft.error}` : 'সিঙ্কের অপেক্ষায় · নিশ্চিত হলে হিসাবে দেখাবে'}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
         {entriesLoading ? (
           <View style={{ padding: 32, alignItems: 'center' }}><ActivityIndicator color={colors.primary} /></View>
         ) : entries.length === 0 ? (
@@ -1181,6 +1209,8 @@ export default function PartyDetailScreen() {
         partyName={party.name}
         staffMode={isStaff}
         adjustmentPartyIds={identity?.adjustmentPartyIds ?? []}
+        actorId={identity?.userId ?? ''}
+        businessId={identity?.businessId ?? ''}
         onClose={() => setShowSheet(false)}
         onSuccess={() => { refetchParty(); refetchEntries(); }}
       />

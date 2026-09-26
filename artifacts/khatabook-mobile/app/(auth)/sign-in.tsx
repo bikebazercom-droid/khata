@@ -143,6 +143,7 @@ export default function SignInScreen() {
     setPhoneLoading(true);
     try {
       const body = await customFetch<{ token?: string }>('/api/auth/phone/verify-otp', {
+        headers: { 'X-Client-Platform': 'mobile' },
         method: 'POST',
         body: JSON.stringify({ phone: phone.trim(), code: otp.trim() }),
         responseType: 'json',

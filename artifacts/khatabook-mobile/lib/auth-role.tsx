@@ -47,6 +47,22 @@ export function AuthRoleProvider({ children }: { children: React.ReactNode }) {
   const currentAuthKey = userId ? `clerk:${userId}` : isSignedIn ? 'clerk-session' : 'phone-session';
 
   useEffect(() => {
+    if (!identity || identityAuthKey !== currentAuthKey || unauthorized) return;
+    const heartbeat = () => {
+      if (AppState.currentState !== 'active') return;
+      void customFetch('/api/auth/presence', {
+        method: 'POST', responseType: 'text', headers: { 'X-Client-Platform': 'mobile' },
+      }).catch(() => { /* Offline is not foreground presence on the server. */ });
+    };
+    heartbeat();
+    const timer = setInterval(heartbeat, 60_000);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') heartbeat();
+    });
+    return () => { clearInterval(timer); subscription.remove(); };
+  }, [identity, identityAuthKey, currentAuthKey, unauthorized]);
+
+  useEffect(() => {
     requestIdentityRefresh = () => {
       if (Date.now() - lastRefresh.current < 2_000) return;
       lastRefresh.current = Date.now();
@@ -124,7 +140,9 @@ export function AuthRoleProvider({ children }: { children: React.ReactNode }) {
 
     async function loadIdentity() {
       try {
-        const result = await customFetch<Partial<MobileIdentity>>('/api/auth/me', { responseType: 'json' });
+        const result = await customFetch<Partial<MobileIdentity>>('/api/auth/me', {
+          responseType: 'json', headers: { 'X-Client-Platform': 'mobile' },
+        });
         if (
           (result.role !== 'owner' && result.role !== 'staff') ||
           !result.userId ||

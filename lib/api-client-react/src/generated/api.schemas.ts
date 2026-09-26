@@ -143,6 +143,11 @@ export interface LedgerEntry {
 }
 
 export interface LedgerEntryInput {
+  /**
+     * Stable UUID for retry-safe creation. Scoped to the authenticated actor and business.
+     * @pattern ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$
+     */
+  clientRequestId?: string;
   type: LedgerEntryType;
   /** @exclusiveMinimum 0 */
   amount: number;
@@ -272,7 +277,7 @@ export type AuthProvider = typeof AuthProvider[keyof typeof AuthProvider];
 
 export const AuthProvider = {
   phone_otp: 'phone_otp',
-  gmail: 'gmail',
+  clerk: 'clerk',
 } as const;
 
 export interface AdminLoginInput {
@@ -285,20 +290,18 @@ export interface AdminLoginResult {
   expiresAt: string;
 }
 
-export type AdminStatsUsersByLoginSource = {[key: string]: number};
-
-export type AdminStatsUsersByAuthProvider = {[key: string]: number};
+export interface AdminTrendDay {
+  date: string;
+  signups: number;
+  logins: number;
+}
 
 export interface AdminStats {
   totalUsers: number;
-  totalBusinesses: number;
-  totalTransactions: number;
-  totalTransactionVolume: number;
+  activeUsers: number;
   newUsersToday: number;
   newUsersThisWeek: number;
-  activeUsersThisMonth: number;
-  usersByLoginSource: AdminStatsUsersByLoginSource;
-  usersByAuthProvider: AdminStatsUsersByAuthProvider;
+  trends: AdminTrendDay[];
 }
 
 export type AdminUserStatus = typeof AdminUserStatus[keyof typeof AdminUserStatus];
@@ -312,27 +315,33 @@ export const AdminUserStatus = {
 export interface AdminUser {
   id: string;
   name: string;
-  phone: string;
-  loginSource: LoginSource;
+  /** @nullable */
+  email: string | null;
+  /** @nullable */
+  phone: string | null;
   authProvider: AuthProvider;
-  deviceMeta: string;
   status: AdminUserStatus;
-  businessCount: number;
+  isOnline: boolean;
   createdAt: string;
   /** @nullable */
   lastLogin: string | null;
 }
 
-export interface AdminBusinessSummary {
+export interface AdminLoginEvent {
   id: string;
-  name: string;
-  partyCount: number;
-  ledgerCount: number;
-  createdAt: string;
+  occurredAt: string;
+  /**
+     * Unavailable unless verified direct or trusted-proxy policy determines a real client IP. Historical values may reflect shared proxies.
+     * @nullable
+     */
+  ip: string | null;
+  device: string;
+  authMethod: string;
+  source: string;
 }
 
 export type AdminUserDetail = AdminUser & {
-  businesses: AdminBusinessSummary[];
+  loginHistory: AdminLoginEvent[];
 };
 
 export type AdminUserUpdateStatus = typeof AdminUserUpdateStatus[keyof typeof AdminUserUpdateStatus];
@@ -354,56 +363,67 @@ export interface AdminUsersPage {
   pageSize: number;
 }
 
-export interface AdminBusiness {
-  id: string;
-  name: string;
-  ownerName: string;
-  ownerPhone: string;
-  partyCount: number;
-  ledgerCount: number;
-  transactionVolume: number;
-  createdAt: string;
-}
-
-export interface AdminBusinessesPage {
-  items: AdminBusiness[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
-
-export interface AdminTransaction {
-  id: string;
-  businessName: string;
-  partyName: string;
-  partyPhone: string;
-  type: LedgerEntryType;
-  amount: number;
-  description: string;
-  createdAt: string;
-}
-
-export interface AdminTransactionsPage {
-  items: AdminTransaction[];
-  total: number;
-  page: number;
-  pageSize: number;
+export interface TwilioStatus {
+  status: string;
+  /** @nullable */
+  balance: string | null;
+  /** @nullable */
+  currency: string | null;
+  /** @nullable */
+  sender: string | null;
+  senders: string[];
 }
 
 export interface AdminOtpConfig {
-  gatewayUrl: string;
-  /** Last 4 chars of key only — never expose the full key */
-  apiKeyHint: string;
-  remainingBalance: number;
+  enabled: boolean;
+  sender: string;
   /** @nullable */
   updatedAt: string | null;
+  twilio: TwilioStatus | null;
+  /** @nullable */
+  connectionError: string | null;
 }
 
 export interface AdminOtpConfigInput {
-  gatewayUrl: string;
-  apiKey: string;
-  /** @minimum 0 */
-  remainingBalance: number;
+  enabled: boolean;
+  sender: string;
+}
+
+export interface IpBlockInput {
+  ip: string;
+  reason?: string;
+}
+
+export interface IpBlockResult {
+  ip: string;
+}
+
+export interface BlockedIp {
+  ip: string;
+  /** @nullable */
+  reason: string | null;
+  createdAt: string;
+}
+
+export type ClientIpPolicyMode = typeof ClientIpPolicyMode[keyof typeof ClientIpPolicyMode];
+
+
+export const ClientIpPolicyMode = {
+  trusted_proxy: 'trusted_proxy',
+  direct: 'direct',
+  setup_required: 'setup_required',
+} as const;
+
+export interface ClientIpPolicy {
+  configured: boolean;
+  mode: ClientIpPolicyMode;
+  clientIpAvailable: boolean;
+  message: string;
+}
+
+export interface BlockedIpsPage {
+  items: BlockedIp[];
+  policy: ClientIpPolicy;
 }
 
 export type ListPartiesParams = {
@@ -419,36 +439,6 @@ search?: string;
 };
 
 export type ListAdminUsersParams = {
-search?: string;
-loginSource?: LoginSource;
-authProvider?: AuthProvider;
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 100
- */
-pageSize?: number;
-};
-
-export type ListAdminBusinessesParams = {
-search?: string;
-/**
- * @minimum 1
- */
-page?: number;
-/**
- * @minimum 1
- * @maximum 100
- */
-pageSize?: number;
-};
-
-export type ListAdminTransactionsParams = {
-startDate?: string;
-endDate?: string;
 search?: string;
 /**
  * @minimum 1

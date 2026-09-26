@@ -5,13 +5,9 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { AuthProvider } from './authProvider';
-import type { LoginSource } from './loginSource';
 
 export type ListAdminUsersParams = {
 search?: string;
-loginSource?: LoginSource;
-authProvider?: AuthProvider;
 /**
  * @minimum 1
  */

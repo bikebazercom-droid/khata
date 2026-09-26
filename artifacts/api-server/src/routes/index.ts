@@ -12,25 +12,27 @@ import staffRouter from "./staff";
 import businessesRouter from "./businesses";
 import userRouter from "./user";
 import adminRouter from "./admin";
-import adminIsolatedRouter from "./adminIsolated";
 import uploadsRouter from "./uploadBinary";
 import downloadsRouter from "./downloads";
 import downloadConfigsRouter from "./downloadConfigs";
 import scanRouter from "./scan";
 import ownerRouter from "./owner";
 import { enforceRoleAccess } from "../middlewares/roleAccess";
+import { enforceIpBlock } from "../middlewares/ipBlock";
 
 const router: IRouter = Router();
 
 // Public routes (no auth required).
 router.use(healthRouter);
+// Keep health checks independent of DB availability. All authentication,
+// authenticated API, admin and OTP paths pass through the persisted blocklist.
+router.use(enforceIpBlock);
 router.use(authRouter);
 router.use(downloadsRouter);
 router.use(downloadConfigsRouter);
 
 // Admin routes — use their own JWT auth (adminBearer), not Clerk.
 router.use(adminRouter);
-router.use(adminIsolatedRouter);
 
 // All routes below require a valid session (Clerk or phone OTP).
 router.use(requireAuth as any);

@@ -3,8 +3,6 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
   Users,
-  Building2,
-  ReceiptText,
   Settings,
   LogOut,
   Menu,
@@ -15,8 +13,6 @@ import { Button } from "@/components/ui/button";
 const links = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/users", label: "Users", icon: Users },
-  { href: "/businesses", label: "Businesses", icon: Building2 },
-  { href: "/transactions", label: "Transactions", icon: ReceiptText },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

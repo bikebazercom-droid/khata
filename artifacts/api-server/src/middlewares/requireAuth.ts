@@ -1,11 +1,12 @@
 import { Request, Response, NextFunction } from "express";
 import { getAuth } from "@clerk/express";
-import { eq, isNull, isNotNull, and, inArray } from "drizzle-orm";
+import { eq, isNull, isNotNull, and, inArray, lt } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import {
   db,
   appUsersTable,
   appUserLoginSessionsTable,
+  userLoginEventsTable,
   businessesTable,
   businessSettingsTable,
   partiesTable,
@@ -14,6 +15,8 @@ import {
   workerPartyAssignmentsTable,
   type AppUser,
 } from "@workspace/db";
+import { clientIp } from "./ipBlock";
+import { deviceDescription } from "../lib/authTelemetry";
 
 // Fixed UUID for the seed business that owns all pre-auth legacy data.
 export const SEED_BUSINESS_ID = "00000000-0000-0000-0000-000000000001";
@@ -391,6 +394,12 @@ export async function requireAuth(
         .insert(userBusinessesTable)
         .values({ userId: DEV_USER_ID, businessId: SEED_BUSINESS_ID })
         .onConflictDoNothing();
+      const [devUser] = await db.select({ status: appUsersTable.status }).from(appUsersTable)
+        .where(eq(appUsersTable.id, DEV_USER_ID)).limit(1);
+      if (devUser?.status !== "active") {
+        res.status(403).json({ error: "Account suspended" });
+        return;
+      }
       (req as AuthenticatedRequest).userId = DEV_USER_ID;
       (req as AuthenticatedRequest).businessId = SEED_BUSINESS_ID;
       (req as AuthenticatedRequest).role = "owner";
@@ -459,6 +468,12 @@ export async function requireAuth(
         if (newSession) {
           await tx.update(appUsersTable).set({ lastLogin: new Date() })
             .where(eq(appUsersTable.id, user.id));
+          await tx.insert(userLoginEventsTable).values({
+            userId: user.id, ip: clientIp(req), device: deviceDescription(req),
+            authMethod: "clerk", source: req.get("x-client-platform") === "mobile" ? "mobile" : "web",
+          });
+          await tx.delete(userLoginEventsTable).where(lt(userLoginEventsTable.occurredAt,
+            new Date(Date.now() - 90 * 24 * 60 * 60_000)));
         }
         return true;
       });

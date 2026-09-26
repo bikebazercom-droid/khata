@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRoute, Link, useLocation } from 'wouter';
 import {
   useGetParty,
@@ -42,6 +42,8 @@ import { toast } from 'sonner';
 import { format, isToday } from 'date-fns';
 import { bn as bnLocale } from 'date-fns/locale';
 import { useAppAuth } from '@/App';
+import { useBusinessContext } from '@/lib/businessContext';
+import { ENTRY_OUTBOX_CHANGED, listEntries, type QueuedEntry } from '@/lib/entryOutbox';
 
 /**
  * The entry's real transaction date. Users can backdate/forward-date an
@@ -75,7 +77,29 @@ export function PartyView() {
   const [, params] = useRoute('/party/:id');
   const id = params?.id;
   const [, navigate] = useLocation();
-  const { role: userRole } = useAppAuth();
+  const { role: userRole, userId } = useAppAuth();
+  const { selectedBusinessId } = useBusinessContext();
+  const [pendingEntries, setPendingEntries] = useState<QueuedEntry[]>([]);
+  const [outboxError, setOutboxError] = useState('');
+  useEffect(() => {
+    setPendingEntries([]);
+    setOutboxError('');
+    if (!userId || !id) return;
+    let active = true;
+    const refresh = () => {
+      void listEntries(userId, selectedBusinessId).then((items) => {
+        if (active) setPendingEntries(items.filter((item) => item.partyId === id));
+      }).catch(() => {
+        if (active) setOutboxError('অপেক্ষমাণ এন্ট্রি পড়া যাচ্ছে না। স্টোরেজ পরীক্ষা করুন।');
+      });
+    };
+    refresh();
+    window.addEventListener(ENTRY_OUTBOX_CHANGED, refresh);
+    return () => {
+      active = false;
+      window.removeEventListener(ENTRY_OUTBOX_CHANGED, refresh);
+    };
+  }, [userId, selectedBusinessId, id]);
 
   const { data: party, isLoading: partyLoading } = useGetParty(id || '', { query: { enabled: !!id, queryKey: getGetPartyQueryKey(id || '') } });
   const { data: entries = [], isLoading: entriesLoading } = useListLedgerEntries(id || '', { query: { enabled: !!id, queryKey: getListLedgerEntriesQueryKey(id || '') } });
@@ -394,6 +418,22 @@ export function PartyView() {
 
       {/* Scrollable ledger area */}
       <div className="flex-1 overflow-y-auto pb-4">
+        {outboxError && <p role="alert" className="m-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{outboxError}</p>}
+        {pendingEntries.length > 0 && (
+          <section className="m-3 rounded-xl border border-amber-200 bg-amber-50 p-3" aria-label="অপেক্ষমাণ এন্ট্রি">
+            <p className="text-xs font-bold text-amber-900 mb-2">অপেক্ষমাণ খসড়া · সার্ভারের ব্যালেন্সে এখনও যোগ হয়নি</p>
+            {pendingEntries.map((entry) => (
+              <div key={entry.id} className="py-2 border-t border-amber-200 text-sm">
+                <span className="font-bold">{entry.data.type === 'YOU_GAVE' ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন'}: {formatCurrency(entry.data.amount)}</span>
+                {entry.data.isTransfer && <span className="ml-2 text-xs">⇄ ট্রান্সফার</span>}
+                {entry.data.description && <span className="block text-xs">{entry.data.description}</span>}
+                {entry.status === 'rejected'
+                  ? <p role="alert" className="text-red-700 text-xs mt-1">সংরক্ষণ প্রত্যাখ্যাত: {entry.error} খসড়াটি এই ডিভাইসে রাখা হয়েছে।</p>
+                  : <span className="block text-amber-800 text-xs mt-1">সিঙ্কের অপেক্ষায় · নিশ্চিত হলে হিসাবে দেখাবে</span>}
+              </div>
+            ))}
+          </section>
+        )}
         {entriesLoading ? (
           <div className="flex justify-center p-12">
             <div className="animate-pulse w-8 h-8 rounded-full bg-slate-200"></div>

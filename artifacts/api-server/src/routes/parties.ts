@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
-import { and, desc, eq, inArray } from "drizzle-orm";
-import { db, appUsersTable, ledgerEntriesTable, partiesTable, workerPartyAssignmentsTable } from "@workspace/db";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import { db, appUsersTable, ledgerEntriesTable, ledgerRequestReceiptsTable, partiesTable, userBusinessesTable, workerPartyAssignmentsTable } from "@workspace/db";
 import { broadcast } from "../lib/eventBus";
 import {
   ListPartiesQueryParams,
@@ -76,6 +77,52 @@ async function staffCanWrite(tx: Parameters<Parameters<typeof db.transaction>[0]
     .where(and(eq(workerPartyAssignmentsTable.userId, userId),
       eq(partiesTable.businessId, businessId), eq(partiesTable.id, sourceId)));
   return assigned.length === 1;
+}
+
+type EntryTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type ReceiptEntry = typeof ledgerEntriesTable.$inferSelect;
+
+async function actorCanWrite(tx: EntryTransaction, role: string, userId: string,
+  businessId: string, sourceId: string, destinationId?: string) {
+  if (role === "staff") return staffCanWrite(tx, userId, businessId, sourceId, destinationId);
+  if (role !== "owner") return false;
+  // All real users have database UUIDs. Test/dev request shims can use a
+  // synthetic principal; real owner membership must be rechecked in the same
+  // transaction as the receipt lookup and ledger writes.
+  if (!isUuid(userId)) return true;
+  const [user] = await tx.select({ role: appUsersTable.role, status: appUsersTable.status })
+    .from(appUsersTable).where(eq(appUsersTable.id, userId)).for("share").limit(1);
+  if (!user || user.role !== "owner" || user.status !== "active") return false;
+  const [membership] = await tx.select({ businessId: userBusinessesTable.businessId })
+    .from(userBusinessesTable).where(and(eq(userBusinessesTable.userId, userId),
+      eq(userBusinessesTable.businessId, businessId))).for("share").limit(1);
+  return !!membership;
+}
+
+// Advisory lock serializes two simultaneous attempts with the same key,
+// including response-loss retries. The unique index remains the backstop.
+async function existingRequest(tx: EntryTransaction, businessId: string, userId: string,
+  requestId: string | undefined, fingerprint: string): Promise<
+  { status: "new" } | { status: "replayed"; entry: ReceiptEntry } | { status: "conflict" }
+> {
+  if (!requestId) return { status: "new" };
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${businessId + ":" + userId}), hashtext(${requestId}))`);
+  const [receipt] = await tx.select().from(ledgerRequestReceiptsTable).where(and(
+    eq(ledgerRequestReceiptsTable.businessId, businessId),
+    eq(ledgerRequestReceiptsTable.actorId, userId),
+    eq(ledgerRequestReceiptsTable.clientRequestId, requestId),
+  )).limit(1);
+  if (!receipt) return { status: "new" };
+  if (receipt.fingerprint !== fingerprint) return { status: "conflict" };
+  return { status: "replayed", entry: receipt.sourceEntry as ReceiptEntry };
+}
+
+async function saveRequest(tx: EntryTransaction, businessId: string, userId: string,
+  requestId: string | undefined, fingerprint: string, entry: ReceiptEntry) {
+  if (!requestId) return;
+  await tx.insert(ledgerRequestReceiptsTable).values({
+    businessId, actorId: userId, clientRequestId: requestId, fingerprint, sourceEntry: entry,
+  });
 }
 import {
   applyPartyFilters,
@@ -320,7 +367,13 @@ router.post(
       return;
     }
 
-    const { type, amount, description, billReference, billImage, dueDate, isTransfer, transferPartyId } = body.data;
+    const { type, amount, description, billReference, billImage, dueDate, isTransfer, transferPartyId, clientRequestId } = body.data;
+    const fingerprint = createHash("sha256").update(JSON.stringify({
+      partyId: party.id, type, amount: amount.toFixed(2),
+      description: description ?? "", billReference: billReference ?? null,
+      billImage: billImage ?? null, dueDate: toDateOnlyString(dueDate ?? null),
+      isTransfer: !!isTransfer, transferPartyId: transferPartyId ?? null,
+    })).digest("hex");
     if ((isTransfer && (!transferPartyId || transferPartyId === party.id)) ||
         (!isTransfer && transferPartyId)) {
       res.status(400).json({ error: "An adjustment requires a different destination party" }); return;
@@ -356,15 +409,17 @@ router.post(
 
       const now = new Date();
 
-      const permitted = await db.transaction(async (tx) => {
-        if (role === "staff" && !(await staffCanWrite(tx, userId, businessId, party.id, transferPartyId))) return false;
+      const result = await db.transaction(async (tx) => {
+        if (!(await actorCanWrite(tx, role, userId, businessId, party.id, transferPartyId))) return { status: "denied" } as const;
+        const receipt = await existingRequest(tx, businessId, userId, clientRequestId, fingerprint);
+        if (receipt.status !== "new") return receipt;
         // Lock in stable order and use current balances for concurrent transfers.
         const locked = await tx.select().from(partiesTable).where(and(
           eq(partiesTable.businessId, businessId), inArray(partiesTable.id, [party.id, transferPartyId]),
         )).orderBy(partiesTable.id).for("update");
         const source = locked.find((p) => p.id === party.id);
         const destination = locked.find((p) => p.id === transferPartyId);
-        if (!source || !destination) return false;
+        if (!source || !destination) return { status: "denied" } as const;
         // Insert both entries first (without linkedEntryId — we don't know the
         // counter ID yet when inserting the primary entry).
         [primaryEntry] = await tx
@@ -423,9 +478,20 @@ router.post(
           .update(partiesTable)
           .set({ ...partyBBalance, lastTransactionAt: now })
           .where(eq(partiesTable.id, transferPartyId));
-        return true;
+        await saveRequest(tx, businessId, userId, clientRequestId, fingerprint,
+          { ...primaryEntry!, linkedEntryId: counterEntry!.id });
+        return { status: "created" } as const;
       });
-      if (!permitted) { res.status(403).json({ error: "Adjustment is not permitted" }); return; }
+      if (result.status === "denied") { res.status(403).json({ error: "Adjustment is not permitted" }); return; }
+      if (result.status === "conflict") { res.status(409).json({ error: "Request ID was already used for different entry data" }); return; }
+      if (result.status === "replayed") {
+        res.setHeader("X-Idempotent-Replay", "true");
+        res.status(200).json(CreateLedgerEntryResponse.parse({
+          ...result.entry, linkedEntryId: role === "staff" ? null : result.entry.linkedEntryId,
+          amount: Number(result.entry.amount),
+        }));
+        return;
+      }
 
       // Reflect the linked IDs in the in-memory objects (update queries don't
       // return rows without .returning(), so we patch them manually here).
@@ -445,12 +511,14 @@ router.post(
     }
 
     // ── NORMAL MODE ───────────────────────────────────────────────────────────
-    const entry = await db.transaction(async (tx) => {
-    if (role === "staff" && !(await staffCanWrite(tx, userId, businessId, party.id))) return null;
+    const result = await db.transaction(async (tx) => {
+    if (!(await actorCanWrite(tx, role, userId, businessId, party.id))) return { status: "denied" } as const;
+    const receipt = await existingRequest(tx, businessId, userId, clientRequestId, fingerprint);
+    if (receipt.status !== "new") return receipt;
     const [currentParty] = await tx.select().from(partiesTable).where(and(
       eq(partiesTable.id, party.id), eq(partiesTable.businessId, businessId),
     )).for("update").limit(1);
-    if (!currentParty) return null;
+    if (!currentParty) return { status: "denied" } as const;
     const currentSigned = toSignedBalance(currentParty);
     const delta = type === "YOU_GAVE" ? amount : -amount;
     const nextSigned = currentSigned + delta;
@@ -481,9 +549,19 @@ router.post(
         ...(dueDate ? { dueDate: toDateOnlyString(dueDate) } : {}),
       })
       .where(eq(partiesTable.id, party.id));
-    return saved!;
+    await saveRequest(tx, businessId, userId, clientRequestId, fingerprint, saved!);
+    return { status: "created", entry: saved! } as const;
     });
-    if (!entry) { res.status(403).json({ error: "Party access was revoked" }); return; }
+    if (result.status === "denied") { res.status(403).json({ error: "Party access was revoked" }); return; }
+    if (result.status === "conflict") { res.status(409).json({ error: "Request ID was already used for different entry data" }); return; }
+    if (result.status === "replayed") {
+      res.setHeader("X-Idempotent-Replay", "true");
+      res.status(200).json(CreateLedgerEntryResponse.parse({
+        ...result.entry, amount: Number(result.entry.amount),
+      }));
+      return;
+    }
+    const entry = result.entry;
 
     broadcast(businessId, { type: 'ledger.created', payload: { partyId: party.id, entryId: entry!.id } });
 

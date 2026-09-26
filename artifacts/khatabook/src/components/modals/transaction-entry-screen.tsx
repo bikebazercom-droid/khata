@@ -10,7 +10,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  useCreateLedgerEntry,
   useListParties,
   useListAdjustmentTargets,
   getListAdjustmentTargetsQueryKey,
@@ -33,6 +32,9 @@ import { scanDocument } from '@/lib/document-scan';
 import { useAppAuth } from '@/App';
 import { uploadBillImage, billImageSrc, type BillImageUploadResult } from '@/lib/billImageStorage';
 import { savePendingUpload } from '@/lib/pendingUploads';
+import { useBusinessContext } from '@/lib/businessContext';
+import { queueEntry } from '@/lib/entryOutbox';
+import { useConnectionState } from '@/context/connection-state';
 
 type KeyKind = 'digit' | 'muted' | 'accent';
 type KeyDef = { label: string; value: string; kind: KeyKind; span?: number };
@@ -122,91 +124,18 @@ export function TransactionEntryScreen({
   initialEntry?: LedgerEntry;
 }) {
   const isEditMode = !!initialEntry;
-  const { role: userRole, adjustmentPartyIds } = useAppAuth();
+  const { role: userRole, adjustmentPartyIds, userId } = useAppAuth();
+  const { selectedBusinessId } = useBusinessContext();
+  const { isOnline } = useConnectionState();
   const canAdjustSource = userRole === 'owner' || adjustmentPartyIds.includes(partyId);
   const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
   /** Stores the cloud-storage path of the bill image already on the entry so
    *  handleUpdate can keep it unchanged when the user hasn't replaced it. */
   const originalBillImagePathRef = useRef<string | null>(initialEntry?.billImage ?? null);
   const queryClient = useQueryClient();
-  // Optimistic mutation: onMutate applies the expected ledger/balance/
-  // dashboard changes to the cache synchronously (instant UI, no spinner),
-  // onError silently rolls back if the background request fails, and
-  // onSettled reconciles with the server's authoritative response in the
-  // background. `handleSave` below fires this and returns to the ledger
-  // view in the same tick — it never awaits the network.
-  const createEntry = useCreateLedgerEntry({
-    mutation: {
-      onMutate: async ({ partyId, data }) => {
-        const entriesKey = getListLedgerEntriesQueryKey(partyId);
-        const partyKey = getGetPartyQueryKey(partyId);
-        const partiesKey = getListPartiesQueryKey();
-        const summaryKey = getGetDashboardSummaryQueryKey();
-
-        const previousEntries = queryClient.getQueryData<LedgerEntry[]>(entriesKey);
-        const previousParty = queryClient.getQueryData<Party>(partyKey);
-        const previousParties = queryClient.getQueryData<Party[]>(partiesKey);
-        const previousSummary = queryClient.getQueryData<DashboardSummary>(summaryKey);
-
-        const optimisticEntry: LedgerEntry = {
-          id: `optimistic-${Date.now()}`,
-          partyId,
-          type: data.type,
-          amount: data.amount,
-          description: data.description ?? '',
-          billReference: data.billReference ?? null,
-          billImage: data.billImage ?? null,
-          dueDate: data.dueDate ?? null,
-          createdAt: new Date().toISOString(),
-          isTransfer: data.isTransfer ?? false,
-          transferPartyId: data.transferPartyId ?? null,
-          linkedEntryId: null,
-        };
-        queryClient.setQueryData<LedgerEntry[]>(entriesKey, (old) => [optimisticEntry, ...(old ?? [])]);
-
-        const delta = data.type === LedgerEntryType.YOU_GAVE ? data.amount : -data.amount;
-        const updatedParty = previousParty ? applyBalanceDelta(previousParty, delta) : undefined;
-        if (updatedParty) {
-          queryClient.setQueryData<Party>(partyKey, { ...updatedParty, lastTransactionAt: optimisticEntry.createdAt });
-        }
-        if (previousParties) {
-          queryClient.setQueryData<Party[]>(
-            partiesKey,
-            previousParties.map((p) =>
-              p.id === partyId ? { ...applyBalanceDelta(p, delta), lastTransactionAt: optimisticEntry.createdAt } : p
-            )
-          );
-        }
-        if (previousSummary) {
-          queryClient.setQueryData<DashboardSummary>(summaryKey, shiftSummaryForPartyChange(previousSummary, previousParty, updatedParty));
-        }
-
-        return { entriesKey, partyKey, partiesKey, summaryKey, previousEntries, previousParty, previousParties, previousSummary };
-      },
-      onError: (err, _vars, context) => {
-        console.error('লেনদেন সংরক্ষণ ব্যর্থ হয়েছে, পরিবর্তন ফিরিয়ে নেওয়া হচ্ছে:', err);
-        if (!context) return;
-        queryClient.setQueryData(context.entriesKey, context.previousEntries);
-        queryClient.setQueryData(context.partyKey, context.previousParty);
-        queryClient.setQueryData(context.partiesKey, context.previousParties);
-        queryClient.setQueryData(context.summaryKey, context.previousSummary);
-      },
-      onSettled: (_data, _err, { partyId, data }) => {
-        // Silent background reconciliation — replaces the optimistic
-        // temp-id entry / estimated balances with the server's real data
-        // without ever blocking or flashing a loading state.
-        queryClient.invalidateQueries({ queryKey: getListLedgerEntriesQueryKey(partyId) });
-        queryClient.invalidateQueries({ queryKey: getGetPartyQueryKey(partyId) });
-        queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
-        // For transfer entries, also refresh the counter-party's data.
-        if (data.transferPartyId) {
-          queryClient.invalidateQueries({ queryKey: getListLedgerEntriesQueryKey(data.transferPartyId) });
-          queryClient.invalidateQueries({ queryKey: getGetPartyQueryKey(data.transferPartyId) });
-        }
-      },
-    },
-  });
+  // New entries are committed to IndexedDB before the form closes. They
+  // remain visibly pending and never affect the confirmed server balance
+  // until the outbox receives acknowledgement and refetches the ledger.
 
   // In edit mode: pre-populate the expression with the existing amount so the
   // user sees the current value immediately when the screen opens.
@@ -439,22 +368,21 @@ export function TransactionEntryScreen({
       const scanned = await scanDocument(dataUrl);
       // Show the scanned image as a local thumbnail immediately.
       setBillImage(scanned);
-      // Keep the raw base64 available for a retry record if the upload fails.
+      // New entries persist the image with their draft; upload only during
+      // replay so a background pre-upload cannot orphan a duplicate object.
       pendingBase64Ref.current = scanned;
-      // Start the background upload right away so that by the time the user
-      // fills in the amount and presses save, the upload is likely complete.
-      uploadPromiseRef.current = uploadBillImage(scanned);
+      uploadPromiseRef.current = isEditMode ? uploadBillImage(scanned) : null;
     } catch (err) {
       // Falls back to the raw captured photo rather than blocking the user
       // with an error toast — they can still attach it or retake it.
       console.error('বিল স্ক্যান করা যায়নি, মূল ছবি ব্যবহার করা হচ্ছে:', err);
       setBillImage(dataUrl);
       pendingBase64Ref.current = dataUrl;
-      uploadPromiseRef.current = uploadBillImage(dataUrl);
+      uploadPromiseRef.current = isEditMode ? uploadBillImage(dataUrl) : null;
     } finally {
       setIsScanning(false);
     }
-  }, []);
+  }, [isEditMode]);
 
   const handleAttachClick = useCallback(() => {
     if (typeof navigator !== 'undefined' && typeof navigator.mediaDevices?.getUserMedia === 'function') {
@@ -594,6 +522,10 @@ export function TransactionEntryScreen({
    */
   const handleUpdate = useCallback(() => {
     if (!initialEntry) return;
+    if (!navigator.onLine || !isOnline) {
+      toast.error('অফলাইনে এন্ট্রি পরিবর্তন করা যায় না', { description: 'ইন্টারনেট ফিরে এলে আবার চেষ্টা করুন। আপনার লেখা ফর্মে আছে।' });
+      return;
+    }
 
     const finalAmount =
       memoryHistory.length > 0
@@ -737,10 +669,12 @@ export function TransactionEntryScreen({
   }, [
     initialEntry, memoryHistory.length, memoryValue, expression,
     partyId, type, description, dueDate, billImage,
-    queryClient, clearMemory, onClose, BASE,
+    queryClient, clearMemory, onClose, BASE, isOnline,
   ]);
 
-  const handleSave = useCallback(() => {
+  const savingRef = useRef(false);
+  const handleSave = useCallback(async () => {
+    if (savingRef.current) return;
     // If memory logs exist, the grand total accumulated in memory is the
     // authoritative amount to save — it already reflects every M+/M- entry.
     // Otherwise fall back to whatever is currently typed in the expression.
@@ -762,79 +696,41 @@ export function TransactionEntryScreen({
       return;
     }
 
-    // Optimistic UI: close the entry screen immediately so the user never
-    // waits. The memory log is scoped to this transaction entry, so it's
-    // cleared the moment the amount is handed off.
-    clearMemory();
-    onClose();
-
-    // Capture refs before clearing any state so the async block below can
-    // access them even after onClose() unmounts or resets the component.
-    const pendingUpload = uploadPromiseRef.current;
+    if (!userId) {
+      toast.error('পরিচয় যাচাই করা যায়নি। আবার লগইন করুন।');
+      return;
+    }
     const capturedBase64 = pendingBase64Ref.current;
-    uploadPromiseRef.current = null;
-    pendingBase64Ref.current = null;
-
-    // If an image was attached, await the background upload (started the
-    // moment the image was scanned — well before this save press) before
-    // firing the mutation. For entries with no image the promise is null so
-    // the mutation fires synchronously in the same microtask.
-    void (async () => {
-      let objectPath: string | undefined;
-      let uploadFailed = false;
-
-      if (pendingUpload) {
-        const result = await pendingUpload;
-        if (result.ok) {
-          objectPath = result.objectPath;
-        } else {
-          uploadFailed = true;
-          // Inform the user — the entry will still be saved, just without
-          // the photo attached. The image will be retried automatically when
-          // connectivity is restored.
-          if (result.reason === 'url-request-failed') {
-            toast.warning('বিল ছবি সংযুক্ত হয়নি', {
-              description: 'সংযোগ না থাকায় ছবিটি এখন আপলোড হয়নি। ইন্টারনেট ফিরলে স্বয়ংক্রিয়ভাবে যোগ হবে।',
-              duration: 6000,
-            });
-          } else {
-            toast.warning('বিল ছবি আপলোড ব্যর্থ হয়েছে', {
-              description: 'নেটওয়ার্ক সমস্যার কারণে ছবিটি সংরক্ষণ করা যায়নি। ইন্টারনেট ফিরলে স্বয়ংক্রিয়ভাবে চেষ্টা হবে।',
-              duration: 6000,
-            });
-          }
-        }
-      }
-
-      try {
-        const entry = await createEntry.mutateAsync({
-          partyId,
-          data: {
-            type,
-            amount: finalAmount,
-            description,
-            billReference: undefined,
-            // Store the objectPath (e.g. "/objects/uploads/uuid") returned by
-            // cloud storage, NOT the local base64 data URL.
-            billImage: objectPath,
-            dueDate: dueDate || undefined,
-            isTransfer: isTransferMode || undefined,
-            transferPartyId: isTransferMode ? transferPartyId : undefined,
-          },
-        });
-
-        // If the upload failed but we have the base64 data and a real entry ID,
-        // persist a retry record so the background service can re-attempt the
-        // upload the next time connectivity is restored.
-        if (uploadFailed && capturedBase64 && entry?.id) {
-          savePendingUpload({ entryId: entry.id, partyId, base64: capturedBase64 });
-        }
-      } catch {
-        // The mutation failed — optimistic rollback is handled by onError above.
-        // Do not save a pending upload record since the entry itself wasn't created.
-      }
-    })();
-  }, [memoryHistory.length, memoryValue, expression, createEntry, partyId, type, description, dueDate, clearMemory, onClose, isTransferMode, transferPartyId]);
+    savingRef.current = true;
+    try {
+      // A successful IndexedDB commit, not a network attempt, is the point at
+      // which it is safe to close the form. The photo travels with the draft.
+      await queueEntry({
+        id: crypto.randomUUID(),
+        actorId: userId,
+        businessId: selectedBusinessId,
+        partyId,
+        data: {
+          type,
+          amount: finalAmount,
+          description,
+          dueDate: dueDate || undefined,
+          isTransfer: isTransferMode || undefined,
+          transferPartyId: isTransferMode ? transferPartyId : undefined,
+        },
+        imageBase64: capturedBase64 ?? undefined,
+        createdAt: new Date().toISOString(),
+        status: 'pending',
+      });
+      clearMemory();
+      onClose();
+      toast.info('এন্ট্রি অপেক্ষমাণ', { description: 'সার্ভার নিশ্চিত করলে মূল হিসাবে যুক্ত হবে।' });
+    } catch {
+      toast.error('খসড়া সংরক্ষণ করা যায়নি', { description: 'আবার চেষ্টা করুন। এন্ট্রি ফর্মটি খোলা আছে।' });
+    } finally {
+      savingRef.current = false;
+    }
+  }, [memoryHistory.length, memoryValue, expression, partyId, type, description, dueDate, clearMemory, onClose, isTransferMode, transferPartyId, canAdjustSource, userRole, adjustmentPartyIds, userId, selectedBusinessId]);
 
   return (
     <div className="absolute inset-0 z-50 bg-[#f8fafc] flex flex-col">
@@ -950,7 +846,11 @@ export function TransactionEntryScreen({
                   <img src={billImage} alt="সংযুক্ত বিল" className="w-full h-full rounded-xl object-cover border border-slate-200" />
                   <button
                     type="button"
-                    onClick={() => setBillImage(null)}
+                    onClick={() => {
+                      setBillImage(null);
+                      pendingBase64Ref.current = null;
+                      uploadPromiseRef.current = null;
+                    }}
                     className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-sm active:scale-90 transition-transform"
                   >
                     <X className="w-3 h-3" />

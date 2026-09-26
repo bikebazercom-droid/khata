@@ -34,6 +34,7 @@ import { BillImageLightbox } from '@/components/modals/bill-image-lightbox';
 import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic';
 import { toast } from 'sonner';
 import html2canvas from 'html2canvas';
+import { useConnectionState } from '@/context/connection-state';
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -47,6 +48,7 @@ export function TransactionDetailPage() {
   const entryId = params?.entryId ?? '';
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
+  const { isOnline } = useConnectionState();
 
   const { data: party, isLoading: partyLoading } = useGetParty(partyId, {
     query: { enabled: !!partyId, queryKey: getGetPartyQueryKey(partyId) },
@@ -126,6 +128,10 @@ export function TransactionDetailPage() {
   // ── Optimistic delete ──────────────────────────────────────────────────
   function handleDelete() {
     if (!partyId || !entryId || !party || !entry) return;
+    if (!navigator.onLine || !isOnline) {
+      toast.error('অফলাইনে এন্ট্রি মুছতে পারবেন না', { description: 'ইন্টারনেট ফিরে এলে আবার চেষ্টা করুন।' });
+      return;
+    }
 
     const entriesKey = getListLedgerEntriesQueryKey(partyId);
     const partyKey   = getGetPartyQueryKey(partyId);

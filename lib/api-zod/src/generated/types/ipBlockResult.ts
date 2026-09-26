@@ -6,7 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface AdminOtpConfigInput {
-  enabled: boolean;
-  sender: string;
+export interface IpBlockResult {
+  ip: string;
 }

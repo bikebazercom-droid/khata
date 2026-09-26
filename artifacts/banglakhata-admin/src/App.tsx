@@ -10,8 +10,6 @@ import LoginPage from '@/pages/login';
 import DashboardPage from '@/pages/dashboard';
 import UsersPage from '@/pages/users';
 import UserDetailPage from '@/pages/user-detail';
-import BusinessesPage from '@/pages/businesses';
-import TransactionsPage from '@/pages/transactions';
 import SettingsPage from '@/pages/settings';
 
 // Wire the admin JWT into every generated API call.
@@ -35,8 +33,6 @@ function Router() {
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/users" component={UsersPage} />
       <Route path="/users/:id" component={UserDetailPage} />
-      <Route path="/businesses" component={BusinessesPage} />
-      <Route path="/transactions" component={TransactionsPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route component={NotFound} />
     </Switch>

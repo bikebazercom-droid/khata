@@ -5,9 +5,9 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { AdminBusinessSummary } from './adminBusinessSummary';
+import type { AdminLoginEvent } from './adminLoginEvent';
 import type { AdminUser } from './adminUser';
 
 export type AdminUserDetail = AdminUser & {
-  businesses: AdminBusinessSummary[];
+  loginHistory: AdminLoginEvent[];
 };

@@ -2,7 +2,7 @@ import express, { type Request, type Response, type NextFunction } from "express
 import request from "supertest";
 import jwt from "jsonwebtoken";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   appUsersTable, appUserLoginSessionsTable, businessesTable, db, ledgerEntriesTable,
   partiesTable, userBusinessesTable, workerInvitesTable, workerPartyAssignmentsTable,
@@ -21,7 +21,7 @@ vi.mock("@clerk/express", () => ({
 vi.mock("../services/sms", () => ({ ensureSmsReady: vi.fn(), sendOtpSms: vi.fn() }));
 
 describe("staff deletion, explicit re-invitation and scoped adjustments", () => {
-  let businessId: string, foreignBusinessId: string, staffId: string;
+  let businessId: string, foreignBusinessId: string, staffId: string, ownerId: string;
   let a: string, b: string, c: string, foreign: string;
   const email = `adjustments-${crypto.randomUUID()}@example.test`;
   const phone = `+88017${Math.floor(Math.random() * 100_000_000).toString().padStart(8, "0")}`;
@@ -30,6 +30,14 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
   app.use(express.json());
   app.use(authRouter);
   app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.get("Authorization") === "Bearer uuid-owner") {
+      Object.assign(req as AuthenticatedRequest, {
+        userId: ownerId, businessId: req.get("x-foreign") ? foreignBusinessId : businessId,
+        role: "owner", status: "active", authMethod: "dev",
+      });
+      next();
+      return;
+    }
     if (req.get("Authorization") === "Bearer owner") {
       Object.assign(req as AuthenticatedRequest, {
         userId: "owner", businessId: req.get("x-foreign") ? foreignBusinessId : businessId,
@@ -53,7 +61,12 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
     [a, b, c, foreign] = parties.map((p) => p.id) as [string, string, string, string];
     const [staff] = await db.insert(appUsersTable).values({ businessId, role: "staff", phone }).returning();
     staffId = staff!.id;
+    const [owner] = await db.insert(appUsersTable).values({
+      businessId, role: "owner", phone: `+88018${Math.floor(Math.random() * 100_000_000).toString().padStart(8, "0")}`,
+    }).returning();
+    ownerId = owner!.id;
     await db.insert(userBusinessesTable).values({ businessId, userId: staffId });
+    await db.insert(userBusinessesTable).values({ businessId, userId: ownerId });
     await db.insert(workerPartyAssignmentsTable).values([a, b, c].map((partyId) => ({ userId: staffId, partyId })));
     token = jwt.sign({ userId: staffId, phone, sessionVersion: 0 }, process.env.SESSION_SECRET!, { expiresIn: "1h" });
   });
@@ -99,7 +112,7 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
     expect(counter?.partyId).toBe(b);
     expect(counter?.linkedEntryId).toBe(success.body.id);
     expect(counter?.createdByUserId).toBe(staffId);
-    expect((await request(app).get("/auth/me").set("Authorization", `Bearer ${token}`)).body.adjustmentPartyIds).toEqual([a, b]);
+    expect((await request(app).get("/auth/me").set("Authorization", `Bearer ${token}`)).body.adjustmentPartyIds.sort()).toEqual([a, b].sort());
     const all = await request(app).get("/parties").set("Authorization", `Bearer ${token}`);
     expect(all.body.map((p: { id: string }) => p.id).sort()).toEqual([a, b, c].sort());
   });
@@ -174,6 +187,73 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
       expect(current.currentBalance).toBe(old.currentBalance);
       expect(current.balanceType).toBe(old.balanceType);
     }
+  });
+
+  it("atomically deduplicates concurrent normal entries, scopes keys by actor/business, and never recreates a deleted entry", async () => {
+    expect((await patch({ partyIds: [a, b, c], adjustmentPartyIds: [a, b] })).status).toBe(200);
+    const key = crypto.randomUUID();
+    const payload = { clientRequestId: key, type: "YOU_GAVE", amount: 23, description: "offline normal" };
+    const send = (auth: string, source = a, body = payload, foreignHeader = false) => {
+      let req = request(app).post(`/parties/${source}/ledger-entries`).set("Authorization", auth);
+      if (foreignHeader) req = req.set("x-foreign", "1");
+      return req.send(body);
+    };
+    const [first, second] = await Promise.all([send("Bearer owner"), send("Bearer owner")]);
+    expect([first.status, second.status].sort()).toEqual([200, 201]);
+    expect(first.body.id).toBe(second.body.id);
+    expect((await db.select().from(ledgerEntriesTable).where(eq(ledgerEntriesTable.id, first.body.id)))).toHaveLength(1);
+    expect((await send("Bearer owner", a, { ...payload, amount: 24 })).status).toBe(409);
+    const otherActor = await send(`Bearer ${token}`);
+    expect(otherActor.status, JSON.stringify(otherActor.body)).toBe(201);
+    expect(otherActor.body.id).not.toBe(first.body.id);
+    const otherBusiness = await send("Bearer owner", foreign, payload, true);
+    expect(otherBusiness.status).toBe(201);
+    expect(otherBusiness.body.id).not.toBe(first.body.id);
+    expect((await request(app).delete(`/parties/${a}/entries/${first.body.id}`)
+      .set("Authorization", "Bearer owner")).status).toBe(200);
+    const replay = await send("Bearer owner");
+    expect(replay.status).toBe(200);
+    expect(replay.body.id).toBe(first.body.id);
+    expect((await db.select().from(ledgerEntriesTable).where(eq(ledgerEntriesTable.id, first.body.id)))).toHaveLength(0);
+  });
+
+  it("checks a real owner's current business membership before any receipt replay", async () => {
+    const requestId = crypto.randomUUID();
+    const send = () => request(app).post(`/parties/${foreign}/ledger-entries`)
+      .set("Authorization", "Bearer uuid-owner").set("x-foreign", "1")
+      .send({ clientRequestId: requestId, type: "YOU_GAVE", amount: 4 });
+    expect((await send()).status).toBe(403);
+    await db.insert(userBusinessesTable).values({ userId: ownerId, businessId: foreignBusinessId });
+    const first = await send();
+    expect(first.status).toBe(201);
+    expect((await send()).status).toBe(200);
+    await db.delete(userBusinessesTable).where(and(
+      eq(userBusinessesTable.userId, ownerId), eq(userBusinessesTable.businessId, foreignBusinessId)));
+    expect((await send()).status).toBe(403);
+    expect((await db.select().from(ledgerEntriesTable).where(eq(ledgerEntriesTable.id, first.body.id)))).toHaveLength(1);
+  });
+
+  it("retries a staff transfer as the same atomic pair, conceals the target link, and denies replay after grant revocation", async () => {
+    expect((await patch({ partyIds: [a, b, c], adjustmentPartyIds: [a, b] })).status).toBe(200);
+    const key = crypto.randomUUID();
+    const payload = { clientRequestId: key, type: "YOU_GOT", amount: 17,
+      isTransfer: true, transferPartyId: b };
+    const send = () => request(app).post(`/parties/${a}/ledger-entries`)
+      .set("Authorization", `Bearer ${token}`).send(payload);
+    const first = await send();
+    const replay = await send();
+    expect(first.status, JSON.stringify(first.body)).toBe(201);
+    expect(replay.status).toBe(200);
+    expect(replay.body.id).toBe(first.body.id);
+    expect(replay.body.linkedEntryId).toBeNull();
+    const [source] = await db.select().from(ledgerEntriesTable).where(eq(ledgerEntriesTable.id, first.body.id));
+    expect(source?.linkedEntryId).toBeTruthy();
+    expect((await db.select().from(ledgerEntriesTable).where(eq(ledgerEntriesTable.id, source!.linkedEntryId!)))).toHaveLength(1);
+    expect((await patch({ adjustmentPartyIds: [a] })).status).toBe(200);
+    expect((await send()).status).toBe(403);
+    expect((await request(app).post(`/parties/${a}/ledger-entries`).set("Authorization", `Bearer ${token}`)
+      .send({ ...payload, clientRequestId: crypto.randomUUID() })).status).toBe(403);
+    expect((await db.select().from(ledgerEntriesTable).where(eq(ledgerEntriesTable.id, first.body.id)))).toHaveLength(1);
   });
 
   it("deletes staff from the list, revokes the same phone token, preserves ledger attribution, and permits explicit re-invite", async () => {
@@ -407,12 +487,15 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
         try {
           if (timed) {
             const pending = write(session).then((result) => result);
-            // Keep DB/socket I/O real while waiting for the provider fixture.
-            for (let i = 0; !releaseLate && i < 1000; i++) {
+            // Fake only the provider timeout. DB/socket I/O is real; a fixed
+            // count of event-loop turns can finish before the request reaches
+            // the mocked provider when the test runner or DB is busy.
+            const providerDeadline = process.hrtime.bigint() + 10_000_000_000n;
+            while (!releaseLate && process.hrtime.bigint() < providerDeadline) {
               await vi.advanceTimersByTimeAsync(0);
               await new Promise<void>((resolve) => setImmediate(resolve));
             }
-            expect(releaseLate).toBeDefined();
+            expect(releaseLate, `provider calls: ${provider.mock.calls.map(([url]) => String(url)).join(", ")}`).toBeDefined();
             await vi.advanceTimersByTimeAsync(5_000);
             denied = await pending;
             expect(metadataSignal?.aborted).toBe(true);

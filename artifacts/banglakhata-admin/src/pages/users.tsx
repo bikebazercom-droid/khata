@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useAuthGuard } from "@/lib/auth";
 import { SidebarLayout } from "@/components/layout/sidebar";
-import { useListAdminUsers } from "@workspace/api-client-react";
+import { useListAdminUsers, getListAdminUsersQueryKey } from "@workspace/api-client-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatShortDate } from "@/lib/format";
 import { Link } from "wouter";
-import { Search, ChevronLeft, ChevronRight, Filter } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { useDebounce } from "@/lib/use-debounce";
 
 export default function UsersPage() {
@@ -21,7 +21,7 @@ export default function UsersPage() {
     search: debouncedSearch,
     page,
     pageSize: 20
-  });
+  }, { query: { queryKey: getListAdminUsersQueryKey({ search: debouncedSearch, page, pageSize: 20 }), refetchInterval: 30_000 } });
 
   // Reset page when search changes
   useEffect(() => {
@@ -38,15 +38,12 @@ export default function UsersPage() {
             <div className="relative w-full sm:w-64">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name or phone..."
+                placeholder="Search by name, email or phone..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9 bg-white"
               />
             </div>
-            <Button variant="outline" size="icon" className="shrink-0 bg-white">
-              <Filter className="h-4 w-4" />
-            </Button>
           </div>
         </div>
 
@@ -55,10 +52,10 @@ export default function UsersPage() {
             <TableHeader className="bg-slate-50">
               <TableRow>
                 <TableHead>User</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Source / Auth</TableHead>
+                <TableHead>Email / phone</TableHead>
+                <TableHead>Auth method</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Businesses</TableHead>
+                <TableHead className="text-right">Active now</TableHead>
                 <TableHead className="text-right">Joined</TableHead>
                 <TableHead></TableHead>
               </TableRow>
@@ -85,10 +82,9 @@ export default function UsersPage() {
                         <span className="text-xs text-muted-foreground font-mono truncate max-w-[120px]" title={user.id}>{user.id.split('-')[0]}...</span>
                       </div>
                     </TableCell>
-                    <TableCell>{user.phone}</TableCell>
+                    <TableCell><div>{user.email ?? "—"}</div><div className="text-xs text-muted-foreground">{user.phone ?? "—"}</div></TableCell>
                     <TableCell>
                       <div className="flex gap-1.5 flex-wrap">
-                        <Badge variant="secondary" className="text-[10px] uppercase">{user.loginSource}</Badge>
                         <Badge variant="outline" className="text-[10px] uppercase text-muted-foreground">{user.authProvider}</Badge>
                       </div>
                     </TableCell>
@@ -97,7 +93,7 @@ export default function UsersPage() {
                         {user.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right font-medium">{user.businessCount}</TableCell>
+                    <TableCell className="text-right font-medium">{user.isOnline ? "● Online" : "Offline"}</TableCell>
                     <TableCell className="text-right text-muted-foreground text-sm">{formatShortDate(user.createdAt)}</TableCell>
                     <TableCell className="text-right">
                       <Link href={`/users/${user.id}`}>

@@ -15,8 +15,14 @@ import router from "./routes";
 import { logger } from "./lib/logger";
 import { ensureDefaultBusiness } from "./middlewares/requireAuth";
 import { migrateBillImages } from "./lib/migrateBillImages";
+import { trustedProxyCidrs } from "./middlewares/ipBlock";
 
 const app: Express = express();
+
+// Only accept forwarding headers from explicitly configured proxy CIDRs.
+// Without configuration, req.ip is the socket peer (not the spoofable XFF).
+const trustedProxies = trustedProxyCidrs();
+app.set("trust proxy", trustedProxies.length ? trustedProxies : false);
 
 app.use(
   pinoHttp({

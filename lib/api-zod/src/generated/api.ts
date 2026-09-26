@@ -219,18 +219,20 @@ export const ListLedgerEntriesResponse = zod.array(ListLedgerEntriesResponseItem
 
 
 /**
- * Creates the ledger entry and recalculates the party's balance and balance type.
+ * Creates the ledger entry and recalculates the party's balance and balance type. A stable clientRequestId makes retries safe within the authenticated actor and business. Reuse with a different payload returns 409. Permissions are checked again on every replay.
  * @summary Record a "You Gave" or "You Got" transaction for a party
  */
 export const CreateLedgerEntryParams = zod.object({
   "partyId": zod.coerce.string()
 })
 
+export const createLedgerEntryBodyClientRequestIdRegExp = new RegExp('^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
 export const createLedgerEntryBodyAmountExclusiveMin = 0;
 
 
 
 export const CreateLedgerEntryBody = zod.object({
+  "clientRequestId": zod.string().regex(createLedgerEntryBodyClientRequestIdRegExp).optional().describe('Stable UUID for retry-safe creation. Scoped to the authenticated actor and business.'),
   "type": zod.enum(['YOU_GAVE', 'YOU_GOT']),
   "amount": zod.number().gt(createLedgerEntryBodyAmountExclusiveMin),
   "description": zod.string().optional(),
@@ -402,14 +404,14 @@ export const AdminLoginResponse = zod.object({
  */
 export const GetAdminStatsResponse = zod.object({
   "totalUsers": zod.number(),
-  "totalBusinesses": zod.number(),
-  "totalTransactions": zod.number(),
-  "totalTransactionVolume": zod.number(),
+  "activeUsers": zod.number(),
   "newUsersToday": zod.number(),
   "newUsersThisWeek": zod.number(),
-  "activeUsersThisMonth": zod.number(),
-  "usersByLoginSource": zod.record(zod.string(), zod.number()),
-  "usersByAuthProvider": zod.record(zod.string(), zod.number())
+  "trends": zod.array(zod.object({
+  "date": zod.coerce.date(),
+  "signups": zod.number(),
+  "logins": zod.number()
+}))
 })
 
 
@@ -425,8 +427,6 @@ export const listAdminUsersQueryPageSizeMax = 100;
 
 export const ListAdminUsersQueryParams = zod.object({
   "search": zod.coerce.string().optional(),
-  "loginSource": zod.enum(['play_store', 'app_store', 'web']).optional(),
-  "authProvider": zod.enum(['phone_otp', 'gmail']).optional(),
   "page": zod.coerce.number().min(1).default(listAdminUsersQueryPageDefault),
   "pageSize": zod.coerce.number().min(1).max(listAdminUsersQueryPageSizeMax).default(listAdminUsersQueryPageSizeDefault)
 })
@@ -435,12 +435,11 @@ export const ListAdminUsersResponse = zod.object({
   "items": zod.array(zod.object({
   "id": zod.string(),
   "name": zod.string(),
-  "phone": zod.string(),
-  "loginSource": zod.enum(['play_store', 'app_store', 'web']),
-  "authProvider": zod.enum(['phone_otp', 'gmail']),
-  "deviceMeta": zod.string(),
+  "email": zod.string().nullable(),
+  "phone": zod.string().nullable(),
+  "authProvider": zod.enum(['phone_otp', 'clerk']),
   "status": zod.enum(['active', 'suspended']),
-  "businessCount": zod.number(),
+  "isOnline": zod.boolean(),
   "createdAt": zod.coerce.date(),
   "lastLogin": zod.coerce.date().nullable()
 })),
@@ -460,21 +459,21 @@ export const GetAdminUserParams = zod.object({
 export const GetAdminUserResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
-  "phone": zod.string(),
-  "loginSource": zod.enum(['play_store', 'app_store', 'web']),
-  "authProvider": zod.enum(['phone_otp', 'gmail']),
-  "deviceMeta": zod.string(),
+  "email": zod.string().nullable(),
+  "phone": zod.string().nullable(),
+  "authProvider": zod.enum(['phone_otp', 'clerk']),
   "status": zod.enum(['active', 'suspended']),
-  "businessCount": zod.number(),
+  "isOnline": zod.boolean(),
   "createdAt": zod.coerce.date(),
   "lastLogin": zod.coerce.date().nullable()
 }).and(zod.object({
-  "businesses": zod.array(zod.object({
+  "loginHistory": zod.array(zod.object({
   "id": zod.string(),
-  "name": zod.string(),
-  "partyCount": zod.number(),
-  "ledgerCount": zod.number(),
-  "createdAt": zod.coerce.date()
+  "occurredAt": zod.coerce.date(),
+  "ip": zod.string().nullable().describe('Unavailable unless verified direct or trusted-proxy policy determines a real client IP. Historical values may reflect shared proxies.'),
+  "device": zod.string(),
+  "authMethod": zod.string(),
+  "source": zod.string()
 }))
 }))
 
@@ -493,123 +492,102 @@ export const UpdateAdminUserBody = zod.object({
 export const UpdateAdminUserResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
-  "phone": zod.string(),
-  "loginSource": zod.enum(['play_store', 'app_store', 'web']),
-  "authProvider": zod.enum(['phone_otp', 'gmail']),
-  "deviceMeta": zod.string(),
+  "email": zod.string().nullable(),
+  "phone": zod.string().nullable(),
+  "authProvider": zod.enum(['phone_otp', 'clerk']),
   "status": zod.enum(['active', 'suspended']),
-  "businessCount": zod.number(),
+  "isOnline": zod.boolean(),
   "createdAt": zod.coerce.date(),
   "lastLogin": zod.coerce.date().nullable()
 }).and(zod.object({
-  "businesses": zod.array(zod.object({
+  "loginHistory": zod.array(zod.object({
   "id": zod.string(),
-  "name": zod.string(),
-  "partyCount": zod.number(),
-  "ledgerCount": zod.number(),
-  "createdAt": zod.coerce.date()
+  "occurredAt": zod.coerce.date(),
+  "ip": zod.string().nullable().describe('Unavailable unless verified direct or trusted-proxy policy determines a real client IP. Historical values may reflect shared proxies.'),
+  "device": zod.string(),
+  "authMethod": zod.string(),
+  "source": zod.string()
 }))
 }))
-
-
-/**
- * @summary List all businesses / shops
- */
-export const listAdminBusinessesQueryPageDefault = 1;
-
-export const listAdminBusinessesQueryPageSizeDefault = 20;
-export const listAdminBusinessesQueryPageSizeMax = 100;
-
-
-
-export const ListAdminBusinessesQueryParams = zod.object({
-  "search": zod.coerce.string().optional(),
-  "page": zod.coerce.number().min(1).default(listAdminBusinessesQueryPageDefault),
-  "pageSize": zod.coerce.number().min(1).max(listAdminBusinessesQueryPageSizeMax).default(listAdminBusinessesQueryPageSizeDefault)
-})
-
-export const ListAdminBusinessesResponse = zod.object({
-  "items": zod.array(zod.object({
-  "id": zod.string(),
-  "name": zod.string(),
-  "ownerName": zod.string(),
-  "ownerPhone": zod.string(),
-  "partyCount": zod.number(),
-  "ledgerCount": zod.number(),
-  "transactionVolume": zod.number(),
-  "createdAt": zod.coerce.date()
-})),
-  "total": zod.number(),
-  "page": zod.number(),
-  "pageSize": zod.number()
-})
-
-
-/**
- * @summary Global ledger entries across all businesses
- */
-export const listAdminTransactionsQueryPageDefault = 1;
-
-export const listAdminTransactionsQueryPageSizeDefault = 20;
-export const listAdminTransactionsQueryPageSizeMax = 100;
-
-
-
-export const ListAdminTransactionsQueryParams = zod.object({
-  "startDate": zod.date().optional(),
-  "endDate": zod.date().optional(),
-  "search": zod.coerce.string().optional(),
-  "page": zod.coerce.number().min(1).default(listAdminTransactionsQueryPageDefault),
-  "pageSize": zod.coerce.number().min(1).max(listAdminTransactionsQueryPageSizeMax).default(listAdminTransactionsQueryPageSizeDefault)
-})
-
-export const ListAdminTransactionsResponse = zod.object({
-  "items": zod.array(zod.object({
-  "id": zod.string(),
-  "businessName": zod.string(),
-  "partyName": zod.string(),
-  "partyPhone": zod.string(),
-  "type": zod.enum(['YOU_GAVE', 'YOU_GOT']),
-  "amount": zod.number(),
-  "description": zod.string(),
-  "createdAt": zod.coerce.date()
-})),
-  "total": zod.number(),
-  "page": zod.number(),
-  "pageSize": zod.number()
-})
 
 
 /**
  * @summary Get OTP gateway configuration
  */
 export const GetAdminOtpConfigResponse = zod.object({
-  "gatewayUrl": zod.string(),
-  "apiKeyHint": zod.string().describe('Last 4 chars of key only — never expose the full key'),
-  "remainingBalance": zod.number(),
-  "updatedAt": zod.coerce.date().nullable()
+  "enabled": zod.boolean(),
+  "sender": zod.string(),
+  "updatedAt": zod.coerce.date().nullable(),
+  "twilio": zod.union([zod.object({
+  "status": zod.string(),
+  "balance": zod.string().nullable(),
+  "currency": zod.string().nullable(),
+  "sender": zod.string().nullable(),
+  "senders": zod.array(zod.string())
+}),zod.null()]),
+  "connectionError": zod.string().nullable()
 })
 
 
 /**
  * @summary Update OTP gateway configuration
  */
-export const updateAdminOtpConfigBodyRemainingBalanceMin = 0;
-
-
-
 export const UpdateAdminOtpConfigBody = zod.object({
-  "gatewayUrl": zod.string(),
-  "apiKey": zod.string(),
-  "remainingBalance": zod.number().min(updateAdminOtpConfigBodyRemainingBalanceMin)
+  "enabled": zod.boolean(),
+  "sender": zod.string()
 })
 
 export const UpdateAdminOtpConfigResponse = zod.object({
-  "gatewayUrl": zod.string(),
-  "apiKeyHint": zod.string().describe('Last 4 chars of key only — never expose the full key'),
-  "remainingBalance": zod.number(),
-  "updatedAt": zod.coerce.date().nullable()
+  "enabled": zod.boolean(),
+  "sender": zod.string(),
+  "updatedAt": zod.coerce.date().nullable(),
+  "twilio": zod.union([zod.object({
+  "status": zod.string(),
+  "balance": zod.string().nullable(),
+  "currency": zod.string().nullable(),
+  "sender": zod.string().nullable(),
+  "senders": zod.array(zod.string())
+}),zod.null()]),
+  "connectionError": zod.string().nullable()
 })
+
+
+export const ListBlockedIpsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "ip": zod.string(),
+  "reason": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})),
+  "policy": zod.object({
+  "configured": zod.boolean(),
+  "mode": zod.enum(['trusted_proxy', 'direct', 'setup_required']),
+  "clientIpAvailable": zod.boolean(),
+  "message": zod.string()
+})
+})
+
+
+export const BlockIpBody = zod.object({
+  "ip": zod.string(),
+  "reason": zod.string().optional()
+})
+
+export const BlockIpResponse = zod.object({
+  "ip": zod.string()
+})
+
+
+export const UnblockIpParams = zod.object({
+  "ip": zod.coerce.string()
+})
+
+export const UnblockIpResponse = zod.void()
+
+
+/**
+ * @summary Refresh authenticated foreground presence (five-minute window)
+ */
+export const ReportForegroundPresenceResponse = zod.void()
 
 
 /**

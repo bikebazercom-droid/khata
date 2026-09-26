@@ -6,4 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type AdminStatsUsersByAuthProvider = {[key: string]: number};
+export interface AdminTrendDay {
+  date: Date;
+  signups: number;
+  logins: number;
+}

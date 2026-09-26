@@ -11,5 +11,5 @@ export type AuthProvider = typeof AuthProvider[keyof typeof AuthProvider];
 
 export const AuthProvider = {
   phone_otp: 'phone_otp',
-  gmail: 'gmail',
+  clerk: 'clerk',
 } as const;

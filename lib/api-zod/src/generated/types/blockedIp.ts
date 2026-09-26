@@ -6,10 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface AdminBusinessSummary {
-  id: string;
-  name: string;
-  partyCount: number;
-  ledgerCount: number;
+export interface BlockedIp {
+  ip: string;
+  /** @nullable */
+  reason: string | null;
   createdAt: Date;
 }
