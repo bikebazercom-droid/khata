@@ -15,3 +15,12 @@ discovery can therefore give users a project that fails its first compilation.
 **How to apply:** Prefer a real assembleDebug build. Otherwise clearly label the
 checks performed, validate resource XML and archive contents separately, and
 do not claim an APK build or successful device test.
+
+For builds in this environment, use an actual OpenJDK 17 installation rather
+than the Java module's GraalVM Java 19 runtime.
+
+**Why:** The GraalVM module can configure Gradle successfully but fail Android's
+JdkImageTransform at compilation time. OpenJDK 17 completed the same SDK build.
+
+**How to apply:** Set JAVA_HOME for the validation process only; never include
+a Nix store path or a local SDK location in a downloadable Android project.
