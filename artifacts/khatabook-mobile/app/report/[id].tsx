@@ -36,7 +36,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import {
   useGetParty,
@@ -654,11 +654,13 @@ export default function ReportScreen() {
   // Shared helper — generates the PDF and returns its local URI
   async function generatePdfUri(): Promise<string> {
     const { uri: tmpUri } = await Print.printToFileAsync({ html: getHtml(), base64: false });
-    // Copy into documentDirectory so the file persists after the temp cache is cleared
+    // Copy into the documents directory so the file persists after the temp cache is cleared.
     const safeName = (party?.name ?? 'report').replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    const destUri  = `${FileSystem.documentDirectory}${safeName}_report.pdf`;
-    await FileSystem.copyAsync({ from: tmpUri, to: destUri });
-    return destUri;
+    const destination = new File(Paths.document, `${safeName}_report.pdf`);
+    // iOS does not overwrite an existing file when copying; replace the previous report.
+    if (destination.exists) destination.delete();
+    new File(tmpUri).copy(destination);
+    return destination.uri;
   }
 
   async function handlePdf() {
