@@ -37,6 +37,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
+import { assertPdfFile, reportPdfName, shareReportPdf } from '@/lib/report-pdf';
 import * as Haptics from 'expo-haptics';
 import {
   useGetParty,
@@ -632,7 +633,7 @@ export default function ReportScreen() {
     setDatePop(null);
   }
 
-  // PDF generate (save via native print dialog)
+  // PDF generation saves an app-private copy; the share sheet offers external destinations.
   const [pdfBusy,   setPdfBusy]   = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
 
@@ -654,13 +655,22 @@ export default function ReportScreen() {
   // Shared helper — generates the PDF and returns its local URI
   async function generatePdfUri(): Promise<string> {
     const { uri: tmpUri } = await Print.printToFileAsync({ html: getHtml(), base64: false });
+    const generated = new File(tmpUri);
+    assertPdfFile(generated);
     // Copy into the documents directory so the file persists after the temp cache is cleared.
-    const safeName = (party?.name ?? 'report').replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    const destination = new File(Paths.document, `${safeName}_report.pdf`);
+    const destination = new File(Paths.document, reportPdfName(id, party?.name ?? 'report'));
     // iOS does not overwrite an existing file when copying; replace the previous report.
     if (destination.exists) destination.delete();
-    new File(tmpUri).copy(destination);
+    generated.copy(destination);
+    assertPdfFile(destination);
     return destination.uri;
+  }
+
+  async function shareSavedPdf(savedUri: string) {
+    const result = await shareReportPdf(savedUri, new File(savedUri), Sharing);
+    if (result === 'unavailable') {
+      Alert.alert('শেয়ার করা যাচ্ছে না', 'এই ডিভাইসে শেয়ারিং সমর্থিত নয়।');
+    }
   }
 
   async function handlePdf() {
@@ -672,18 +682,19 @@ export default function ReportScreen() {
       // Notify the user and offer to open / share immediately
       Alert.alert(
         'PDF সংরক্ষিত হয়েছে ✓',
-        'রিপোর্টটি আপনার ডিভাইসে সেভ হয়েছে।',
+        'রিপোর্টটি অ্যাপের নিজস্ব স্টোরেজে সেভ হয়েছে। বাইরে সেভ করতে বা পাঠাতে “শেয়ার করুন” চাপুন।',
         [
           {
             text: 'শেয়ার করুন',
             onPress: async () => {
+              setShareBusy(true);
               try {
-                await Sharing.shareAsync(savedUri, {
-                  mimeType: 'application/pdf',
-                  UTI: 'com.adobe.pdf',
-                  dialogTitle: 'শেয়ার করুন',
-                });
-              } catch { /* user dismissed share sheet */ }
+                await shareSavedPdf(savedUri);
+              } catch {
+                Alert.alert('ত্রুটি', 'শেয়ার করা যায়নি।');
+              } finally {
+                setShareBusy(false);
+              }
             },
           },
           { text: 'ঠিক আছে', style: 'cancel' },
@@ -702,16 +713,7 @@ export default function ReportScreen() {
     setShareBusy(true);
     try {
       const savedUri = await generatePdfUri();
-      const ok = await Sharing.isAvailableAsync();
-      if (!ok) {
-        Alert.alert('শেয়ার করা যাচ্ছে না', 'এই ডিভাইসে শেয়ারিং সমর্থিত নয়।');
-        return;
-      }
-      await Sharing.shareAsync(savedUri, {
-        mimeType: 'application/pdf',
-        UTI: 'com.adobe.pdf',
-        dialogTitle: 'শেয়ার করুন — WhatsApp, SMS, ইত্যাদি',
-      });
+      await shareSavedPdf(savedUri);
     } catch {
       Alert.alert('ত্রুটি', 'শেয়ার করা যায়নি।');
     } finally {
