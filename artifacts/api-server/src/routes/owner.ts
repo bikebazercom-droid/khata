@@ -331,6 +331,14 @@ router.delete("/owner/workers/:id", async (req, res): Promise<void> => {
     await tx.delete(workerPartyAssignmentsTable).where(eq(workerPartyAssignmentsTable.userId, worker.id));
     await tx.update(appUserLoginSessionsTable).set({ revokedAt: new Date() })
       .where(eq(appUserLoginSessionsTable.userId, worker.id));
+    // Persistent cutoff also covers Clerk sessions never seen by this API.
+    // Keep it after re-invitation; token iat is NOT session creation time.
+    await tx.insert(appUserLoginSessionsTable).values({
+      userId: worker.id, sessionId: "worker-access-revoked", revokedAt: new Date(),
+    }).onConflictDoUpdate({
+      target: [appUserLoginSessionsTable.userId, appUserLoginSessionsTable.sessionId],
+      set: { revokedAt: new Date() },
+    });
     // Revoke any outstanding re-invitation too; old invitations never restore access.
     if (worker.verifiedEmail || worker.phone) {
       await tx.update(workerInvitesTable).set({ status: "revoked", partyIds: [], adjustmentPartyIds: [] }).where(and(

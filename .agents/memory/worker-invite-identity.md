@@ -14,3 +14,9 @@ Deleting staff access means removing business access, not destroying the authent
 **Why:** The owner chose removable access with later reinvitation, not a permanent ban. Physically deleting the user identity can trigger automatic owner provisioning on the next sign-in and break historical attribution.
 
 **How to apply:** Preserve the identity/audit boundary whenever changing deletion or invite claims. Deleted staff must never regain access from old grants, ordinary activation, or stale sessions.
+
+Revocation must also cover identity-provider sessions the API has never seen.
+
+**Why:** Tracking only previously observed session IDs leaves an older, unused session able to claim a later reinvitation. Reissued token timestamps do not prove the underlying session is new.
+
+**How to apply:** For identities whose access was deleted, compare the provider's actual session creation time against the revocation cutoff before accepting a reinvitation; fail closed if it cannot be verified.

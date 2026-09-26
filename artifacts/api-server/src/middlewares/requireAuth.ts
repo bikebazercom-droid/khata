@@ -362,6 +362,23 @@ export async function requireAuth(
         .where(and(eq(appUsersTable.clerkUserId, clerkAuth.userId),
           eq(appUserLoginSessionsTable.sessionId, clerkAuth.sessionId))).limit(1);
       if (oldSession?.revokedAt) { res.status(401).json({ error: "Session signed out" }); return; }
+      const [cutoff] = await db.select({ revokedAt: appUserLoginSessionsTable.revokedAt })
+        .from(appUserLoginSessionsTable)
+        .innerJoin(appUsersTable, eq(appUsersTable.id, appUserLoginSessionsTable.userId))
+        .where(and(eq(appUsersTable.clerkUserId, clerkAuth.userId),
+          eq(appUserLoginSessionsTable.sessionId, "worker-access-revoked"))).limit(1);
+      if (cutoff?.revokedAt) {
+        const response = await fetch(`https://api.clerk.com/v1/sessions/${encodeURIComponent(clerkAuth.sessionId)}`, {
+          headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
+        });
+        if (!response.ok) throw new Error("Could not verify session creation time");
+        const session = await response.json() as { created_at?: number; user_id?: string };
+        if (session.user_id !== clerkAuth.userId || typeof session.created_at !== "number" ||
+          session.created_at <= cutoff.revokedAt.getTime()) {
+          res.status(401).json({ error: "Staff access was removed. Please sign in with a new session." });
+          return;
+        }
+      }
       const verifiedEmail = await getVerifiedClerkEmail(clerkAuth.userId);
       const user = await getOrCreateClerkUser(clerkAuth.userId, verifiedEmail ?? undefined);
       if (user.status !== "active" || user.workerAccessDeletedAt) {
@@ -373,6 +390,11 @@ export async function requireAuth(
         const [currentUser] = await tx.select().from(appUsersTable)
           .where(eq(appUsersTable.id, user.id)).for("update").limit(1);
         if (!currentUser || currentUser.status !== "active" || currentUser.workerAccessDeletedAt) return false;
+        const [currentCutoff] = await tx.select().from(appUserLoginSessionsTable).where(and(
+          eq(appUserLoginSessionsTable.userId, user.id),
+          eq(appUserLoginSessionsTable.sessionId, "worker-access-revoked"),
+        )).limit(1);
+        if ((currentCutoff?.revokedAt?.getTime() ?? 0) !== (cutoff?.revokedAt?.getTime() ?? 0)) return false;
         const [newSession] = await tx.insert(appUserLoginSessionsTable).values({
           userId: user.id,
           sessionId: clerkAuth.sessionId!,

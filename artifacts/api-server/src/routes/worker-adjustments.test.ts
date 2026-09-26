@@ -168,7 +168,10 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
     const [staff] = await db.select().from(appUsersTable).where(eq(appUsersTable.clerkUserId, clerk.id));
     await db.insert(appUserLoginSessionsTable).values({ userId: staff!.id, sessionId: "old-worker-session", revokedAt: new Date() });
     vi.stubEnv("CLERK_SECRET_KEY", "sk_test_local_fixture");
-    vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(JSON.stringify({
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => new Response(JSON.stringify(String(url).includes("/sessions/") ? {
+      user_id: clerk.id,
+      created_at: String(url).includes("unseen-old-session") ? 1 : Date.now() + 1000,
+    } : {
       primary_email_address_id: "verified",
       email_addresses: [{ id: "verified", email_address: email, verification: { status: "verified" } }],
     })));
@@ -176,12 +179,14 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
       .send({ email, partyIds: [a], adjustmentPartyIds: [] });
     expect(invitation.status).toBe(201);
     expect((await request(app).get("/auth/me").set("x-clerk-session", "old-worker-session")).status).toBe(401);
+    expect((await request(app).get("/auth/me").set("x-clerk-session", "unseen-old-session")).status).toBe(401);
     const [pending] = await db.select().from(workerInvitesTable).where(eq(workerInvitesTable.id, invitation.body.id));
     expect(pending?.status).toBe("pending");
     const fresh = await request(app).get("/auth/me").set("x-clerk-session", "fresh-worker-session");
     expect(fresh.status).toBe(200);
     expect(fresh.body.adjustmentPartyIds).toEqual([]);
     expect((await request(app).get("/auth/me").set("x-clerk-session", "old-worker-session")).status).toBe(401);
+    expect((await request(app).get("/auth/me").set("x-clerk-session", "unseen-old-session")).status).toBe(401);
   });
 
   it("serializes adjustment writes against grant removal and denies all writes after revoke commits", async () => {
@@ -189,6 +194,14 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
     const [write, revoke] = await Promise.all([transfer(a, b), patch({ adjustmentPartyIds: [] })]);
     expect([201, 403]).toContain(write.status);
     expect(revoke.status).toBe(200);
+    const before = await db.select({ id: ledgerEntriesTable.id }).from(ledgerEntriesTable)
+      .where(inArray(ledgerEntriesTable.partyId, [a, b]));
     expect((await transfer(a, b)).status).toBe(403);
+    const after = await db.select({ id: ledgerEntriesTable.id }).from(ledgerEntriesTable)
+      .where(inArray(ledgerEntriesTable.partyId, [a, b]));
+    expect(after.map((entry) => entry.id).sort()).toEqual(before.map((entry) => entry.id).sort());
+    const refreshed = await request(app).get("/auth/me").set("Authorization", `Bearer ${token}`);
+    expect(refreshed.status).toBe(200);
+    expect(refreshed.body.adjustmentPartyIds).toEqual([]);
   });
 });

@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import { useAuth } from '@clerk/expo';
 import * as SecureStore from 'expo-secure-store';
 import { useQueryClient } from '@tanstack/react-query';
@@ -41,14 +42,38 @@ export function AuthRoleProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [unauthorized, setUnauthorized] = useState(false);
   const [refreshSequence, setRefreshSequence] = useState(0);
+  const loadedAuthKey = useRef<string | null>(null);
+  const lastRefresh = useRef(0);
   const currentAuthKey = userId ? `clerk:${userId}` : isSignedIn ? 'clerk-session' : 'phone-session';
 
   useEffect(() => {
-    requestIdentityRefresh = () => setRefreshSequence((current) => current + 1);
+    requestIdentityRefresh = () => {
+      if (Date.now() - lastRefresh.current < 2_000) return;
+      lastRefresh.current = Date.now();
+      setRefreshSequence((current) => current + 1);
+    };
     return () => {
       requestIdentityRefresh = null;
     };
   }, []);
+
+  // An owner may change grants while this device stays on the same screen.
+  useEffect(() => {
+    const refresh = () => {
+      if (AppState.currentState === 'active') notifyMobileIdentityChanged();
+    };
+    const timer = setInterval(refresh, 10_000);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') notifyMobileIdentityChanged();
+    });
+    return () => { clearInterval(timer); subscription.remove(); };
+  }, []);
+
+  useEffect(() => queryClient.getMutationCache().subscribe((event) => {
+    if (event.type !== 'updated' || event.action.type !== 'error') return;
+    const status = (event.mutation.state.error as { status?: number } | null)?.status;
+    if (status === 401 || status === 403) notifyMobileIdentityChanged();
+  }), [queryClient]);
 
   useEffect(() => {
     setAuthTokenGetter(async () => {
@@ -70,10 +95,16 @@ export function AuthRoleProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => queryClient.getQueryCache().subscribe((event) => {
     if (event.type !== 'updated' || event.action.type !== 'error') return;
     const status = (event.query.state.error as { status?: number } | null)?.status;
+    if (status === 403) { notifyMobileIdentityChanged(); return; }
     if (status !== 401) return;
     queryClient.clear();
-    setIdentity(null);
-    setIdentityAuthKey(null);
+    const accountChanged = loadedAuthKey.current !== currentAuthKey;
+    if (accountChanged) {
+      setIdentity(null);
+      setIdentityAuthKey(null);
+      setLoading(true);
+      queryClient.clear();
+    }
     setUnauthorized(true);
     setError('Your session has expired. Please sign in again.');
     setLoading(false);
@@ -88,10 +119,8 @@ export function AuthRoleProvider({ children }: { children: React.ReactNode }) {
     setIdentityAuthKey(null);
     setError(null);
     setUnauthorized(false);
-    setLoading(true);
     // Never allow queries from the previous authenticated account to remain
     // available while the new account's permissions are being resolved.
-    queryClient.clear();
 
     async function loadIdentity() {
       try {
@@ -110,8 +139,11 @@ export function AuthRoleProvider({ children }: { children: React.ReactNode }) {
           throw new Error('অ্যাকাউন্টের অ্যাডজাস্টমেন্ট অনুমতির তথ্য সঠিক নয়।');
         }
         if (!cancelled) {
+          loadedAuthKey.current = currentAuthKey;
           setIdentity({ ...result, adjustmentPartyIds: result.adjustmentPartyIds ?? [] } as MobileIdentity);
           setIdentityAuthKey(currentAuthKey);
+          // Assignment revocation must also remove stale party/ledger results.
+          void queryClient.invalidateQueries();
         }
       } catch (cause) {
         if (!cancelled) {

@@ -37,6 +37,7 @@ import type { LedgerEntry, Party } from '@workspace/api-client-react';
 import { useColors } from '@/hooks/useColors';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthRole } from '@/lib/auth-role';
+import { canAdjustParty, adjustmentDestinations, validAdjustmentSelection } from '@/lib/adjustment-access';
 
 // ─── Module-level helpers ────────────────────────────────────────────────────
 
@@ -134,13 +135,19 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
   const [isTransferMode, setIsTransferMode] = useState(false);
   const [transferPartyId, setTransferPartyId] = useState<string | null>(null);
   const [transferSearch, setTransferSearch] = useState('');
-  const canAdjustSource = !staffMode || adjustmentPartyIds.includes(partyId);
+  const canAdjustSource = canAdjustParty(staffMode, adjustmentPartyIds, partyId);
   const transferSearchParams = { search: transferSearch || undefined };
   const { data: allParties = [], isLoading: transferLoading, isError: transferError, error: transferErrorDetail, refetch: refetchTransfers } = useListParties(
     transferSearchParams,
     { query: { enabled: isTransferMode && canAdjustSource, queryKey: ['/api/parties', 'transfer', transferSearch] } },
   );
-  const transferPartyOptions = allParties.filter((p) => p.id !== partyId && (!staffMode || adjustmentPartyIds.includes(p.id)));
+  const transferPartyOptions = adjustmentDestinations(allParties, partyId, staffMode, adjustmentPartyIds);
+
+  useEffect(() => {
+    setTransferPartyId((selected) => validAdjustmentSelection(selected, partyId, staffMode, adjustmentPartyIds));
+    // Keep transfer mode: revocation must not silently turn a draft adjustment
+    // into an ordinary ledger entry.
+  }, [partyId, staffMode, adjustmentPartyIds]);
 
   useEffect(() => { if (visible) setType(initialType); }, [visible, initialType]);
 
