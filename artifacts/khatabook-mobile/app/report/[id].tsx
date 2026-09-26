@@ -37,7 +37,8 @@ import { Feather } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
-import { assertPdfFile, reportPdfName, shareReportPdf } from '@/lib/report-pdf';
+import * as LegacyFileSystem from 'expo-file-system/legacy';
+import { assertPdfFile, reportPdfName, shareReportPdf, saveReportPdfToFolder, FolderPdfError } from '@/lib/report-pdf';
 import * as Haptics from 'expo-haptics';
 import {
   useGetParty,
@@ -636,6 +637,7 @@ export default function ReportScreen() {
   // PDF generation saves an app-private copy; the share sheet offers external destinations.
   const [pdfBusy,   setPdfBusy]   = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
+  const folderInProgress = useRef(false);
 
   const getHtml = useCallback(() => {
     const r = getRange(filter, cStart, cEnd);
@@ -673,8 +675,48 @@ export default function ReportScreen() {
     }
   }
 
+  function offerFolderSave(savedUri: string) {
+    if (Platform.OS !== 'android') return;
+    Alert.alert(
+      'ফোল্ডারে PDF সেভ',
+      'পরের পর্দায় একটি ফোল্ডার বেছে নিয়ে “Use this folder” / অনুমতি দিন চাপুন। Android ১১ বা পরের সংস্করণে মূল Downloads, ফোন বা SD কার্ডের মূল ফোল্ডার বাছা নাও যেতে পারে। Downloads-এর ভেতরে “বাংলা খাতা” নামে সাবফোল্ডার তৈরি করে বা অন্য অনুমোদিত সাবফোল্ডার বেছে নিন। সর্বোচ্চ ১০ MiB PDF সেভ করা যাবে।',
+      [
+        { text: 'বাতিল', style: 'cancel' },
+        {
+          text: 'ফোল্ডার বাছুন',
+          onPress: async () => {
+            if (folderInProgress.current) return;
+            folderInProgress.current = true;
+            setPdfBusy(true);
+            try {
+              const result = await saveReportPdfToFolder(
+                Platform.OS, savedUri, new File(savedUri), id, party?.name ?? 'report',
+                {
+                  ...LegacyFileSystem.StorageAccessFramework,
+                  getInfoAsync: LegacyFileSystem.getInfoAsync,
+                },
+              );
+              if (result === 'saved') {
+                Alert.alert('ফোল্ডারে সেভ হয়েছে', 'নির্বাচিত ফোল্ডারে PDF কপি লেখা সম্পন্ন হয়েছে। Files অ্যাপে দেখুন। একই নাম থাকলে ফাইল সেবা নতুন নাম দিতে পারে।');
+              } else if (result === 'not-granted') {
+                Alert.alert('ফোল্ডারে সেভ হয়নি', 'ফোল্ডার বাছা বাতিল হয়েছে বা অনুমতি দেওয়া হয়নি। অ্যাপের নিজস্ব PDF কপি অক্ষত আছে। আবার “PDF ডাউনলোড” → “ফোল্ডারে সেভ” থেকে চেষ্টা করতে পারেন।');
+              }
+            } catch (error) {
+              Alert.alert('ফোল্ডারে সেভ হয়নি', error instanceof FolderPdfError
+                ? error.message
+                : 'সেভ করা PDF পড়া যায়নি। “PDF ডাউনলোড” দিয়ে আবার তৈরি করুন।');
+            } finally {
+              folderInProgress.current = false;
+              setPdfBusy(false);
+            }
+          },
+        },
+      ],
+    );
+  }
+
   async function handlePdf() {
-    if (!party) return;
+    if (!party || folderInProgress.current) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setPdfBusy(true);
     try {
@@ -682,8 +724,14 @@ export default function ReportScreen() {
       // Notify the user and offer to open / share immediately
       Alert.alert(
         'PDF সংরক্ষিত হয়েছে ✓',
-        'রিপোর্টটি অ্যাপের নিজস্ব স্টোরেজে সেভ হয়েছে। বাইরে সেভ করতে বা পাঠাতে “শেয়ার করুন” চাপুন।',
+        Platform.OS === 'android'
+          ? 'রিপোর্টটি অ্যাপের নিজস্ব স্টোরেজে সেভ হয়েছে। বাইরে কপি রাখতে “ফোল্ডারে সেভ” অথবা পাঠাতে “শেয়ার করুন” চাপুন।'
+          : 'রিপোর্টটি অ্যাপের নিজস্ব স্টোরেজে সেভ হয়েছে। বাইরে সেভ করতে বা পাঠাতে “শেয়ার করুন” চাপুন।',
         [
+          ...(Platform.OS === 'android' ? [{
+            text: 'ফোল্ডারে সেভ',
+            onPress: () => offerFolderSave(savedUri),
+          }] : []),
           {
             text: 'শেয়ার করুন',
             onPress: async () => {
@@ -708,7 +756,7 @@ export default function ReportScreen() {
   }
 
   async function handleShare() {
-    if (!party) return;
+    if (!party || folderInProgress.current) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setShareBusy(true);
     try {

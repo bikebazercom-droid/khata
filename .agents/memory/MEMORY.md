@@ -5,3 +5,4 @@
 - [Expo + Clerk Metro config fix](expo-clerk-metro-config.md) — Metro crashes watching @clerk/backend_tmp_* dirs; add blockList pattern to metro.config.js.
 - [Worker invitation identity](worker-invite-identity.md) — one pending invite per verified identity across businesses avoids arbitrary first-sign-in claims.
 - [Android export validation](android-export-validation.md) — Gradle task discovery is not source compilation; API-only compiler checks are not APK builds.
+- [Expo folder exports](expo-folder-save-constraints.md) — SAF writes need bounded memory; Android restricts root folder grants and provider cleanup can fail silently.
