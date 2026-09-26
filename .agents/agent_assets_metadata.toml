@@ -42,3 +42,17 @@ mtime_ms = 1790408710233
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/0fd2722f-1537-407d-b126-8b447dd8a257/9300125e-00d6-417e-bcbc-e0c79438a3df"
 storage_version_token = "1790408724648319"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "xvYTCg4ur4V3xUp-5GrP6"
+uri = "file://exports/BanglaKhata-NativeDownloads-AndroidStudio.zip"
+type = "unspecified"
+title = "BanglaKhata — Android Project with Native PDF Downloads & Sharing"
+description = "Complete Android Studio project with DownloadManager, secure generated-PDF bridge, public Downloads storage, runtime permissions, and native sharing. Includes a successfully built debug APK and setup instructions."
+logical_id = "44d2f0dc-8f96-4053-845a-3d6adbecb9a9"
+content_hash = "sha256:9fe5afb8c17690007db2bad40b33c04071d4b21b78cd3cf16ddb09971fd386fa"
+size = 2216128
+mtime_ms = 1790415838109
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/44d2f0dc-8f96-4053-845a-3d6adbecb9a9/d67f5472-58e0-48b3-bff8-d522a928eaa6"
+storage_version_token = "1790415892971330"
+content_type = "application/octet-stream"

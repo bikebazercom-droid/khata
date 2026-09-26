@@ -34,6 +34,7 @@ public final class MainActivity extends ComponentActivity {
     private ProgressBar progress;
     private ValueCallback<Uri[]> fileCallback;
     private OnBackPressedCallback backCallback;
+    private NativeDownloads downloads;
 
     private final ActivityResultLauncher<Intent> filePicker =
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
@@ -84,19 +85,26 @@ public final class MainActivity extends ComponentActivity {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
-        settings.setAllowFileAccess(false);
+        settings.setAllowFileAccess(true);
+        settings.setAllowFileAccessFromFileURLs(false);
+        settings.setAllowUniversalAccessFromFileURLs(false);
         settings.setAllowContentAccess(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setUseWideViewPort(true);
         settings.setLoadWithOverviewMode(true);
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
+        downloads = new NativeDownloads(this, webView);
+        downloads.install();
         webView.setWebViewClient(new WebViewClient() {
+            @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap icon) {
+                downloads.onNavigation();
+            }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 String scheme = uri.getScheme();
                 // Web navigation is handled by this WebView, not a browser app.
-                if ("https".equalsIgnoreCase(scheme) || "http".equalsIgnoreCase(scheme)) {
+                if ("https".equalsIgnoreCase(scheme)) {
                     return false;
                 }
                 if ("tel".equalsIgnoreCase(scheme) || "mailto".equalsIgnoreCase(scheme)
@@ -112,6 +120,7 @@ public final class MainActivity extends ComponentActivity {
             @Override public void onPageFinished(WebView view, String url) {
                 if (backCallback != null) backCallback.setEnabled(view.canGoBack());
                 CookieManager.getInstance().flush();
+                downloads.onPageFinished(url);
             }
             @Override public void onReceivedError(WebView view, WebResourceRequest request,
                                                   WebResourceError error) {
@@ -153,6 +162,7 @@ public final class MainActivity extends ComponentActivity {
     @Override protected void onResume() {
         super.onResume();
         if (webView != null) webView.onResume();
+        if (downloads != null) downloads.checkCompleted();
     }
     @Override protected void onPause() {
         if (webView != null) webView.onPause();
@@ -164,6 +174,7 @@ public final class MainActivity extends ComponentActivity {
         super.onSaveInstanceState(state);
     }
     @Override protected void onDestroy() {
+        if (downloads != null) downloads.close();
         if (fileCallback != null) fileCallback.onReceiveValue(null);
         if (webView != null) {
             webView.stopLoading();
