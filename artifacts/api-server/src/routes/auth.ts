@@ -17,6 +17,8 @@ import {
   appUsersTable,
   appUserLoginSessionsTable,
   businessesTable,
+  workerPartyAssignmentsTable,
+  partiesTable,
 } from "@workspace/db";
 import {
   getOrCreatePhoneUser,
@@ -199,8 +201,9 @@ router.post(
 
     // JIT provision the user + business.
     const user = await getOrCreatePhoneUser(normalized);
-    if (user.status !== "active") {
-      res.status(403).json({ error: "Account suspended" });
+    if (user.status !== "active" || user.workerAccessDeletedAt) {
+      res.status(403).json({ error: user.workerAccessDeletedAt
+        ? "Staff access removed. Ask the owner for a new invitation." : "Account suspended" });
       return;
     }
     await db.update(appUsersTable).set({ lastLogin: new Date() })
@@ -286,12 +289,18 @@ router.get("/auth/me", requireAuth, async (req: Request, res: Response): Promise
   const auth = req as AuthenticatedRequest;
   const [business] = await db.select({ name: businessesTable.name }).from(businessesTable)
     .where(eq(businessesTable.id, auth.businessId)).limit(1);
+  const [user] = await db.select({ ids: appUsersTable.adjustmentPartyIds }).from(appUsersTable)
+    .where(eq(appUsersTable.id, auth.userId)).limit(1);
+  const assignments = auth.role === "staff" ? await db.select({ id: partiesTable.id })
+    .from(workerPartyAssignmentsTable).innerJoin(partiesTable, eq(partiesTable.id, workerPartyAssignmentsTable.partyId))
+    .where(and(eq(workerPartyAssignmentsTable.userId, auth.userId), eq(partiesTable.businessId, auth.businessId))) : [];
   res.json({
     role: auth.role,
     businessId: auth.businessId,
     userId: auth.userId,
     businessName: business?.name ?? "",
     authMethod: auth.authMethod,
+    adjustmentPartyIds: auth.role === "staff" ? (user?.ids ?? []).filter((id) => assignments.some((a) => a.id === id)) : [],
     ...(auth.phone ? { phone: auth.phone } : {}),
   });
 });

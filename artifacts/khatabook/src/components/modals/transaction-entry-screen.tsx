@@ -120,7 +120,8 @@ export function TransactionEntryScreen({
   initialEntry?: LedgerEntry;
 }) {
   const isEditMode = !!initialEntry;
-  const { role: userRole } = useAppAuth();
+  const { role: userRole, adjustmentPartyIds } = useAppAuth();
+  const canAdjustSource = userRole === 'owner' || adjustmentPartyIds.includes(partyId);
   const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
   /** Stores the cloud-storage path of the bill image already on the entry so
    *  handleUpdate can keep it unchanged when the user hasn't replaced it. */
@@ -297,9 +298,9 @@ export function TransactionEntryScreen({
   // Fetch party list for the transfer dropdown (only when toggle is on).
   const { data: transferPartyList = [] } = useListParties(
     { search: transferSearch || undefined },
-    { query: { enabled: isTransferMode && !isEditMode, queryKey: getListPartiesQueryKey({ search: transferSearch || undefined }) } },
+    { query: { enabled: canAdjustSource && isTransferMode && !isEditMode, queryKey: getListPartiesQueryKey({ search: transferSearch || undefined }) } },
   );
-  const transferPartyOptions = transferPartyList.filter((p) => p.id !== partyId);
+  const transferPartyOptions = transferPartyList.filter((p) => p.id !== partyId && (userRole === 'owner' || adjustmentPartyIds.includes(p.id)));
 
   // Controls the "unsaved changes" confirmation dialog shown when the user
   // presses back with a dirty edit-mode form.
@@ -751,7 +752,7 @@ export function TransactionEntryScreen({
     }
 
     // Validate transfer selection before doing anything else.
-    if (isTransferMode && !transferPartyId) {
+    if (isTransferMode && (!canAdjustSource || !transferPartyId || (userRole !== 'owner' && !adjustmentPartyIds.includes(transferPartyId)))) {
       toast.warning('কাস্টমার বেছে নিন', {
         description: 'অ্যাডজাস্টমেন্টের জন্য একটি কাস্টমার নির্বাচন করুন।',
         duration: 3000,
@@ -974,11 +975,12 @@ export function TransactionEntryScreen({
         </div>
 
         {/* Row 2: adjustment toggle — create mode only */}
-        {!isEditMode && userRole === 'owner' && (
+        {!isEditMode && canAdjustSource && (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
             {/* Compact toggle row */}
             <button
               type="button"
+              data-testid="button-toggle-adjustment"
               onClick={() => { setIsTransferMode((v) => !v); setTransferPartyId(null); setTransferSearch(''); }}
               className="w-full h-11 flex items-center justify-between px-4 active:bg-slate-50 transition-colors"
             >
@@ -1007,6 +1009,7 @@ export function TransactionEntryScreen({
               <div className="border-t border-slate-100 px-3 pb-3">
                 <input
                   value={transferSearch}
+                  data-testid="input-adjustment-party-search"
                   onChange={(e) => setTransferSearch(e.target.value)}
                   placeholder="কাস্টমারের নাম লিখুন…"
                   autoFocus
@@ -1020,6 +1023,7 @@ export function TransactionEntryScreen({
                     <button
                       key={p.id}
                       type="button"
+                      data-testid={`button-adjustment-party-${p.id}`}
                       onClick={() => setTransferPartyId(p.id)}
                       className={cn(
                         'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-left transition-colors',

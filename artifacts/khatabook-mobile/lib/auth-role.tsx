@@ -10,6 +10,7 @@ export interface MobileIdentity {
   userId: string;
   businessId: string;
   businessName: string;
+  adjustmentPartyIds: string[];
 }
 
 interface AuthRoleContextValue {
@@ -103,8 +104,13 @@ export function AuthRoleProvider({ children }: { children: React.ReactNode }) {
         ) {
           throw new Error('Account permissions response is incomplete.');
         }
+        if (result.adjustmentPartyIds !== undefined &&
+          (!Array.isArray(result.adjustmentPartyIds) ||
+            !result.adjustmentPartyIds.every((id) => typeof id === 'string'))) {
+          throw new Error('অ্যাকাউন্টের অ্যাডজাস্টমেন্ট অনুমতির তথ্য সঠিক নয়।');
+        }
         if (!cancelled) {
-          setIdentity(result as MobileIdentity);
+          setIdentity({ ...result, adjustmentPartyIds: result.adjustmentPartyIds ?? [] } as MobileIdentity);
           setIdentityAuthKey(currentAuthKey);
         }
       } catch (cause) {

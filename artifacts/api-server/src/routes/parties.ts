@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { db, ledgerEntriesTable, partiesTable, workerPartyAssignmentsTable } from "@workspace/db";
+import { db, appUsersTable, ledgerEntriesTable, partiesTable, workerPartyAssignmentsTable } from "@workspace/db";
 import { broadcast } from "../lib/eventBus";
 import {
   ListPartiesQueryParams,
@@ -61,6 +61,23 @@ const PatchLedgerEntryBody = {
 const PatchLedgerEntryResponse = {
   parse(v: unknown) { return v; },
 };
+
+// Owner grant edits/deletion lock the same user row. A staff write either
+// commits before revocation or sees the revoked grants; it cannot race past it.
+async function staffCanWrite(tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  userId: string, businessId: string, sourceId: string, destinationId?: string): Promise<boolean> {
+  const [user] = await tx.select().from(appUsersTable).where(eq(appUsersTable.id, userId)).for("update").limit(1);
+  if (!user || user.role !== "staff" || user.status !== "active" || user.workerAccessDeletedAt ||
+      user.businessId !== businessId) return false;
+  const ids = destinationId ? [sourceId, destinationId] : [sourceId];
+  if (destinationId && (!user.adjustmentPartyIds.includes(sourceId) ||
+      !user.adjustmentPartyIds.includes(destinationId))) return false;
+  const assigned = await tx.select({ id: partiesTable.id }).from(workerPartyAssignmentsTable)
+    .innerJoin(partiesTable, eq(partiesTable.id, workerPartyAssignmentsTable.partyId))
+    .where(and(eq(workerPartyAssignmentsTable.userId, userId),
+      eq(partiesTable.businessId, businessId), inArray(partiesTable.id, ids)));
+  return assigned.length === ids.length;
+}
 import {
   applyPartyFilters,
   fromSignedBalance,
@@ -251,7 +268,7 @@ router.get(
 router.post(
   "/parties/:partyId/ledger-entries",
   async (req, res): Promise<void> => {
-    const { businessId, userId } = req as unknown as AuthenticatedRequest;
+    const { businessId, userId, role } = req as unknown as AuthenticatedRequest;
     const params = CreateLedgerEntryParams.safeParse(req.params);
     if (!params.success) {
       res.status(400).json({ error: params.error.message });
@@ -287,6 +304,10 @@ router.post(
     }
 
     const { type, amount, description, billReference, billImage, dueDate, isTransfer, transferPartyId } = body.data;
+    if ((isTransfer && (!transferPartyId || transferPartyId === party.id)) ||
+        (!isTransfer && transferPartyId)) {
+      res.status(400).json({ error: "An adjustment requires a different destination party" }); return;
+    }
 
     // ── TRANSFER MODE: atomic double-entry across two parties ─────────────────
     if (isTransfer && transferPartyId) {
@@ -318,7 +339,15 @@ router.post(
 
       const now = new Date();
 
-      await db.transaction(async (tx) => {
+      const permitted = await db.transaction(async (tx) => {
+        if (role === "staff" && !(await staffCanWrite(tx, userId, businessId, party.id, transferPartyId))) return false;
+        // Lock in stable order and use current balances for concurrent transfers.
+        const locked = await tx.select().from(partiesTable).where(and(
+          eq(partiesTable.businessId, businessId), inArray(partiesTable.id, [party.id, transferPartyId]),
+        )).orderBy(partiesTable.id).for("update");
+        const source = locked.find((p) => p.id === party.id);
+        const destination = locked.find((p) => p.id === transferPartyId);
+        if (!source || !destination) return false;
         // Insert both entries first (without linkedEntryId — we don't know the
         // counter ID yet when inserting the primary entry).
         [primaryEntry] = await tx
@@ -361,7 +390,7 @@ router.post(
           .where(eq(ledgerEntriesTable.id, counterEntry!.id));
 
         // Update party A balance
-        const partyASigned = toSignedBalance(party);
+        const partyASigned = toSignedBalance(source);
         const partyADelta = type === "YOU_GAVE" ? amount : -amount;
         const partyABalance = fromSignedBalance(partyASigned + partyADelta);
         await tx
@@ -370,14 +399,16 @@ router.post(
           .where(eq(partiesTable.id, party.id));
 
         // Update party B balance
-        const partyBSigned = toSignedBalance(transferParty);
+        const partyBSigned = toSignedBalance(destination);
         const partyBDelta = counterType === "YOU_GAVE" ? amount : -amount;
         const partyBBalance = fromSignedBalance(partyBSigned + partyBDelta);
         await tx
           .update(partiesTable)
           .set({ ...partyBBalance, lastTransactionAt: now })
           .where(eq(partiesTable.id, transferPartyId));
+        return true;
       });
+      if (!permitted) { res.status(403).json({ error: "Adjustment permission is required for both parties" }); return; }
 
       // Reflect the linked IDs in the in-memory objects (update queries don't
       // return rows without .returning(), so we patch them manually here).
@@ -396,14 +427,20 @@ router.post(
     }
 
     // ── NORMAL MODE ───────────────────────────────────────────────────────────
-    const currentSigned = toSignedBalance(party);
+    const entry = await db.transaction(async (tx) => {
+    if (role === "staff" && !(await staffCanWrite(tx, userId, businessId, party.id))) return null;
+    const [currentParty] = await tx.select().from(partiesTable).where(and(
+      eq(partiesTable.id, party.id), eq(partiesTable.businessId, businessId),
+    )).for("update").limit(1);
+    if (!currentParty) return null;
+    const currentSigned = toSignedBalance(currentParty);
     const delta = type === "YOU_GAVE" ? amount : -amount;
     const nextSigned = currentSigned + delta;
     const { currentBalance, balanceType } = fromSignedBalance(nextSigned);
 
     const now = new Date();
 
-    const [entry] = await db
+    const [saved] = await tx
       .insert(ledgerEntriesTable)
       .values({
         partyId: party.id,
@@ -417,7 +454,7 @@ router.post(
       })
       .returning();
 
-    await db
+    await tx
       .update(partiesTable)
       .set({
         currentBalance,
@@ -426,6 +463,9 @@ router.post(
         ...(dueDate ? { dueDate: toDateOnlyString(dueDate) } : {}),
       })
       .where(eq(partiesTable.id, party.id));
+    return saved!;
+    });
+    if (!entry) { res.status(403).json({ error: "Party access was revoked" }); return; }
 
     broadcast(businessId, { type: 'ledger.created', payload: { partyId: party.id, entryId: entry!.id } });
 

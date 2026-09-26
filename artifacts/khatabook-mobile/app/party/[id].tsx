@@ -113,11 +113,12 @@ interface TransactionSheetProps {
   partyId: string;
   partyName: string;
   staffMode?: boolean;
+  adjustmentPartyIds: string[];
   onClose: () => void;
   onSuccess: () => void;
 }
 
-function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyName, staffMode = false, onClose, onSuccess }: TransactionSheetProps) {
+function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyName, staffMode = false, adjustmentPartyIds, onClose, onSuccess }: TransactionSheetProps) {
   const colors = useColors();
   const qc = useQueryClient();
   const { getToken } = useAuth();
@@ -133,12 +134,13 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
   const [isTransferMode, setIsTransferMode] = useState(false);
   const [transferPartyId, setTransferPartyId] = useState<string | null>(null);
   const [transferSearch, setTransferSearch] = useState('');
+  const canAdjustSource = !staffMode || adjustmentPartyIds.includes(partyId);
   const transferSearchParams = { search: transferSearch || undefined };
-  const { data: allParties = [] } = useListParties(
+  const { data: allParties = [], isLoading: transferLoading, isError: transferError, error: transferErrorDetail, refetch: refetchTransfers } = useListParties(
     transferSearchParams,
-    { query: { enabled: isTransferMode && !staffMode, queryKey: ['/api/parties', 'transfer', transferSearch] } },
+    { query: { enabled: isTransferMode && canAdjustSource, queryKey: ['/api/parties', 'transfer', transferSearch] } },
   );
-  const transferPartyOptions = allParties.filter((p) => p.id !== partyId);
+  const transferPartyOptions = allParties.filter((p) => p.id !== partyId && (!staffMode || adjustmentPartyIds.includes(p.id)));
 
   useEffect(() => { if (visible) setType(initialType); }, [visible, initialType]);
 
@@ -200,6 +202,10 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
       Alert.alert('কাস্টমার বেছে নিন', 'অ্যাডজাস্টমেন্টের জন্য একটি কাস্টমার নির্বাচন করুন।');
       return;
     }
+    if (isTransferMode && (!canAdjustSource || (staffMode && !adjustmentPartyIds.includes(transferPartyId!)))) {
+      Alert.alert('অনুমতি নেই', 'অ্যাডজাস্টমেন্টের উৎস ও গন্তব্য—দুই খাতাতেই অনুমতি প্রয়োজন।');
+      return;
+    }
     try {
       const pending = uploadRef.current; uploadRef.current = null;
       const objectPath = pending ? await pending : null;
@@ -209,8 +215,8 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
           type,
           amount: parsed,
           description: description.trim() || undefined,
-          ...(!staffMode ? {
-            billImage: objectPath ?? undefined,
+          ...(!staffMode ? { billImage: objectPath ?? undefined } : {}),
+          ...(isTransferMode ? {
             isTransfer: isTransferMode || undefined,
             transferPartyId: isTransferMode ? transferPartyId : undefined,
           } : {}),
@@ -226,8 +232,8 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
         qc.invalidateQueries({ queryKey: [`/api/parties/${transferPartyId}`] });
       }
       reset(); onSuccess(); onClose();
-    } catch {
-      Alert.alert('Error', 'লেনদেন রেকর্ড করা যায়নি। আবার চেষ্টা করুন।');
+    } catch (error) {
+      Alert.alert('লেনদেন সংরক্ষণ করা যায়নি', error instanceof Error ? error.message : 'আবার চেষ্টা করুন।');
     }
   }
 
@@ -347,7 +353,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
           </View> : null}
 
           {/* ── Transfer / adjustment section ─────────────────────────── */}
-          {!staffMode ? <View style={{
+          {canAdjustSource ? <View style={{
             borderRadius: colors.radius,
             marginBottom: 16,
             overflow: 'hidden',
@@ -405,7 +411,12 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
                   }}
                 />
                 <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                  {transferPartyOptions.length === 0 ? (
+                  {transferLoading ? <ActivityIndicator color={colors.primary} style={{ padding: 16 }} /> :
+                   transferError ? (
+                    <TouchableOpacity onPress={() => void refetchTransfers()} style={{ paddingVertical: 14 }}>
+                      <Text style={{ fontSize: 12, color: colors.destructive }}>{transferErrorDetail instanceof Error ? transferErrorDetail.message : 'খাতার তালিকা লোড করা যায়নি।'} আবার চেষ্টা করুন</Text>
+                    </TouchableOpacity>
+                   ) : transferPartyOptions.length === 0 ? (
                     <View style={{ alignItems: 'center', paddingVertical: 16 }}>
                       <Feather name="users" size={20} color="#94a3b8" />
                       <Text style={{ fontSize: 12, color: '#94a3b8', fontFamily: 'Inter_400Regular', marginTop: 6 }}>কোনো কাস্টমার পাওয়া যায়নি</Text>
@@ -1163,6 +1174,7 @@ export default function PartyDetailScreen() {
         partyId={id!}
         partyName={party.name}
         staffMode={isStaff}
+        adjustmentPartyIds={identity?.adjustmentPartyIds ?? []}
         onClose={() => setShowSheet(false)}
         onSuccess={() => { refetchParty(); refetchEntries(); }}
       />

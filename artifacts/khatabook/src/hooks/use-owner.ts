@@ -13,6 +13,7 @@ export interface Worker {
   identity: string; // phone or email
   status: 'active' | 'suspended' | 'pending';
   partyIds: string[];
+  adjustmentPartyIds: string[];
   lastLogin: string | null;
   lastLogout: string | null;
   invitedAt: string | null;
@@ -39,10 +40,12 @@ export interface CreateWorkerPayload {
   email?: string;
   phone?: string;
   partyIds: string[];
+  adjustmentPartyIds: string[];
 }
 
 export interface UpdateWorkerPayload {
   partyIds?: string[];
+  adjustmentPartyIds?: string[];
   status?: 'active' | 'suspended';
 }
 
@@ -50,6 +53,8 @@ export function useOwnerParties() {
   const { selectedBusinessId } = useBusinessContext();
   return useQuery({
     queryKey: ['owner-parties', selectedBusinessId],
+    staleTime: 0,
+    refetchOnMount: 'always',
     queryFn: async (): Promise<OwnerParty[]> => {
       const res = await fetch(`/api/owner/parties`, {
         credentials: "include",
@@ -148,5 +153,27 @@ export function useUpdateWorker() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['owner-workers', selectedBusinessId] });
     }
+  });
+}
+
+export function useDeleteWorker() {
+  const queryClient = useQueryClient();
+  const { selectedBusinessId } = useBusinessContext();
+  return useMutation({
+    mutationFn: async (id: string): Promise<void> => {
+      const res = await fetch(`/api/owner/workers/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'X-Business-Id': selectedBusinessId || '' },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'স্টাফ মুছতে সমস্যা হয়েছে');
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['owner-workers', selectedBusinessId] });
+      queryClient.invalidateQueries({ queryKey: ['owner-activity', selectedBusinessId] });
+    },
   });
 }

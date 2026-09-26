@@ -338,6 +338,7 @@ function AddPartyForm({
       onSettled: () => {
         queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+        queryClient.invalidateQueries({ queryKey: ['owner-parties'] });
       },
     },
   });

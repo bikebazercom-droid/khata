@@ -12,6 +12,7 @@ export const workerInvitesTable = pgTable("worker_invites", {
   email: text("email"),
   phone: text("phone"),
   partyIds: jsonb("party_ids").$type<string[]>().notNull().default([]),
+  adjustmentPartyIds: jsonb("adjustment_party_ids").$type<string[]>().notNull().default([]),
   status: workerInviteStatusEnum("status").notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   claimedAt: timestamp("claimed_at", { withTimezone: true }),

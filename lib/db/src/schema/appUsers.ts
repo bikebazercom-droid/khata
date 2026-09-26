@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, pgEnum, integer, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, pgEnum, integer, primaryKey, jsonb } from "drizzle-orm/pg-core";
 import { businessesTable } from "./businesses";
 
 export const userRoleEnum = pgEnum("user_role", ["owner", "staff"]);
@@ -31,6 +31,9 @@ export const appUsersTable = pgTable("app_users", {
   lastLogout: timestamp("last_logout", { withTimezone: true }),
   /** Admin-managed status; suspended users cannot sign in */
   status: userStatusEnum("status").notNull().default("active"),
+  /** Removed staff retain their identity and audit attribution, but no access. */
+  workerAccessDeletedAt: timestamp("worker_access_deleted_at", { withTimezone: true }),
+  adjustmentPartyIds: jsonb("adjustment_party_ids").$type<string[]>().notNull().default([]),
 });
 
 /** Records the Clerk sessions already counted as successful logins. */

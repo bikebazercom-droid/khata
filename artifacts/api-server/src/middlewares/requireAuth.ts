@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { getAuth } from "@clerk/express";
-import { eq, isNull, and, inArray } from "drizzle-orm";
+import { eq, isNull, isNotNull, and, inArray } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import {
   db,
@@ -53,6 +53,7 @@ export async function ensureDefaultBusiness(): Promise<void> {
     // Backfill user_businesses for any existing app_users rows
     const existingUsers = await db.select().from(appUsersTable);
     for (const u of existingUsers) {
+      if (u.workerAccessDeletedAt) continue;
       await db
         .insert(userBusinessesTable)
         .values({ userId: u.id, businessId: u.businessId })
@@ -72,22 +73,35 @@ async function linkUserBusiness(userId: string, businessId: string) {
     .onConflictDoNothing();
 }
 
-async function claimWorkerInvite(identity: { email?: string; phone?: string; clerkUserId?: string }) {
+async function claimWorkerInvite(identity: { email?: string; phone?: string; clerkUserId?: string }, existing?: AppUser) {
   return db.transaction(async (tx) => {
     const identityCondition = identity.email
       ? eq(workerInvitesTable.email, identity.email)
       : eq(workerInvitesTable.phone, identity.phone!);
+    const [candidate] = await tx.select().from(workerInvitesTable)
+      .where(and(identityCondition, eq(workerInvitesTable.status, "pending"))).limit(1);
+    if (!candidate) return null;
+    // Access mutations and claims lock business before invite/user, consistently.
+    await tx.select({ id: businessesTable.id }).from(businessesTable)
+      .where(eq(businessesTable.id, candidate.businessId)).for("update");
     const [invite] = await tx.select().from(workerInvitesTable)
       .where(and(identityCondition, eq(workerInvitesTable.status, "pending")))
       .for("update").limit(1);
     if (!invite) return null;
-    const [staff] = await tx.insert(appUsersTable).values({
+    if (existing && (existing.businessId !== invite.businessId || existing.role !== "staff")) return null;
+    const [staff] = existing ? await tx.update(appUsersTable).set({
+      workerAccessDeletedAt: null, status: "active", adjustmentPartyIds: [],
+    }).where(and(eq(appUsersTable.id, existing.id), eq(appUsersTable.status, "suspended"),
+      isNotNull(appUsersTable.workerAccessDeletedAt)))
+      .returning() : await tx.insert(appUsersTable).values({
       clerkUserId: identity.clerkUserId,
       verifiedEmail: identity.email,
       phone: identity.phone,
       businessId: invite.businessId,
       role: "staff",
     }).returning();
+    if (!staff) return null;
+    await tx.delete(workerPartyAssignmentsTable).where(eq(workerPartyAssignmentsTable.userId, staff.id));
     await tx.insert(userBusinessesTable)
       .values({ userId: staff!.id, businessId: invite.businessId }).onConflictDoNothing();
     const eligiblePartyIds = invite.partyIds.length
@@ -101,6 +115,9 @@ async function claimWorkerInvite(identity: { email?: string; phone?: string; cle
         userId: staff!.id, partyId: id,
       }))).onConflictDoNothing();
     }
+    const [updatedStaff] = await tx.update(appUsersTable).set({
+      adjustmentPartyIds: invite.adjustmentPartyIds.filter((id) => eligiblePartyIds.some((p) => p.id === id)),
+    }).where(eq(appUsersTable.id, staff.id)).returning();
     const [claimedInvite] = await tx.update(workerInvitesTable).set({
       status: "claimed",
       claimedAt: new Date(),
@@ -110,7 +127,7 @@ async function claimWorkerInvite(identity: { email?: string; phone?: string; cle
       eq(workerInvitesTable.status, "pending"),
     )).returning({ id: workerInvitesTable.id });
     if (!claimedInvite) throw new Error("Worker invitation is no longer pending");
-    return staff!;
+    return updatedStaff!;
   });
 }
 
@@ -123,6 +140,12 @@ export async function getOrCreateClerkUser(
     .from(appUsersTable)
     .where(eq(appUsersTable.clerkUserId, clerkUserId));
   if (existing) {
+    if (existing.workerAccessDeletedAt) {
+      // Never turn a removed staff identity into an owner. Only a new owner-issued
+      // invitation and a freshly verified matching identity can restore access.
+      if (!verifiedEmail || verifiedEmail !== existing.verifiedEmail) return existing;
+      return (await claimWorkerInvite({ email: verifiedEmail, clerkUserId }, existing)) ?? existing;
+    }
     if (verifiedEmail && existing.verifiedEmail !== verifiedEmail) {
       const [updated] = await db.update(appUsersTable)
         .set({ verifiedEmail }).where(eq(appUsersTable.id, existing.id)).returning();
@@ -180,6 +203,9 @@ export async function getOrCreatePhoneUser(
     .from(appUsersTable)
     .where(eq(appUsersTable.phone, phone));
   if (existing) {
+    if (existing.workerAccessDeletedAt) {
+      return (await claimWorkerInvite({ phone }, existing)) ?? existing;
+    }
     await linkUserBusiness(existing.id, existing.businessId);
     return existing;
   }
@@ -328,13 +354,25 @@ export async function requireAuth(
         res.status(401).json({ error: "A Clerk user session is required" });
         return;
       }
+      // Check revoked sessions before JIT re-claim; an old token cannot consume
+      // a fresh invitation or regain access after the membership is restored.
+      const [oldSession] = await db.select({ revokedAt: appUserLoginSessionsTable.revokedAt })
+        .from(appUserLoginSessionsTable)
+        .innerJoin(appUsersTable, eq(appUsersTable.id, appUserLoginSessionsTable.userId))
+        .where(and(eq(appUsersTable.clerkUserId, clerkAuth.userId),
+          eq(appUserLoginSessionsTable.sessionId, clerkAuth.sessionId))).limit(1);
+      if (oldSession?.revokedAt) { res.status(401).json({ error: "Session signed out" }); return; }
       const verifiedEmail = await getVerifiedClerkEmail(clerkAuth.userId);
       const user = await getOrCreateClerkUser(clerkAuth.userId, verifiedEmail ?? undefined);
-      if (user.status !== "active") {
-        res.status(403).json({ error: "Account suspended" });
+      if (user.status !== "active" || user.workerAccessDeletedAt) {
+        res.status(403).json({ error: user.workerAccessDeletedAt
+          ? "Staff access removed. Ask the owner for a new invitation." : "Account suspended" });
         return;
       }
       const sessionAllowed = await db.transaction(async (tx) => {
+        const [currentUser] = await tx.select().from(appUsersTable)
+          .where(eq(appUsersTable.id, user.id)).for("update").limit(1);
+        if (!currentUser || currentUser.status !== "active" || currentUser.workerAccessDeletedAt) return false;
         const [newSession] = await tx.insert(appUserLoginSessionsTable).values({
           userId: user.id,
           sessionId: clerkAuth.sessionId!,
@@ -379,7 +417,7 @@ export async function requireAuth(
     const payload = verifyPhoneSession(token);
     if (payload) {
       const [user] = await db.select().from(appUsersTable).where(eq(appUsersTable.id, payload.userId)).limit(1);
-      if (!user || user.status !== "active" || user.phone !== payload.phone ||
+      if (!user || user.status !== "active" || user.workerAccessDeletedAt || user.phone !== payload.phone ||
           user.phoneSessionVersion !== payload.sessionVersion) {
         res.status(401).json({ error: "Invalid or revoked session" });
         return;

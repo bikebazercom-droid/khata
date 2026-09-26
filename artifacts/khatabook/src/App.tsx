@@ -247,7 +247,7 @@ export function useAppAuth() {
 
   // ── Development bypass — returned AFTER all hooks so hook order is stable ──
   if (devBypass) {
-    return { isAuthenticated: true, isLoading: false, authMethod: 'dev' as const, role: 'owner' as const, userId: 'dev-user' };
+    return { isAuthenticated: true, isLoading: false, authMethod: 'dev' as const, role: 'owner' as const, userId: 'dev-user', adjustmentPartyIds: [] as string[] };
   }
 
   return {
@@ -256,6 +256,7 @@ export function useAppAuth() {
     authMethod: clerkSignedIn ? 'clerk' : (authData ? 'phone' : null),
     role,
     userId: authData?.userId,
+    adjustmentPartyIds: (authData as (typeof authData & { adjustmentPartyIds?: string[] }) | undefined)?.adjustmentPartyIds ?? [],
   };
 }
 
