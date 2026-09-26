@@ -7,21 +7,15 @@
  */
 import type { LedgerEntryType } from './ledgerEntryType';
 
-export interface LedgerEntryInput {
-  type: LedgerEntryType;
+export interface LedgerEntryPatch {
+  type?: LedgerEntryType;
   /** @exclusiveMinimum 0 */
-  amount: number;
+  amount?: number;
   description?: string;
   /** @nullable */
   billReference?: string | null;
-  /**
-     * Cloud storage object path for the scanned bill/receipt image (e.g. /objects/uploads/uuid).
-     * @nullable
-     */
+  /** @nullable */
   billImage?: string | null;
   /** @nullable */
   dueDate?: Date | null;
-  isTransfer?: boolean;
-  /** @nullable */
-  transferPartyId?: string | null;
 }

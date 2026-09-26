@@ -262,7 +262,7 @@ export default function AccessScreen() {
     inviteMutation.mutate({
       email: normalizedEmail,
       partyIds: invitePartyIds,
-      adjustmentPartyIds: inviteAdjustmentPartyIds.filter((id) => invitePartyIds.includes(id)),
+      adjustmentPartyIds: inviteAdjustmentPartyIds,
     });
   }
 
@@ -280,14 +280,12 @@ export default function AccessScreen() {
   function toggleWorkerParty(partyId: string) {
     if (draftPartyIds.includes(partyId)) {
       setDraftPartyIds((ids) => ids.filter((id) => id !== partyId));
-      setDraftAdjustmentIds((ids) => ids.filter((id) => id !== partyId));
     } else {
       setDraftPartyIds((ids) => [...ids, partyId]);
     }
   }
 
   function toggleAdjustmentParty(partyId: string) {
-    if (!draftPartyIds.includes(partyId)) return;
     setDraftAdjustmentIds((ids) => ids.includes(partyId) ? ids.filter((id) => id !== partyId) : [...ids, partyId]);
   }
 
@@ -295,7 +293,7 @@ export default function AccessScreen() {
     if (partiesQuery.isLoading || partiesQuery.isError) return;
     updateMutation.mutate({
       id: worker.id,
-      payload: { partyIds: draftPartyIds, adjustmentPartyIds: draftAdjustmentIds.filter((id) => draftPartyIds.includes(id)) },
+      payload: { partyIds: draftPartyIds, adjustmentPartyIds: draftAdjustmentIds },
     }, {
       onSuccess: () => {
         setExpandedWorkerId(null);
@@ -428,7 +426,7 @@ export default function AccessScreen() {
                             {formatDate(worker.lastLogout) ? <Text style={s.metadata}>শেষ সাইন আউট: {formatDate(worker.lastLogout)}</Text> : null}
                           </View>
                         ) : null}
-                         <Text style={[s.permissionHint, { paddingHorizontal: 12 }]}>প্রথমে খাতা অ্যাক্সেস দিন, তারপর শুধু অনুমোদিত খাতায় অ্যাডজাস্টমেন্ট বেছে নিন। উৎস ও গন্তব্য উভয় খাতায় অনুমতি লাগবে।</Text>
+                         <Text style={[s.permissionHint, { paddingHorizontal: 12 }]}>উৎসে খাতা অ্যাক্সেস ও অ্যাডজাস্টমেন্ট অনুমতি লাগবে। গন্তব্যে শুধু অ্যাডজাস্টমেন্ট অনুমতি দিন; খাতার অ্যাক্সেস আলাদা।</Text>
                          <TextInput
                            testID={`access-worker-search-${worker.id}`}
                            style={[s.emailInput, { marginHorizontal: 12, marginBottom: 10 }]}
@@ -457,8 +455,8 @@ export default function AccessScreen() {
                                      </TouchableOpacity>
                                      <TouchableOpacity
                                        testID={`access-adjustment-${worker.id}-${party.id}`}
-                                       style={[s.assignmentRow, { flex: 1, minWidth: 130, borderTopWidth: 0, opacity: assigned ? 1 : 0.5 }]}
-                                       disabled={!assigned || updateMutation.isPending}
+                                       style={[s.assignmentRow, { flex: 1, minWidth: 130, borderTopWidth: 0 }]}
+                                       disabled={updateMutation.isPending}
                                        onPress={() => toggleAdjustmentParty(party.id)}
                                      >
                                        <Feather name={allowed ? 'check-square' : 'square'} size={21} color={allowed ? colors.primary : colors.mutedForeground} />
@@ -552,8 +550,8 @@ export default function AccessScreen() {
                 );
               })}
               <Text style={s.permissionHeader}>অ্যাডজাস্টমেন্টের অনুমতি</Text>
-              <Text style={s.permissionHint}>শুধু অ্যাক্সেস দেওয়া খাতাগুলো থেকে বেছে নিন। অ্যাডজাস্টমেন্টের দুই খাতাতেই অনুমতি লাগবে।</Text>
-              {parties.filter((party) => invitePartyIds.includes(party.id)).map((party) => {
+              <Text style={s.permissionHint}>উৎসে খাতা অ্যাক্সেস ও অ্যাডজাস্টমেন্ট অনুমতি লাগবে। গন্তব্যে শুধু অ্যাডজাস্টমেন্ট অনুমতি দিন; এতে খাতা দেখা যাবে না।</Text>
+              {parties.map((party) => {
                 const checked = inviteAdjustmentPartyIds.includes(party.id);
                 return (
                   <TouchableOpacity key={party.id} testID={`access-invite-adjustment-${party.id}`} style={s.checkboxRow} onPress={() =>

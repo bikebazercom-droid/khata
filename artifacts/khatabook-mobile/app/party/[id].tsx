@@ -27,6 +27,8 @@ import {
   useListLedgerEntries,
   useCreateLedgerEntry,
   useListParties,
+  useListAdjustmentTargets,
+  getListAdjustmentTargetsQueryKey,
   useSendPaymentReminder,
   usePatchLedgerEntry,
   useDeleteLedgerEntry,
@@ -136,12 +138,11 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
   const [transferPartyId, setTransferPartyId] = useState<string | null>(null);
   const [transferSearch, setTransferSearch] = useState('');
   const canAdjustSource = canAdjustParty(staffMode, adjustmentPartyIds, partyId);
-  const transferSearchParams = { search: transferSearch || undefined };
-  const { data: allParties = [], isLoading: transferLoading, isError: transferError, error: transferErrorDetail, refetch: refetchTransfers } = useListParties(
-    transferSearchParams,
-    { query: { enabled: isTransferMode && canAdjustSource, queryKey: ['/api/parties', 'transfer', transferSearch] } },
+  const { data: allTargets = [], isLoading: transferLoading, isError: transferError, error: transferErrorDetail, refetch: refetchTransfers } = useListAdjustmentTargets(
+    { query: { enabled: isTransferMode && canAdjustSource, queryKey: getListAdjustmentTargetsQueryKey() } },
   );
-  const transferPartyOptions = adjustmentDestinations(allParties, partyId, staffMode, adjustmentPartyIds);
+  const transferPartyOptions = adjustmentDestinations(allTargets, partyId, staffMode, adjustmentPartyIds)
+    .filter((p) => p.name.toLocaleLowerCase().includes(transferSearch.trim().toLocaleLowerCase()));
 
   useEffect(() => {
     setTransferPartyId((selected) => validAdjustmentSelection(selected, partyId, staffMode, adjustmentPartyIds));
@@ -455,9 +456,6 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
                           </Text>
                         </View>
                         <Text style={{ flex: 1, fontSize: 14, fontFamily: 'Inter_600SemiBold', color: selected ? '#fff' : '#0f172a', marginRight: 8 }} numberOfLines={1} ellipsizeMode="tail">{p.name}</Text>
-                        {p.phone ? (
-                          <Text style={{ fontSize: 11, flexShrink: 0, color: selected ? 'rgba(255,255,255,0.75)' : '#64748b', fontFamily: 'Inter_400Regular' }} numberOfLines={1}>{p.phone}</Text>
-                        ) : null}
                         {selected && <Feather name="check-circle" size={16} color="#fff" style={{ marginLeft: 6, flexShrink: 0 }} />}
                       </TouchableOpacity>
                     );
@@ -878,6 +876,7 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
             <TouchableOpacity
               style={[s.infoCard, { flexDirection: 'row', alignItems: 'center', gap: 14 }]}
               activeOpacity={0.75}
+              disabled={!transferParty}
               onPress={() => { onClose(); router.push(`/party/${transferPartyId}`); }}
             >
               <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#3B82F6', alignItems: 'center', justifyContent: 'center' }}>
@@ -888,15 +887,15 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 11, color: '#9CA3AF', fontFamily: 'Inter_500Medium', marginBottom: 2 }}>কার সাথে অ্যাডজাস্ট?</Text>
                 <Text style={{ fontSize: 15, fontFamily: 'Inter_600SemiBold', color: '#1E293B' }} numberOfLines={1}>
-                  {transferParty?.name ?? '…'}
+                  {transferParty?.name ?? entry.description ?? '…'}
                 </Text>
                 {transferParty?.phone ? (
                   <Text style={{ fontSize: 12, color: '#64748B', fontFamily: 'Inter_400Regular', marginTop: 1 }}>{transferParty.phone}</Text>
                 ) : null}
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Text style={{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: '#2563EB' }}>খাতা দেখুন</Text>
-                <Feather name="arrow-right" size={15} color="#2563EB" />
+                <Text style={{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: '#2563EB' }}>{transferParty ? 'খাতা দেখুন' : 'খাতা দেখার অনুমতি নেই'}</Text>
+                {transferParty ? <Feather name="arrow-right" size={15} color="#2563EB" /> : null}
               </View>
             </TouchableOpacity>
           ) : null}

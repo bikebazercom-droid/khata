@@ -20,3 +20,9 @@ Revocation must also cover identity-provider sessions the API has never seen.
 **Why:** Tracking only previously observed session IDs leaves an older, unused session able to claim a later reinvitation. Reissued token timestamps do not prove the underlying session is new.
 
 **How to apply:** For identities whose access was deleted, compare the provider's actual session creation time against the revocation cutoff before accepting a reinvitation; fail closed if it cannot be verified.
+
+Adjustment permission and ledger visibility are separate business permissions.
+
+**Why:** The owner explicitly wants staff to adjust from an assigned ledger with selected counterparties without seeing those counterparties' balances or transaction history. Requiring ledger visibility for each destination defeats this privacy requirement.
+
+**How to apply:** Keep owner-selected adjustment destinations independent of ledger assignments. Expose only the destination identity needed for the picker, not its financial details. An explicit ledger grant still confers its usual visibility; an adjustment-only grant must not confer it.

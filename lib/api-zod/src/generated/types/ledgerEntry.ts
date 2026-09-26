@@ -23,4 +23,9 @@ export interface LedgerEntry {
   /** @nullable */
   dueDate: Date | null;
   createdAt: Date;
+  isTransfer?: boolean;
+  /** @nullable */
+  transferPartyId?: string | null;
+  /** @nullable */
+  linkedEntryId?: string | null;
 }

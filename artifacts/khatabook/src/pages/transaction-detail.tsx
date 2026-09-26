@@ -335,7 +335,8 @@ export function TransactionDetailPage() {
         {entry.isTransfer && transferPartyId && (
           <button
             type="button"
-            onClick={() => navigate(`/party/${transferPartyId}`)}
+            onClick={() => { if (transferParty) navigate(`/party/${transferPartyId}`); }}
+            disabled={!transferParty}
             className="w-full text-left bg-white rounded-lg overflow-hidden active:bg-blue-50 transition-colors"
             style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid #DBEAFE' }}
           >
@@ -354,7 +355,7 @@ export function TransactionDetailPage() {
                 </div>
                 <div>
                   <p className="text-[15px] font-semibold" style={{ color: '#1F2937' }}>
-                    {transferParty?.name ?? '…'}
+                    {transferParty?.name ?? entry.description ?? '…'}
                   </p>
                   {transferParty?.phone && (
                     <p className="text-[12px]" style={{ color: '#6B7280' }}>{transferParty.phone}</p>
@@ -362,8 +363,8 @@ export function TransactionDetailPage() {
                 </div>
               </div>
               <div className="flex items-center gap-1" style={{ color: '#2563EB' }}>
-                <span className="text-[13px] font-semibold">খাতা দেখুন</span>
-                <ArrowRight className="w-4 h-4" />
+                <span className="text-[13px] font-semibold">{transferParty ? 'খাতা দেখুন' : 'খাতা দেখার অনুমতি নেই'}</span>
+                {transferParty && <ArrowRight className="w-4 h-4" />}
               </div>
             </div>
           </button>

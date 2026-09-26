@@ -69,14 +69,13 @@ async function staffCanWrite(tx: Parameters<Parameters<typeof db.transaction>[0]
   const [user] = await tx.select().from(appUsersTable).where(eq(appUsersTable.id, userId)).for("update").limit(1);
   if (!user || user.role !== "staff" || user.status !== "active" || user.workerAccessDeletedAt ||
       user.businessId !== businessId) return false;
-  const ids = destinationId ? [sourceId, destinationId] : [sourceId];
   if (destinationId && (!user.adjustmentPartyIds.includes(sourceId) ||
       !user.adjustmentPartyIds.includes(destinationId))) return false;
   const assigned = await tx.select({ id: partiesTable.id }).from(workerPartyAssignmentsTable)
     .innerJoin(partiesTable, eq(partiesTable.id, workerPartyAssignmentsTable.partyId))
     .where(and(eq(workerPartyAssignmentsTable.userId, userId),
-      eq(partiesTable.businessId, businessId), inArray(partiesTable.id, ids)));
-  return assigned.length === ids.length;
+      eq(partiesTable.businessId, businessId), eq(partiesTable.id, sourceId)));
+  return assigned.length === 1;
 }
 import {
   applyPartyFilters,
@@ -91,6 +90,23 @@ import { type AuthenticatedRequest } from "../middlewares/requireAuth";
 const router: IRouter = Router();
 const isUuid = (value: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+
+// Grants authorize choosing a counterparty, never reading its ledger or balance.
+router.get("/adjustment-targets", async (req, res): Promise<void> => {
+  const { businessId, role, userId } = req as unknown as AuthenticatedRequest;
+  const [user] = role === "staff"
+    ? await db.select({ adjustmentPartyIds: appUsersTable.adjustmentPartyIds }).from(appUsersTable)
+      .where(and(eq(appUsersTable.id, userId), eq(appUsersTable.businessId, businessId))).limit(1)
+    : [];
+  if (role === "staff" && (!user || !user.adjustmentPartyIds.length)) {
+    res.json([]);
+    return;
+  }
+  const rows = await db.select({ id: partiesTable.id, name: partiesTable.name, role: partiesTable.role })
+    .from(partiesTable).where(and(eq(partiesTable.businessId, businessId),
+      role === "staff" ? inArray(partiesTable.id, user!.adjustmentPartyIds) : undefined));
+  res.json(rows);
+});
 
 router.get("/parties", async (req, res): Promise<void> => {
   const { businessId, userId, role: userRole } = req as unknown as AuthenticatedRequest;
@@ -226,7 +242,7 @@ router.get("/parties/:partyId", async (req, res): Promise<void> => {
 router.get(
   "/parties/:partyId/ledger-entries",
   async (req, res): Promise<void> => {
-    const { businessId } = req as unknown as AuthenticatedRequest;
+    const { businessId, role } = req as unknown as AuthenticatedRequest;
     const parsed = ListLedgerEntriesParams.safeParse(req.params);
     if (!parsed.success) {
       res.status(400).json({ error: parsed.error.message });
@@ -258,6 +274,7 @@ router.get(
       ListLedgerEntriesResponse.parse(
         entries.map((entry) => ({
           ...entry,
+          linkedEntryId: role === "staff" && entry.isTransfer ? null : entry.linkedEntryId,
           amount: Number(entry.amount),
         })),
       ),
@@ -322,7 +339,7 @@ router.post(
         );
 
       if (!transferParty) {
-        res.status(404).json({ error: "Transfer party not found" });
+        res.status(403).json({ error: "Adjustment is not permitted" });
         return;
       }
 
@@ -408,7 +425,7 @@ router.post(
           .where(eq(partiesTable.id, transferPartyId));
         return true;
       });
-      if (!permitted) { res.status(403).json({ error: "Adjustment permission is required for both parties" }); return; }
+      if (!permitted) { res.status(403).json({ error: "Adjustment is not permitted" }); return; }
 
       // Reflect the linked IDs in the in-memory objects (update queries don't
       // return rows without .returning(), so we patch them manually here).
@@ -420,6 +437,7 @@ router.post(
       res.status(201).json(
         CreateLedgerEntryResponse.parse({
           ...primaryEntryFinal,
+          linkedEntryId: role === "staff" ? null : primaryEntryFinal.linkedEntryId,
           amount: Number(primaryEntryFinal.amount),
         }),
       );
@@ -523,6 +541,63 @@ router.patch(
 
     if (!entry) {
       res.status(404).json({ error: "Entry not found" });
+      return;
+    }
+
+    // A transfer's two ledger rows must change together. Never update only one
+    // amount/direction or its counterparty balance would diverge permanently.
+    if (entry.isTransfer && (body.data.amount !== undefined || body.data.type !== undefined)) {
+      const updatedPair = await db.transaction(async (tx) => {
+        if (!entry.transferPartyId || !entry.linkedEntryId) return null;
+        const locked = await tx.select().from(partiesTable).where(and(
+          eq(partiesTable.businessId, businessId),
+          inArray(partiesTable.id, [party.id, entry.transferPartyId]),
+        )).orderBy(partiesTable.id).for("update");
+        if (locked.length !== 2) return null;
+        const [current] = await tx.select().from(ledgerEntriesTable)
+          .where(and(eq(ledgerEntriesTable.id, entry.id), eq(ledgerEntriesTable.partyId, party.id)))
+          .for("update").limit(1);
+        const [counter] = await tx.select().from(ledgerEntriesTable)
+          .where(and(eq(ledgerEntriesTable.id, entry.linkedEntryId), eq(ledgerEntriesTable.partyId, entry.transferPartyId)))
+          .for("update").limit(1);
+        if (!current || !counter || !current.isTransfer || !counter.isTransfer ||
+            current.linkedEntryId !== counter.id || counter.linkedEntryId !== current.id) return null;
+        const amount = body.data.amount ?? Number(current.amount);
+        const type = body.data.type ?? current.type;
+        const counterType = type === "YOU_GAVE" ? "YOU_GOT" : "YOU_GAVE";
+        const changed = {
+          ...(body.data.amount !== undefined ? { amount: amount.toFixed(2) } : {}),
+          ...(body.data.type !== undefined ? { type } : {}),
+          ...(body.data.description !== undefined ? { description: body.data.description } : {}),
+          ...(body.data.billImage !== undefined ? { billImage: body.data.billImage } : {}),
+          ...(body.data.dueDate !== undefined ? { dueDate: body.data.dueDate || null } : {}),
+        };
+        const [saved] = await tx.update(ledgerEntriesTable).set(changed)
+          .where(eq(ledgerEntriesTable.id, current.id)).returning();
+        await tx.update(ledgerEntriesTable).set({ amount: amount.toFixed(2), type: counterType })
+          .where(eq(ledgerEntriesTable.id, counter.id));
+        for (const row of locked) {
+          const oldEntry = row.id === party.id ? current : counter;
+          const nextType = row.id === party.id ? type : counterType;
+          const previousDelta = oldEntry.type === "YOU_GAVE" ? Number(oldEntry.amount) : -Number(oldEntry.amount);
+          const nextDelta = nextType === "YOU_GAVE" ? amount : -amount;
+          await tx.update(partiesTable).set(fromSignedBalance(
+            toSignedBalance(row) - previousDelta + nextDelta,
+          )).where(eq(partiesTable.id, row.id));
+        }
+        return { saved: saved!, counterId: counter.id, counterPartyId: counter.partyId,
+          oldBillImage: current.billImage };
+      });
+      if (!updatedPair) { res.status(409).json({ error: "Linked adjustment is unavailable" }); return; }
+      if (body.data.billImage !== undefined && updatedPair.oldBillImage &&
+          updatedPair.oldBillImage !== body.data.billImage && updatedPair.oldBillImage.startsWith("/objects/")) {
+        new ObjectStorageService().deleteObjectEntity(updatedPair.oldBillImage).catch((err: unknown) =>
+          req.log?.error({ err }, "Failed to delete replaced adjustment bill photo"));
+      }
+      broadcast(businessId, { type: "ledger.updated", payload: { partyId: party.id, entryId: entry.id } });
+      broadcast(businessId, { type: "ledger.updated",
+        payload: { partyId: updatedPair.counterPartyId, entryId: updatedPair.counterId } });
+      res.json(PatchLedgerEntryResponse.parse({ ...updatedPair.saved, amount: Number(updatedPair.saved.amount) }));
       return;
     }
 
@@ -666,9 +741,23 @@ router.delete(
         : [];
 
       await db.transaction(async (tx) => {
+        // Serialize paired deletes with edits/transfers, while preserving the
+        // legacy orphan cleanup path if the counter-entry is already missing.
+        const locked = linkedPartyId && linkedParty ? await tx.select().from(partiesTable).where(and(
+          eq(partiesTable.businessId, businessId), inArray(partiesTable.id, [partyId, linkedPartyId]),
+        )).orderBy(partiesTable.id).for("update") : [];
+        const currentParty = locked.find((p) => p.id === partyId) ?? party;
+        const currentLinkedParty = locked.find((p) => p.id === linkedPartyId) ?? linkedParty;
+        const [currentEntry] = await tx.select().from(ledgerEntriesTable)
+          .where(and(eq(ledgerEntriesTable.id, entryId), eq(ledgerEntriesTable.partyId, partyId)))
+          .for("update").limit(1);
+        if (!currentEntry) return;
+        const [currentCounter] = linkedEntry ? await tx.select().from(ledgerEntriesTable)
+          .where(and(eq(ledgerEntriesTable.id, linkedEntryId), eq(ledgerEntriesTable.partyId, linkedEntry.partyId)))
+          .for("update").limit(1) : [];
         // Reverse primary party's balance.
-        const primarySigned = toSignedBalance(party);
-        const primaryDelta = entry.type === "YOU_GAVE" ? Number(entry.amount) : -Number(entry.amount);
+        const primarySigned = toSignedBalance(currentParty);
+        const primaryDelta = currentEntry.type === "YOU_GAVE" ? Number(currentEntry.amount) : -Number(currentEntry.amount);
         const primaryBalance = fromSignedBalance(primarySigned - primaryDelta);
         await tx
           .update(partiesTable)
@@ -681,12 +770,12 @@ router.delete(
           .where(eq(ledgerEntriesTable.id, entryId));
 
         // Reverse linked party's balance and delete its entry (if it exists).
-        if (linkedEntry && linkedParty) {
-          const linkedSigned = toSignedBalance(linkedParty);
+        if (currentCounter && currentLinkedParty) {
+          const linkedSigned = toSignedBalance(currentLinkedParty);
           const linkedDelta =
-            linkedEntry.type === "YOU_GAVE"
-              ? Number(linkedEntry.amount)
-              : -Number(linkedEntry.amount);
+            currentCounter.type === "YOU_GAVE"
+              ? Number(currentCounter.amount)
+              : -Number(currentCounter.amount);
           const linkedBalance = fromSignedBalance(linkedSigned - linkedDelta);
           await tx
             .update(partiesTable)

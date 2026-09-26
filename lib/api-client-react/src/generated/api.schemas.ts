@@ -5,6 +5,57 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface BengaliLedgerScanInput {
+  image: Blob;
+}
+
+export type BengaliLedgerItemConfidence = typeof BengaliLedgerItemConfidence[keyof typeof BengaliLedgerItemConfidence];
+
+
+export const BengaliLedgerItemConfidence = {
+  high: 'high',
+  medium: 'medium',
+  low: 'low',
+} as const;
+
+export type LedgerEntryType = typeof LedgerEntryType[keyof typeof LedgerEntryType];
+
+
+export const LedgerEntryType = {
+  YOU_GAVE: 'YOU_GAVE',
+  YOU_GOT: 'YOU_GOT',
+} as const;
+
+export interface BengaliLedgerItem {
+  /** @nullable */
+  partyId: string | null;
+  partyName: string;
+  extractedName: string;
+  amount: number;
+  type: LedgerEntryType;
+  note: string;
+  confidence: BengaliLedgerItemConfidence;
+}
+
+export interface BengaliLedgerScanResult {
+  items: BengaliLedgerItem[];
+}
+
+export interface BengaliLedgerBulkEntry {
+  partyId: string;
+  amount: number;
+  type: LedgerEntryType;
+  note?: string;
+}
+
+export interface BengaliLedgerBulkSaveInput {
+  entries: BengaliLedgerBulkEntry[];
+}
+
+export interface BengaliLedgerBulkSaveResult {
+  count: number;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -35,13 +86,11 @@ export const DueFilter = {
   NO_DUE_DATE: 'NO_DUE_DATE',
 } as const;
 
-export type LedgerEntryType = typeof LedgerEntryType[keyof typeof LedgerEntryType];
-
-
-export const LedgerEntryType = {
-  YOU_GAVE: 'YOU_GAVE',
-  YOU_GOT: 'YOU_GOT',
-} as const;
+export interface AdjustmentTarget {
+  id: string;
+  name: string;
+  role: PartyRole;
+}
 
 export interface Party {
   id: string;
@@ -86,12 +135,11 @@ export interface LedgerEntry {
   /** @nullable */
   dueDate: string | null;
   createdAt: string;
-  /** Whether this entry is part of a cross-customer transfer/adjustment. */
-  isTransfer: boolean;
-  /** The other party involved in the transfer (if isTransfer is true). @nullable */
-  transferPartyId: string | null;
-  /** ID of the paired counter-entry created for the other party. @nullable */
-  linkedEntryId: string | null;
+  isTransfer?: boolean;
+  /** @nullable */
+  transferPartyId?: string | null;
+  /** @nullable */
+  linkedEntryId?: string | null;
 }
 
 export interface LedgerEntryInput {
@@ -108,9 +156,8 @@ export interface LedgerEntryInput {
   billImage?: string | null;
   /** @nullable */
   dueDate?: string | null;
-  /** Set to true to auto-create a counter-entry for transferPartyId. */
   isTransfer?: boolean;
-  /** The other party UUID for cross-customer transfer. @nullable */
+  /** @nullable */
   transferPartyId?: string | null;
 }
 
@@ -398,43 +445,6 @@ page?: number;
  */
 pageSize?: number;
 };
-
-// ─── Bengali Ledger Scanner ───────────────────────────────────────────────────
-
-export type BengaliLedgerItemType = typeof BengaliLedgerItemType[keyof typeof BengaliLedgerItemType];
-export const BengaliLedgerItemType = { YOU_GAVE: 'YOU_GAVE', YOU_GOT: 'YOU_GOT' } as const;
-
-export type BengaliLedgerConfidence = typeof BengaliLedgerConfidence[keyof typeof BengaliLedgerConfidence];
-export const BengaliLedgerConfidence = { high: 'high', medium: 'medium', low: 'low' } as const;
-
-export interface BengaliLedgerItem {
-  partyId: string | null;
-  partyName: string;
-  extractedName: string;
-  amount: number;
-  type: BengaliLedgerItemType;
-  note: string;
-  confidence: BengaliLedgerConfidence;
-}
-
-export interface BengaliLedgerScanResult {
-  items: BengaliLedgerItem[];
-}
-
-export interface BengaliLedgerBulkEntry {
-  partyId: string;
-  amount: number;
-  type: BengaliLedgerItemType;
-  note?: string;
-}
-
-export interface BengaliLedgerBulkSaveInput {
-  entries: BengaliLedgerBulkEntry[];
-}
-
-export interface BengaliLedgerBulkSaveResult {
-  count: number;
-}
 
 export type ListAdminTransactionsParams = {
 startDate?: string;

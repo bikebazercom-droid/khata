@@ -23,6 +23,42 @@ tags:
   - name: admin
     description: Admin console operations
 paths:
+  /scan/bengali-ledger:
+    post:
+      operationId: scanBengaliLedger
+      tags: [ledger]
+      summary: Scan ledger image
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/BengaliLedgerScanInput"
+      responses:
+        "200":
+          description: Recognized entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BengaliLedgerScanResult"
+  /scan/bulk-save:
+    post:
+      operationId: bulkSaveBengaliLedger
+      tags: [ledger]
+      summary: Save reviewed scan entries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BengaliLedgerBulkSaveInput"
+      responses:
+        "200":
+          description: Number saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BengaliLedgerBulkSaveResult"
   /healthz:
     get:
       operationId: healthCheck
@@ -77,6 +113,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BusinessSettings"
+  /adjustment-targets:
+    get:
+      operationId: listAdjustmentTargets
+      tags: [parties]
+      summary: List authorized adjustment counterparties (identity only; no ledger access)
+      responses:
+        "200":
+          description: Minimal counterparty identities
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdjustmentTarget"
   /parties:
     get:
       operationId: listParties
@@ -207,6 +257,38 @@ paths:
                 $ref: "#/components/schemas/LedgerEntry"
         "404":
           description: Not found
+  /parties/{partyId}/ledger-entries/{entryId}:
+    patch:
+      operationId: patchLedgerEntry
+      tags: [ledger]
+      summary: Partially update a ledger entry
+      parameters:
+        - { name: partyId, in: path, required: true, schema: { type: string } }
+        - { name: entryId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LedgerEntryPatch"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LedgerEntry"
+  /parties/{partyId}/entries/{entryId}:
+    delete:
+      operationId: deleteLedgerEntry
+      tags: [ledger]
+      summary: Delete a ledger entry and its linked transfer entry
+      parameters:
+        - { name: partyId, in: path, required: true, schema: { type: string } }
+        - { name: entryId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Deleted
   /ledger-entries:
     get:
       operationId: listGlobalLedgerEntries
@@ -584,6 +666,51 @@ paths:
           description: Not found
 components:
   schemas:
+    BengaliLedgerScanInput:
+      type: object
+      required: [image]
+      properties:
+        image:
+          type: string
+          format: binary
+    BengaliLedgerItem:
+      type: object
+      required: [partyId, partyName, extractedName, amount, type, note, confidence]
+      properties:
+        partyId: { type: ["string", "null"] }
+        partyName: { type: string }
+        extractedName: { type: string }
+        amount: { type: number }
+        type: { $ref: "#/components/schemas/LedgerEntryType" }
+        note: { type: string }
+        confidence: { type: string, enum: [high, medium, low] }
+    BengaliLedgerScanResult:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/BengaliLedgerItem" }
+    BengaliLedgerBulkEntry:
+      type: object
+      required: [partyId, amount, type]
+      properties:
+        partyId: { type: string }
+        amount: { type: number }
+        type: { $ref: "#/components/schemas/LedgerEntryType" }
+        note: { type: string }
+    BengaliLedgerBulkSaveInput:
+      type: object
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/BengaliLedgerBulkEntry" }
+    BengaliLedgerBulkSaveResult:
+      type: object
+      required: [count]
+      properties:
+        count: { type: integer }
     HealthStatus:
       type: object
       properties:
@@ -603,6 +730,16 @@ components:
     LedgerEntryType:
       type: string
       enum: [YOU_GAVE, YOU_GOT]
+    AdjustmentTarget:
+      type: object
+      required: [id, name, role]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          $ref: "#/components/schemas/PartyRole"
     Party:
       type: object
       required:
@@ -693,6 +830,12 @@ components:
         createdAt:
           type: string
           format: date-time
+        isTransfer:
+          type: boolean
+        transferPartyId:
+          type: ["string", "null"]
+        linkedEntryId:
+          type: ["string", "null"]
     LedgerEntryInput:
       type: object
       required:
@@ -714,6 +857,19 @@ components:
         dueDate:
           type: ["string", "null"]
           format: date
+        isTransfer:
+          type: boolean
+        transferPartyId:
+          type: ["string", "null"]
+    LedgerEntryPatch:
+      type: object
+      properties:
+        type: { $ref: "#/components/schemas/LedgerEntryType" }
+        amount: { type: number, exclusiveMinimum: 0 }
+        description: { type: string }
+        billReference: { type: ["string", "null"] }
+        billImage: { type: ["string", "null"] }
+        dueDate: { type: ["string", "null"], format: date }
     DashboardSummary:
       type: object
       required:

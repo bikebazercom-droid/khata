@@ -9,6 +9,43 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Scan ledger image
+ */
+export const ScanBengaliLedgerBody = zod.object({
+  "image": zod.instanceof(File)
+})
+
+export const ScanBengaliLedgerResponse = zod.object({
+  "items": zod.array(zod.object({
+  "partyId": zod.string().nullable(),
+  "partyName": zod.string(),
+  "extractedName": zod.string(),
+  "amount": zod.number(),
+  "type": zod.enum(['YOU_GAVE', 'YOU_GOT']),
+  "note": zod.string(),
+  "confidence": zod.enum(['high', 'medium', 'low'])
+}))
+})
+
+
+/**
+ * @summary Save reviewed scan entries
+ */
+export const BulkSaveBengaliLedgerBody = zod.object({
+  "entries": zod.array(zod.object({
+  "partyId": zod.string(),
+  "amount": zod.number(),
+  "type": zod.enum(['YOU_GAVE', 'YOU_GOT']),
+  "note": zod.string().optional()
+}))
+})
+
+export const BulkSaveBengaliLedgerResponse = zod.object({
+  "count": zod.number()
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */
@@ -59,6 +96,17 @@ export const UpdateBusinessSettingsResponse = zod.object({
   "language": zod.string(),
   "onlineCollectionBalance": zod.number()
 })
+
+
+/**
+ * @summary List authorized adjustment counterparties (identity only; no ledger access)
+ */
+export const ListAdjustmentTargetsResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "role": zod.enum(['CUSTOMER', 'SUPPLIER'])
+})
+export const ListAdjustmentTargetsResponse = zod.array(ListAdjustmentTargetsResponseItem)
 
 
 /**
@@ -163,9 +211,9 @@ export const ListLedgerEntriesResponseItem = zod.object({
   "billImage": zod.string().nullable().describe('Scanned bill\/receipt image stored as a cloud storage object path (e.g. \/objects\/uploads\/uuid). Legacy rows may hold a base64 data URL during migration.'),
   "dueDate": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date(),
-  "isTransfer": zod.boolean(),
-  "transferPartyId": zod.string().nullable(),
-  "linkedEntryId": zod.string().nullable()
+  "isTransfer": zod.boolean().optional(),
+  "transferPartyId": zod.string().nullish(),
+  "linkedEntryId": zod.string().nullish()
 })
 export const ListLedgerEntriesResponse = zod.array(ListLedgerEntriesResponseItem)
 
@@ -203,10 +251,58 @@ export const CreateLedgerEntryResponse = zod.object({
   "billImage": zod.string().nullable().describe('Scanned bill\/receipt image stored as a cloud storage object path (e.g. \/objects\/uploads\/uuid). Legacy rows may hold a base64 data URL during migration.'),
   "dueDate": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date(),
-  "isTransfer": zod.boolean(),
-  "transferPartyId": zod.string().nullable(),
-  "linkedEntryId": zod.string().nullable()
+  "isTransfer": zod.boolean().optional(),
+  "transferPartyId": zod.string().nullish(),
+  "linkedEntryId": zod.string().nullish()
 })
+
+
+/**
+ * @summary Partially update a ledger entry
+ */
+export const PatchLedgerEntryParams = zod.object({
+  "partyId": zod.coerce.string(),
+  "entryId": zod.coerce.string()
+})
+
+export const patchLedgerEntryBodyAmountExclusiveMin = 0;
+
+
+
+export const PatchLedgerEntryBody = zod.object({
+  "type": zod.enum(['YOU_GAVE', 'YOU_GOT']).optional(),
+  "amount": zod.number().gt(patchLedgerEntryBodyAmountExclusiveMin).optional(),
+  "description": zod.string().optional(),
+  "billReference": zod.string().nullish(),
+  "billImage": zod.string().nullish(),
+  "dueDate": zod.coerce.date().nullish()
+})
+
+export const PatchLedgerEntryResponse = zod.object({
+  "id": zod.string(),
+  "partyId": zod.string(),
+  "type": zod.enum(['YOU_GAVE', 'YOU_GOT']),
+  "amount": zod.number(),
+  "description": zod.string(),
+  "billReference": zod.string().nullable(),
+  "billImage": zod.string().nullable().describe('Scanned bill\/receipt image stored as a cloud storage object path (e.g. \/objects\/uploads\/uuid). Legacy rows may hold a base64 data URL during migration.'),
+  "dueDate": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "isTransfer": zod.boolean().optional(),
+  "transferPartyId": zod.string().nullish(),
+  "linkedEntryId": zod.string().nullish()
+})
+
+
+/**
+ * @summary Delete a ledger entry and its linked transfer entry
+ */
+export const DeleteLedgerEntryParams = zod.object({
+  "partyId": zod.coerce.string(),
+  "entryId": zod.coerce.string()
+})
+
+export const DeleteLedgerEntryResponse = zod.unknown()
 
 
 /**

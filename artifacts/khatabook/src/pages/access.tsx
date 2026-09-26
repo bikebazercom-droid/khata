@@ -343,6 +343,10 @@ export function AccessPage() {
           workers={workers}
           open={!!selectedPartyId}
           onOpenChange={(op) => !op && setSelectedPartyId(null)}
+          parties={parties}
+          partiesPending={partiesPending}
+          partiesError={partiesError}
+          retryParties={refetchParties}
         />
       )}
     </div>
@@ -370,7 +374,7 @@ function AddWorkerDialog({ open, onOpenChange, parties, partiesPending, partiesE
       email: isEmail ? identity.trim() : undefined,
       phone: !isEmail ? identity.trim() : undefined,
       partyIds,
-      adjustmentPartyIds: adjustmentPartyIds.filter(id => partyIds.includes(id)),
+      adjustmentPartyIds,
     }, {
       onSuccess: () => {
         toast.success("স্টাফ যোগ করা হয়েছে। অ্যাপের লিংক ও সাইন-ইন নির্দেশিকা নিজে শেয়ার করুন।");
@@ -403,7 +407,7 @@ function AddWorkerDialog({ open, onOpenChange, parties, partiesPending, partiesE
             </div>
             <div>
               <p className="text-xs font-bold text-slate-700 mb-2">খাতা ও অ্যাডজাস্টমেন্টের অনুমতি</p>
-              <p className="text-xs text-slate-500 mb-2">প্রথমে খাতা অ্যাক্সেস দিন, তারপর যে খাতায় অ্যাডজাস্টমেন্ট করতে পারবে শুধু সেগুলো বেছে নিন। উৎস ও গন্তব্য উভয় খাতায় অনুমতি লাগবে।</p>
+              <p className="text-xs text-slate-500 mb-2">উৎসে খাতা অ্যাক্সেস ও অ্যাডজাস্টমেন্ট অনুমতি লাগবে। গন্তব্যে শুধু অ্যাডজাস্টমেন্ট অনুমতি দিন; এতে গন্তব্যের খাতা দেখা যাবে না।</p>
               {partiesPending ? <p className="text-xs text-slate-500" data-testid="status-invite-parties-loading">খাতা লোড হচ্ছে...</p>
                 : partiesError ? <button type="button" data-testid="button-retry-invite-parties" onClick={retryParties} className="text-xs text-red-600 underline">খাতা লোড করা যায়নি — আবার চেষ্টা করুন</button>
                 : parties.length === 0 ? <p className="text-xs text-slate-500">কোনো খাতা নেই</p> : null}
@@ -414,12 +418,11 @@ function AddWorkerDialog({ open, onOpenChange, parties, partiesPending, partiesE
                     <label className="flex gap-2 items-center text-xs font-semibold text-slate-700 cursor-pointer">
                       <Checkbox data-testid={`input-create-access-${party.id}`} className="size-5 border-2 border-slate-500 data-[state=checked]:border-[#1B3A6B] data-[state=checked]:bg-[#1B3A6B] data-[state=checked]:text-white" checked={partyIds.includes(party.id)} onCheckedChange={checked => {
                         setPartyIds(ids => checked === true ? [...ids, party.id] : ids.filter(id => id !== party.id));
-                        if (checked !== true) setAdjustmentPartyIds(ids => ids.filter(id => id !== party.id));
                       }} />
                       খাতা অ্যাক্সেস
                     </label>
-                    <label className={cn("flex gap-2 items-center text-xs font-semibold cursor-pointer", partyIds.includes(party.id) ? "text-slate-700" : "text-slate-400")}>
-                      <Checkbox data-testid={`input-create-adjustment-${party.id}`} className="size-5 border-2 border-slate-500 data-[state=checked]:border-[#1B3A6B] data-[state=checked]:bg-[#1B3A6B] data-[state=checked]:text-white disabled:border-slate-300 disabled:opacity-100" checked={adjustmentPartyIds.includes(party.id)} disabled={!partyIds.includes(party.id)} onCheckedChange={checked => setAdjustmentPartyIds(ids => checked === true ? [...ids, party.id] : ids.filter(id => id !== party.id))} />
+                    <label className="flex gap-2 items-center text-xs font-semibold cursor-pointer text-slate-700">
+                      <Checkbox data-testid={`input-create-adjustment-${party.id}`} className="size-5 border-2 border-slate-500 data-[state=checked]:border-[#1B3A6B] data-[state=checked]:bg-[#1B3A6B] data-[state=checked]:text-white" checked={adjustmentPartyIds.includes(party.id)} onCheckedChange={checked => setAdjustmentPartyIds(ids => checked === true ? [...ids, party.id] : ids.filter(id => id !== party.id))} />
                       অ্যাডজাস্টমেন্ট
                     </label>
                   </div>
@@ -471,7 +474,6 @@ function WorkerDetailDialog({ worker, open, onOpenChange, parties, partiesPendin
   const toggleParty = (partyId: string) => {
     if (draftPartyIds.includes(partyId)) {
       setDraftPartyIds(ids => ids.filter(id => id !== partyId));
-      setDraftAdjustmentIds(ids => ids.filter(id => id !== partyId));
     } else {
       setDraftPartyIds(ids => [...ids, partyId]);
     }
@@ -487,7 +489,7 @@ function WorkerDetailDialog({ worker, open, onOpenChange, parties, partiesPendin
     if (partiesPending || partiesError) return;
     updateWorker.mutate({
       id: worker.id,
-      payload: { partyIds: draftPartyIds, adjustmentPartyIds: draftAdjustmentIds.filter(id => draftPartyIds.includes(id)) },
+      payload: { partyIds: draftPartyIds, adjustmentPartyIds: draftAdjustmentIds },
     }, {
       onSuccess: () => {
         toast.success('খাতা ও অ্যাডজাস্টমেন্ট অনুমতি সেভ হয়েছে');
@@ -606,8 +608,8 @@ function WorkerDetailDialog({ worker, open, onOpenChange, parties, partiesPendin
                           <Checkbox data-testid={`input-worker-access-${party.id}`} className="size-5 border-2 border-slate-500 data-[state=checked]:border-[#1B3A6B] data-[state=checked]:bg-[#1B3A6B] data-[state=checked]:text-white" checked={isAssigned} disabled={updateWorker.isPending} onCheckedChange={() => toggleParty(party.id)} />
                          খাতা অ্যাক্সেস
                        </label>
-                        <label className={cn("flex gap-2 items-center text-xs font-semibold cursor-pointer", isAssigned ? "text-slate-700" : "text-slate-400")}>
-                          <Checkbox data-testid={`input-worker-adjustment-${party.id}`} className="size-5 border-2 border-slate-500 data-[state=checked]:border-[#1B3A6B] data-[state=checked]:bg-[#1B3A6B] data-[state=checked]:text-white disabled:border-slate-300 disabled:opacity-100" checked={draftAdjustmentIds.includes(party.id)} disabled={!isAssigned || updateWorker.isPending} onCheckedChange={() => toggleAdjustment(party.id)} />
+                        <label className="flex gap-2 items-center text-xs font-semibold cursor-pointer text-slate-700">
+                          <Checkbox data-testid={`input-worker-adjustment-${party.id}`} className="size-5 border-2 border-slate-500 data-[state=checked]:border-[#1B3A6B] data-[state=checked]:bg-[#1B3A6B] data-[state=checked]:text-white" checked={draftAdjustmentIds.includes(party.id)} disabled={updateWorker.isPending} onCheckedChange={() => toggleAdjustment(party.id)} />
                          অ্যাডজাস্টমেন্ট
                        </label>
                      </div>
@@ -655,7 +657,7 @@ function WorkerDetailDialog({ worker, open, onOpenChange, parties, partiesPendin
   );
 }
 
-function PartyAccessDialog({ party, workers, open, onOpenChange }: { party: any; workers: Worker[]; open: boolean; onOpenChange: (val: boolean) => void }) {
+function PartyAccessDialog({ party, workers, open, onOpenChange, parties, partiesPending, partiesError, retryParties }: { party: OwnerParty; workers: Worker[]; open: boolean; onOpenChange: (val: boolean) => void; parties: OwnerParty[]; partiesPending: boolean; partiesError: boolean; retryParties: () => void }) {
   const [identity, setIdentity] = useState('');
   const createWorker = useCreateWorker();
   const updateWorker = useUpdateWorker();
@@ -685,7 +687,7 @@ function PartyAccessDialog({ party, workers, open, onOpenChange }: { party: any;
     const newIds = currentPartyIds.filter(id => id !== party.id);
     updateWorker.mutate({
       id: workerId,
-      payload: { partyIds: newIds, adjustmentPartyIds: (workers.find(w => w.id === workerId)?.adjustmentPartyIds ?? []).filter(id => newIds.includes(id)) }
+      payload: { partyIds: newIds }
     }, {
       onError: (err: any) => toast.error(err.message || "অ্যাক্সেস সরাতে সমস্যা হয়েছে")
     });
@@ -810,6 +812,13 @@ function PartyAccessDialog({ party, workers, open, onOpenChange }: { party: any;
                         {w.status === 'active' ? 'অ্যাকাউন্ট সাসপেন্ড' : w.status === 'pending' ? 'আমন্ত্রণ বাতিল করুন' : 'অ্যাকাউন্ট অ্যাক্টিভ করুন'}
                       </Button>
                     </div>
+                    <PartyWorkerPermissions
+                      worker={w}
+                      parties={parties}
+                      partiesPending={partiesPending}
+                      partiesError={partiesError}
+                      retryParties={retryParties}
+                    />
                   </div>
                 ))}
               </div>
@@ -843,5 +852,110 @@ function PartyAccessDialog({ party, workers, open, onOpenChange }: { party: any;
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function PartyWorkerPermissions({ worker, parties, partiesPending, partiesError, retryParties }: {
+  worker: Worker;
+  parties: OwnerParty[];
+  partiesPending: boolean;
+  partiesError: boolean;
+  retryParties: () => void;
+}) {
+  const updateWorker = useUpdateWorker();
+  const [search, setSearch] = useState('');
+  const [draftPartyIds, setDraftPartyIds] = useState<string[]>(() => worker.partyIds);
+  const [draftAdjustmentIds, setDraftAdjustmentIds] = useState<string[]>(() => worker.adjustmentPartyIds ?? []);
+  const [saveError, setSaveError] = useState('');
+  const filteredParties = parties.filter(p => p.name.toLowerCase().includes(search.trim().toLowerCase()));
+
+  const resetDraft = () => {
+    setDraftPartyIds(worker.partyIds);
+    setDraftAdjustmentIds(worker.adjustmentPartyIds ?? []);
+    setSearch('');
+    setSaveError('');
+  };
+
+  const save = () => {
+    if (partiesPending || partiesError) return;
+    updateWorker.mutate({
+      id: worker.id,
+      payload: {
+        partyIds: draftPartyIds,
+        adjustmentPartyIds: draftAdjustmentIds,
+      },
+    }, {
+      onSuccess: (updated) => {
+        setDraftPartyIds(updated.partyIds);
+        setDraftAdjustmentIds(updated.adjustmentPartyIds);
+        setSaveError('');
+        toast.success('খাতা ও অ্যাডজাস্টমেন্ট অনুমতি সেভ হয়েছে');
+      },
+      onError: (err: Error) => setSaveError(err.message || 'অনুমতি সেভ করতে সমস্যা হয়েছে'),
+    });
+  };
+
+  return (
+    <div className="pt-3 border-t border-slate-100">
+      <h4 className="text-xs font-bold text-slate-800">এই স্টাফের খাতা ও অ্যাডজাস্টমেন্ট অনুমতি</h4>
+      <p className="text-[11px] leading-relaxed text-slate-500 mt-1 mb-3">
+        সব কাস্টমার/সাপ্লায়ার থেকে বেছে নিন। উৎস খাতায় অ্যাক্সেস ও অ্যাডজাস্টমেন্ট অনুমতি লাগবে। গন্তব্যের জন্য শুধু অ্যাডজাস্টমেন্ট অনুমতি দিলেই চলবে; এতে গন্তব্যের খাতা দেখা যাবে না।
+      </p>
+      <div className="relative mb-2">
+        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <Input
+          data-testid={`input-party-worker-search-${worker.id}`}
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="কাস্টমার/সাপ্লায়ার খুঁজুন..."
+          className="pl-9 h-9 bg-slate-50 border-slate-200 rounded-xl"
+        />
+      </div>
+      {partiesPending ? (
+        <p className="py-4 text-center text-xs text-slate-500" data-testid={`status-party-worker-loading-${worker.id}`}>খাতা লোড হচ্ছে...</p>
+      ) : partiesError ? (
+        <button type="button" data-testid={`button-retry-party-worker-parties-${worker.id}`} onClick={retryParties} className="py-4 text-xs text-red-600 underline">খাতা লোড করা যায়নি — আবার চেষ্টা করুন</button>
+      ) : parties.length === 0 ? (
+        <p className="py-4 text-center text-xs text-slate-500">কোনো কাস্টমার/সাপ্লায়ার নেই</p>
+      ) : filteredParties.length === 0 ? (
+        <p className="py-4 text-center text-xs text-slate-500">খুঁজে পাওয়া যায়নি</p>
+      ) : (
+        <div className="space-y-2">
+          {filteredParties.map(p => {
+            const assigned = draftPartyIds.includes(p.id);
+            return (
+              <div key={p.id} data-testid={`row-party-worker-permission-${worker.id}-${p.id}`} className="rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+                <p className="text-xs font-bold text-slate-800 break-words">
+                  {p.name} <span className="font-normal text-slate-500">· {p.role === 'CUSTOMER' ? 'কাস্টমার' : 'সাপ্লায়ার'}</span>
+                </p>
+                <div className="flex flex-wrap gap-x-4 gap-y-2 mt-2">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                    <Checkbox data-testid={`input-party-worker-access-${worker.id}-${p.id}`} checked={assigned} disabled={updateWorker.isPending} onCheckedChange={checked => {
+                      setDraftPartyIds(ids => checked === true ? [...ids, p.id] : ids.filter(id => id !== p.id));
+                      setSaveError('');
+                    }} />
+                    খাতা অ্যাক্সেস
+                  </label>
+                  <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer text-slate-700">
+                    <Checkbox data-testid={`input-party-worker-adjustment-${worker.id}-${p.id}`} checked={draftAdjustmentIds.includes(p.id)} disabled={updateWorker.isPending} onCheckedChange={checked => {
+                      setDraftAdjustmentIds(ids => checked === true ? [...ids, p.id] : ids.filter(id => id !== p.id));
+                      setSaveError('');
+                    }} />
+                    অ্যাডজাস্টমেন্ট
+                  </label>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {saveError && <p className="text-xs text-red-600 mt-2" role="alert" data-testid={`status-party-worker-save-error-${worker.id}`}>{saveError}</p>}
+      <div className="flex gap-2 mt-3">
+        <Button type="button" variant="outline" data-testid={`button-cancel-party-worker-permissions-${worker.id}`} onClick={resetDraft} disabled={updateWorker.isPending} className="flex-1">বাতিল</Button>
+        <Button type="button" data-testid={`button-save-party-worker-permissions-${worker.id}`} onClick={save} disabled={updateWorker.isPending || partiesPending || partiesError} className="flex-1 bg-[#1B3A6B] hover:bg-[#142d55]">
+          {updateWorker.isPending ? 'সেভ হচ্ছে...' : 'অনুমতি সেভ করুন'}
+        </Button>
+      </div>
+    </div>
   );
 }

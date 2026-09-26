@@ -115,8 +115,12 @@ async function claimWorkerInvite(identity: { email?: string; phone?: string; cle
         userId: staff!.id, partyId: id,
       }))).onConflictDoNothing();
     }
+    const eligibleTargets = invite.adjustmentPartyIds.length
+      ? await tx.select({ id: partiesTable.id }).from(partiesTable).where(and(
+        eq(partiesTable.businessId, invite.businessId), inArray(partiesTable.id, invite.adjustmentPartyIds),
+      )) : [];
     const [updatedStaff] = await tx.update(appUsersTable).set({
-      adjustmentPartyIds: invite.adjustmentPartyIds.filter((id) => eligiblePartyIds.some((p) => p.id === id)),
+      adjustmentPartyIds: eligibleTargets.map((p) => p.id),
     }).where(eq(appUsersTable.id, staff.id)).returning();
     const [claimedInvite] = await tx.update(workerInvitesTable).set({
       status: "claimed",
@@ -273,6 +277,59 @@ async function resolveBusinessId(
   return membership ? membership.businessId : user.businessId;
 }
 
+// One end-to-end budget per provider lookup, covering headers and JSON decoding.
+// Abort releases network resources; the race also bounds transports ignoring abort.
+export const CLERK_SESSION_METADATA_TIMEOUT_MS = 5_000;
+
+async function fetchClerkMetadata(url: string, failureMessage: string): Promise<unknown> {
+  const secret = process.env.CLERK_SECRET_KEY;
+  if (!secret) throw new Error("Clerk secret key is required to verify identity");
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let expired = false;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      expired = true;
+      controller.abort();
+      reject(new Error(`${failureMessage}: timed out`));
+    }, CLERK_SESSION_METADATA_TIMEOUT_MS);
+  });
+  const lookup = (async () => {
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${secret}` },
+      signal: controller.signal,
+    });
+    if (expired) {
+      // A transport that ignores abort may still return headers after timeout.
+      void response.body?.cancel().catch(() => {});
+      throw new Error(`${failureMessage}: timed out`);
+    }
+    if (!response.ok) throw new Error(failureMessage);
+    return response.json();
+  })();
+  try {
+    return await Promise.race([lookup, deadline]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+    // Also stop a stalled body on any error; on success it has been consumed.
+    controller.abort();
+  }
+}
+
+export async function verifyClerkSessionCreationTime(
+  sessionId: string,
+  userId: string,
+  cutoff: Date,
+): Promise<boolean> {
+  const session = await fetchClerkMetadata(
+    `https://api.clerk.com/v1/sessions/${encodeURIComponent(sessionId)}`,
+    "Could not verify session creation time",
+  ) as { id?: string; created_at?: number; user_id?: string } | null;
+  return !!session && session.id === sessionId && session.user_id === userId &&
+    typeof session.created_at === "number" && Number.isFinite(session.created_at) &&
+    session.created_at > cutoff.getTime();
+}
+
 // ─── Phone-session JWT ───────────────────────────────────────────────────────
 
 const SESSION_SECRET = process.env.SESSION_SECRET!;
@@ -368,14 +425,7 @@ export async function requireAuth(
         .where(and(eq(appUsersTable.clerkUserId, clerkAuth.userId),
           eq(appUserLoginSessionsTable.sessionId, "worker-access-revoked"))).limit(1);
       if (cutoff?.revokedAt) {
-        const response = await fetch(`https://api.clerk.com/v1/sessions/${encodeURIComponent(clerkAuth.sessionId)}`, {
-          headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
-        });
-        if (!response.ok) throw new Error("Could not verify session creation time");
-        const session = await response.json() as { id?: string; created_at?: number; user_id?: string } | null;
-        if (!session || session.id !== clerkAuth.sessionId || session.user_id !== clerkAuth.userId ||
-          typeof session.created_at !== "number" || !Number.isFinite(session.created_at) ||
-          session.created_at <= cutoff.revokedAt.getTime()) {
+        if (!await verifyClerkSessionCreationTime(clerkAuth.sessionId, clerkAuth.userId, cutoff.revokedAt)) {
           res.status(401).json({ error: "Staff access was removed. Please sign in with a new session." });
           return;
         }
@@ -466,23 +516,17 @@ export async function requireAuth(
   res.status(401).json({ error: "Unauthorized" });
 }
 
-async function getVerifiedClerkEmail(clerkUserId: string): Promise<string | null> {
-  const secret = process.env.CLERK_SECRET_KEY;
-  if (!secret) return null;
-  try {
-    const response = await fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(clerkUserId)}`, {
-      headers: { Authorization: `Bearer ${secret}` },
-    });
-    if (!response.ok) return null;
-    const user = await response.json() as {
-      email_addresses?: Array<{ id: string; email_address: string; verification?: { status?: string } }>;
-      primary_email_address_id?: string;
-    };
-    const item = user.email_addresses?.find((email) =>
-      email.id === user.primary_email_address_id && email.verification?.status === "verified",
-    ) ?? user.email_addresses?.find((email) => email.verification?.status === "verified");
-    return item?.email_address.trim().toLowerCase() ?? null;
-  } catch {
-    return null;
-  }
+export async function getVerifiedClerkEmail(clerkUserId: string): Promise<string | null> {
+  const user = await fetchClerkMetadata(
+    `https://api.clerk.com/v1/users/${encodeURIComponent(clerkUserId)}`,
+    "Could not verify Clerk email",
+  ) as {
+    email_addresses?: Array<{ id: string; email_address: string; verification?: { status?: string } }>;
+    primary_email_address_id?: string;
+  } | null;
+  if (!user) throw new Error("Could not verify Clerk email");
+  const item = user.email_addresses?.find((email) =>
+    email.id === user.primary_email_address_id && email.verification?.status === "verified",
+  ) ?? user.email_addresses?.find((email) => email.verification?.status === "verified");
+  return item?.email_address.trim().toLowerCase() ?? null;
 }

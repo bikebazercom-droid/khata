@@ -12,6 +12,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   useCreateLedgerEntry,
   useListParties,
+  useListAdjustmentTargets,
+  getListAdjustmentTargetsQueryKey,
   LedgerEntryType,
   getListLedgerEntriesQueryKey,
   getGetPartyQueryKey,
@@ -296,11 +298,11 @@ export function TransactionEntryScreen({
   const [transferSearch, setTransferSearch] = useState('');
 
   // Fetch party list for the transfer dropdown (only when toggle is on).
-  const { data: transferPartyList = [] } = useListParties(
-    { search: transferSearch || undefined },
-    { query: { enabled: canAdjustSource && isTransferMode && !isEditMode, queryKey: getListPartiesQueryKey({ search: transferSearch || undefined }) } },
+  const { data: transferPartyList = [] } = useListAdjustmentTargets(
+    { query: { enabled: canAdjustSource && isTransferMode && !isEditMode, queryKey: getListAdjustmentTargetsQueryKey() } },
   );
-  const transferPartyOptions = transferPartyList.filter((p) => p.id !== partyId && (userRole === 'owner' || adjustmentPartyIds.includes(p.id)));
+  const transferPartyOptions = transferPartyList.filter((p) => p.id !== partyId &&
+    p.name.toLocaleLowerCase().includes(transferSearch.trim().toLocaleLowerCase()));
 
   // Controls the "unsaved changes" confirmation dialog shown when the user
   // presses back with a dirty edit-mode form.
@@ -1031,11 +1033,6 @@ export function TransactionEntryScreen({
                       )}
                     >
                       <span className="flex-1 truncate">{p.name}</span>
-                      {p.phone && (
-                        <span className={cn('text-xs shrink-0', transferPartyId === p.id ? 'text-blue-100' : 'text-slate-400')}>
-                          {p.phone}
-                        </span>
-                      )}
                     </button>
                   ))}
                 </div>

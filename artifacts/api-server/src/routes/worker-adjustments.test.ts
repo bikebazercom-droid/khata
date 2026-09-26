@@ -88,12 +88,14 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
     expect((await transfer(a, b)).status).toBe(403);
     expect((await patch({ adjustmentPartyIds: [a, foreign] })).status).toBe(400);
     expect((await patch({ adjustmentPartyIds: [a, b] })).status).toBe(200);
-    expect((await transfer(a, foreign)).status).toBe(404);
+    expect((await transfer(a, foreign)).status).toBe(403);
     expect((await transfer(c, b)).status).toBe(403);
     expect((await transfer(a, a)).status).toBe(400);
     const success = await transfer(a, b);
     expect(success.status).toBe(201);
-    const [counter] = await db.select().from(ledgerEntriesTable).where(eq(ledgerEntriesTable.id, success.body.linkedEntryId));
+    expect(success.body.linkedEntryId).toBeNull();
+    const [primary] = await db.select().from(ledgerEntriesTable).where(eq(ledgerEntriesTable.id, success.body.id));
+    const [counter] = await db.select().from(ledgerEntriesTable).where(eq(ledgerEntriesTable.id, primary!.linkedEntryId!));
     expect(counter?.partyId).toBe(b);
     expect(counter?.linkedEntryId).toBe(success.body.id);
     expect(counter?.createdByUserId).toBe(staffId);
@@ -102,15 +104,76 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
     expect(all.body.map((p: { id: string }) => p.id).sort()).toEqual([a, b, c].sort());
   });
 
-  it("intersects grants on assignment edit, and explicit [] revokes adjustment without removing normal access", async () => {
+  it("retains independent adjustment grants on assignment edit and explicit [] revokes them", async () => {
     const trimmed = await patch({ partyIds: [a, c] });
     expect(trimmed.status).toBe(200);
-    expect(trimmed.body.adjustmentPartyIds).toEqual([a]);
-    expect((await transfer(a, b)).status).toBe(403);
+    expect(trimmed.body.adjustmentPartyIds).toEqual([a, b]);
+    expect((await transfer(a, b)).status).toBe(201);
     expect((await patch({ partyIds: [a, b, c], adjustmentPartyIds: [a, b] })).status).toBe(200);
     expect((await patch({ adjustmentPartyIds: [] })).status).toBe(200);
     expect((await transfer(a, b)).status).toBe(403);
     expect((await request(app).get(`/parties/${b}`).set("Authorization", `Bearer ${token}`)).status).toBe(200);
+  });
+
+  it("offers adjustment-only counterparties without granting any balance or ledger visibility", async () => {
+    expect((await patch({ partyIds: [a], adjustmentPartyIds: [a, b] })).status).toBe(200);
+    const authorization = `Bearer ${token}`;
+    const targets = await request(app).get("/adjustment-targets").set("Authorization", authorization);
+    expect(targets.status).toBe(200);
+    expect((await request(app).get("/auth/me").set("Authorization", authorization)).body.adjustmentPartyIds)
+      .toEqual(expect.arrayContaining([a, b]));
+    expect(targets.body).toEqual(expect.arrayContaining([
+      { id: a, name: "A", role: "CUSTOMER" }, { id: b, name: "B", role: "CUSTOMER" },
+    ]));
+    expect(targets.body).toHaveLength(2);
+    const list = await request(app).get("/parties").set("Authorization", authorization);
+    expect(list.body.map((p: { id: string }) => p.id)).toEqual([a]);
+    expect((await request(app).get("/parties?search=B").set("Authorization", authorization)).body).toEqual([]);
+    expect((await request(app).get(`/parties/${b}`).set("Authorization", authorization)).status).toBe(404);
+    expect((await request(app).get(`/parties/${b}/ledger-entries`).set("Authorization", authorization)).status).toBe(404);
+    expect((await request(app).get("/dashboard/summary").set("Authorization", authorization)).status).toBe(403);
+    expect((await transfer(c, b)).status).toBe(404);
+    expect((await transfer(a, c)).status).toBe(403);
+    const result = await transfer(a, b);
+    expect(result.status).toBe(201);
+    expect(result.body.transferPartyId).toBe(b);
+    expect(result.body.linkedEntryId).toBeNull();
+    expect(JSON.stringify(result.body)).not.toMatch(/currentBalance|balanceType/);
+    const source = await request(app).get(`/parties/${a}/ledger-entries`).set("Authorization", authorization);
+    expect(source.status).toBe(200);
+    expect(source.body.find((entry: { id: string }) => entry.id === result.body.id)?.linkedEntryId).toBeNull();
+    expect((await patch({ adjustmentPartyIds: [a] })).status).toBe(200);
+    expect((await transfer(a, b)).status).toBe(403);
+    expect((await request(app).get("/adjustment-targets").set("Authorization", authorization)).body)
+      .toEqual([{ id: a, name: "A", role: "CUSTOMER" }]);
+    expect((await request(app).patch(`/parties/${b}/ledger-entries/${result.body.id}`).set("Authorization", authorization)
+      .send({ amount: 99 })).status).toBe(403);
+    expect((await request(app).delete(`/parties/${b}/entries/${result.body.id}`).set("Authorization", authorization)).status).toBe(403);
+  });
+
+  it("keeps both sides and balances synchronized when an owner edits or deletes a transfer", async () => {
+    const owner = () => request(app);
+    const before = await db.select().from(partiesTable).where(inArray(partiesTable.id, [a, b]));
+    const first = await owner().post(`/parties/${a}/ledger-entries`).set("Authorization", "Bearer owner")
+      .send({ type: "YOU_GAVE", amount: 13, isTransfer: true, transferPartyId: b });
+    expect(first.status).toBe(201);
+    const edited = await owner().patch(`/parties/${a}/ledger-entries/${first.body.id}`)
+      .set("Authorization", "Bearer owner").send({ type: "YOU_GOT", amount: 19 });
+    expect(edited.status).toBe(200);
+    const [counter] = await db.select().from(ledgerEntriesTable)
+      .where(eq(ledgerEntriesTable.id, first.body.linkedEntryId));
+    expect(counter?.type).toBe("YOU_GAVE");
+    expect(Number(counter?.amount)).toBe(19);
+    expect((await owner().delete(`/parties/${a}/entries/${first.body.id}`)
+      .set("Authorization", "Bearer owner")).status).toBe(200);
+    expect(await db.select().from(ledgerEntriesTable).where(inArray(ledgerEntriesTable.id,
+      [first.body.id, first.body.linkedEntryId]))).toEqual([]);
+    const after = await db.select().from(partiesTable).where(inArray(partiesTable.id, [a, b]));
+    for (const old of before) {
+      const current = after.find((p) => p.id === old.id)!;
+      expect(current.currentBalance).toBe(old.currentBalance);
+      expect(current.balanceType).toBe(old.balanceType);
+    }
   });
 
   it("deletes staff from the list, revokes the same phone token, preserves ledger attribution, and permits explicit re-invite", async () => {
@@ -143,11 +206,12 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
 
   it("supports pending adjustment edits, deletes pending invites, and serializes claim versus delete", async () => {
     const create = await request(app).post("/owner/workers").set("Authorization", "Bearer owner")
-      .send({ email, partyIds: [a, b], adjustmentPartyIds: [a, b] });
+      .send({ email, partyIds: [a], adjustmentPartyIds: [a, b] });
     expect(create.status).toBe(201);
     const inviteId = create.body.id;
+    expect(create.body.adjustmentPartyIds).toEqual([a, b]);
     expect((await request(app).patch(`/owner/workers/${inviteId}`).set("Authorization", "Bearer owner")
-      .send({ partyIds: [a] })).body.adjustmentPartyIds).toEqual([a]);
+      .send({ partyIds: [a] })).body.adjustmentPartyIds).toEqual([a, b]);
     expect((await request(app).delete(`/owner/workers/${inviteId}`).set("Authorization", "Bearer owner")).status).toBe(204);
     const [revoked] = await db.select().from(workerInvitesTable).where(eq(workerInvitesTable.id, inviteId));
     expect(revoked?.status).toBe("revoked");
@@ -208,6 +272,11 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
 
   it.each([
     ["timeout rejection", 500],
+    ["never headers", 500],
+    ["stalled JSON", 500],
+    ["user never headers", 500],
+    ["user stalled JSON", 500],
+    ["user unavailable", 500],
     ["rate limited", 500],
     ["unavailable", 500],
     ["invalid JSON", 500],
@@ -233,18 +302,37 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
     let inviteId: string | undefined;
     let recovered = false;
     let cutoff = 0;
+    let releaseLate: (() => void) | undefined;
+    let metadataSignal: AbortSignal | undefined;
     const known = `${identity}-known`;
     const unseen = `${identity}-unseen`;
     const fresh = `${identity}-fresh`;
     clerk.id = identity;
     vi.stubEnv("CLERK_SECRET_KEY", "sk_test_local_fixture");
     // No passthrough: every provider request must match this isolated identity.
-    const provider = vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      const provider = vi.spyOn(globalThis, "fetch").mockImplementation(async (url, options) => {
       if (String(url) === `https://api.clerk.com/v1/users/${identity}`) {
-        return new Response(JSON.stringify({
+          const userMetadata = {
           primary_email_address_id: "verified",
           email_addresses: [{ id: "verified", email_address: fixtureEmail, verification: { status: "verified" } }],
-        }));
+          };
+          if (!recovered && failure === "user unavailable") return new Response("unavailable", { status: 503 });
+          if (!recovered && failure === "user never headers") {
+            metadataSignal = options?.signal as AbortSignal;
+            return new Promise<globalThis.Response>((resolve) => {
+              releaseLate = () => resolve(new Response(JSON.stringify(userMetadata)));
+            });
+          }
+          if (!recovered && failure === "user stalled JSON") {
+            metadataSignal = options?.signal as AbortSignal;
+            return {
+              ok: true,
+              json: () => new Promise((resolve) => {
+                releaseLate = () => resolve(userMetadata);
+              }),
+            } as unknown as globalThis.Response;
+          }
+          return new Response(JSON.stringify(userMetadata));
       }
       expect(String(url)).toMatch(new RegExp(`^https://api.clerk.com/v1/sessions/${identity}-(fresh|unseen)$`));
       const sessionId = String(url).split("/").at(-1)!;
@@ -252,6 +340,21 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
         id: sessionId, user_id: identity, created_at: sessionId === unseen ? cutoff - 1 : cutoff + 1000,
       };
       if (!recovered && sessionId === fresh) {
+        if (failure === "never headers") {
+          metadataSignal = options?.signal as AbortSignal;
+          return new Promise<globalThis.Response>((resolve) => {
+            releaseLate = () => resolve(new Response(JSON.stringify(session)));
+          });
+        }
+        if (failure === "stalled JSON") {
+          metadataSignal = options?.signal as AbortSignal;
+          return {
+            ok: true,
+            json: () => new Promise((resolve) => {
+              releaseLate = () => resolve(session);
+            }),
+          } as unknown as globalThis.Response;
+        }
         if (failure === "timeout rejection") throw new DOMException("Fixture timeout", "TimeoutError");
         if (failure === "rate limited") return new Response("rate limited", { status: 429 });
         if (failure === "unavailable") return new Response("unavailable", { status: 503 });
@@ -295,7 +398,30 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
       const write = (session: string) => request(app).post(`/parties/${a}/ledger-entries`)
         .set("x-clerk-session", session).send({ type: "YOU_GAVE", amount: 10, isTransfer: true, transferPartyId: b });
       for (const session of [fresh, known, unseen]) {
-        const denied = await write(session);
+        const timed = session === fresh && (
+          failure === "never headers" || failure === "stalled JSON" ||
+          failure === "user never headers" || failure === "user stalled JSON"
+        );
+        if (timed) vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+        let denied: { status: number; body: { error: string } };
+        try {
+          if (timed) {
+            const pending = write(session).then((result) => result);
+            // Keep DB/socket I/O real while waiting for the provider fixture.
+            for (let i = 0; !releaseLate && i < 1000; i++) {
+              await vi.advanceTimersByTimeAsync(0);
+              await new Promise<void>((resolve) => setImmediate(resolve));
+            }
+            expect(releaseLate).toBeDefined();
+            await vi.advanceTimersByTimeAsync(5_000);
+            denied = await pending;
+            expect(metadataSignal?.aborted).toBe(true);
+          } else {
+            denied = await write(session);
+          }
+        } finally {
+          if (timed) vi.useRealTimers();
+        }
         expect(denied.status).toBe(session === fresh ? status : 401);
         expect(denied.body.error).toEqual(expect.any(String));
         const [pending] = await db.select().from(workerInvitesTable).where(eq(workerInvitesTable.id, inviteId!));
@@ -307,6 +433,12 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
         expect(await db.select().from(workerPartyAssignmentsTable).where(eq(workerPartyAssignmentsTable.userId, userId))).toEqual([]);
         expect(await db.select().from(userBusinessesTable).where(eq(userBusinessesTable.userId, userId))).toEqual(memberships);
         expect(await ledger()).toEqual(before);
+        if (timed) {
+          releaseLate!();
+          await new Promise<void>((resolve) => setImmediate(resolve));
+          expect((await db.select().from(workerInvitesTable).where(eq(workerInvitesTable.id, inviteId!)))[0]?.status).toBe("pending");
+          expect(await ledger()).toEqual(before);
+        }
       }
       expect(provider).toHaveBeenCalledWith(`https://api.clerk.com/v1/sessions/${fresh}`, expect.any(Object));
       recovered = true;
@@ -319,6 +451,7 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
       expect(await ledger()).toEqual(afterRecovery);
       expect((await request(app).get("/auth/me").set("x-clerk-session", fresh)).status).toBe(200);
     } finally {
+      vi.useRealTimers();
       provider.mockRestore();
       clerk.id = previousClerkId;
       // Cleanup also runs on assertion failures; no fixture identity survives a case.

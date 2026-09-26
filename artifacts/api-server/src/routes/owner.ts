@@ -39,7 +39,7 @@ router.get("/owner/workers", async (req, res): Promise<void> => {
     eq(workerInvitesTable.businessId, businessId),
     eq(workerInvitesTable.status, "pending"),
   ));
-  const pendingPartyIds = [...new Set(pending.flatMap((invite) => invite.partyIds))];
+  const pendingPartyIds = [...new Set(pending.flatMap((invite) => [...invite.partyIds, ...invite.adjustmentPartyIds]))];
   const ownedPendingParties = pendingPartyIds.length
     ? await db.select({ id: partiesTable.id }).from(partiesTable).where(and(
       eq(partiesTable.businessId, businessId),
@@ -60,7 +60,7 @@ router.get("/owner/workers", async (req, res): Promise<void> => {
       identity: user.verifiedEmail ?? user.phone ?? "unknown",
       status: user.status,
       partyIds: assignments.map((item) => item.partyId),
-      adjustmentPartyIds: user.adjustmentPartyIds.filter((id) => assignments.some((item) => item.partyId === id)),
+      adjustmentPartyIds: user.adjustmentPartyIds,
       lastLogin: user.lastLogin?.toISOString() ?? null,
       lastLogout: user.lastLogout?.toISOString() ?? null,
     };
@@ -72,7 +72,7 @@ router.get("/owner/workers", async (req, res): Promise<void> => {
       identity: invite.email ?? invite.phone,
       status: "pending" as const,
       partyIds: invite.partyIds.filter((partyId) => ownedPendingPartyIds.has(partyId)),
-      adjustmentPartyIds: invite.adjustmentPartyIds.filter((id) => invite.partyIds.includes(id) && ownedPendingPartyIds.has(id)),
+      adjustmentPartyIds: invite.adjustmentPartyIds.filter((id) => ownedPendingPartyIds.has(id)),
       invitedAt: invite.createdAt.toISOString(),
     })),
   ] });
@@ -129,7 +129,6 @@ router.post("/owner/workers", async (req, res): Promise<void> => {
       (body?.phone !== undefined && !phone) ||
       !validIds(partyIds) ||
       !validIds(adjustmentPartyIds) ||
-      !adjustmentPartyIds.every((id) => Array.isArray(partyIds) && partyIds.includes(id)) ||
       Object.keys(body ?? {}).some((key) => !["email", "phone", "partyIds", "adjustmentPartyIds"].includes(key))) {
     res.status(400).json({ error: "Provide one valid email or phone and a partyIds string array" });
     return;
@@ -151,6 +150,12 @@ router.post("/owner/workers", async (req, res): Promise<void> => {
   if (parties.length !== new Set(partyIds).size ||
       parties.some((party) => !partyIds.includes(party.id))) {
     res.status(400).json({ error: "partyIds must belong to this business" });
+    return;
+  }
+  const targets = adjustmentPartyIds.length ? await db.select({ id: partiesTable.id }).from(partiesTable)
+    .where(and(eq(partiesTable.businessId, businessId), inArray(partiesTable.id, adjustmentPartyIds))) : [];
+  if (targets.length !== adjustmentPartyIds.length) {
+    res.status(400).json({ error: "adjustmentPartyIds must belong to this business" });
     return;
   }
   const result = await db.transaction(async (tx) => {
@@ -229,9 +234,7 @@ router.patch("/owner/workers/:id", async (req, res): Promise<void> => {
     }
 
     const effectiveIds = partyIds ?? invite.partyIds;
-    const adjustmentIds = hasAdjustmentIds ? body.adjustmentPartyIds as string[] :
-      invite.adjustmentPartyIds.filter((id) => effectiveIds.includes(id));
-    if (!adjustmentIds.every((id) => effectiveIds.includes(id))) return { kind: "foreign-party" as const };
+    const adjustmentIds = hasAdjustmentIds ? body.adjustmentPartyIds as string[] : invite.adjustmentPartyIds;
     const adjustmentParties = adjustmentIds.length ? await tx.select({ id: partiesTable.id }).from(partiesTable)
       .where(and(eq(partiesTable.businessId, businessId), inArray(partiesTable.id, adjustmentIds))) : [];
     if (adjustmentParties.length !== adjustmentIds.length) return { kind: "foreign-party" as const };
@@ -261,7 +264,7 @@ router.patch("/owner/workers/:id", async (req, res): Promise<void> => {
     return { status: 400, body: { error: "partyIds must not contain duplicates" } };
   }
   if (inviteResult.kind === "foreign-party") {
-    return { status: 400, body: { error: "partyIds must belong to this business; adjustmentPartyIds must be a subset" } };
+    return { status: 400, body: { error: "partyIds and adjustmentPartyIds must belong to this business" } };
   }
   if (inviteResult.kind === "updated") {
     return { status: 200, body: { id: inviteResult.id, status: inviteResult.status, partyIds: inviteResult.partyIds, adjustmentPartyIds: inviteResult.adjustmentPartyIds } };
@@ -279,12 +282,11 @@ router.patch("/owner/workers/:id", async (req, res): Promise<void> => {
   const assignments = await tx.select({ partyId: workerPartyAssignmentsTable.partyId }).from(workerPartyAssignmentsTable)
     .where(eq(workerPartyAssignmentsTable.userId, worker.id));
   const effectiveIds = partyIds ?? assignments.map((a) => a.partyId);
-  const adjustmentIds = hasAdjustmentIds ? body.adjustmentPartyIds as string[] :
-    worker.adjustmentPartyIds.filter((id) => effectiveIds.includes(id));
-  const allowedParties = effectiveIds.length ? await tx.select({ id: partiesTable.id }).from(partiesTable)
-    .where(and(eq(partiesTable.businessId, businessId), inArray(partiesTable.id, effectiveIds))) : [];
-  if (!adjustmentIds.every((id) => effectiveIds.includes(id) && allowedParties.some((p) => p.id === id))) {
-    return { status: 400, body: { error: "adjustmentPartyIds must be assigned parties in this business" } };
+  const adjustmentIds = hasAdjustmentIds ? body.adjustmentPartyIds as string[] : worker.adjustmentPartyIds;
+  const allowedTargets = adjustmentIds.length ? await tx.select({ id: partiesTable.id }).from(partiesTable)
+    .where(and(eq(partiesTable.businessId, businessId), inArray(partiesTable.id, adjustmentIds))) : [];
+  if (allowedTargets.length !== adjustmentIds.length) {
+    return { status: 400, body: { error: "adjustmentPartyIds must belong to this business" } };
   }
   if (partyIds) {
     if (new Set(partyIds).size !== partyIds.length) {

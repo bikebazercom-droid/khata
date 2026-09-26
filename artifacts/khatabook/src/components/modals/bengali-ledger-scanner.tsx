@@ -64,11 +64,8 @@ export function BengaliLedgerScanner({ onClose, onSuccess }: Props) {
     setPreviewUrl(URL.createObjectURL(file));
     setStep('scanning');
 
-    const fd = new FormData();
-    fd.append('image', file);
-
     try {
-      const result = await scanMutation.mutateAsync({ formData: fd });
+      const result = await scanMutation.mutateAsync({ data: { image: file } });
 
       if (!result.items || result.items.length === 0) {
         setError('ছবিতে কোনো লেনদেন পাওয়া যায়নি। স্পষ্ট আলোতে পুনরায় চেষ্টা করুন।');

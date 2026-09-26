@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AdjustmentTarget,
   AdminBusinessesPage,
   AdminLoginInput,
   AdminLoginResult,
@@ -32,6 +33,7 @@ import type {
   AdminUsersPage,
   BengaliLedgerBulkSaveInput,
   BengaliLedgerBulkSaveResult,
+  BengaliLedgerScanInput,
   BengaliLedgerScanResult,
   BusinessSettings,
   BusinessSettingsUpdate,
@@ -81,6 +83,150 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getScanBengaliLedgerUrl = () => {
+
+
+
+
+  return `/api/scan/bengali-ledger`
+}
+
+/**
+ * @summary Scan ledger image
+ */
+export const scanBengaliLedger = async (bengaliLedgerScanInput: BengaliLedgerScanInput, options?: RequestInit): Promise<BengaliLedgerScanResult> => {
+    const formData = new FormData();
+formData.append(`image`, bengaliLedgerScanInput.image);
+
+  return customFetch<BengaliLedgerScanResult>(getScanBengaliLedgerUrl(),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+);}
+
+
+
+
+
+export const getScanBengaliLedgerMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof scanBengaliLedger>>, TError,{data: BodyType<BengaliLedgerScanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof scanBengaliLedger>>, TError,{data: BodyType<BengaliLedgerScanInput>}, TContext> => {
+
+const mutationKey = ['scanBengaliLedger'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof scanBengaliLedger>>, {data: BodyType<BengaliLedgerScanInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  scanBengaliLedger(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ScanBengaliLedgerMutationResult = NonNullable<Awaited<ReturnType<typeof scanBengaliLedger>>>
+    export type ScanBengaliLedgerMutationBody = BodyType<BengaliLedgerScanInput>
+    export type ScanBengaliLedgerMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Scan ledger image
+ */
+export const useScanBengaliLedger = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof scanBengaliLedger>>, TError,{data: BodyType<BengaliLedgerScanInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof scanBengaliLedger>>,
+        TError,
+        {data: BodyType<BengaliLedgerScanInput>},
+        TContext
+      > => {
+      return useMutation(getScanBengaliLedgerMutationOptions(options));
+    }
+
+export const getBulkSaveBengaliLedgerUrl = () => {
+
+
+
+
+  return `/api/scan/bulk-save`
+}
+
+/**
+ * @summary Save reviewed scan entries
+ */
+export const bulkSaveBengaliLedger = async (bengaliLedgerBulkSaveInput: BengaliLedgerBulkSaveInput, options?: RequestInit): Promise<BengaliLedgerBulkSaveResult> => {
+
+  return customFetch<BengaliLedgerBulkSaveResult>(getBulkSaveBengaliLedgerUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(bengaliLedgerBulkSaveInput)
+  }
+);}
+
+
+
+
+
+export const getBulkSaveBengaliLedgerMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkSaveBengaliLedger>>, TError,{data: BodyType<BengaliLedgerBulkSaveInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkSaveBengaliLedger>>, TError,{data: BodyType<BengaliLedgerBulkSaveInput>}, TContext> => {
+
+const mutationKey = ['bulkSaveBengaliLedger'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkSaveBengaliLedger>>, {data: BodyType<BengaliLedgerBulkSaveInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkSaveBengaliLedger(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkSaveBengaliLedgerMutationResult = NonNullable<Awaited<ReturnType<typeof bulkSaveBengaliLedger>>>
+    export type BulkSaveBengaliLedgerMutationBody = BodyType<BengaliLedgerBulkSaveInput>
+    export type BulkSaveBengaliLedgerMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Save reviewed scan entries
+ */
+export const useBulkSaveBengaliLedger = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkSaveBengaliLedger>>, TError,{data: BodyType<BengaliLedgerBulkSaveInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkSaveBengaliLedger>>,
+        TError,
+        {data: BodyType<BengaliLedgerBulkSaveInput>},
+        TContext
+      > => {
+      return useMutation(getBulkSaveBengaliLedgerMutationOptions(options));
+    }
 
 export const getHealthCheckUrl = () => {
 
@@ -384,6 +530,83 @@ export const useUpdateBusinessSettings = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getUpdateBusinessSettingsMutationOptions(options));
     }
+
+export const getListAdjustmentTargetsUrl = () => {
+
+
+
+
+  return `/api/adjustment-targets`
+}
+
+/**
+ * @summary List authorized adjustment counterparties (identity only; no ledger access)
+ */
+export const listAdjustmentTargets = async ( options?: RequestInit): Promise<AdjustmentTarget[]> => {
+
+  return customFetch<AdjustmentTarget[]>(getListAdjustmentTargetsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAdjustmentTargetsQueryKey = () => {
+    return [
+    `/api/adjustment-targets`
+    ] as const;
+    }
+
+
+export const getListAdjustmentTargetsQueryOptions = <TData = Awaited<ReturnType<typeof listAdjustmentTargets>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdjustmentTargets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAdjustmentTargetsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdjustmentTargets>>> = ({ signal }) => listAdjustmentTargets({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdjustmentTargets>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAdjustmentTargetsQueryResult = NonNullable<Awaited<ReturnType<typeof listAdjustmentTargets>>>
+export type ListAdjustmentTargetsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List authorized adjustment counterparties (identity only; no ledger access)
+ */
+
+export function useListAdjustmentTargets<TData = Awaited<ReturnType<typeof listAdjustmentTargets>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdjustmentTargets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAdjustmentTargetsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getListPartiesUrl = (params?: ListPartiesParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -837,6 +1060,153 @@ export const useCreateLedgerEntry = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getCreateLedgerEntryMutationOptions(options));
+    }
+
+export const getPatchLedgerEntryUrl = (partyId: string,
+    entryId: string,) => {
+
+
+
+
+  return `/api/parties/${partyId}/ledger-entries/${entryId}`
+}
+
+/**
+ * @summary Partially update a ledger entry
+ */
+export const patchLedgerEntry = async (partyId: string,
+    entryId: string,
+    ledgerEntryPatch: LedgerEntryPatch, options?: RequestInit): Promise<LedgerEntry> => {
+
+  return customFetch<LedgerEntry>(getPatchLedgerEntryUrl(partyId,entryId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(ledgerEntryPatch)
+  }
+);}
+
+
+
+
+
+export const getPatchLedgerEntryMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchLedgerEntry>>, TError,{partyId: string;entryId: string;data: BodyType<LedgerEntryPatch>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchLedgerEntry>>, TError,{partyId: string;entryId: string;data: BodyType<LedgerEntryPatch>}, TContext> => {
+
+const mutationKey = ['patchLedgerEntry'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchLedgerEntry>>, {partyId: string;entryId: string;data: BodyType<LedgerEntryPatch>}> = (props) => {
+          const {partyId,entryId,data} = props ?? {};
+
+          return  patchLedgerEntry(partyId,entryId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PatchLedgerEntryMutationResult = NonNullable<Awaited<ReturnType<typeof patchLedgerEntry>>>
+    export type PatchLedgerEntryMutationBody = BodyType<LedgerEntryPatch>
+    export type PatchLedgerEntryMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Partially update a ledger entry
+ */
+export const usePatchLedgerEntry = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchLedgerEntry>>, TError,{partyId: string;entryId: string;data: BodyType<LedgerEntryPatch>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof patchLedgerEntry>>,
+        TError,
+        {partyId: string;entryId: string;data: BodyType<LedgerEntryPatch>},
+        TContext
+      > => {
+      return useMutation(getPatchLedgerEntryMutationOptions(options));
+    }
+
+export const getDeleteLedgerEntryUrl = (partyId: string,
+    entryId: string,) => {
+
+
+
+
+  return `/api/parties/${partyId}/entries/${entryId}`
+}
+
+/**
+ * @summary Delete a ledger entry and its linked transfer entry
+ */
+export const deleteLedgerEntry = async (partyId: string,
+    entryId: string, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteLedgerEntryUrl(partyId,entryId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteLedgerEntryMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteLedgerEntry>>, TError,{partyId: string;entryId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteLedgerEntry>>, TError,{partyId: string;entryId: string}, TContext> => {
+
+const mutationKey = ['deleteLedgerEntry'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteLedgerEntry>>, {partyId: string;entryId: string}> = (props) => {
+          const {partyId,entryId} = props ?? {};
+
+          return  deleteLedgerEntry(partyId,entryId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteLedgerEntryMutationResult = NonNullable<Awaited<ReturnType<typeof deleteLedgerEntry>>>
+
+    export type DeleteLedgerEntryMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a ledger entry and its linked transfer entry
+ */
+export const useDeleteLedgerEntry = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteLedgerEntry>>, TError,{partyId: string;entryId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteLedgerEntry>>,
+        TError,
+        {partyId: string;entryId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteLedgerEntryMutationOptions(options));
     }
 
 export const getListGlobalLedgerEntriesUrl = (params?: ListGlobalLedgerEntriesParams,) => {
@@ -1918,189 +2288,4 @@ export const useSendPaymentReminder = <TError = ErrorType<void>,
       > => {
       return useMutation(getSendPaymentReminderMutationOptions(options));
     }
-
-// ─── Patch ledger entry ───────────────────────────────────────────────────────
-
-export const getPatchLedgerEntryUrl = (partyId: string, entryId: string) =>
-  `/api/parties/${partyId}/ledger-entries/${entryId}`;
-
-export const patchLedgerEntry = async (
-  partyId: string,
-  entryId: string,
-  ledgerEntryPatch: LedgerEntryPatch,
-  options?: RequestInit,
-): Promise<LedgerEntry> =>
-  customFetch<LedgerEntry>(getPatchLedgerEntryUrl(partyId, entryId), {
-    ...options,
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(ledgerEntryPatch),
-  });
-
-export const getPatchLedgerEntryMutationOptions = <TError = ErrorType<void>, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<Awaited<ReturnType<typeof patchLedgerEntry>>, TError, { partyId: string; entryId: string; data: BodyType<LedgerEntryPatch> }, TContext>;
-    request?: SecondParameter<typeof customFetch>;
-  },
-): UseMutationOptions<Awaited<ReturnType<typeof patchLedgerEntry>>, TError, { partyId: string; entryId: string; data: BodyType<LedgerEntryPatch> }, TContext> => {
-  const mutationKey = ['patchLedgerEntry'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-  const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchLedgerEntry>>, { partyId: string; entryId: string; data: BodyType<LedgerEntryPatch> }> = (props) => {
-    const { partyId, entryId, data } = props ?? {};
-    return patchLedgerEntry(partyId, entryId, data, requestOptions);
-  };
-  return { mutationFn, ...mutationOptions };
-};
-
-export type PatchLedgerEntryMutationResult = NonNullable<Awaited<ReturnType<typeof patchLedgerEntry>>>;
-export type PatchLedgerEntryMutationBody = BodyType<LedgerEntryPatch>;
-export type PatchLedgerEntryMutationError = ErrorType<void>;
-
-/** @summary Partially update a ledger entry */
-export const usePatchLedgerEntry = <TError = ErrorType<void>, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<Awaited<ReturnType<typeof patchLedgerEntry>>, TError, { partyId: string; entryId: string; data: BodyType<LedgerEntryPatch> }, TContext>;
-    request?: SecondParameter<typeof customFetch>;
-  },
-): UseMutationResult<Awaited<ReturnType<typeof patchLedgerEntry>>, TError, { partyId: string; entryId: string; data: BodyType<LedgerEntryPatch> }, TContext> =>
-  useMutation(getPatchLedgerEntryMutationOptions(options));
-
-// ─── Delete ledger entry ──────────────────────────────────────────────────────
-
-export const getDeleteLedgerEntryUrl = (partyId: string, entryId: string) =>
-  `/api/parties/${partyId}/entries/${entryId}`;
-
-export const deleteLedgerEntry = async (
-  partyId: string,
-  entryId: string,
-  options?: RequestInit,
-): Promise<void> =>
-  customFetch<void>(getDeleteLedgerEntryUrl(partyId, entryId), {
-    ...options,
-    method: 'DELETE',
-  });
-
-export const getDeleteLedgerEntryMutationOptions = <TError = ErrorType<void>, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<Awaited<ReturnType<typeof deleteLedgerEntry>>, TError, { partyId: string; entryId: string }, TContext>;
-    request?: SecondParameter<typeof customFetch>;
-  },
-): UseMutationOptions<Awaited<ReturnType<typeof deleteLedgerEntry>>, TError, { partyId: string; entryId: string }, TContext> => {
-  const mutationKey = ['deleteLedgerEntry'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-  const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteLedgerEntry>>, { partyId: string; entryId: string }> = (props) => {
-    const { partyId, entryId } = props ?? {};
-    return deleteLedgerEntry(partyId, entryId, requestOptions);
-  };
-  return { mutationFn, ...mutationOptions };
-};
-
-export type DeleteLedgerEntryMutationResult = NonNullable<Awaited<ReturnType<typeof deleteLedgerEntry>>>;
-export type DeleteLedgerEntryMutationError = ErrorType<void>;
-
-/** @summary Delete a ledger entry (and its linked transfer counter-entry if present) */
-export const useDeleteLedgerEntry = <TError = ErrorType<void>, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<Awaited<ReturnType<typeof deleteLedgerEntry>>, TError, { partyId: string; entryId: string }, TContext>;
-    request?: SecondParameter<typeof customFetch>;
-  },
-): UseMutationResult<Awaited<ReturnType<typeof deleteLedgerEntry>>, TError, { partyId: string; entryId: string }, TContext> =>
-  useMutation(getDeleteLedgerEntryMutationOptions(options));
-
-// ─── Bengali Ledger Scanner ───────────────────────────────────────────────────
-
-export const getScanBengaliLedgerUrl = () => `/api/scan/bengali-ledger`;
-
-export const scanBengaliLedger = async (
-  formData: FormData,
-  options?: RequestInit,
-): Promise<BengaliLedgerScanResult> =>
-  customFetch<BengaliLedgerScanResult>(getScanBengaliLedgerUrl(), {
-    ...options,
-    method: 'POST',
-    body: formData,
-  });
-
-export const getScanBengaliLedgerMutationOptions = <TError = ErrorType<ErrorEnvelope>, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<Awaited<ReturnType<typeof scanBengaliLedger>>, TError, { formData: FormData }, TContext>;
-    request?: SecondParameter<typeof customFetch>;
-  },
-): UseMutationOptions<Awaited<ReturnType<typeof scanBengaliLedger>>, TError, { formData: FormData }, TContext> => {
-  const mutationKey = ['scanBengaliLedger'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-  const mutationFn: MutationFunction<Awaited<ReturnType<typeof scanBengaliLedger>>, { formData: FormData }> = (props) => {
-    const { formData } = props ?? {};
-    return scanBengaliLedger(formData, requestOptions);
-  };
-  return { mutationFn, ...mutationOptions };
-};
-
-export type ScanBengaliLedgerMutationResult = NonNullable<Awaited<ReturnType<typeof scanBengaliLedger>>>;
-export type ScanBengaliLedgerMutationError = ErrorType<ErrorEnvelope>;
-
-export const useScanBengaliLedger = <TError = ErrorType<ErrorEnvelope>, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<Awaited<ReturnType<typeof scanBengaliLedger>>, TError, { formData: FormData }, TContext>;
-    request?: SecondParameter<typeof customFetch>;
-  },
-): UseMutationResult<Awaited<ReturnType<typeof scanBengaliLedger>>, TError, { formData: FormData }, TContext> =>
-  useMutation(getScanBengaliLedgerMutationOptions(options));
-
-export const getBulkSaveBengaliLedgerUrl = () => `/api/scan/bulk-save`;
-
-export const bulkSaveBengaliLedger = async (
-  data: BodyType<BengaliLedgerBulkSaveInput>,
-  options?: RequestInit,
-): Promise<BengaliLedgerBulkSaveResult> =>
-  customFetch<BengaliLedgerBulkSaveResult>(getBulkSaveBengaliLedgerUrl(), {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(data),
-  });
-
-export const getBulkSaveBengaliLedgerMutationOptions = <TError = ErrorType<void>, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<Awaited<ReturnType<typeof bulkSaveBengaliLedger>>, TError, { data: BodyType<BengaliLedgerBulkSaveInput> }, TContext>;
-    request?: SecondParameter<typeof customFetch>;
-  },
-): UseMutationOptions<Awaited<ReturnType<typeof bulkSaveBengaliLedger>>, TError, { data: BodyType<BengaliLedgerBulkSaveInput> }, TContext> => {
-  const mutationKey = ['bulkSaveBengaliLedger'];
-  const { mutation: mutationOptions, request: requestOptions } = options
-    ? options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey
-      ? options
-      : { ...options, mutation: { ...options.mutation, mutationKey } }
-    : { mutation: { mutationKey }, request: undefined };
-  const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkSaveBengaliLedger>>, { data: BodyType<BengaliLedgerBulkSaveInput> }> = (props) => {
-    const { data } = props ?? {};
-    return bulkSaveBengaliLedger(data, requestOptions);
-  };
-  return { mutationFn, ...mutationOptions };
-};
-
-export type BulkSaveBengaliLedgerMutationResult = NonNullable<Awaited<ReturnType<typeof bulkSaveBengaliLedger>>>;
-export type BulkSaveBengaliLedgerMutationBody = BodyType<BengaliLedgerBulkSaveInput>;
-export type BulkSaveBengaliLedgerMutationError = ErrorType<void>;
-
-export const useBulkSaveBengaliLedger = <TError = ErrorType<void>, TContext = unknown>(
-  options?: {
-    mutation?: UseMutationOptions<Awaited<ReturnType<typeof bulkSaveBengaliLedger>>, TError, { data: BodyType<BengaliLedgerBulkSaveInput> }, TContext>;
-    request?: SecondParameter<typeof customFetch>;
-  },
-): UseMutationResult<Awaited<ReturnType<typeof bulkSaveBengaliLedger>>, TError, { data: BodyType<BengaliLedgerBulkSaveInput> }, TContext> =>
-  useMutation(getBulkSaveBengaliLedgerMutationOptions(options));
-
 

@@ -7,7 +7,7 @@
  * OTPs are only usable after the SMS provider accepts delivery.
  */
 import { Router, type IRouter, type Request, type Response } from "express";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, inArray } from "drizzle-orm";
 import { createHmac, randomInt } from "node:crypto";
 import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
@@ -291,16 +291,17 @@ router.get("/auth/me", requireAuth, async (req: Request, res: Response): Promise
     .where(eq(businessesTable.id, auth.businessId)).limit(1);
   const [user] = await db.select({ ids: appUsersTable.adjustmentPartyIds }).from(appUsersTable)
     .where(eq(appUsersTable.id, auth.userId)).limit(1);
-  const assignments = auth.role === "staff" ? await db.select({ id: partiesTable.id })
-    .from(workerPartyAssignmentsTable).innerJoin(partiesTable, eq(partiesTable.id, workerPartyAssignmentsTable.partyId))
-    .where(and(eq(workerPartyAssignmentsTable.userId, auth.userId), eq(partiesTable.businessId, auth.businessId))) : [];
+  const targets = auth.role === "staff" && user?.ids.length
+    ? await db.select({ id: partiesTable.id }).from(partiesTable)
+      .where(and(eq(partiesTable.businessId, auth.businessId), inArray(partiesTable.id, user.ids)))
+    : [];
   res.json({
     role: auth.role,
     businessId: auth.businessId,
     userId: auth.userId,
     businessName: business?.name ?? "",
     authMethod: auth.authMethod,
-    adjustmentPartyIds: auth.role === "staff" ? (user?.ids ?? []).filter((id) => assignments.some((a) => a.id === id)) : [],
+    adjustmentPartyIds: auth.role === "staff" ? targets.map((party) => party.id) : [],
     ...(auth.phone ? { phone: auth.phone } : {}),
   });
 });

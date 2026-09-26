@@ -4,6 +4,7 @@ import type { Request, Response, NextFunction } from "express";
 import type { AuthenticatedRequest } from "./requireAuth";
 
 const STAFF_ALLOWED = [
+  /^GET \/adjustment-targets$/,
   /^GET \/parties$/,
   /^GET \/parties\/[^/]+$/,
   /^GET \/parties\/[^/]+\/ledger-entries$/,
