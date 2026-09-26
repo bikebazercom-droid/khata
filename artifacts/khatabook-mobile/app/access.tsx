@@ -72,6 +72,9 @@ export default function AccessScreen() {
   const [invitePartyIds, setInvitePartyIds] = useState<string[]>([]);
   const [inviteAdjustmentPartyIds, setInviteAdjustmentPartyIds] = useState<string[]>([]);
   const [expandedWorkerId, setExpandedWorkerId] = useState<string | null>(null);
+  const [workerSearch, setWorkerSearch] = useState('');
+  const [draftPartyIds, setDraftPartyIds] = useState<string[]>([]);
+  const [draftAdjustmentIds, setDraftAdjustmentIds] = useState<string[]>([]);
 
   const partiesQuery = useQuery({
     queryKey: ['mobile-owner-parties', businessId],
@@ -263,24 +266,40 @@ export default function AccessScreen() {
     });
   }
 
-  function toggleWorkerParty(worker: Worker, partyId: string) {
-    const partyIds = worker.partyIds.includes(partyId)
-      ? worker.partyIds.filter((id) => id !== partyId)
-      : [...worker.partyIds, partyId];
-    updateMutation.mutate({
-      id: worker.id,
-      payload: { partyIds, adjustmentPartyIds: (worker.adjustmentPartyIds ?? []).filter((id) => partyIds.includes(id)) },
-    });
+  function openWorker(worker: Worker) {
+    if (expandedWorkerId === worker.id) {
+      setExpandedWorkerId(null);
+      return;
+    }
+    setDraftPartyIds(worker.partyIds);
+    setDraftAdjustmentIds(worker.adjustmentPartyIds ?? []);
+    setWorkerSearch('');
+    setExpandedWorkerId(worker.id);
   }
 
-  function toggleAdjustmentParty(worker: Worker, partyId: string) {
-    const selected = worker.adjustmentPartyIds ?? [];
+  function toggleWorkerParty(partyId: string) {
+    if (draftPartyIds.includes(partyId)) {
+      setDraftPartyIds((ids) => ids.filter((id) => id !== partyId));
+      setDraftAdjustmentIds((ids) => ids.filter((id) => id !== partyId));
+    } else {
+      setDraftPartyIds((ids) => [...ids, partyId]);
+    }
+  }
+
+  function toggleAdjustmentParty(partyId: string) {
+    if (!draftPartyIds.includes(partyId)) return;
+    setDraftAdjustmentIds((ids) => ids.includes(partyId) ? ids.filter((id) => id !== partyId) : [...ids, partyId]);
+  }
+
+  function saveWorkerPermissions(worker: Worker) {
+    if (partiesQuery.isLoading || partiesQuery.isError) return;
     updateMutation.mutate({
       id: worker.id,
-      payload: {
-        adjustmentPartyIds: selected.includes(partyId)
-          ? selected.filter((id) => id !== partyId)
-          : [...selected, partyId],
+      payload: { partyIds: draftPartyIds, adjustmentPartyIds: draftAdjustmentIds.filter((id) => draftPartyIds.includes(id)) },
+    }, {
+      onSuccess: () => {
+        setExpandedWorkerId(null);
+        Alert.alert('সেভ হয়েছে', 'নির্বাচিত খাতা ও অ্যাডজাস্টমেন্টের অনুমতি সেভ হয়েছে।');
       },
     });
   }
@@ -387,7 +406,7 @@ export default function AccessScreen() {
                     <TouchableOpacity
                       style={s.partyRow}
                       activeOpacity={0.7}
-                      onPress={() => setExpandedWorkerId(expanded ? null : worker.id)}
+                       onPress={() => openWorker(worker)}
                     >
                       <View style={[s.avatar, { backgroundColor: colors.muted }]}>
                         <Feather name="mail" size={17} color={colors.mutedForeground} />
@@ -409,41 +428,54 @@ export default function AccessScreen() {
                             {formatDate(worker.lastLogout) ? <Text style={s.metadata}>শেষ সাইন আউট: {formatDate(worker.lastLogout)}</Text> : null}
                           </View>
                         ) : null}
-                        {parties.map((party) => {
-                          const assigned = worker.partyIds.includes(party.id);
-                          return (
-                            <TouchableOpacity
-                              key={party.id}
-                              style={s.assignmentRow}
-                              disabled={updateMutation.isPending || worker.status === 'suspended'}
-                              onPress={() => toggleWorkerParty(worker, party.id)}
-                            >
-                              <Text style={s.assignmentText}>{party.name} · {party.role === 'CUSTOMER' ? 'কাস্টমার' : 'সাপ্লায়ার'}</Text>
-                              <Feather name={assigned ? 'check-square' : 'square'} size={19} color={assigned ? colors.primary : colors.mutedForeground} />
-                            </TouchableOpacity>
-                          );
-                        })}
-                        {worker.status !== 'suspended' && (
-                          <>
-                            <Text style={[s.permissionHeader, { paddingHorizontal: 12 }]}>অ্যাডজাস্টমেন্টের অনুমতি</Text>
-                            <Text style={[s.permissionHint, { paddingHorizontal: 12 }]}>উৎস ও গন্তব্য—দুই খাতাতেই এই অনুমতি থাকতে হবে।</Text>
-                            {parties.filter((party) => worker.partyIds.includes(party.id)).map((party) => {
-                              const allowed = (worker.adjustmentPartyIds ?? []).includes(party.id);
-                              return (
-                                <TouchableOpacity
-                                  key={party.id}
-                                  testID={`access-adjustment-${worker.id}-${party.id}`}
-                                  style={s.assignmentRow}
-                                  disabled={updateMutation.isPending}
-                                  onPress={() => toggleAdjustmentParty(worker, party.id)}
-                                >
-                                  <Text style={s.assignmentText}>{party.name}</Text>
-                                  <Feather name={allowed ? 'check-square' : 'square'} size={19} color={allowed ? colors.primary : colors.mutedForeground} />
-                                </TouchableOpacity>
-                              );
-                            })}
-                          </>
-                        )}
+                         <Text style={[s.permissionHint, { paddingHorizontal: 12 }]}>প্রথমে খাতা অ্যাক্সেস দিন, তারপর শুধু অনুমোদিত খাতায় অ্যাডজাস্টমেন্ট বেছে নিন। উৎস ও গন্তব্য উভয় খাতায় অনুমতি লাগবে।</Text>
+                         <TextInput
+                           testID={`access-worker-search-${worker.id}`}
+                           style={[s.emailInput, { marginHorizontal: 12, marginBottom: 10 }]}
+                           value={workerSearch}
+                           onChangeText={setWorkerSearch}
+                           placeholder="কাস্টমার/সাপ্লায়ার খুঁজুন..."
+                           placeholderTextColor={colors.mutedForeground}
+                         />
+                         {partiesQuery.isLoading ? <ActivityIndicator color={colors.primary} /> :
+                           partiesQuery.isError ? <Text style={s.empty}>খাতা লোড করা যায়নি: {messageFor(partiesQuery.error)}</Text> :
+                             parties.filter((party) => party.name.toLocaleLowerCase().includes(workerSearch.trim().toLocaleLowerCase())).map((party) => {
+                               const assigned = draftPartyIds.includes(party.id);
+                               const allowed = draftAdjustmentIds.includes(party.id);
+                               return (
+                                 <View key={party.id} style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingVertical: 7 }}>
+                                   <Text style={[s.assignmentText, { paddingHorizontal: 12 }]}>{party.name} · {party.role === 'CUSTOMER' ? 'কাস্টমার' : 'সাপ্লায়ার'}</Text>
+                                   <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                                     <TouchableOpacity
+                                       testID={`access-party-${worker.id}-${party.id}`}
+                                       style={[s.assignmentRow, { flex: 1, minWidth: 125, borderTopWidth: 0 }]}
+                                       disabled={updateMutation.isPending}
+                                       onPress={() => toggleWorkerParty(party.id)}
+                                     >
+                                       <Feather name={assigned ? 'check-square' : 'square'} size={21} color={assigned ? colors.primary : colors.mutedForeground} />
+                                       <Text style={[s.assignmentText, { marginLeft: 7 }]}>খাতা অ্যাক্সেস</Text>
+                                     </TouchableOpacity>
+                                     <TouchableOpacity
+                                       testID={`access-adjustment-${worker.id}-${party.id}`}
+                                       style={[s.assignmentRow, { flex: 1, minWidth: 130, borderTopWidth: 0, opacity: assigned ? 1 : 0.5 }]}
+                                       disabled={!assigned || updateMutation.isPending}
+                                       onPress={() => toggleAdjustmentParty(party.id)}
+                                     >
+                                       <Feather name={allowed ? 'check-square' : 'square'} size={21} color={allowed ? colors.primary : colors.mutedForeground} />
+                                       <Text style={[s.assignmentText, { marginLeft: 7 }]}>অ্যাডজাস্টমেন্ট</Text>
+                                     </TouchableOpacity>
+                                   </View>
+                                 </View>
+                               );
+                             })}
+                         <TouchableOpacity
+                           testID={`access-save-${worker.id}`}
+                           style={[s.inviteButton, { marginHorizontal: 12, marginBottom: 12 }]}
+                           disabled={updateMutation.isPending || partiesQuery.isLoading || partiesQuery.isError}
+                           onPress={() => saveWorkerPermissions(worker)}
+                         >
+                           <Text style={s.inviteText}>{updateMutation.isPending ? 'সেভ হচ্ছে...' : 'অনুমতি সেভ করুন'}</Text>
+                         </TouchableOpacity>
                         {worker.status !== 'suspended' && (
                           <View style={s.workerActions}>
                             <TouchableOpacity testID={`access-revoke-${worker.id}`} disabled={updateMutation.isPending || deleteMutation.isPending} onPress={() => revokeWorker(worker)}>

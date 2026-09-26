@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { ChevronLeft, Plus, Phone, Mail, Shield, Search, FileText, Users, History, AlertCircle, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { useOwnerWorkers, useCreateWorker, useUpdateWorker, useDeleteWorker, useOwnerParties, useOwnerActivity, type Worker, type OwnerParty } from '@/hooks/use-owner';
 import { cn } from '@/lib/utils';
@@ -402,23 +403,23 @@ function AddWorkerDialog({ open, onOpenChange, parties, partiesPending, partiesE
             </div>
             <div>
               <p className="text-xs font-bold text-slate-700 mb-2">খাতা ও অ্যাডজাস্টমেন্টের অনুমতি</p>
-              <p className="text-xs text-slate-500 mb-2">শুধু নির্বাচিত খাতায় অ্যাডজাস্টমেন্ট করা যাবে। উভয় খাতাতেই অনুমতি থাকতে হবে।</p>
+              <p className="text-xs text-slate-500 mb-2">প্রথমে খাতা অ্যাক্সেস দিন, তারপর যে খাতায় অ্যাডজাস্টমেন্ট করতে পারবে শুধু সেগুলো বেছে নিন। উৎস ও গন্তব্য উভয় খাতায় অনুমতি লাগবে।</p>
               {partiesPending ? <p className="text-xs text-slate-500" data-testid="status-invite-parties-loading">খাতা লোড হচ্ছে...</p>
                 : partiesError ? <button type="button" data-testid="button-retry-invite-parties" onClick={retryParties} className="text-xs text-red-600 underline">খাতা লোড করা যায়নি — আবার চেষ্টা করুন</button>
                 : parties.length === 0 ? <p className="text-xs text-slate-500">কোনো খাতা নেই</p> : null}
-              {parties.map(party => (
+              {!partiesPending && !partiesError && parties.map(party => (
                 <div key={party.id} className="py-2 border-b border-slate-100">
-                  <p className="text-sm font-semibold text-slate-800">{party.name}</p>
-                  <div className="flex gap-4 mt-1">
-                    <label className="flex gap-1.5 items-center text-xs text-slate-700">
-                      <input type="checkbox" data-testid={`input-create-access-${party.id}`} checked={partyIds.includes(party.id)} onChange={e => {
-                        setPartyIds(ids => e.target.checked ? [...ids, party.id] : ids.filter(id => id !== party.id));
-                        if (!e.target.checked) setAdjustmentPartyIds(ids => ids.filter(id => id !== party.id));
+                  <p className="text-sm font-semibold text-slate-800">{party.name} <span className="text-xs font-normal text-slate-500">· {party.role === 'CUSTOMER' ? 'কাস্টমার' : 'সাপ্লায়ার'}</span></p>
+                  <div className="flex flex-wrap gap-3 mt-2">
+                    <label className="flex gap-2 items-center text-xs font-semibold text-slate-700 cursor-pointer">
+                      <Checkbox data-testid={`input-create-access-${party.id}`} className="size-5 border-2 border-slate-500 data-[state=checked]:border-[#1B3A6B] data-[state=checked]:bg-[#1B3A6B] data-[state=checked]:text-white" checked={partyIds.includes(party.id)} onCheckedChange={checked => {
+                        setPartyIds(ids => checked === true ? [...ids, party.id] : ids.filter(id => id !== party.id));
+                        if (checked !== true) setAdjustmentPartyIds(ids => ids.filter(id => id !== party.id));
                       }} />
                       খাতা অ্যাক্সেস
                     </label>
-                    <label className="flex gap-1.5 items-center text-xs text-slate-700">
-                      <input type="checkbox" data-testid={`input-create-adjustment-${party.id}`} checked={adjustmentPartyIds.includes(party.id)} disabled={!partyIds.includes(party.id)} onChange={e => setAdjustmentPartyIds(ids => e.target.checked ? [...ids, party.id] : ids.filter(id => id !== party.id))} />
+                    <label className={cn("flex gap-2 items-center text-xs font-semibold cursor-pointer", partyIds.includes(party.id) ? "text-slate-700" : "text-slate-400")}>
+                      <Checkbox data-testid={`input-create-adjustment-${party.id}`} className="size-5 border-2 border-slate-500 data-[state=checked]:border-[#1B3A6B] data-[state=checked]:bg-[#1B3A6B] data-[state=checked]:text-white disabled:border-slate-300 disabled:opacity-100" checked={adjustmentPartyIds.includes(party.id)} disabled={!partyIds.includes(party.id)} onCheckedChange={checked => setAdjustmentPartyIds(ids => checked === true ? [...ids, party.id] : ids.filter(id => id !== party.id))} />
                       অ্যাডজাস্টমেন্ট
                     </label>
                   </div>
@@ -567,7 +568,7 @@ function WorkerDetailDialog({ worker, open, onOpenChange, parties, partiesPendin
         </div>
 
         <div className="flex-1 overflow-y-auto p-2 bg-slate-50">
-          <p className="px-2 py-2 text-xs text-slate-500">খাতা অ্যাক্সেস ও অ্যাডজাস্টমেন্ট অনুমতি আলাদা। অ্যাডজাস্টমেন্টে উৎস এবং গন্তব্য উভয় খাতার অনুমতি লাগবে।</p>
+          <p className="px-2 py-2 text-xs text-slate-500">প্রথমে খাতা অ্যাক্সেস দিন, তারপর শুধু যে খাতায় অ্যাডজাস্টমেন্ট করতে পারবে সেগুলো বেছে নিন। উৎস ও গন্তব্য উভয় খাতায় অনুমতি লাগবে।</p>
           {partiesPending ? (
             <div className="text-center p-8 text-slate-500 text-sm font-medium" data-testid="status-worker-parties-loading">খাতা লোড হচ্ছে...</div>
           ) : partiesError ? (
@@ -588,25 +589,25 @@ function WorkerDetailDialog({ worker, open, onOpenChange, parties, partiesPendin
                       isAssigned ? "border-[#1B3A6B]/30 ring-1 ring-[#1B3A6B]/10" : "border-slate-200"
                     )}
                   >
-                    <div className="flex items-center gap-3">
+                     <div className="flex items-center gap-3 min-w-0">
                       <div className={cn(
                         "w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm",
                         party.role === 'CUSTOMER' ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
                       )}>
                         {party.name.charAt(0)}
                       </div>
-                      <div>
-                        <p className="font-bold text-sm text-slate-900">{party.name}</p>
+                       <div className="min-w-0">
+                         <p className="font-bold text-sm text-slate-900 break-words" data-testid={`text-worker-party-${party.id}`}>{party.name}</p>
                         <p className="text-[10px] font-semibold text-slate-500">{party.role === 'CUSTOMER' ? 'কাস্টমার' : 'সাপ্লায়ার'}</p>
                       </div>
                     </div>
-                     <div className="flex gap-4">
-                       <label className="flex gap-1.5 items-center text-xs text-slate-700">
-                         <input type="checkbox" data-testid={`input-worker-access-${party.id}`} checked={isAssigned} disabled={updateWorker.isPending} onChange={() => toggleParty(party.id)} />
+                      <div className="flex flex-wrap gap-3">
+                        <label className="flex gap-2 items-center text-xs font-semibold text-slate-700 cursor-pointer">
+                          <Checkbox data-testid={`input-worker-access-${party.id}`} className="size-5 border-2 border-slate-500 data-[state=checked]:border-[#1B3A6B] data-[state=checked]:bg-[#1B3A6B] data-[state=checked]:text-white" checked={isAssigned} disabled={updateWorker.isPending} onCheckedChange={() => toggleParty(party.id)} />
                          খাতা অ্যাক্সেস
                        </label>
-                       <label className="flex gap-1.5 items-center text-xs text-slate-700">
-                         <input type="checkbox" data-testid={`input-worker-adjustment-${party.id}`} checked={draftAdjustmentIds.includes(party.id)} disabled={!isAssigned || updateWorker.isPending} onChange={() => toggleAdjustment(party.id)} />
+                        <label className={cn("flex gap-2 items-center text-xs font-semibold cursor-pointer", isAssigned ? "text-slate-700" : "text-slate-400")}>
+                          <Checkbox data-testid={`input-worker-adjustment-${party.id}`} className="size-5 border-2 border-slate-500 data-[state=checked]:border-[#1B3A6B] data-[state=checked]:bg-[#1B3A6B] data-[state=checked]:text-white disabled:border-slate-300 disabled:opacity-100" checked={draftAdjustmentIds.includes(party.id)} disabled={!isAssigned || updateWorker.isPending} onCheckedChange={() => toggleAdjustment(party.id)} />
                          অ্যাডজাস্টমেন্ট
                        </label>
                      </div>
