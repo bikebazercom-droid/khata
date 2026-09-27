@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ClerkProvider, SignIn, SignUp, Show, useClerk, useAuth } from '@clerk/react';
+import { ClerkProvider, useAuth } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from 'wouter';
@@ -23,8 +23,9 @@ import NotFound from '@/pages/not-found';
 import { fetchMe } from '@/lib/phoneAuth';
 import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import { useRetryPendingUploads } from '@/lib/useRetryPendingUploads';
-import { readAuthCache, writeAuthCache, clearAuthCache } from '@/lib/authCache';
-import { restoreCache, persistCache, clearPersistedCache } from '@/lib/queryPersister';
+import { readOfflineIdentity, writeOfflineIdentity, clearOfflineIdentity, allowOfflineBusinesses } from '@/lib/authCache';
+import { setPersistedScope, persistCache, pausePersistedCache, clearActorViews } from '@/lib/queryPersister';
+import { OfflineLedger } from '@/pages/offline-ledger';
 import { BusinessContextProvider } from '@/lib/businessContext';
 import { BusinessSwitcherDrawer } from '@/components/modals/business-switcher-drawer';
 import { LanguageProvider } from '@/lib/i18n';
@@ -149,6 +150,7 @@ const queryClient = new QueryClient({
     },
   },
 });
+persistCache(queryClient);
 
 // ── Seed the QueryClient with last-session data before the first render ───────
 // (Removed persisted query restore to prevent cross-account cache leak)
@@ -216,34 +218,68 @@ function RealtimeSyncManager() {
 // ─── Invalidate cache on user change ──────────────────────────────────────────
 
 function AuthCacheInvalidator() {
-  const { addListener } = useClerk();
   const qc = useQueryClient();
-  const { userId } = useAppAuth();
-  const prevUserIdRef = useRef<string | null | undefined>(undefined);
-
-  // Clear cache when clerk user changes
+  const { selectedBusinessId, setSelectedBusiness } = useBusinessContext();
+  const { isLoaded, userId: clerkUserId } = useAuth();
+  const { data: me, isError, error } = useQuery({
+    queryKey: ['auth-me', clerkUserId],
+    queryFn: fetchMe,
+    enabled: isLoaded,
+    retry: false,
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
   useEffect(() => {
-    const unsub = addListener(({ user }) => {
-      const clerkUserId = user?.id ?? null;
-      if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== clerkUserId) {
-        qc.clear();
-        clearAuthCache();
-        clearPersistedCache();
-      }
-      prevUserIdRef.current = clerkUserId;
-    });
-    return unsub;
-  }, [addListener, qc]);
-
-  // Clear cache when any userId changes (clerk or phone)
-  const prevAppUserIdRef = useRef<string | null | undefined>(undefined);
-  useEffect(() => {
-    if (prevAppUserIdRef.current !== undefined && prevAppUserIdRef.current !== userId) {
+    if (isError && [401, 403].includes((error as Error & { status?: number })?.status ?? 0)) {
       qc.clear();
-      clearPersistedCache();
+      const actor = readOfflineIdentity()?.userId;
+      if (actor) clearActorViews(actor);
+      clearOfflineIdentity();
+      return;
     }
-    prevAppUserIdRef.current = userId;
-  }, [userId, qc]);
+    if (!me?.userId || !me.businessId) return;
+    const previous = readOfflineIdentity();
+    if (previous && previous.userId === me.userId &&
+      (previous.role !== me.role || JSON.stringify(previous.adjustmentPartyIds) !== JSON.stringify((me as typeof me & { adjustmentPartyIds?: string[] }).adjustmentPartyIds ?? []))) {
+      clearActorViews(me.userId);
+    }
+    if (previous && previous.userId !== me.userId) {
+      qc.clear();
+      clearActorViews(previous.userId);
+      clearOfflineIdentity();
+      localStorage.removeItem('selected_business_id');
+      setSelectedBusiness(me.businessId);
+    }
+    writeOfflineIdentity(me);
+    const identity = readOfflineIdentity();
+    const business = previous?.userId !== me.userId ? me.businessId : selectedBusinessId || me.businessId;
+    if (identity?.permittedBusinessIds.includes(business)) {
+      setPersistedScope(qc, me.userId, me.role ?? 'staff', business);
+    } else {
+      qc.clear();
+      pausePersistedCache();
+    }
+  }, [me, selectedBusinessId, isError, error, qc, setSelectedBusiness]);
+
+  useEffect(() => {
+    if (!me?.userId || isError) return;
+    let active = true;
+    void fetch('/api/businesses', { credentials: 'include' }).then(async (response) => {
+      if (!response.ok) return;
+      const businesses = await response.json() as { id: string }[];
+      if (active && readOfflineIdentity()?.userId === me.userId) {
+        const ids = businesses.map((business) => business.id);
+        allowOfflineBusinesses(me.userId, ids);
+        if (selectedBusinessId && !ids.includes(selectedBusinessId)) {
+          clearActorViews(me.userId);
+          setSelectedBusiness(me.businessId);
+        } else if (selectedBusinessId && ids.includes(selectedBusinessId)) {
+          setPersistedScope(qc, me.userId, me.role ?? 'staff', selectedBusinessId);
+        }
+      }
+    }).catch(() => { /* No new local business grants during an outage. */ });
+    return () => { active = false; };
+  }, [me, isError, selectedBusinessId, setSelectedBusiness, qc]);
 
   return null;
 }
@@ -267,11 +303,12 @@ export function useAppAuth() {
   // does not establish the user's business permissions.
   const devBypass = import.meta.env.DEV && import.meta.env.VITE_DEV_AUTH_BYPASS === 'true';
   const enabled = isLoaded && !devBypass;
-  const { data: authData, isLoading: authLoading } = useQuery({
+  const { data: authData, isLoading: authLoading, isError, error } = useQuery({
     queryKey: ['auth-me', clerkUserId],
     queryFn: fetchMe,
     enabled,
-    staleTime: 60_000,
+    staleTime: 0,
+    refetchOnMount: 'always',
     retry: false,
   });
 
@@ -279,7 +316,7 @@ export function useAppAuth() {
   // We need authData to settle for the role.
   const authSettled = isLoaded && (!enabled || !authLoading);
 
-  const realAuth = enabled && !!authData?.userId;
+  const realAuth = enabled && !isError && !!authData?.userId;
 
   // We MUST gate rendering on authoritative /auth/me to avoid cross-account leak
   const isAuthenticated = authSettled ? realAuth : false;
@@ -302,6 +339,7 @@ export function useAppAuth() {
     role,
     userId: authData?.userId,
     adjustmentPartyIds: (authData as (typeof authData & { adjustmentPartyIds?: string[] }) | undefined)?.adjustmentPartyIds ?? [],
+    authError: isError ? (error as Error).message : null,
   };
 }
 
@@ -468,6 +506,7 @@ function AppRouter() {
           </Switch>
         </TooltipProvider>
         <Toaster position="bottom-right" richColors />
+        <OfflineReadyIndicator />
         <BusinessSwitcherDrawer />
         </ConnectionStateProvider>
         </LanguageProvider>
@@ -476,7 +515,32 @@ function AppRouter() {
   );
 }
 
+function OfflineReadyIndicator() {
+  const [ready, setReady] = useState(false);
+  const { isAuthenticated } = useAppAuth();
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    let active = true;
+    void navigator.serviceWorker.ready.then(() => { if (active) setReady(true); });
+    return () => { active = false; };
+  }, []);
+  return ready && isAuthenticated && readOfflineIdentity() ? <span className="fixed bottom-2 left-2 z-10 rounded-full bg-slate-800/90 px-2 py-1 text-xs text-white" aria-label="অফলাইন দেখার জন্য প্রস্তুত">অফলাইনে দেখার জন্য প্রস্তুত</span> : null;
+}
+
 function App() {
+  const [offline, setOffline] = useState(() => !navigator.onLine);
+  useEffect(() => {
+    const goOffline = () => { pausePersistedCache(); queryClient.clear(); setOffline(true); };
+    const goOnline = () => { queryClient.clear(); setOffline(false); };
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('online', goOnline);
+    return () => { window.removeEventListener('offline', goOffline); window.removeEventListener('online', goOnline); };
+  }, []);
+  if (offline) {
+    const identity = readOfflineIdentity();
+    const selected = localStorage.getItem('selected_business_id');
+    return <OfflineLedger identity={identity} businessId={selected || identity?.businessId || null} />;
+  }
   return (
     <BusinessContextProvider>
       <WouterRouter base={basePath}>

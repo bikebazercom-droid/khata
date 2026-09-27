@@ -1,79 +1,31 @@
-/**
- * queryPersister — offline-first cache bridge for React Query.
- *
- * Two public functions:
- *
- *   restoreCache(qc)  — call synchronously at module scope right after
- *                       creating the QueryClient. Reads the last-session
- *                       snapshot from localStorage and seeds every query
- *                       with its previous value so the UI renders with real
- *                       data before any network request fires.
- *
- *   persistCache(qc)  — subscribes to the query cache and writes successful
- *                       query results to localStorage in batches. Call once
- *                       at module scope alongside restoreCache.
- *
- * Design choices
- * ──────────────
- *  • localStorage (not IndexedDB) — synchronous reads mean we can seed the
- *    cache in the same JS tick that creates the QueryClient, before React
- *    even begins rendering. IndexedDB is async-only and would require a
- *    loading gate that defeats the purpose.
- *
- *  • 24-hour TTL — the whole store expires as a unit. Stale-enough data
- *    triggers a background refetch via React Query's normal staleTime logic.
- *
- *  • Versioned key — bump CACHE_KEY whenever the API response shape changes
- *    so old persisted data is automatically discarded.
- *
- *  • Debounced writes — multiple queries completing in the same tick are
- *    batched into one localStorage.setItem to avoid write storms.
- *
- *  • Quota-safe — if localStorage is full, oldest entries are pruned and we
- *    retry; if still failing we clear the store entirely rather than crashing.
- */
-
 import type { QueryClient } from '@tanstack/react-query';
 
-// Bump this string whenever the persisted data shape changes.
-const CACHE_KEY = 'dkhata_qcache_v1';
+// This is a local, per-browser *view*, not an authentication credential.
+// Never restore the legacy unscoped snapshot.
+const PREFIX = 'dkhata_offline_view_v2:';
+const LEGACY = 'dkhata_qcache_v1';
+const MAX_AGE = 24 * 60 * 60 * 1000;
+let scope: string | null = null;
+let timer: ReturnType<typeof setTimeout> | undefined;
+type Snapshot = { ts: number; entries: Record<string, unknown> };
 
-/** Time-to-live for the entire cache snapshot (24 hours). */
-const MAX_AGE_MS = 24 * 60 * 60 * 1000;
-
-/**
- * Query keys whose first element is in this set are excluded from
- * persistence. 'auth-me' is managed by authCache.ts; we don't want to
- * double-cache it here.
- */
-const EXCLUDED_ROOTS = new Set<string>(['auth-me']);
-
-// ── Internal store type ────────────────────────────────────────────────────────
-
-interface Store {
-  /** Timestamp of the last write — used for TTL checks. */
-  ts: number;
-  /**
-   * Map of JSON-serialised query key → query data.
-   * We intentionally store `unknown` because React Query data is typed at
-   * the hook call site; the persister is type-agnostic.
-   */
-  entries: Record<string, unknown>;
+export function permittedQueryKey(key: readonly unknown[]): boolean {
+  if (typeof key[0] !== 'string') return false;
+  return key[0] === '/api/parties' ||
+    /^\/api\/parties\/[^/]+(?:\/ledger-entries)?$/.test(key[0]);
 }
 
-// ── Internal singleton ────────────────────────────────────────────────────────
+function storageKey(actor: string, role: string, business: string) {
+  return PREFIX + encodeURIComponent(JSON.stringify([actor, role, business]));
+}
 
-/** In-memory mirror of the store — avoids repeated JSON.parse on every read. */
-let _store: Store | null = null;
-
-function loadStore(): Store {
+function read(key: string): Snapshot {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return { ts: 0, entries: {} };
-    const parsed = JSON.parse(raw) as Store;
-    if (Date.now() - parsed.ts > MAX_AGE_MS) {
-      // Expired — discard and start fresh.
-      localStorage.removeItem(CACHE_KEY);
+    const value = localStorage.getItem(key);
+    if (!value) return { ts: 0, entries: {} };
+    const parsed = JSON.parse(value) as Snapshot;
+    if (typeof parsed.ts !== 'number' || !parsed.entries || typeof parsed.entries !== 'object' || Date.now() - parsed.ts > MAX_AGE) {
+      localStorage.removeItem(key);
       return { ts: 0, entries: {} };
     }
     return parsed;
@@ -82,137 +34,77 @@ function loadStore(): Store {
   }
 }
 
-function getStore(): Store {
-  if (!_store) _store = loadStore();
-  return _store;
+export function getOfflineEntries(actor: string, role: string, business: string): Record<string, unknown> {
+  const entries = read(storageKey(actor, role, business)).entries;
+  return Object.fromEntries(Object.entries(entries).filter(([key]) => {
+    try { return permittedQueryKey(JSON.parse(key)); } catch { return false; }
+  }));
 }
 
-// ── Debounced, quota-safe write ───────────────────────────────────────────────
-
-let _flushTimer: ReturnType<typeof setTimeout> | null = null;
-
-function scheduleFlush(): void {
-  if (_flushTimer) return; // already scheduled
-  _flushTimer = setTimeout(() => {
-    _flushTimer = null;
-    flushNow();
-  }, 250);
+// Called only after /api/auth/me confirms the actor and business permission.
+export function setPersistedScope(qc: QueryClient, actor: string, role: string, business: string): void {
+  const next = storageKey(actor, role, business);
+  if (scope === next) return;
+  if (timer) clearTimeout(timer);
+  if (scope) qc.removeQueries({ predicate: (query) => query.queryKey[0] !== 'auth-me' });
+  scope = next;
+  // Do not optimistically restore a private view while online: permissions may
+  // have changed since the snapshot. Fresh server queries refill this scope.
 }
 
-function flushNow(): void {
-  if (!_store) return;
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(_store));
-  } catch {
-    // localStorage quota exceeded — trim the oldest half of entries.
-    try {
-      const entries = Object.entries(_store.entries);
-      _store.entries = Object.fromEntries(entries.slice(Math.ceil(entries.length / 2)));
-      localStorage.setItem(CACHE_KEY, JSON.stringify(_store));
-    } catch {
-      // Still failing — clear entirely so future writes succeed.
-      localStorage.removeItem(CACHE_KEY);
-      _store = { ts: 0, entries: {} };
-    }
-  }
-}
-
-// ── Public API ────────────────────────────────────────────────────────────────
-
-/**
- * Seeds the QueryClient with every entry from the last-session localStorage
- * snapshot. Must be called synchronously at module scope — before React
- * renders — so HomeView, PartyView, etc. receive data on their first render
- * without waiting for network.
- *
- * The seeded data is immediately "stale" (React Query treats setQueryData
- * results as stale-by-default). React Query will silently refetch in the
- * background and update the UI when fresh data arrives, producing the
- * stale-while-revalidate pattern the user sees as an instant + always-fresh UI.
- */
-export function restoreCache(qc: QueryClient): void {
-  const store = getStore();
-  for (const [keyStr, data] of Object.entries(store.entries)) {
-    try {
-      const key = JSON.parse(keyStr) as unknown[];
-      if (!Array.isArray(key)) continue;
-      if (typeof key[0] === 'string' && EXCLUDED_ROOTS.has(key[0])) continue;
-      qc.setQueryData(key, data);
-    } catch {
-      // Malformed entry — skip silently.
-    }
-  }
-}
-
-/**
- * Subscribes to the query cache observer and persists each successful
- * fetch to localStorage. Returns the unsubscribe function.
- *
- * Call once at module scope. The subscription is lightweight — it only
- * runs on `updated` events with type `success`.
- */
 export function persistCache(qc: QueryClient): () => void {
+  try { localStorage.removeItem(LEGACY); } catch { /* storage unavailable */ }
   return qc.getQueryCache().subscribe((event) => {
-    // Only act on successful query completions.
-    if (event.type !== 'updated') return;
-    if (event.action.type !== 'success') return;
-
+    if (!scope || event.type !== 'updated' || event.action.type !== 'success' || event.action.manual) return;
     const { queryKey, state } = event.query;
-    if (state.data === undefined) return;
-
-    // Skip excluded roots.
-    if (Array.isArray(queryKey) && typeof queryKey[0] === 'string') {
-      if (EXCLUDED_ROOTS.has(queryKey[0])) return;
-    }
-
-    const store = getStore();
-    store.entries[JSON.stringify(queryKey)] = state.data;
-    store.ts = Date.now();
-    scheduleFlush();
+    if (!permittedQueryKey(queryKey) || state.data === undefined) return;
+    const currentScope = scope;
+    const data = state.data;
+    const key = JSON.stringify(queryKey);
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      if (scope !== currentScope) return;
+      const snapshot = read(currentScope);
+      snapshot.entries[key] = data;
+      snapshot.ts = Date.now();
+      try { localStorage.setItem(currentScope, JSON.stringify(snapshot)); }
+      catch { /* Quota exhaustion must never affect ledger writes or the outbox. */ }
+    }, 250);
   });
 }
 
-/**
- * Surgically removes specific query keys from the persisted localStorage
- * snapshot without touching anything else.
- *
- * Call this immediately when a delete SSE event arrives, before the
- * background refetch completes, so that if the user closes the tab in the
- * ~200 ms window between the delete and the refetch, the next session
- * never sees the deleted item from the stale snapshot.
- *
- * @param queryKeys - Array of React Query key arrays to evict.
- *   e.g. [getListPartiesQueryKey(), getGetPartyQueryKey(partyId)]
- */
-export function evictPersistedCacheEntries(queryKeys: ReadonlyArray<readonly unknown[]>): void {
-  const store = getStore();
-  let changed = false;
-  for (const key of queryKeys) {
-    const keyStr = JSON.stringify(key);
-    if (keyStr in store.entries) {
-      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-      delete store.entries[keyStr];
-      changed = true;
-    }
-  }
-  if (changed) {
-    store.ts = Date.now();
-    scheduleFlush();
-  }
+export function evictPersistedCacheEntries(keys: ReadonlyArray<readonly unknown[]>): void {
+  if (!scope) return;
+  const snapshot = read(scope);
+  for (const key of keys) delete snapshot.entries[JSON.stringify(key)];
+  try { localStorage.setItem(scope, JSON.stringify(snapshot)); } catch { /* ignore */ }
 }
 
-/**
- * Wipes the persisted cache from both memory and localStorage.
- * Call on logout so a different user signing in never sees the previous
- * user's data during the optimistic-render window.
- */
+// Preserve actor-scoped drafts in IndexedDB. Remove only the active view.
 export function clearPersistedCache(): void {
-  _store = null;
-  if (_flushTimer) {
-    clearTimeout(_flushTimer);
-    _flushTimer = null;
+  if (timer) clearTimeout(timer);
+  timer = undefined;
+  if (scope) {
+    try { localStorage.removeItem(scope); } catch { /* ignore */ }
   }
+  scope = null;
+  try { localStorage.removeItem(LEGACY); } catch { /* ignore */ }
+}
+
+export function pausePersistedCache(): void {
+  if (timer) clearTimeout(timer);
+  timer = undefined;
+  scope = null;
+}
+
+export function clearActorViews(actor: string): void {
   try {
-    localStorage.removeItem(CACHE_KEY);
-  } catch { /* ignore */ }
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith(PREFIX)) continue;
+      const parsed = JSON.parse(decodeURIComponent(key.slice(PREFIX.length))) as string[];
+      if (parsed[0] === actor) localStorage.removeItem(key);
+    }
+  } catch { /* storage unavailable */ }
+  pausePersistedCache();
 }

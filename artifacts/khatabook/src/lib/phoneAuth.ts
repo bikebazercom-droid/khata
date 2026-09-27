@@ -18,7 +18,11 @@ export interface MeResponse {
 
 export async function fetchMe(): Promise<MeResponse> {
   const res = await fetch(`/api/auth/me`, { credentials: "include" });
-  if (!res.ok) throw new Error("not authenticated");
+  if (!res.ok) {
+    const error = new Error(res.status === 401 ? "Session expired" : "Authentication server unavailable") as Error & { status: number };
+    error.status = res.status;
+    throw error;
+  }
   return res.json() as Promise<MeResponse>;
 }
 

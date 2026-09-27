@@ -1,33 +1,42 @@
-/**
- * Tiny localStorage helper that remembers whether the user was authenticated
- * on their last visit. Used only to decide whether to show the loading spinner
- * on app start — actual auth is always verified against the server.
- *
- * Stored value is just 'clerk' | 'phone'. We deliberately keep nothing
- * sensitive here — no tokens, no user IDs, no session data.
- */
+import type { MeResponse } from './phoneAuth';
 
-const KEY = 'dkhata_auth_v1';
+const KEY = 'dkhata_offline_identity_v2';
+export type OfflineIdentity = Pick<MeResponse, 'userId' | 'businessId' | 'authMethod'> & {
+  role: 'owner' | 'staff';
+  adjustmentPartyIds: string[];
+  permittedBusinessIds: string[];
+};
 
-export type AuthMethod = 'clerk' | 'phone';
-
-export function readAuthCache(): AuthMethod | null {
+// A record of the last successful server verification, never a login session.
+export function readOfflineIdentity(): OfflineIdentity | null {
   try {
-    const v = localStorage.getItem(KEY);
-    return v === 'clerk' || v === 'phone' ? v : null;
-  } catch {
-    return null;
-  }
+    const value = JSON.parse(localStorage.getItem(KEY) || 'null') as OfflineIdentity | null;
+    return value && typeof value.userId === 'string' && !!value.userId &&
+      typeof value.businessId === 'string' && !!value.businessId &&
+      (value.role === 'owner' || value.role === 'staff') &&
+      (value.authMethod === 'clerk' || value.authMethod === 'phone') &&
+      Array.isArray(value.adjustmentPartyIds) && Array.isArray(value.permittedBusinessIds) ? value : null;
+  } catch { return null; }
 }
 
-export function writeAuthCache(method: AuthMethod): void {
+export function writeOfflineIdentity(me: MeResponse): void {
+  if (!me.userId || !me.businessId || (me.role !== 'owner' && me.role !== 'staff')) return;
   try {
-    localStorage.setItem(KEY, method);
-  } catch {}
+    localStorage.setItem(KEY, JSON.stringify({
+      userId: me.userId, businessId: me.businessId, role: me.role,
+      authMethod: me.authMethod, adjustmentPartyIds: (me as MeResponse & { adjustmentPartyIds?: string[] }).adjustmentPartyIds ?? [],
+      permittedBusinessIds: readOfflineIdentity()?.userId === me.userId && readOfflineIdentity()?.role === me.role
+        ? readOfflineIdentity()!.permittedBusinessIds : [me.businessId],
+    }));
+  } catch { /* disabled storage */ }
 }
 
-export function clearAuthCache(): void {
-  try {
-    localStorage.removeItem(KEY);
-  } catch {}
+export function allowOfflineBusinesses(actor: string, ids: string[]): void {
+  const identity = readOfflineIdentity();
+  if (!identity || identity.userId !== actor) return;
+  try { localStorage.setItem(KEY, JSON.stringify({ ...identity, permittedBusinessIds: ids })); } catch { /* ignore */ }
+}
+
+export function clearOfflineIdentity(): void {
+  try { localStorage.removeItem(KEY); } catch { /* disabled storage */ }
 }
