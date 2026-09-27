@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ClerkProvider, useAuth } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
@@ -30,7 +30,9 @@ import { BusinessContextProvider } from '@/lib/businessContext';
 import { BusinessSwitcherDrawer } from '@/components/modals/business-switcher-drawer';
 import { LanguageProvider } from '@/lib/i18n';
 import { drainEntries, ENTRY_OUTBOX_CHANGED } from '@/lib/entryOutbox';
+import { clearAllPendingUploads } from '@/lib/pendingUploads';
 import { useBusinessContext } from '@/lib/businessContext';
+import { isNetworkWriteAuthorized, markServerReauthenticated, revokeNetworkWrites, useAuthConnectivity } from '@/lib/useAuthConnectivity';
 
 // ─── Clerk setup ──────────────────────────────────────────────────────────────
 
@@ -173,8 +175,9 @@ function RealtimeSyncManager() {
   activeScope.current = scope;
   useEffect(() => {
     if (!scope || !userId) return;
+    activeScope.current = scope;
     const run = () => {
-      void drainEntries(userId, selectedBusinessId, () => activeScope.current === scope, () => {
+      void drainEntries(userId, selectedBusinessId, () => isNetworkWriteAuthorized() && activeScope.current === scope, () => {
         if (activeScope.current === scope) void qc.invalidateQueries();
       }).catch(() => {
         toast.error('অফলাইন খসড়া পড়া যাচ্ছে না', { description: 'স্টোরেজ অনুমতি পরীক্ষা করুন; পরে আবার সিঙ্ক হবে।' });
@@ -187,6 +190,7 @@ function RealtimeSyncManager() {
     document.addEventListener('visibilitychange', run);
     const interval = window.setInterval(run, 15_000);
     return () => {
+      activeScope.current = '';
       window.removeEventListener('online', run);
       window.removeEventListener(ENTRY_OUTBOX_CHANGED, run);
       window.removeEventListener('banglakhata-connection-restored', run);
@@ -223,7 +227,7 @@ function AuthCacheInvalidator() {
   const { isLoaded, userId: clerkUserId } = useAuth();
   const { data: me, isError, error } = useQuery({
     queryKey: ['auth-me', clerkUserId],
-    queryFn: fetchMe,
+    queryFn: () => fetchMe(),
     enabled: isLoaded,
     retry: false,
     staleTime: 0,
@@ -237,6 +241,7 @@ function AuthCacheInvalidator() {
       clearOfflineIdentity();
       return;
     }
+    if (isError) return; // A stale successful query is not fresh permission.
     if (!me?.userId || !me.businessId) return;
     const previous = readOfflineIdentity();
     if (previous && previous.userId === me.userId &&
@@ -245,6 +250,7 @@ function AuthCacheInvalidator() {
     }
     if (previous && previous.userId !== me.userId) {
       qc.clear();
+      clearAllPendingUploads();
       clearActorViews(previous.userId);
       clearOfflineIdentity();
       localStorage.removeItem('selected_business_id');
@@ -305,7 +311,7 @@ export function useAppAuth() {
   const enabled = isLoaded && !devBypass;
   const { data: authData, isLoading: authLoading, isError, error } = useQuery({
     queryKey: ['auth-me', clerkUserId],
-    queryFn: fetchMe,
+    queryFn: () => fetchMe(),
     enabled,
     staleTime: 0,
     refetchOnMount: 'always',
@@ -425,7 +431,34 @@ function HomeRoute() {
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 
-function AppRouter() {
+function AuthServerReporter({ onNetworkFailure, onSettled }: { onNetworkFailure: () => void; onSettled: () => void }) {
+  const { isLoaded, userId } = useAuth();
+  const { data, isSuccess, isError, error } = useQuery({
+    queryKey: ['auth-me', userId],
+    queryFn: () => fetchMe(),
+    enabled: isLoaded,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    retry: false,
+  });
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (isSuccess) {
+      if (data?.userId && data.businessId && (data.role === 'owner' || data.role === 'staff')) {
+        markServerReauthenticated();
+        onSettled();
+      } else onNetworkFailure();
+    }
+    if (isError) {
+      const status = (error as Error & { status?: number })?.status;
+      if (status === 401 || status === 403) { revokeNetworkWrites(); onSettled(); }
+      else onNetworkFailure();
+    }
+  }, [isLoaded, data, isSuccess, isError, error, onSettled, onNetworkFailure]);
+  return null;
+}
+
+function AppRouter({ onNetworkFailure, onSettled }: { onNetworkFailure: () => void; onSettled: () => void }) {
   const [, setLocation] = useLocation();
 
   return (
@@ -447,6 +480,7 @@ function AppRouter() {
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
       <QueryClientProvider client={queryClient}>
+        <AuthServerReporter onNetworkFailure={onNetworkFailure} onSettled={onSettled} />
         <LanguageProvider>
         <ConnectionStateProvider>
         <AuthCacheInvalidator />
@@ -528,15 +562,10 @@ function OfflineReadyIndicator() {
 }
 
 function App() {
-  const [offline, setOffline] = useState(() => !navigator.onLine);
-  useEffect(() => {
-    const goOffline = () => { pausePersistedCache(); queryClient.clear(); setOffline(true); };
-    const goOnline = () => { queryClient.clear(); setOffline(false); };
-    window.addEventListener('offline', goOffline);
-    window.addEventListener('online', goOnline);
-    return () => { window.removeEventListener('offline', goOffline); window.removeEventListener('online', goOnline); };
-  }, []);
-  if (offline) {
+  const clearQueries = useCallback(() => queryClient.clear(), []);
+  const { phase, goOffline, serverAuthSettled } = useAuthConnectivity(clearQueries);
+  if (phase === 'probing') return <AppSplash />;
+  if (phase === 'offline') {
     const identity = readOfflineIdentity();
     const selected = localStorage.getItem('selected_business_id');
     return <OfflineLedger identity={identity} businessId={selected || identity?.businessId || null} />;
@@ -544,7 +573,7 @@ function App() {
   return (
     <BusinessContextProvider>
       <WouterRouter base={basePath}>
-        <AppRouter />
+        <AppRouter onNetworkFailure={goOffline} onSettled={serverAuthSettled} />
       </WouterRouter>
     </BusinessContextProvider>
   );

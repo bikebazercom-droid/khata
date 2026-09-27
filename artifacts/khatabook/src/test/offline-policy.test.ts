@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
 import { clearOfflineIdentity, readOfflineIdentity, writeOfflineIdentity } from '../lib/authCache';
-import { clearActorViews, getOfflineEntries, permittedQueryKey, persistCache, setPersistedScope } from '../lib/queryPersister';
+import { clearActorViews, evictPersistedCacheEntries, getOfflineEntries, pausePersistedCache, permittedQueryKey, persistCache, setPersistedScope } from '../lib/queryPersister';
 
 describe('offline private view', () => {
-  beforeEach(() => { localStorage.clear(); vi.useFakeTimers(); });
+  beforeEach(() => { pausePersistedCache(); localStorage.clear(); vi.useFakeTimers(); });
 
   it('never persists API auth/admin/object responses or arbitrary queries', () => {
     for (const key of ['/api/auth/me', '/api/admin/users', '/api/objects/a', 'auth-me', '/api/user/account']) {
@@ -37,5 +37,42 @@ describe('offline private view', () => {
     expect(JSON.stringify(readOfflineIdentity())).not.toContain('123');
     clearOfflineIdentity();
     expect(readOfflineIdentity()).toBeNull();
+  });
+
+  it('flushes all simultaneous server query successes, not just the last', async () => {
+    const qc = new QueryClient();
+    const unsubscribe = persistCache(qc);
+    setPersistedScope(qc, 'actor', 'owner', 'biz');
+    await Promise.all([
+      qc.fetchQuery({ queryKey: ['/api/parties'], queryFn: async () => [{ id: 'p', name: 'Test' }] }),
+      qc.fetchQuery({ queryKey: ['/api/parties/p'], queryFn: async () => ({ id: 'p', name: 'Test' }) }),
+      qc.fetchQuery({ queryKey: ['/api/parties/p/ledger-entries'], queryFn: async () => [{ id: 'e', amount: 10 }] }),
+    ]);
+    vi.advanceTimersByTime(251);
+    expect(Object.keys(getOfflineEntries('actor', 'owner', 'biz')).sort()).toEqual([
+      '["/api/parties"]', '["/api/parties/p"]', '["/api/parties/p/ledger-entries"]',
+    ].sort());
+    unsubscribe();
+  });
+
+  it('discards unflushed entries when switching scope or logging out; eviction wins over pending writes', async () => {
+    const qc = new QueryClient();
+    const unsubscribe = persistCache(qc);
+    setPersistedScope(qc, 'actor-A', 'owner', 'biz-A');
+    await qc.fetchQuery({ queryKey: ['/api/parties'], queryFn: async () => [{ id: 'private-A' }] });
+    setPersistedScope(qc, 'actor-B', 'staff', 'biz-B');
+    await qc.fetchQuery({ queryKey: ['/api/parties'], queryFn: async () => [{ id: 'private-B' }] });
+    vi.advanceTimersByTime(251);
+    expect(getOfflineEntries('actor-A', 'owner', 'biz-A')).toEqual({});
+    expect(getOfflineEntries('actor-B', 'staff', 'biz-B')['["/api/parties"]']).toEqual([{ id: 'private-B' }]);
+    await qc.fetchQuery({ queryKey: ['/api/parties/p/ledger-entries'], queryFn: async () => [{ id: 'delete-me' }] });
+    evictPersistedCacheEntries([['/api/parties/p/ledger-entries']]);
+    vi.advanceTimersByTime(251);
+    expect(getOfflineEntries('actor-B', 'staff', 'biz-B')).not.toHaveProperty('["/api/parties/p/ledger-entries"]');
+    await qc.fetchQuery({ queryKey: ['/api/parties/p'], queryFn: async () => ({ id: 'unflushed' }) });
+    clearActorViews('actor-B');
+    vi.advanceTimersByTime(251);
+    expect(getOfflineEntries('actor-B', 'staff', 'biz-B')).toEqual({});
+    unsubscribe();
   });
 });

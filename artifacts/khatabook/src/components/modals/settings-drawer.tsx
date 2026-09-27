@@ -30,6 +30,7 @@ import { useLanguage } from '@/lib/i18n';
 import { useAppAuth } from '@/App';
 import { clearOfflineIdentity, readOfflineIdentity } from '@/lib/authCache';
 import { clearActorViews } from '@/lib/queryPersister';
+import { revokeNetworkWrites } from '@/lib/useAuthConnectivity';
 
 /** Shape stored in localStorage under PROFILE_KEY */
 export interface ShopProfile {
@@ -136,6 +137,7 @@ export function SettingsDrawer({
       }
 
       queryClient.clear();
+      revokeNetworkWrites();
       const actor = readOfflineIdentity()?.userId;
       if (actor) clearActorViews(actor);
       clearOfflineIdentity();
@@ -178,6 +180,7 @@ export function SettingsDrawer({
     try {
       await fetch('/api/auth/logout-event', { method: 'POST', credentials: 'include' }).catch(() => {});
       queryClient.clear();
+      revokeNetworkWrites();
       const actor = readOfflineIdentity()?.userId;
       if (actor) clearActorViews(actor);
       clearOfflineIdentity();

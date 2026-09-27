@@ -26,6 +26,7 @@ import {
 import { toast } from 'sonner';
 import { getPendingUploads, removePendingUpload } from './pendingUploads';
 import { uploadBillImage } from './billImageStorage';
+import { isNetworkWriteAuthorized } from './useAuthConnectivity';
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -64,6 +65,7 @@ export function useRetryPendingUploads(enabled: boolean): void {
 
     try {
       for (const record of pending) {
+        if (!isNetworkWriteAuthorized()) break;
         // Re-upload to cloud storage.
         const uploadResult = await uploadBillImage(record.base64);
         if (!uploadResult.ok) {
@@ -72,6 +74,7 @@ export function useRetryPendingUploads(enabled: boolean): void {
         }
 
         // Patch the entry on the server.
+        if (!isNetworkWriteAuthorized()) break;
         const patched = await patchEntryBillImage(record.partyId, record.entryId, uploadResult.objectPath);
         if (!patched) {
           // Server-side error — leave record, try again next time.

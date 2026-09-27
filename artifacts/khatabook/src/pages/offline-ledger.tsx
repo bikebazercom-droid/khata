@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import type { OfflineIdentity } from '@/lib/authCache';
 import { getOfflineEntries } from '@/lib/queryPersister';
 import { listEntries, type QueuedEntry } from '@/lib/entryOutbox';
+import type { LedgerEntry } from '@workspace/api-client-react';
 
 type Party = { id: string; name: string; currentBalance?: number; balanceType?: string; role?: string };
-type Entry = { id: string; amount?: number; type?: string; note?: string; createdAt?: string; dueDate?: string };
+type Entry = LedgerEntry;
 
 // Deliberately separate from Clerk and the online mutation components. This view
 // cannot issue network writes or initiate bill uploads while identity is unverified.
@@ -57,8 +58,8 @@ export function OfflineLedger({ identity, businessId }: { identity: OfflineIdent
           {activeParty?.currentBalance != null && <p className="my-2">ব্যালেন্স: ৳{activeParty.currentBalance.toLocaleString('bn-BD')}</p>}
           <h2 className="mt-5 font-semibold">সংরক্ষিত লেনদেন</h2>
           {entries.length ? entries.map((entry) => <div key={entry.id} className="border-b py-3">
-            <div className="flex justify-between"><span>{entry.type ?? 'লেনদেন'}</span><strong>৳{Number(entry.amount ?? 0).toLocaleString('bn-BD')}</strong></div>
-            <p className="text-sm text-slate-500">{entry.note} {entry.dueDate ?? entry.createdAt}</p>
+             <div className="flex justify-between"><span>{entry.type === 'YOU_GAVE' ? 'আপনি দিয়েছেন' : entry.type === 'YOU_GOT' ? 'আপনি পেয়েছেন' : 'লেনদেন'}</span><strong>৳{Number(entry.amount ?? 0).toLocaleString('bn-BD')}</strong></div>
+             <p className="text-sm text-slate-500">{entry.description} {entry.createdAt}</p>
           </div>) : <p className="py-4 text-slate-500">এই হিসাবের কোনো সংরক্ষিত লেনদেন নেই।</p>}
         </> : <>
           <h1 className="text-xl font-bold">সংরক্ষিত হিসাব</h1>

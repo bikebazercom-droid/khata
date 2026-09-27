@@ -7,6 +7,7 @@ const LEGACY = 'dkhata_qcache_v1';
 const MAX_AGE = 24 * 60 * 60 * 1000;
 let scope: string | null = null;
 let timer: ReturnType<typeof setTimeout> | undefined;
+let dirty: Map<string, unknown> = new Map();
 type Snapshot = { ts: number; entries: Record<string, unknown> };
 
 export function permittedQueryKey(key: readonly unknown[]): boolean {
@@ -45,7 +46,7 @@ export function getOfflineEntries(actor: string, role: string, business: string)
 export function setPersistedScope(qc: QueryClient, actor: string, role: string, business: string): void {
   const next = storageKey(actor, role, business);
   if (scope === next) return;
-  if (timer) clearTimeout(timer);
+  discardPending();
   if (scope) qc.removeQueries({ predicate: (query) => query.queryKey[0] !== 'auth-me' });
   scope = next;
   // Do not optimistically restore a private view while online: permissions may
@@ -59,13 +60,15 @@ export function persistCache(qc: QueryClient): () => void {
     const { queryKey, state } = event.query;
     if (!permittedQueryKey(queryKey) || state.data === undefined) return;
     const currentScope = scope;
-    const data = state.data;
     const key = JSON.stringify(queryKey);
+    dirty.set(key, state.data);
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => {
+      timer = undefined;
       if (scope !== currentScope) return;
       const snapshot = read(currentScope);
-      snapshot.entries[key] = data;
+      for (const [dirtyKey, value] of dirty) snapshot.entries[dirtyKey] = value;
+      dirty.clear();
       snapshot.ts = Date.now();
       try { localStorage.setItem(currentScope, JSON.stringify(snapshot)); }
       catch { /* Quota exhaustion must never affect ledger writes or the outbox. */ }
@@ -76,14 +79,17 @@ export function persistCache(qc: QueryClient): () => void {
 export function evictPersistedCacheEntries(keys: ReadonlyArray<readonly unknown[]>): void {
   if (!scope) return;
   const snapshot = read(scope);
-  for (const key of keys) delete snapshot.entries[JSON.stringify(key)];
+  for (const key of keys) {
+    const serialized = JSON.stringify(key);
+    dirty.delete(serialized);
+    delete snapshot.entries[serialized];
+  }
   try { localStorage.setItem(scope, JSON.stringify(snapshot)); } catch { /* ignore */ }
 }
 
 // Preserve actor-scoped drafts in IndexedDB. Remove only the active view.
 export function clearPersistedCache(): void {
-  if (timer) clearTimeout(timer);
-  timer = undefined;
+  discardPending();
   if (scope) {
     try { localStorage.removeItem(scope); } catch { /* ignore */ }
   }
@@ -92,9 +98,14 @@ export function clearPersistedCache(): void {
 }
 
 export function pausePersistedCache(): void {
+  discardPending();
+  scope = null;
+}
+
+function discardPending(): void {
   if (timer) clearTimeout(timer);
   timer = undefined;
-  scope = null;
+  dirty.clear();
 }
 
 export function clearActorViews(actor: string): void {
