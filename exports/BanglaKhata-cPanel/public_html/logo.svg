@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 90" fill="none">
+  <!-- Book icon -->
+  <!-- Left page of open book -->
+  <path d="M44,74 C44,74 10,68 8,28 L8,13 C8,11 10,10 12,11 C22,13 37,17 44,22 Z" fill="#1B3A6B"/>
+  <!-- Right page of open book -->
+  <path d="M44,74 C44,74 78,68 80,28 L80,13 C80,11 78,10 76,11 C66,13 51,17 44,22 Z" fill="#1B3A6B"/>
+  <!-- Right page inner highlight -->
+  <path d="M44,71 C44,71 75,65 77,28 L77,14 C68,15 54,18 44,23 Z" fill="#24488A"/>
+  <!-- Chart area fill (orange) on right page -->
+  <path d="M50,58 L55,47 L61,52 L67,38 L75,43 L75,62 L50,62 Z" fill="#F5A623" opacity="0.75"/>
+  <!-- Chart line -->
+  <polyline points="50,58 55,47 61,52 67,38 75,43" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+  <!-- Orange trending arrow -->
+  <line x1="67" y1="39" x2="79" y2="22" stroke="#F5A623" stroke-width="2.8" stroke-linecap="round"/>
+  <path d="M79,22 L73,25 M79,22 L77,29" fill="none" stroke="#F5A623" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Book spine -->
+  <line x1="44" y1="22" x2="44" y2="74" stroke="#0D2040" stroke-width="1.5" opacity="0.4"/>
+
+  <!-- "Banglakhata" text -->
+  <text x="96" y="52" font-family="'Inter', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="800" fill="#1B3A6B" letter-spacing="-0.5">Banglakhata</text>
+</svg>

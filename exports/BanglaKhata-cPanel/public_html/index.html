@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="bn">
+  <head>
+    <script>
+      // Suppress errors thrown by browser extensions (e.g. MetaMask)
+      // so they don't appear in Vite's runtime-error overlay.
+      window.addEventListener('error', function (e) {
+        if (e.filename && e.filename.startsWith('chrome-extension://')) {
+          e.stopImmediatePropagation();
+        }
+      }, true);
+    </script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#1B3A6B" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>Banglakhata - Digital Ledger</title>
+    <meta name="description" content="Banglakhata — নিরাপদ ও দ্রুততম ক্লাউড হিসাব। কাস্টমার ও সাপ্লায়ারের সব হিসাব এক জায়গায়।" />
+    <meta name="robots" content="index, follow" />
+    <meta property="og:title" content="Banglakhata" />
+    <meta property="og:description" content="Banglakhata — কাস্টমার ও সাপ্লায়ারের সব হিসাব এক জায়গায়, নিরাপদে।" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Banglakhata" />
+    <meta name="twitter:description" content="Banglakhata — কাস্টমার ও সাপ্লায়ারের সব হিসাব এক জায়গায়, নিরাপদে।" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Inter for the app UI -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Noto Sans Bengali — preloaded so it is available when the PDF generator fires -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <script type="module" crossorigin src="/assets/index-DIFp7kOe.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BaFHj1lp.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

@@ -18,6 +18,17 @@ import { migrateBillImages } from "./lib/migrateBillImages";
 import { trustedProxyCidrs } from "./middlewares/ipBlock";
 
 const app: Express = express();
+const corsAllowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+if (
+  process.env.OBJECT_STORAGE_DRIVER === 'local' &&
+  process.env.NODE_ENV === 'production' &&
+  corsAllowedOrigins.length === 0
+) {
+  throw new Error('CORS_ALLOWED_ORIGINS is required for production local-storage deployments');
+}
 
 // Only accept forwarding headers from explicitly configured proxy CIDRs.
 // Without configuration, req.ip is the socket peer (not the spoofable XFF).
@@ -47,7 +58,12 @@ app.use(
 // Clerk proxy must come before body parsers — it streams raw bytes.
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
-app.use(cors({ credentials: true, origin: true }));
+app.use(cors({
+  credentials: true,
+  origin: corsAllowedOrigins.length
+    ? (origin, callback) => callback(null, !origin || corsAllowedOrigins.includes(origin))
+    : true,
+}));
 
 // cookie-parser required for reading phone_session JWT cookie.
 app.use(cookieParser());

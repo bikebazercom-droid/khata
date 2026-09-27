@@ -138,7 +138,7 @@ export function LandingPage() {
 
   // ── click handlers ──────────────────────────────────────────────────────────
 
-  function handleAndroidClick(e: React.MouseEvent<HTMLAnchorElement>) {
+  function handleAndroidClick(e: React.MouseEvent<HTMLButtonElement>) {
     e.preventDefault();
 
     // If a real Play Store URL is configured, open it.
@@ -147,12 +147,12 @@ export function LandingPage() {
       return;
     }
 
-    // Otherwise trigger a download — priority: store-url-that-is-a-file >
-    // explicit apk url > server fallback path (always exists after startup).
+    // Do not point users at a guessed download path; only use a URL returned
+    // by the server's current download configuration.
     const url = (cfg?.androidStoreUrl && isDownloadUrl(cfg.androidStoreUrl))
       ? cfg.androidStoreUrl
-      : (cfg?.androidApkUrl ?? '/api/downloads/banglakhata.apk');
-    triggerDownload(url, 'banglakhata.apk');
+      : cfg?.androidApkUrl;
+    if (url) triggerDownload(url, 'banglakhata.apk');
   }
 
   function handleIosClick(e: React.MouseEvent<HTMLAnchorElement>) {
@@ -170,18 +170,24 @@ export function LandingPage() {
 
   function handleWindowsClick(e: React.MouseEvent<HTMLAnchorElement>) {
     e.preventDefault();
-    // Fall back to the server path if config hasn't loaded yet.
-    const url = cfg?.windowsUrl ?? '/api/downloads/banglakhata-windows.exe';
-    triggerDownload(url, 'banglakhata-windows.exe');
+    if (cfg?.windowsUrl) triggerDownload(cfg.windowsUrl, 'banglakhata-windows.exe');
   }
 
   // ── derived labels ──────────────────────────────────────────────────────────
 
   // If the store URL is a real store (not a download link) show "Play Store".
   // In every other case show "Download APK" — file always exists after startup.
-  const isRealStoreUrl = cfg?.androidStoreUrl && !isDownloadUrl(cfg.androidStoreUrl);
-  const androidLabel   = isRealStoreUrl ? 'Play Store' : 'Download APK';
-  const androidSub     = isRealStoreUrl ? 'Android-এ ডাউনলোড' : 'সরাসরি ডাউনলোড';
+  const isRealStoreUrl = Boolean(cfg?.androidStoreUrl && !isDownloadUrl(cfg.androidStoreUrl));
+  const androidDownloadUrl = cfg?.androidStoreUrl && isDownloadUrl(cfg.androidStoreUrl)
+    ? cfg.androidStoreUrl
+    : cfg?.androidApkUrl;
+  const androidAvailable = isRealStoreUrl || Boolean(androidDownloadUrl);
+  const androidLabel = isRealStoreUrl
+    ? 'Play Store'
+    : androidDownloadUrl ? 'Download APK' : 'Android App';
+  const androidSub = isRealStoreUrl
+    ? 'Android-এ ডাউনলোড'
+    : androidDownloadUrl ? 'সরাসরি ডাউনলোড' : 'শীঘ্রই আসছে';
   const iosLabel     = cfg?.iosStoreUrl ? 'App Store' : 'App Store';
   const iosSub       = cfg?.iosStoreUrl ? 'iOS-এ ডাউনলোড' : 'শীঘ্রই আসছে';
 
@@ -221,15 +227,14 @@ export function LandingPage() {
           </p>
           <p className="text-white/50 text-sm max-w-sm leading-relaxed mb-12">
             গ্রাহক, সরবরাহকারী, বকেয়া এবং লেনদেন — সব এক জায়গায়।
-            Android, iOS ও Windows-এ বিনামূল্যে পাওয়া যাচ্ছে।
           </p>
 
           {/* Android + iOS row */}
           <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm mb-4">
 
             {/* Android */}
-            <a href="#" onClick={handleAndroidClick}
-              className="flex-1 flex items-center justify-center gap-3 bg-white text-[#1B3A6B] rounded-2xl px-6 py-4 font-bold text-sm shadow-xl hover:bg-white/90 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
+            <button type="button" disabled={!androidAvailable} onClick={handleAndroidClick}
+              className="flex-1 flex items-center justify-center gap-3 bg-white text-[#1B3A6B] rounded-2xl px-6 py-4 font-bold text-sm shadow-xl hover:bg-white/90 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100">
               <svg className="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M3.18 23.76a2 2 0 0 0 2.73.74l10.47-6.03-2.91-2.91-10.29 8.2zM20.8 10.34L6.18.92A2 2 0 0 0 3.18.18L13.86 10.86 20.8 10.34zM2.01 1.5A2 2 0 0 0 2 2v20a2 2 0 0 0 .01.5L13.14 11.36 2.01 1.5zM16.54 13l-2.68-2.68 2.68-2.68 3.05 1.76a2 2 0 0 1 0 3.46L16.54 13z"/>
               </svg>
@@ -238,7 +243,7 @@ export function LandingPage() {
                 <br/>
                 <span className="font-normal text-xs opacity-70">{androidSub}</span>
               </span>
-            </a>
+            </button>
 
             {/* iOS */}
             <a href="#" onClick={handleIosClick}
@@ -254,8 +259,7 @@ export function LandingPage() {
             </a>
           </div>
 
-          {/* Windows button — always visible; file is guaranteed to exist */}
-          <a href="#" onClick={handleWindowsClick}
+          {cfg?.windowsUrl && <a href="#" onClick={handleWindowsClick}
             className="w-full max-w-sm flex items-center justify-center gap-3 bg-[#0078d4] hover:bg-[#006cbf] border border-[#0078d4]/50 text-white rounded-2xl px-6 py-4 font-bold text-sm shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
             <svg className="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="currentColor">
               <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-13.051-1.949"/>
@@ -265,7 +269,7 @@ export function LandingPage() {
               <br/>
               <span className="font-normal text-xs opacity-80">কম্পিউটারের জন্য ডাউনলোড করুন</span>
             </span>
-          </a>
+          </a>}
 
           <p className="text-white/30 text-xs mt-6">
             বিনামূল্যে · কোনো ক্রেডিট কার্ড লাগবে না

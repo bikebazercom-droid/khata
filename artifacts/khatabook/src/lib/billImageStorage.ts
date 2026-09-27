@@ -200,19 +200,23 @@ export async function uploadBillImage(base64DataUrl: string): Promise<BillImageU
       return { ok: false, reason: 'url-request-failed' };
     }
 
-    const { uploadURL, objectPath } = (await metaRes.json()) as {
+    const { uploadURL, objectPath, uploadToken } = (await metaRes.json()) as {
       uploadURL: string;
       objectPath: string;
+      uploadToken?: string;
     };
 
-    // Step 2: upload the image bytes directly to GCS via the presigned URL.
+    // Step 2: upload the image bytes directly to storage via the presigned URL.
     // Retry once after a short delay — a momentary network interruption between
     // step 1 and step 2 should not permanently lose the photo.
     const attemptPut = (): Promise<Response> =>
       fetch(uploadURL, {
         method: 'PUT',
         body: blob,
-        headers: { 'Content-Type': blob.type },
+        headers: {
+          'Content-Type': blob.type,
+          ...(uploadToken ? { Authorization: `Bearer ${uploadToken}` } : {}),
+        },
       });
 
     let uploadRes: Response;

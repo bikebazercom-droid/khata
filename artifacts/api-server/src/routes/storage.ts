@@ -37,14 +37,21 @@ router.post(
     try {
       const { name, size, contentType } = parsed.data;
 
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      const { businessId } = req as AuthenticatedRequest;
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL({
+        businessId, size, contentType,
+      });
       const objectPath =
         objectStorageService.normalizeObjectEntityPath(uploadURL);
+      const uploadToken = objectStorageService.getLocalUploadToken(uploadURL);
 
       res.json(
         RequestUploadUrlResponse.parse({
-          uploadURL,
+          uploadURL: uploadToken
+            ? objectStorageService.getLocalUploadEndpoint()
+            : uploadURL,
           objectPath,
+          ...(uploadToken ? { uploadToken } : {}),
           metadata: { name, size, contentType },
         }),
       );
@@ -159,3 +166,28 @@ router.get('/storage/objects/*path', async (req: Request, res: Response) => {
 });
 
 export default router;
+
+/**
+ * Local-disk PUT capability endpoint. This is deliberately exported separately
+ * so routes/index mounts it before requireAuth: the signed ticket is the
+ * authentication capability for the direct file PUT, matching GCS presigned
+ * uploads and keeping existing clients free of an Authorization header.
+ */
+export const localUploadRouter: IRouter = Router();
+localUploadRouter.put('/storage/uploads/put', async (req: Request, res: Response) => {
+  const authorization = req.header('authorization') ?? '';
+  const ticket = /^Bearer\s+([A-Za-z0-9._~-]+)$/i.exec(authorization)?.[1] ?? '';
+  if (!ticket) { res.status(400).json({ error: 'Missing upload ticket' }); return; }
+  try {
+    const result = await objectStorageService.putLocalTicket(ticket, req, {
+      contentType: req.header('content-type') ?? undefined,
+      contentLength: req.header('content-length') ?? undefined,
+    });
+    res.status(200).json({ objectPath: result.objectPath });
+  } catch (error) {
+    req.log.error({ err: error }, 'Error storing local object');
+    const message = error instanceof Error ? error.message : '';
+    res.status(/ticket|Content|size|escape/i.test(message) ? 400 : 500)
+      .json({ error: 'Failed to upload object' });
+  }
+});

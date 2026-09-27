@@ -8,8 +8,8 @@
  * `data:` are skipped, so the migration is idempotent.
  */
 
-import { sql } from "drizzle-orm";
-import { db, ledgerEntriesTable } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
+import { db, ledgerEntriesTable, partiesTable } from "@workspace/db";
 import { ObjectStorageService } from "./objectStorage";
 import { logger } from "./logger";
 
@@ -31,8 +31,10 @@ export async function migrateBillImages(): Promise<void> {
       .select({
         id: ledgerEntriesTable.id,
         billImage: ledgerEntriesTable.billImage,
+        businessId: partiesTable.businessId,
       })
       .from(ledgerEntriesTable)
+      .innerJoin(partiesTable, eq(ledgerEntriesTable.partyId, partiesTable.id))
       .where(sql`${ledgerEntriesTable.billImage} like 'data:%'`);
 
     if (rows.length === 0) {
@@ -49,19 +51,33 @@ export async function migrateBillImages(): Promise<void> {
       if (!row.billImage) continue;
 
       try {
+        if (!row.businessId) throw new Error("Bill image owner business is missing");
         const { buffer, mimeType } = dataUrlToBuffer(row.billImage);
 
-        // Get a presigned PUT URL, then upload the image bytes directly to GCS.
-        const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+        // Get a presigned PUT URL, then upload the image bytes directly to
+        // storage. Local-disk tickets travel in Authorization so access logs
+        // never record a bearer ticket in the URL.
+        const uploadURL = await objectStorageService.getObjectEntityUploadURL({
+          businessId: row.businessId,
+          size: buffer.length,
+          contentType: mimeType,
+        });
         const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+        const localToken = objectStorageService.getLocalUploadToken(uploadURL);
 
-        const uploadRes = await fetch(uploadURL, {
+        const uploadRes = await fetch(
+          localToken ? objectStorageService.getLocalUploadEndpoint() : uploadURL,
+          {
           method: "PUT",
           body: buffer,
-          headers: { "Content-Type": mimeType },
+          headers: {
+            "Content-Type": mimeType,
+            ...(localToken ? { Authorization: `Bearer ${localToken}` } : {}),
+          },
           // @ts-ignore — Node 18+ fetch accepts Buffer as body
           duplex: "half",
-        });
+          },
+        );
 
         if (!uploadRes.ok) {
           throw new Error(`GCS PUT returned ${uploadRes.status}`);

@@ -985,10 +985,13 @@ components:
       properties:
         uploadURL:
           type: string
-          description: Presigned GCS URL for PUT upload.
+          description: Presigned or signed API URL for PUT upload.
         objectPath:
           type: string
           description: Normalized object path (e.g. `/objects/uploads/uuid`). Store this in your database.
+        uploadToken:
+          type: string
+          description: Optional short-lived Bearer capability for local-disk uploads.
         metadata:
           $ref: '#/components/schemas/UploadUrlRequest'
     ErrorEnvelope:

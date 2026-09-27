@@ -22,7 +22,10 @@ export function submitLiveLedgerEntry(submission: LiveEntrySubmission) {
       const uploaded = await fetch(signed.uploadURL, {
         method: 'PUT',
         body: blob,
-        headers: { 'Content-Type': contentType },
+        headers: {
+          'Content-Type': contentType,
+          ...(signed.uploadToken ? { Authorization: `Bearer ${signed.uploadToken}` } : {}),
+        },
       });
       if (!uploaded.ok) throw new Error(`বিলের ছবি আপলোড হয়নি (${uploaded.status})।`);
       return signed.objectPath;

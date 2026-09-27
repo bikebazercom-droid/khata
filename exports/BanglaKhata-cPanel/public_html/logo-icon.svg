@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 88 88" fill="none">
+  <!-- Left page of open book -->
+  <path d="M44,78 C44,78 8,70 6,24 L6,10 C6,8 8,7 11,8 C22,11 38,16 44,22 Z" fill="#1B3A6B"/>
+  <!-- Right page of open book -->
+  <path d="M44,78 C44,78 80,70 82,24 L82,10 C82,8 80,7 77,8 C66,11 50,16 44,22 Z" fill="#1B3A6B"/>
+  <!-- Right page inner highlight -->
+  <path d="M44,75 C44,75 77,67 79,24 L79,11 C68,13 52,17 44,23 Z" fill="#24488A"/>
+  <!-- Chart area fill on right page -->
+  <path d="M50,62 L57,49 L63,55 L70,39 L79,45 L79,66 L50,66 Z" fill="#F5A623" opacity="0.75"/>
+  <!-- Chart line -->
+  <polyline points="50,62 57,49 63,55 70,39 79,45" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+  <!-- Orange trending arrow -->
+  <line x1="70" y1="40" x2="83" y2="21" stroke="#F5A623" stroke-width="3" stroke-linecap="round"/>
+  <path d="M83,21 L76,25 M83,21 L80,29" fill="none" stroke="#F5A623" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Book spine -->
+  <line x1="44" y1="22" x2="44" y2="78" stroke="#0D2040" stroke-width="1.5" opacity="0.4"/>
+</svg>

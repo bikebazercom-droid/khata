@@ -7,7 +7,7 @@ import dashboardRouter from "./dashboard";
 import settingsRouter from "./settings";
 import ledgerRouter from "./ledger";
 import eventsRouter from "./events";
-import storageRouter from "./storage";
+import storageRouter, { localUploadRouter } from "./storage";
 import staffRouter from "./staff";
 import businessesRouter from "./businesses";
 import userRouter from "./user";
@@ -30,6 +30,9 @@ router.use(enforceIpBlock);
 router.use(authRouter);
 router.use(downloadsRouter);
 router.use(downloadConfigsRouter);
+// Direct local-disk uploads use a short-lived signed capability URL, just like
+// the GCS presigned PUT. Mount before session auth so clients need no header.
+router.use(localUploadRouter);
 
 // Admin routes — use their own JWT auth (adminBearer), not Clerk.
 router.use(adminRouter);
