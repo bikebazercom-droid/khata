@@ -33,10 +33,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '@/lib/i18n';
 import { Redirect } from 'expo-router';
 import { useAuthRole } from '@/lib/auth-role';
-
-const API_BASE = process.env.EXPO_PUBLIC_DOMAIN
-  ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
-  : '';
+import { API_BASE_URL } from '@/lib/api-base';
 
 type Tab = 'CUSTOMER' | 'SUPPLIER';
 
@@ -357,7 +354,7 @@ function BengaliLedgerScannerSheet({ visible, onClose, onSuccess }: ScannerSheet
       fd.append('image', { uri: asset.uri, type: asset.mimeType ?? 'image/jpeg', name: 'ledger.jpg' } as any);
       const token = await getToken();
       const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-      const res = await fetch(`${API_BASE}/api/scan/bengali-ledger`, { method: 'POST', headers, body: fd });
+      const res = await fetch(`${API_BASE_URL}/api/scan/bengali-ledger`, { method: 'POST', headers, body: fd });
       if (!res.ok) throw new Error('scan failed');
       const data = await res.json() as { items: BengaliLedgerItem[] };
 

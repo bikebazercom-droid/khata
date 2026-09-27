@@ -40,14 +40,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuthRole } from '@/lib/auth-role';
 import { canAdjustParty, adjustmentDestinations, validAdjustmentSelection } from '@/lib/adjustment-access';
 import { submitLiveLedgerEntry } from '@/lib/live-entry-submit';
+import { API_BASE_URL } from '@/lib/api-base';
 import { v4 as uuidv4 } from 'uuid';
 import NetInfo from '@react-native-community/netinfo';
 
 // ─── Module-level helpers ────────────────────────────────────────────────────
-
-const API_BASE = process.env.EXPO_PUBLIC_DOMAIN
-  ? `https://${process.env.EXPO_PUBLIC_DOMAIN}`
-  : '';
 
 const BN_DIGITS: Record<string, string> = {
   '0': '০', '1': '১', '2': '২', '3': '৩', '4': '৪',
@@ -73,7 +70,7 @@ function fmtNum(s: string): string {
 function billImageSrc(billImage: string | null | undefined): string | null {
   if (!billImage) return null;
   if (billImage.startsWith('data:')) return billImage;
-  if (billImage.startsWith('/objects/')) return `${API_BASE}/api/storage${billImage}`;
+  if (billImage.startsWith('/objects/')) return `${API_BASE_URL}/api/storage${billImage}`;
   return null;
 }
 

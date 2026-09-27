@@ -14,10 +14,14 @@ if (!expoReady) {
   console.error('Install dependencies first: corepack pnpm install --frozen-lockfile (from ZIP root).');
   process.exit(1);
 }
-if (!config.EXPO_PUBLIC_DOMAIN ||
-    !/^pk_(?:live|test)_[A-Za-z0-9_-]+$/.test(config.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY || '') ||
-    !/^https:\/\//.test(config.EXPO_PUBLIC_CLERK_PROXY_URL || '')) {
-  console.error('Update mobile/public-build.json with a valid public HTTPS API host and Clerk production publishable settings.');
+let validApiUrl = false;
+try {
+  const apiUrl = new URL(config.EXPO_PUBLIC_API_URL);
+  validApiUrl = apiUrl.protocol === 'https:' && !!apiUrl.hostname;
+} catch { /* invalid or missing public API URL */ }
+if (!validApiUrl ||
+    !/^pk_(?:live|test)_[A-Za-z0-9_-]+$/.test(config.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY || '')) {
+  console.error('Update mobile/public-build.json with the full HTTPS API URL and Clerk production publishable key.');
   process.exit(1);
 }
 if (!existsSync(path.join(android, 'gradle', 'wrapper', 'gradle-wrapper.jar'))) {

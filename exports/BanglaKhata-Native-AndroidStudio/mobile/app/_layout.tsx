@@ -27,12 +27,11 @@ import { LanguageProvider } from '@/lib/i18n';
 import { AuthRoleProvider, notifyMobileIdentityChanged, useAuthRole } from '@/lib/auth-role';
 import { useColors } from '@/hooks/useColors';
 import { LiveEntrySync } from '@/lib/use-live-entry-sync';
+import { API_BASE_URL } from '@/lib/api-base';
 
 // Set API base URL — Expo bundles run outside the web proxy and need an
-// absolute URL. EXPO_PUBLIC_DOMAIN is injected by the dev script.
-if (process.env.EXPO_PUBLIC_DOMAIN) {
-  setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
-}
+// absolute URL. Configure it in mobile/public-build.json.
+if (API_BASE_URL) setBaseUrl(API_BASE_URL);
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();

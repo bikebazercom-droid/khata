@@ -6,8 +6,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '@clerk/expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthRole, notifyMobileIdentityChanged } from './auth-role';
-
-const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN;
+import { API_BASE_URL } from './api-base';
 
 /** Keep authenticated server events and visible queries in sync while foregrounded. */
 export function LiveEntrySync() {
@@ -19,7 +18,7 @@ export function LiveEntrySync() {
   activeScope.current = scope;
 
   useEffect(() => {
-    if (!identity || !DOMAIN) return;
+    if (!identity || !API_BASE_URL) return;
     let active = true;
     let connected = true;
     let generation = 0;
@@ -43,7 +42,7 @@ export function LiveEntrySync() {
       const authToken = await token();
       if (!current() || !connected || !authToken || generation !== thisGeneration) return;
       const events = new EventSource<'connected' | 'ledger.created' | 'ledger.updated' | 'ledger.deleted' |
-        'party.created' | 'party.deleted' | 'settings.updated'>(`https://${DOMAIN}/api/events`, {
+        'party.created' | 'party.deleted' | 'settings.updated'>(`${API_BASE_URL}/api/events`, {
         headers: { Authorization: `Bearer ${authToken}`, 'x-business-id': identity.businessId },
         pollingInterval: 3000,
       });
