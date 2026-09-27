@@ -56,3 +56,17 @@ mtime_ms = 1790415838109
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/44d2f0dc-8f96-4053-845a-3d6adbecb9a9/d67f5472-58e0-48b3-bff8-d522a928eaa6"
 storage_version_token = "1790415892971330"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "DCFKHT2BtUXl8Kgys0Ye5"
+uri = "file://exports/BanglaKhata-Native-AndroidStudio.zip"
+type = "unspecified"
+title = "BanglaKhata — Native Android Studio Project"
+description = "২.৯ MB ZIP: বর্তমান নেটিভ মোবাইল অ্যাপ, Android Gradle প্রজেক্ট ও বাংলা বিল্ড নির্দেশনা। WebView নয়; Expo Go লাগে না। সম্পূর্ণ APK বিল্ড ও ডিভাইস পরীক্ষা এখানে করা যায়নি।"
+logical_id = "c2d8062b-eb41-4010-be2b-20a5991a9032"
+content_hash = "sha256:2e47f8def12d901420a4dd4b8bdb2fb7e90d30f7f3aadd73401d53f90072fa9c"
+size = 2978565
+mtime_ms = 1790491068383
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/c2d8062b-eb41-4010-be2b-20a5991a9032/61e3468f-727b-4bcc-bd1c-00f70f220c8d"
+storage_version_token = "1790491207926576"
+content_type = "application/octet-stream"
