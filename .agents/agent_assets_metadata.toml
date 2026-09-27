@@ -70,3 +70,17 @@ mtime_ms = 1790491068383
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/c2d8062b-eb41-4010-be2b-20a5991a9032/61e3468f-727b-4bcc-bd1c-00f70f220c8d"
 storage_version_token = "1790491207926576"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "czkWQUucUMhOxXMlhpqcE"
+uri = "file://exports/BanglaKhata-Native-AndroidStudio-DirectServer.zip"
+type = "unspecified"
+title = "BanglaKhata — Windows Android Studio ZIP"
+description = "Fresh 2.9 MB native React Native project with a short BK archive root, duplicate META-INF packaging rules, the live server configuration and direct server-only ledger submissions. No offline ledger outbox is included. The archive was checked after a clean Linux extraction; this environment lacks Android SDK, so no APK was produced here."
+logical_id = "0fc4ef5b-702f-4d35-849f-c4e2622c940f"
+content_hash = "sha256:15c8c8f6071bbb9466fa26c3417f003dab05ff98429e3a20f861ea3f706f39db"
+size = 2995722
+mtime_ms = 1790510715976
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/0fc4ef5b-702f-4d35-849f-c4e2622c940f/80b2fd7e-d98a-4f37-94ca-8432096b1b18"
+storage_version_token = "1790510735227821"
+content_type = "application/octet-stream"

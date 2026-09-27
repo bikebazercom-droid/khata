@@ -6,11 +6,10 @@ import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '@clerk/expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthRole, notifyMobileIdentityChanged } from './auth-role';
-import { drainEntries, subscribeOutbox } from './entry-outbox';
 
 const DOMAIN = process.env.EXPO_PUBLIC_DOMAIN;
 
-/** Background push while foregrounded; refetch and replay after every reconnect. */
+/** Keep authenticated server events and visible queries in sync while foregrounded. */
 export function LiveEntrySync() {
   const { identity } = useAuthRole();
   const { getToken } = useAuth();
@@ -32,17 +31,9 @@ export function LiveEntrySync() {
       const clerkToken = await getToken().catch(() => null);
       return clerkToken ?? await SecureStore.getItemAsync('phone_session_token').catch(() => null);
     };
-    const replay = () => {
-      if (current() && connected) {
-        void drainEntries(identity.userId, identity.businessId, current, () => {
-          if (current()) void qc.invalidateQueries();
-        }).catch(() => { /* Draft remains stored; visible in the party screen. */ });
-      }
-    };
     const refresh = () => {
       if (!current() || !connected) return;
       void qc.invalidateQueries();
-      replay();
     };
     const open = async () => {
       const thisGeneration = ++generation;
@@ -88,11 +79,8 @@ export function LiveEntrySync() {
         else { generation++; source?.close(); source = undefined; }
       }
     });
-    const unsubscribe = subscribeOutbox(replay);
     void open();
-    // Refresh token periodically for long-lived streams and retry transient
-    // writes even when no connectivity-change event was delivered by Android.
-    const retry = setInterval(replay, 15_000);
+    // Refresh the auth token periodically for long-lived streams.
     const renew = setInterval(() => { if (current()) { void open(); refresh(); } }, 5 * 60_000);
     return () => {
       active = false;
@@ -100,8 +88,6 @@ export function LiveEntrySync() {
       source?.close();
       appState.remove();
       network();
-      unsubscribe();
-      clearInterval(retry);
       clearInterval(renew);
       if (authorizationRetry) clearTimeout(authorizationRetry);
     };

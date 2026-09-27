@@ -115,6 +115,12 @@ android {
         }
     }
     packagingOptions {
+        resources {
+            pickFirsts += [
+                'META-INF/versions/9/OSGI-INF/MANIFEST.MF',
+                'META-INF/**'
+            ]
+        }
         jniLibs {
             def enableLegacyPackaging = findProperty('expo.useLegacyPackaging') ?: 'false'
             useLegacyPackaging enableLegacyPackaging.toBoolean()

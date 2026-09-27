@@ -39,7 +39,7 @@ import { useColors } from '@/hooks/useColors';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthRole } from '@/lib/auth-role';
 import { canAdjustParty, adjustmentDestinations, validAdjustmentSelection } from '@/lib/adjustment-access';
-import { queueEntry, listEntries, subscribeOutbox, type QueuedEntry } from '@/lib/entry-outbox';
+import { submitLiveLedgerEntry } from '@/lib/live-entry-submit';
 import { v4 as uuidv4 } from 'uuid';
 import NetInfo from '@react-native-community/netinfo';
 
@@ -112,6 +112,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
   const [billImageUri, setBillImageUri] = useState<string | null>(null);
   const savingRef = useRef(false);
   const [saving, setSaving] = useState(false);
+  const requestIdRef = useRef<{ fingerprint: string; id: string } | null>(null);
 
   // Transfer / adjustment state
   const [isTransferMode, setIsTransferMode] = useState(false);
@@ -133,6 +134,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
   useEffect(() => { if (visible) setType(initialType); }, [visible, initialType]);
 
   function reset() {
+    requestIdRef.current = null;
     setAmount(''); setDescription(''); setType(initialType);
     setBillImageUri(null);
     setIsTransferMode(false); setTransferPartyId(null); setTransferSearch('');
@@ -200,8 +202,15 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
     try {
       savingRef.current = true;
       setSaving(true);
-      await queueEntry({
-        id: uuidv4(), actorId, businessId, partyId,
+      const fingerprint = JSON.stringify([
+        partyId, businessId, type, parsed, description.trim(),
+        isTransferMode, transferPartyId, staffMode ? null : billImageUri,
+      ]);
+      if (requestIdRef.current?.fingerprint !== fingerprint) {
+        requestIdRef.current = { fingerprint, id: uuidv4() };
+      }
+      await submitLiveLedgerEntry({
+        clientRequestId: requestIdRef.current.id, businessId, partyId,
         data: {
           type,
           amount: parsed,
@@ -211,13 +220,13 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
             transferPartyId: isTransferMode ? transferPartyId : undefined,
           } : {}),
         },
-        status: 'pending',
-      }, staffMode ? undefined : billImageUri ?? undefined);
+        imageUri: staffMode ? undefined : billImageUri ?? undefined,
+      });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('এন্ট্রি অপেক্ষমাণ', 'সার্ভার নিশ্চিত করলে মূল হিসাবে যুক্ত হবে। অফলাইনে খসড়াটি এই ডিভাইসে সংরক্ষিত আছে।');
+      Alert.alert('সার্ভারে সংরক্ষিত হয়েছে', 'এন্ট্রি সরাসরি বাংলাখাতা সার্ভারে জমা হয়েছে।');
       reset(); onSuccess(); onClose();
     } catch (error) {
-      Alert.alert('খসড়া সংরক্ষণ করা যায়নি', error instanceof Error ? error.message : 'আবার চেষ্টা করুন। ফর্মটি খোলা আছে।');
+      Alert.alert('সার্ভারে সংরক্ষণ করা যায়নি', `${error instanceof Error ? error.message : 'আবার চেষ্টা করুন।'} কোনো এন্ট্রি ডিভাইসে সংরক্ষণ করা হয়নি; ফর্মে থাকা তথ্য রেখে আবার পাঠাতে পারেন।`);
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -984,24 +993,6 @@ export default function PartyDetailScreen() {
   const [showReminderSheet, setShowReminderSheet] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<LedgerEntry | null>(null);
-  const [pendingEntries, setPendingEntries] = useState<QueuedEntry[]>([]);
-  const [outboxError, setOutboxError] = useState('');
-
-  useEffect(() => {
-    setPendingEntries([]);
-    setOutboxError('');
-    if (!identity || !id) return;
-    let active = true;
-    const refresh = () => {
-      void listEntries(identity.userId, identity.businessId).then((items) => {
-        if (active) setPendingEntries(items.filter((item) => item.partyId === id));
-      }).catch(() => { if (active) setOutboxError('অফলাইন খসড়া পড়া যাচ্ছে না। ডিভাইস স্টোরেজ পরীক্ষা করুন।'); });
-    };
-    refresh();
-    const unsubscribe = subscribeOutbox(refresh);
-    return () => { active = false; unsubscribe(); };
-  }, [identity?.userId, identity?.businessId, id]);
-
   const { data: party, isLoading: partyLoading, refetch: refetchParty } = useGetParty(id!, {
     query: { enabled: !!identity && !!id, queryKey: getGetPartyQueryKey(id!) },
   });
@@ -1156,28 +1147,6 @@ export default function PartyDetailScreen() {
             লেনদেনের ইতিহাস ({entries.length})
           </Text>
         </View>
-
-        {outboxError ? <Text accessibilityRole="alert" style={{ color: '#b91c1c', margin: 16 }}>{outboxError}</Text> : null}
-        {pendingEntries.length > 0 && (
-          <View style={{ marginHorizontal: 16, padding: 14, backgroundColor: '#fffbeb', borderRadius: 12, borderWidth: 1, borderColor: '#fcd34d' }}>
-            <Text style={{ color: '#92400e', fontFamily: 'Inter_700Bold', fontSize: 13, marginBottom: 8 }}>
-              অপেক্ষমাণ খসড়া · সার্ভারের ব্যালেন্সে যোগ হয়নি
-            </Text>
-            {pendingEntries.map((draft) => (
-              <View key={draft.id} style={{ borderTopWidth: 1, borderTopColor: '#fde68a', paddingVertical: 8 }}>
-                <Text style={{ color: '#78350f', fontFamily: 'Inter_600SemiBold' }}>
-                  {draft.data.type === 'YOU_GAVE' ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন'}: {fmtCur(draft.data.amount)}
-                  {draft.data.isTransfer ? ' · ⇄ ট্রান্সফার' : ''}
-                </Text>
-                {draft.data.description ? <Text style={{ color: '#92400e', fontSize: 12 }}>{draft.data.description}</Text> : null}
-                <Text accessibilityRole={draft.status === 'rejected' ? 'alert' : undefined}
-                  style={{ color: draft.status === 'rejected' ? '#b91c1c' : '#92400e', fontSize: 12 }}>
-                  {draft.status === 'rejected' ? `সংরক্ষণ প্রত্যাখ্যাত: ${draft.error}` : 'সিঙ্কের অপেক্ষায় · নিশ্চিত হলে হিসাবে দেখাবে'}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
 
         {entriesLoading ? (
           <View style={{ padding: 32, alignItems: 'center' }}><ActivityIndicator color={colors.primary} /></View>
