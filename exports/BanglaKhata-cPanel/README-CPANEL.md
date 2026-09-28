@@ -24,12 +24,34 @@ Also prepare:
 
 - `public_html/` — the BanglaKhata web app at `/` and the admin app at `/admin/`.
 - `node-app/` — compiled API, production Node dependencies, and start script.
-- `database/0000_cpanel-bootstrap.sql` — schema-only SQL for a new, empty
-  PostgreSQL database.
+- `database/helmetba_bkdb-bootstrap.sql` — GUI-importable PostgreSQL schema
+  for the `helmetba_bkdb` database (19 tables, foreign keys, and indexes).
 
 The repository's existing app download files were invalid placeholder binaries,
 so they are intentionally not included. Build and verify any APK or desktop
 installer before publishing it.
+
+## Create the PostgreSQL tables from a GUI
+
+1. In cPanel's PostgreSQL Databases page, confirm `helmetba_bkdb` exists and
+   that the database user assigned to the API has create/use privileges on the
+   `public` schema.
+2. Back up the database first if it contains anything you need to keep.
+3. Open the hosting provider's PostgreSQL SQL/Import screen (or phpPgAdmin),
+   select `helmetba_bkdb`, and import
+   `database/helmetba_bkdb-bootstrap.sql`. The script checks the selected
+   database name before creating anything.
+4. Confirm the tables appear in the database browser. The script creates
+   missing tables, foreign keys, and indexes inside one transaction; it does
+   not insert application records, drop objects, or alter existing columns.
+
+The script is safe to rerun when matching tables and constraints already
+exist. It is not a repair migration for tables whose columns differ from this
+version. If your database already has a different or partial BanglaKhata
+schema, stop and take a schema backup before proceeding. If cPanel prefixes the
+database name and `current_database()` is not exactly `helmetba_bkdb`, change
+the guard at the top of the SQL file to the actual database name before
+importing.
 
 ## Deploy
 
@@ -39,10 +61,8 @@ installer before publishing it.
 2. Place `node-app/` outside the document root, for example
    `/home/CPANEL_USER/banglakhata-node`. In cPanel's Node.js Application Manager,
    select Node 20+, set that application root, and use `npm start`.
-3. Create a **new, empty** PostgreSQL database. Apply
-   `database/0000_cpanel-bootstrap.sql` once, using the cPanel SQL tool or
-   `psql`. Do not run this bootstrap against a database that already contains
-   BanglaKhata data.
+3. Create or select the PostgreSQL database. For `helmetba_bkdb`, follow the
+   GUI import steps above before starting the API.
 4. Configure these environment values in the Node app settings:
 
    - `NODE_ENV=production`
@@ -70,8 +90,17 @@ installer before publishing it.
 5. Configure cPanel/Passenger to forward `/api/*` to the Node app while
    preserving the `/api` path prefix. The included `.htaccess` deliberately
    avoids rewriting `/api` to the website; it does not create this proxy.
-6. Start the app and test the API, sign-in, a ledger entry, and a private bill
-   image upload before changing users over.
+6. Start/restart the app and test the API, sign-in, a ledger entry, and a
+   private bill image upload before changing users over.
+
+### If the website says it is offline
+
+The web files can load while the API is stopped or unreachable. Without a
+signed-in session, `GET /api/auth/me` should return a `401` JSON response; it
+must not return a `503` HTML page. A `503` usually means the Passenger app did
+not start, its startup environment is incomplete, or `/api` is not mapped to
+the Node app. Check cPanel's Node application and Apache/Passenger error logs.
+The database SQL creates tables, but it does not configure or start Passenger.
 
 ## Data and service limitations
 
