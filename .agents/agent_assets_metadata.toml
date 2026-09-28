@@ -112,3 +112,31 @@ mtime_ms = 1790590341944
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/c9473a1a-6aa7-4dab-a992-24f3fd9ae585/e728907a-73ee-427f-b7a6-90c5d69c2a02"
 storage_version_token = "1790590591307709"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "xqvT0Q5bkb2BUdWmw5X01"
+uri = "file://exports/BanglaKhata-Public-Website-cPanel.zip"
+type = "unspecified"
+title = "BanglaKhata Public Website + Admin (cPanel)"
+description = "Static public_html package for the landing site and /admin, with Apache SPA and API routing rules."
+logical_id = "f98c6712-a382-48ab-b67e-66727f200553"
+content_hash = "sha256:7784f481f7361b74e6bf9c4d9e01dcde26e8ad2d40649c972521aad340764b55"
+size = 1541593
+mtime_ms = 1790598119098
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/f98c6712-a382-48ab-b67e-66727f200553/0dbeba77-4df3-4453-8361-1e2708013aca"
+storage_version_token = "1790598299186904"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "-0O-j7eJuOqfSj8Fku8BS"
+uri = "file://exports/BanglaKhata-Core-Backend-Mobile-cPanel.zip"
+type = "unspecified"
+title = "BanglaKhata Core Backend + Mobile Source (cPanel)"
+description = "Node.js API and production dependencies, PostgreSQL bootstrap SQL, and Android Studio source."
+logical_id = "1ff77b88-9d9e-409d-9b1a-32779530829e"
+content_hash = "sha256:aafa0746ef269da1cfac4a1887780859aa5794a15960c51b716e7eb0eb068575"
+size = 80823522
+mtime_ms = 1790598139668
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/1ff77b88-9d9e-409d-9b1a-32779530829e/4043e0cc-3659-4472-b3d1-59ddf85ee74e"
+storage_version_token = "1790598303696473"
+content_type = "application/octet-stream"

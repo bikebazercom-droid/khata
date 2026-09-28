@@ -1,0 +1,16 @@
+Options -Indexes -MultiViews
+DirectoryIndex index.html
+RewriteEngine On
+
+# Leave API requests for the Node.js Application Manager / Passenger mapping.
+RewriteRule ^api(?:/|$) - [L]
+
+# Fall back to the admin SPA for client-side routes, but leave real files alone.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^admin(?:/.*)?$ /admin/index.html [L]
+
+# Fall back to the public SPA for client-side routes.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.html [L]

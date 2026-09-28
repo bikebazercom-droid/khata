@@ -1,0 +1,4 @@
+packages:
+  - mobile
+  - lib/api-client-react
+minimumReleaseAge: 1440

@@ -1,0 +1,10 @@
+{
+  "name": "banglakhata-native-androidstudio",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.26.1",
+  "scripts": {
+    "android:release": "node mobile/scripts/build-android.cjs",
+    "typecheck": "pnpm exec tsc -b lib/api-client-react && pnpm --filter @workspace/khatabook-mobile typecheck"
+  }
+}

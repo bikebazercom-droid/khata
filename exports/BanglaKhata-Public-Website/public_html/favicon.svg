@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect width="64" height="64" rx="14" fill="#1B3A6B"/>
+  <!-- Open book icon in white/orange on navy bg -->
+  <!-- Left page -->
+  <path d="M32,55 C32,55 8,50 7,20 L7,9 C7,8 8,7 10,8 C18,10 28,13 32,17 Z" fill="white" opacity="0.92"/>
+  <!-- Right page -->
+  <path d="M32,55 C32,55 56,50 57,20 L57,9 C57,8 56,7 54,8 C46,10 36,13 32,17 Z" fill="white" opacity="0.92"/>
+  <!-- Right page inner (slightly transparent) -->
+  <path d="M32,53 C32,53 54,48 55,20 L55,10 C46,11 37,14 32,18 Z" fill="white" opacity="0.25"/>
+  <!-- Chart area on right page -->
+  <path d="M36,45 L40,37 L43,40 L47,30 L53,34 L53,47 L36,47 Z" fill="#F5A623" opacity="0.85"/>
+  <!-- Orange arrow -->
+  <line x1="47" y1="30" x2="56" y2="17" stroke="#F5A623" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M56,17 L51,20 M56,17 L54,23" fill="none" stroke="#F5A623" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
