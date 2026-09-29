@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  createLedgerEntry,
   useListParties,
   useListAdjustmentTargets,
   getListAdjustmentTargetsQueryKey,
@@ -33,7 +34,6 @@ import { useAppAuth } from '@/App';
 import { uploadBillImage, billImageSrc, type BillImageUploadResult } from '@/lib/billImageStorage';
 import { savePendingUpload } from '@/lib/pendingUploads';
 import { useBusinessContext } from '@/lib/businessContext';
-import { queueEntry } from '@/lib/entryOutbox';
 import { useConnectionState } from '@/context/connection-state';
 
 type KeyKind = 'digit' | 'muted' | 'accent';
@@ -206,8 +206,9 @@ export function TransactionEntryScreen({
   );
   // Mirrors the raw base64 data URL set at image capture time so handleSave
   // can access it synchronously even after onClose() clears component state.
-  // Needed to persist a retry record when the upload fails.
+  // Used to upload a bill image before submitting a new entry online.
   const pendingBase64Ref = useRef<string | null>(null);
+  const uploadedCreateImageRef = useRef<{ source: string; objectPath: string } | null>(null);
   // Background upload promise started as soon as the image is scanned/selected.
   // By the time the user fills in the amount and presses save, the upload is
   // almost always already complete — so awaiting it in handleSave adds no
@@ -363,6 +364,7 @@ export function TransactionEntryScreen({
   const showMetadata = hasInteracted;
 
   const processCapturedImage = useCallback(async (dataUrl: string) => {
+    uploadedCreateImageRef.current = null;
     setIsScanning(true);
     try {
       const scanned = await scanDocument(dataUrl);
@@ -673,6 +675,7 @@ export function TransactionEntryScreen({
   ]);
 
   const savingRef = useRef(false);
+  const createRequestRef = useRef<{ fingerprint: string; id: string } | null>(null);
   const handleSave = useCallback(async () => {
     if (savingRef.current) return;
     // If memory logs exist, the grand total accumulated in memory is the
@@ -700,37 +703,74 @@ export function TransactionEntryScreen({
       toast.error('পরিচয় যাচাই করা যায়নি। আবার লগইন করুন।');
       return;
     }
+    if (!navigator.onLine) {
+      toast.error('ইন্টারনেট সংযোগ প্রয়োজন', {
+        description: 'ব্রাউজারে হিসাব সরাসরি সার্ভারে জমা হয়। সংযোগ ফিরে এলে আবার চেষ্টা করুন।',
+      });
+      return;
+    }
     const capturedBase64 = pendingBase64Ref.current;
     savingRef.current = true;
     try {
-      // A successful IndexedDB commit, not a network attempt, is the point at
-      // which it is safe to close the form. The photo travels with the draft.
-      await queueEntry({
-        id: crypto.randomUUID(),
-        actorId: userId,
-        businessId: selectedBusinessId,
-        partyId,
-        data: {
-          type,
-          amount: finalAmount,
-          description,
-          dueDate: dueDate || undefined,
-          isTransfer: isTransferMode || undefined,
-          transferPartyId: isTransferMode ? transferPartyId : undefined,
-        },
-        imageBase64: capturedBase64 ?? undefined,
-        createdAt: new Date().toISOString(),
-        status: 'pending',
+      let billImage: string | undefined;
+      if (capturedBase64) {
+        const cachedUpload = uploadedCreateImageRef.current;
+        if (cachedUpload?.source === capturedBase64) {
+          billImage = cachedUpload.objectPath;
+        } else {
+          const uploaded = await uploadBillImage(capturedBase64);
+          if (!uploaded.ok) {
+            toast.error('বিলের ছবি আপলোড হয়নি', {
+              description: 'ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।',
+            });
+            return;
+          }
+          billImage = uploaded.objectPath;
+          uploadedCreateImageRef.current = { source: capturedBase64, objectPath: billImage };
+        }
+      }
+
+      const data = {
+        type,
+        amount: finalAmount,
+        description,
+        dueDate: dueDate || undefined,
+        isTransfer: isTransferMode || undefined,
+        transferPartyId: isTransferMode ? transferPartyId : undefined,
+        ...(billImage ? { billImage } : {}),
+      };
+      const fingerprint = JSON.stringify([partyId, selectedBusinessId, data]);
+      const requestId = createRequestRef.current?.fingerprint === fingerprint
+        ? createRequestRef.current.id
+        : crypto.randomUUID();
+      createRequestRef.current = { fingerprint, id: requestId };
+
+      await createLedgerEntry(partyId, {
+        ...data,
+        clientRequestId: requestId,
+      }, {
+        headers: { 'x-business-id': selectedBusinessId ?? '' },
       });
+
+      queryClient.invalidateQueries({ queryKey: getListLedgerEntriesQueryKey(partyId) });
+      queryClient.invalidateQueries({ queryKey: getGetPartyQueryKey(partyId) });
+      queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+      createRequestRef.current = null;
+      uploadedCreateImageRef.current = null;
+      pendingBase64Ref.current = null;
       clearMemory();
       onClose();
-      toast.info('এন্ট্রি অপেক্ষমাণ', { description: 'সার্ভার নিশ্চিত করলে মূল হিসাবে যুক্ত হবে।' });
-    } catch {
-      toast.error('খসড়া সংরক্ষণ করা যায়নি', { description: 'আবার চেষ্টা করুন। এন্ট্রি ফর্মটি খোলা আছে।' });
+      toast.success('হিসাব সার্ভারে সংরক্ষণ হয়েছে');
+    } catch (error) {
+      console.error('Online ledger entry save failed:', error);
+      toast.error('সার্ভারে হিসাব জমা হয়নি', {
+        description: 'সংযোগ পরীক্ষা করে এই ফর্ম থেকে আবার চেষ্টা করুন। এন্ট্রি সংরক্ষিত হয়নি।',
+      });
     } finally {
       savingRef.current = false;
     }
-  }, [memoryHistory.length, memoryValue, expression, partyId, type, description, dueDate, clearMemory, onClose, isTransferMode, transferPartyId, canAdjustSource, userRole, adjustmentPartyIds, userId, selectedBusinessId]);
+  }, [memoryHistory.length, memoryValue, expression, partyId, type, description, dueDate, clearMemory, onClose, isTransferMode, transferPartyId, canAdjustSource, userRole, adjustmentPartyIds, userId, selectedBusinessId, queryClient]);
 
   return (
     <div className="absolute inset-0 z-50 bg-[#f8fafc] flex flex-col">
@@ -849,6 +889,7 @@ export function TransactionEntryScreen({
                     onClick={() => {
                       setBillImage(null);
                       pendingBase64Ref.current = null;
+                      uploadedCreateImageRef.current = null;
                       uploadPromiseRef.current = null;
                     }}
                     className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-sm active:scale-90 transition-transform"

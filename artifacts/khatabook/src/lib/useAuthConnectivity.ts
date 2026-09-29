@@ -114,5 +114,5 @@ export function useAuthConnectivity(clearQueries: () => void) {
   }, [phase, goOffline]);
 
   const serverAuthSettled = useCallback(() => { settled.current = true; }, []);
-  return { phase, goOffline, serverAuthSettled };
+  return { phase, goOffline, serverAuthSettled, retry: probe };
 }

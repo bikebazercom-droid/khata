@@ -25,7 +25,6 @@ import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import { useRetryPendingUploads } from '@/lib/useRetryPendingUploads';
 import { readOfflineIdentity, writeOfflineIdentity, clearOfflineIdentity, allowOfflineBusinesses } from '@/lib/authCache';
 import { setPersistedScope, persistCache, pausePersistedCache, clearActorViews } from '@/lib/queryPersister';
-import { OfflineLedger } from '@/pages/offline-ledger';
 import { BusinessContextProvider } from '@/lib/businessContext';
 import { BusinessSwitcherDrawer } from '@/components/modals/business-switcher-drawer';
 import { LanguageProvider } from '@/lib/i18n';
@@ -540,7 +539,6 @@ function AppRouter({ onNetworkFailure, onSettled }: { onNetworkFailure: () => vo
           </Switch>
         </TooltipProvider>
         <Toaster position="bottom-right" richColors />
-        <OfflineReadyIndicator />
         <BusinessSwitcherDrawer />
         </ConnectionStateProvider>
         </LanguageProvider>
@@ -549,26 +547,12 @@ function AppRouter({ onNetworkFailure, onSettled }: { onNetworkFailure: () => vo
   );
 }
 
-function OfflineReadyIndicator() {
-  const [ready, setReady] = useState(false);
-  const { isAuthenticated } = useAppAuth();
-  useEffect(() => {
-    if (!('serviceWorker' in navigator)) return;
-    let active = true;
-    void navigator.serviceWorker.ready.then(() => { if (active) setReady(true); });
-    return () => { active = false; };
-  }, []);
-  return ready && isAuthenticated && readOfflineIdentity() ? <span className="fixed bottom-2 left-2 z-10 rounded-full bg-slate-800/90 px-2 py-1 text-xs text-white" aria-label="অফলাইন দেখার জন্য প্রস্তুত">অফলাইনে দেখার জন্য প্রস্তুত</span> : null;
-}
-
 function App() {
   const clearQueries = useCallback(() => queryClient.clear(), []);
-  const { phase, goOffline, serverAuthSettled } = useAuthConnectivity(clearQueries);
+  const { phase, goOffline, serverAuthSettled, retry } = useAuthConnectivity(clearQueries);
   if (phase === 'probing') return <AppSplash />;
   if (phase === 'offline') {
-    const identity = readOfflineIdentity();
-    const selected = localStorage.getItem('selected_business_id');
-    return <OfflineLedger identity={identity} businessId={selected || identity?.businessId || null} />;
+    return <OnlineConnectionRequired onRetry={() => { void retry(); }} />;
   }
   return (
     <BusinessContextProvider>
@@ -576,6 +560,26 @@ function App() {
         <AppRouter onNetworkFailure={goOffline} onSettled={serverAuthSettled} />
       </WouterRouter>
     </BusinessContextProvider>
+  );
+}
+
+function OnlineConnectionRequired({ onRetry }: { onRetry: () => void }) {
+  return (
+    <main className="min-h-[100dvh] bg-slate-50 px-6 flex items-center justify-center">
+      <section className="w-full max-w-sm rounded-2xl bg-white p-7 text-center shadow-sm border border-slate-100">
+        <h1 className="text-xl font-bold text-slate-900">সার্ভারের সাথে সংযোগ নেই</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-600">
+          ব্রাউজারে হিসাব দেখতে বা যোগ করতে সক্রিয় ইন্টারনেট সংযোগ দরকার। সংযোগ ফিরে এলে আবার চেষ্টা করুন।
+        </p>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-6 min-h-11 w-full rounded-xl bg-[#0b3d91] px-4 font-semibold text-white hover:bg-blue-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+        >
+          আবার চেষ্টা করুন
+        </button>
+      </section>
+    </main>
   );
 }
 
