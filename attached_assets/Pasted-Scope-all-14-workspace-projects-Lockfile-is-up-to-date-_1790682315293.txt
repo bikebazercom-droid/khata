@@ -1,0 +1,105 @@
+Scope: all 14 workspace projects
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +1516
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 1516, reused 0, downloaded 20, added 0
+Progress: resolved 1516, reused 0, downloaded 225, added 29
+Progress: resolved 1516, reused 0, downloaded 532, added 129
+Progress: resolved 1516, reused 0, downloaded 869, added 234
+Progress: resolved 1516, reused 0, downloaded 1166, added 323
+Progress: resolved 1516, reused 0, downloaded 1407, added 470
+
+   ╭──────────────────────────────────────────────╮
+   │                                              │
+   │     Update available! 10.26.1 → 12.6.0.      │
+   │     Changelog: https://pnpm.io/v/12.6.0      │
+   │   To update, run: corepack use pnpm@12.6.0   │
+   │                                              │
+   ╰──────────────────────────────────────────────╯
+
+Progress: resolved 1516, reused 0, downloaded 1489, added 1002
+Progress: resolved 1516, reused 0, downloaded 1490, added 1514
+Progress: resolved 1516, reused 0, downloaded 1490, added 1516, done
+.../esbuild@0.28.1/node_modules/esbuild postinstall$ node install.js
+.../esbuild@0.28.1/node_modules/esbuild postinstall: Done
+
+dependencies:
++ @replit/connectors-sdk 0.4.1
+
+devDependencies:
++ prettier 3.9.5
++ typescript 5.9.3
+
+╭ Warning ─────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│   Ignored build scripts: @clerk/shared@3.47.8, browser-tabs-lock@1.3.0,      │
+│   bufferutil@4.1.0, core-js@3.47.0, core-js@3.49.0, utf-8-validate@6.0.6.    │
+│   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+│   to run scripts.                                                            │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Done in 11.3s using pnpm v10.26.1
+
+> workspace@0.0.0 build:hostinger /home/u760807821/domains/banglakhata.com/hbuilds/source/repository
+> pnpm --filter @workspace/api-server run build && NODE_ENV=production BASE_PATH=/ pnpm --filter @workspace/khatabook run build && NODE_ENV=production BASE_PATH=/admin/ pnpm --filter @workspace/banglakhata-admin run build
+
+
+> @workspace/api-server@0.0.0 build /home/u760807821/domains/banglakhata.com/hbuilds/source/repository/artifacts/api-server
+> node ./build.mjs
+
+
+  dist/index.mjs                       3.9mb ⚠️
+  dist/pino-worker.mjs               153.5kb
+  dist/pino-file.mjs                 142.1kb
+  dist/pino-pretty.mjs               114.4kb
+  dist/thread-stream-worker.mjs        7.4kb
+  dist/index.mjs.map                   9.0mb
+  dist/pino-worker.mjs.map           256.9kb
+  dist/pino-file.mjs.map             229.1kb
+  dist/pino-pretty.mjs.map           203.6kb
+  dist/thread-stream-worker.mjs.map   12.0kb
+
+⚡ Done in 326ms
+
+> @workspace/khatabook@0.0.0 build /home/u760807821/domains/banglakhata.com/hbuilds/source/repository/artifacts/khatabook
+> vite build --config vite.config.ts
+
+vite v7.3.6 building client environment for production...
+transforming...
+src/components/ui/calendar.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 3947 modules transformed.
+rendering chunks...
+[plugin vite:reporter] 
+(!) /home/u760807821/domains/banglakhata.com/hbuilds/source/repository/node_modules/.pnpm/html2canvas@1.4.1/node_modules/html2canvas/dist/html2canvas.esm.js is dynamically imported by /home/u760807821/domains/banglakhata.com/hbuilds/source/repository/artifacts/khatabook/src/pages/staff-deployment.tsx, /home/u760807821/domains/banglakhata.com/hbuilds/source/repository/node_modules/.pnpm/jspdf@4.2.1/node_modules/jspdf/dist/jspdf.es.min.js but also statically imported by /home/u760807821/domains/banglakhata.com/hbuilds/source/repository/artifacts/khatabook/src/pages/home.tsx, /home/u760807821/domains/banglakhata.com/hbuilds/source/repository/artifacts/khatabook/src/pages/party-report-view.tsx, /home/u760807821/domains/banglakhata.com/hbuilds/source/repository/artifacts/khatabook/src/pages/report-view.tsx, /home/u760807821/domains/banglakhata.com/hbuilds/source/repository/artifacts/khatabook/src/pages/transaction-detail.tsx, dynamic import will not move module into another chunk.
+
+computing gzip size...
+dist/public/index.html                        2.47 kB │ gzip:   1.02 kB
+dist/public/assets/index-BaFHj1lp.css       135.00 kB │ gzip:  21.65 kB
+dist/public/assets/purify.es-VaSPOPhr.js     28.72 kB │ gzip:  10.74 kB
+dist/public/assets/index.es-EuoFf4cZ.js     158.79 kB │ gzip:  52.90 kB
+dist/public/assets/index-BYZ0moRN.js      2,608.48 kB │ gzip: 744.79 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 13.63s
+
+> @workspace/banglakhata-admin@0.0.0 build /home/u760807821/domains/banglakhata.com/hbuilds/source/repository/artifacts/banglakhata-admin
+> vite build --config vite.config.ts
+
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 2398 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/public/index.html                   1.43 kB │ gzip:   0.55 kB
+dist/public/assets/index-cgiD17qr.css   95.36 kB │ gzip:  15.93 kB
+dist/public/assets/index-H2LjUciD.js   758.67 kB │ gzip: 222.11 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 8.20s
