@@ -29,6 +29,30 @@ const AuthRoleContext = createContext<AuthRoleContextValue>({
 });
 let requestIdentityRefresh: (() => void) | null = null;
 
+function getClerkTokenWithTimeout(
+  getToken: () => Promise<string | null>,
+  timeoutMs: number,
+): Promise<string | null> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), timeoutMs);
+    try {
+      void getToken().then(
+        (token) => {
+          clearTimeout(timer);
+          resolve(token);
+        },
+        () => {
+          clearTimeout(timer);
+          resolve(null);
+        },
+      );
+    } catch {
+      clearTimeout(timer);
+      resolve(null);
+    }
+  });
+}
+
 export function notifyMobileIdentityChanged() {
   requestIdentityRefresh?.();
 }
@@ -75,6 +99,7 @@ export function AuthRoleProvider({ children }: { children: React.ReactNode }) {
 
   // An owner may change grants while this device stays on the same screen.
   useEffect(() => {
+    if (!identity || identityAuthKey !== currentAuthKey || unauthorized) return;
     const refresh = () => {
       if (AppState.currentState === 'active') notifyMobileIdentityChanged();
     };
@@ -83,7 +108,7 @@ export function AuthRoleProvider({ children }: { children: React.ReactNode }) {
       if (state === 'active') notifyMobileIdentityChanged();
     });
     return () => { clearInterval(timer); subscription.remove(); };
-  }, []);
+  }, [identity, identityAuthKey, currentAuthKey, unauthorized]);
 
   useEffect(() => queryClient.getMutationCache().subscribe((event) => {
     if (event.type !== 'updated' || event.action.type !== 'error') return;
@@ -93,11 +118,9 @@ export function AuthRoleProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setAuthTokenGetter(async () => {
-      try {
-        const clerkToken = await getToken();
+      if (isSignedIn) {
+        const clerkToken = await getClerkTokenWithTimeout(getToken, 3_000);
         if (clerkToken) return clerkToken;
-      } catch {
-        // Phone OTP sessions use the same shared API auth transport.
       }
       try {
         return await SecureStore.getItemAsync('phone_session_token');
@@ -106,7 +129,7 @@ export function AuthRoleProvider({ children }: { children: React.ReactNode }) {
       }
     });
     return () => setAuthTokenGetter(null);
-  }, [getToken]);
+  }, [getToken, isSignedIn]);
 
   useEffect(() => queryClient.getQueryCache().subscribe((event) => {
     if (event.type !== 'updated' || event.action.type !== 'error') return;
@@ -130,6 +153,8 @@ export function AuthRoleProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     if (!isLoaded) return;
+    const controller = new AbortController();
+    const requestTimeout = setTimeout(() => controller.abort(), 15_000);
 
     setIdentity(null);
     setIdentityAuthKey(null);
@@ -141,7 +166,9 @@ export function AuthRoleProvider({ children }: { children: React.ReactNode }) {
     async function loadIdentity() {
       try {
         const result = await customFetch<Partial<MobileIdentity>>('/api/auth/me', {
-          responseType: 'json', headers: { 'X-Client-Platform': 'mobile' },
+          responseType: 'json',
+          headers: { 'X-Client-Platform': 'mobile' },
+          signal: controller.signal,
         });
         if (
           (result.role !== 'owner' && result.role !== 'staff') ||
@@ -172,9 +199,12 @@ export function AuthRoleProvider({ children }: { children: React.ReactNode }) {
           if (isUnauthorized) {
             void SecureStore.deleteItemAsync('phone_session_token').catch(() => {});
           }
-          setError(cause instanceof Error ? cause.message : 'Could not load account permissions.');
+          setError(controller.signal.aborted
+            ? 'অ্যাকাউন্ট যাচাই করতে সময় বেশি লাগছে। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।'
+            : cause instanceof Error ? cause.message : 'অ্যাকাউন্টের অনুমতি যাচাই করা যায়নি।');
         }
       } finally {
+        clearTimeout(requestTimeout);
         if (!cancelled) setLoading(false);
       }
     }
@@ -182,8 +212,10 @@ export function AuthRoleProvider({ children }: { children: React.ReactNode }) {
     void loadIdentity();
     return () => {
       cancelled = true;
+      clearTimeout(requestTimeout);
+      controller.abort();
     };
-  }, [currentAuthKey, getToken, isLoaded, isSignedIn, userId, queryClient, refreshSequence]);
+  }, [currentAuthKey, isLoaded, isSignedIn, userId, queryClient, refreshSequence]);
 
   const visibleIdentity = identityAuthKey === currentAuthKey ? identity : null;
   const visibleLoading = loading || (!error && identityAuthKey !== currentAuthKey);
