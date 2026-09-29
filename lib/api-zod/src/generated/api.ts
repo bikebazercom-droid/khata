@@ -238,6 +238,7 @@ export const CreateLedgerEntryBody = zod.object({
   "description": zod.string().optional(),
   "billReference": zod.string().nullish(),
   "billImage": zod.string().nullish().describe('Cloud storage object path for the scanned bill\/receipt image (e.g. \/objects\/uploads\/uuid).'),
+  "entryDate": zod.coerce.date().nullish().describe('Optional transaction date. Stored as the entry timestamp at midnight UTC.'),
   "dueDate": zod.coerce.date().nullish(),
   "isTransfer": zod.boolean().optional(),
   "transferPartyId": zod.string().nullish()
@@ -277,6 +278,7 @@ export const PatchLedgerEntryBody = zod.object({
   "description": zod.string().optional(),
   "billReference": zod.string().nullish(),
   "billImage": zod.string().nullish(),
+  "entryDate": zod.coerce.date().nullish(),
   "dueDate": zod.coerce.date().nullish()
 })
 

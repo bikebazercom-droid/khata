@@ -9,6 +9,7 @@ const STAFF_ALLOWED = [
   /^GET \/parties\/[^/]+$/,
   /^GET \/parties\/[^/]+\/ledger-entries$/,
   /^POST \/parties\/[^/]+\/ledger-entries$/,
+  /^PATCH \/parties\/[^/]+\/ledger-entries\/[^/]+$/,
 ];
 
 export async function enforceRoleAccess(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -30,7 +31,7 @@ export async function enforceRoleAccess(req: Request, res: Response, next: NextF
 
   if (req.method === "POST") {
     const body = req.body;
-    const allowed = new Set(["type", "amount", "description", "billReference", "dueDate", "isTransfer", "transferPartyId", "clientRequestId"]);
+    const allowed = new Set(["type", "amount", "description", "billReference", "entryDate", "dueDate", "isTransfer", "transferPartyId", "clientRequestId"]);
     const validTransfer = body?.isTransfer === true && typeof body.transferPartyId === "string" &&
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.transferPartyId);
     const normal = (body?.isTransfer === undefined || body.isTransfer === false) && body?.transferPartyId == null;
@@ -40,6 +41,10 @@ export async function enforceRoleAccess(req: Request, res: Response, next: NextF
       res.status(403).json({ error: "Staff may create normal entries or authorized adjustments, without bill images" });
       return;
     }
+  }
+  if (req.method === "PATCH" && req.body && typeof req.body === "object" && "billImage" in req.body) {
+    res.status(403).json({ error: "Staff may edit entry details, without bill images" });
+    return;
   }
 
   const partyMatch = path.match(/^\/parties\/([^/]+)(?:\/|$)/);

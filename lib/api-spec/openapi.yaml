@@ -838,6 +838,10 @@ components:
         billImage:
           type: ["string", "null"]
           description: Cloud storage object path for the scanned bill/receipt image (e.g. /objects/uploads/uuid).
+        entryDate:
+          type: ["string", "null"]
+          format: date
+          description: Optional transaction date. Stored as the entry timestamp at midnight UTC.
         dueDate:
           type: ["string", "null"]
           format: date
@@ -853,6 +857,7 @@ components:
         description: { type: string }
         billReference: { type: ["string", "null"] }
         billImage: { type: ["string", "null"] }
+        entryDate: { type: ["string", "null"], format: date }
         dueDate: { type: ["string", "null"], format: date }
     DashboardSummary:
       type: object

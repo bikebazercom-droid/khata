@@ -12,6 +12,7 @@ import { useAuth } from '@clerk/expo';
 import { useLanguage } from '@/lib/i18n';
 import * as SecureStore from 'expo-secure-store';
 import { notifyMobileIdentityChanged, useAuthRole } from '@/lib/auth-role';
+import { StartupLoading } from '@/components/StartupLoading';
 
 function AuthRoleFailure({ message }: { message: string }) {
   const colors = useColors();
@@ -135,7 +136,7 @@ export default function TabLayout() {
   const { identity, loading: roleLoading, error: roleError, unauthorized } = useAuthRole();
 
   // Wait for Clerk to load before deciding where to send the user.
-  if (!isLoaded) return null;
+  if (!isLoaded) return <StartupLoading />;
   if (unauthorized) return <Redirect href="/(auth)/sign-in" />;
 
   // Check if user is signed in via Clerk OR has a stored phone token
@@ -143,7 +144,7 @@ export default function TabLayout() {
     return <PhoneAuthGate />;
   }
 
-  if (roleLoading) return null;
+  if (roleLoading) return <StartupLoading message="অ্যাকাউন্ট যাচাই করা হচ্ছে…" />;
   if (!identity) return <AuthRoleFailure message={roleError ?? 'আবার চেষ্টা করুন।'} />;
 
   if (isLiquidGlassAvailable()) {
@@ -173,11 +174,11 @@ function PhoneAuthGate() {
       });
   }, []);
 
-  if (!checked) return null;
+  if (!checked) return <StartupLoading message="সাইন-ইন তথ্য যাচাই করা হচ্ছে…" />;
   if (!hasPhoneToken) return <Redirect href="/(auth)/sign-in" />;
   if (unauthorized) return <Redirect href="/(auth)/sign-in" />;
 
-  if (roleLoading) return null;
+  if (roleLoading) return <StartupLoading message="অ্যাকাউন্ট যাচাই করা হচ্ছে…" />;
   if (!identity) return <AuthRoleFailure message={roleError ?? 'আবার চেষ্টা করুন।'} />;
   if (isLiquidGlassAvailable()) return <NativeTabLayout staff={identity.role === 'staff'} />;
   return <ClassicTabLayout staff={identity.role === 'staff'} />;

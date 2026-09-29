@@ -26,9 +26,17 @@ type PatchLedgerEntryBodyData = {
   amount?: number;
   type?: "YOU_GAVE" | "YOU_GOT";
   description?: string;
+  billReference?: string | null;
   billImage?: string | null;
+  entryDate?: string | null;
   dueDate?: string | null;
 };
+
+function isValidDateOnly(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
 
 const PatchLedgerEntryParams = {
   safeParse(v: unknown): { success: true; data: PatchLedgerEntryParamsData } | { success: false; error: { message: string } } {
@@ -44,15 +52,30 @@ const PatchLedgerEntryBody = {
   safeParse(v: unknown): { success: true; data: PatchLedgerEntryBodyData } | { success: false; error: { message: string } } {
     const x = v as Record<string, unknown>;
     if (typeof x !== "object" || x === null) return { success: false, error: { message: "body must be an object" } };
-    if (x.amount !== undefined && (typeof x.amount !== "number" || x.amount <= 0)) {
+    const allowed = new Set(["amount", "type", "description", "billReference", "billImage", "entryDate", "dueDate"]);
+    if (Object.keys(x).some((key) => !allowed.has(key))) {
+      return { success: false, error: { message: "body contains an unsupported field" } };
+    }
+    if (x.amount !== undefined && (typeof x.amount !== "number" || !Number.isFinite(x.amount) || x.amount <= 0)) {
       return { success: false, error: { message: "amount must be a positive number" } };
     }
     if (x.type !== undefined && x.type !== "YOU_GAVE" && x.type !== "YOU_GOT") {
       return { success: false, error: { message: "type must be YOU_GAVE or YOU_GOT" } };
     }
+    if (x.description !== undefined && typeof x.description !== "string") {
+      return { success: false, error: { message: "description must be a string" } };
+    }
+    if (x.billReference !== undefined && x.billReference !== null && typeof x.billReference !== "string") {
+      return { success: false, error: { message: "billReference must be a string or null" } };
+    }
     if (x.billImage !== undefined && x.billImage !== null) {
       if (typeof x.billImage !== "string" || !x.billImage.startsWith("/objects/")) {
         return { success: false, error: { message: "billImage must start with /objects/" } };
+      }
+    }
+    for (const field of ["entryDate", "dueDate"] as const) {
+      if (x[field] !== undefined && x[field] !== null && !isValidDateOnly(x[field])) {
+        return { success: false, error: { message: `${field} must be a valid ISO date` } };
       }
     }
     return { success: true, data: x as PatchLedgerEntryBodyData };
@@ -339,6 +362,13 @@ router.post(
       return;
     }
 
+    const rawBody = req.body as Record<string, unknown> | null;
+    for (const field of ["entryDate", "dueDate"] as const) {
+      if (rawBody?.[field] !== undefined && rawBody[field] !== null && !isValidDateOnly(rawBody[field])) {
+        res.status(400).json({ error: `${field} must be a valid ISO date` });
+        return;
+      }
+    }
     const body = CreateLedgerEntryBody.safeParse(req.body);
     if (!body.success) {
       res.status(400).json({ error: body.error.message });
@@ -367,11 +397,13 @@ router.post(
       return;
     }
 
-    const { type, amount, description, billReference, billImage, dueDate, isTransfer, transferPartyId, clientRequestId } = body.data;
+    const { type, amount, description, billReference, billImage, entryDate, dueDate, isTransfer, transferPartyId, clientRequestId } = body.data;
+    const entryDateValue = toDateOnlyString(entryDate ?? null);
     const fingerprint = createHash("sha256").update(JSON.stringify({
       partyId: party.id, type, amount: amount.toFixed(2),
       description: description ?? "", billReference: billReference ?? null,
       billImage: billImage ?? null, dueDate: toDateOnlyString(dueDate ?? null),
+      entryDate: entryDateValue,
       isTransfer: !!isTransfer, transferPartyId: transferPartyId ?? null,
     })).digest("hex");
     if ((isTransfer && (!transferPartyId || transferPartyId === party.id)) ||
@@ -432,6 +464,7 @@ router.post(
             description: primaryDesc,
             billReference: billReference ?? null,
             billImage: billImage ?? null,
+            ...(entryDateValue ? { createdAt: new Date(`${entryDateValue}T00:00:00.000Z`) } : {}),
             dueDate: toDateOnlyString(dueDate ?? null),
             isTransfer: true,
             transferPartyId,
@@ -446,6 +479,7 @@ router.post(
             type: counterType,
             amount: amount.toFixed(2),
             description: counterDesc,
+            ...(entryDateValue ? { createdAt: new Date(`${entryDateValue}T00:00:00.000Z`) } : {}),
             isTransfer: true,
             transferPartyId: party.id,
           })
@@ -536,6 +570,7 @@ router.post(
         description: description ?? "",
         billReference: billReference ?? null,
         billImage: billImage ?? null,
+        ...(entryDateValue ? { createdAt: new Date(`${entryDateValue}T00:00:00.000Z`) } : {}),
         dueDate: toDateOnlyString(dueDate ?? null),
       })
       .returning();
@@ -577,7 +612,7 @@ router.post(
 router.patch(
   "/parties/:partyId/ledger-entries/:entryId",
   async (req, res): Promise<void> => {
-    const { businessId } = req as unknown as AuthenticatedRequest;
+    const { businessId, userId, role } = req as unknown as AuthenticatedRequest;
     const params = PatchLedgerEntryParams.safeParse(req.params);
     if (!params.success) {
       res.status(400).json({ error: params.error.message });
@@ -624,9 +659,16 @@ router.patch(
 
     // A transfer's two ledger rows must change together. Never update only one
     // amount/direction or its counterparty balance would diverge permanently.
-    if (entry.isTransfer && (body.data.amount !== undefined || body.data.type !== undefined)) {
+    if (entry.isTransfer && (
+      body.data.amount !== undefined ||
+      body.data.type !== undefined ||
+      body.data.entryDate !== undefined
+    )) {
       const updatedPair = await db.transaction(async (tx) => {
         if (!entry.transferPartyId || !entry.linkedEntryId) return null;
+        if (!(await actorCanWrite(tx, role, userId, businessId, party.id, entry.transferPartyId))) {
+          return { denied: true } as const;
+        }
         const locked = await tx.select().from(partiesTable).where(and(
           eq(partiesTable.businessId, businessId),
           inArray(partiesTable.id, [party.id, entry.transferPartyId]),
@@ -647,12 +689,18 @@ router.patch(
           ...(body.data.amount !== undefined ? { amount: amount.toFixed(2) } : {}),
           ...(body.data.type !== undefined ? { type } : {}),
           ...(body.data.description !== undefined ? { description: body.data.description } : {}),
+          ...(body.data.billReference !== undefined ? { billReference: body.data.billReference || null } : {}),
           ...(body.data.billImage !== undefined ? { billImage: body.data.billImage } : {}),
+          ...(body.data.entryDate ? { createdAt: new Date(`${body.data.entryDate}T00:00:00.000Z`) } : {}),
           ...(body.data.dueDate !== undefined ? { dueDate: body.data.dueDate || null } : {}),
         };
         const [saved] = await tx.update(ledgerEntriesTable).set(changed)
           .where(eq(ledgerEntriesTable.id, current.id)).returning();
-        await tx.update(ledgerEntriesTable).set({ amount: amount.toFixed(2), type: counterType })
+        await tx.update(ledgerEntriesTable).set({
+          amount: amount.toFixed(2),
+          type: counterType,
+          ...(body.data.entryDate ? { createdAt: new Date(`${body.data.entryDate}T00:00:00.000Z`) } : {}),
+        })
           .where(eq(ledgerEntriesTable.id, counter.id));
         for (const row of locked) {
           const oldEntry = row.id === party.id ? current : counter;
@@ -667,6 +715,7 @@ router.patch(
           oldBillImage: current.billImage };
       });
       if (!updatedPair) { res.status(409).json({ error: "Linked adjustment is unavailable" }); return; }
+      if ("denied" in updatedPair) { res.status(403).json({ error: "Adjustment access was revoked" }); return; }
       if (body.data.billImage !== undefined && updatedPair.oldBillImage &&
           updatedPair.oldBillImage !== body.data.billImage && updatedPair.oldBillImage.startsWith("/objects/")) {
         new ObjectStorageService().deleteObjectEntity(updatedPair.oldBillImage).catch((err: unknown) =>
@@ -683,6 +732,8 @@ router.patch(
     // Fields omitted by the caller are left untouched in the database.
     const updateSet: Partial<{
       billImage: string | null;
+      billReference: string | null;
+      createdAt: Date;
       amount: string;
       type: "YOU_GAVE" | "YOU_GOT";
       description: string;
@@ -690,16 +741,61 @@ router.patch(
     }> = {};
 
     if (body.data.billImage !== undefined) updateSet.billImage = body.data.billImage;
+    if (body.data.billReference !== undefined) updateSet.billReference = body.data.billReference;
     if (body.data.amount    !== undefined) updateSet.amount    = body.data.amount.toFixed(2);
     if (body.data.type      !== undefined) updateSet.type      = body.data.type;
     if (body.data.description !== undefined) updateSet.description = body.data.description;
     if (body.data.dueDate   !== undefined) updateSet.dueDate   = body.data.dueDate || null;
+    if (body.data.entryDate) updateSet.createdAt = new Date(`${body.data.entryDate}T00:00:00.000Z`);
 
-    const [updated] = await db
-      .update(ledgerEntriesTable)
-      .set(updateSet)
-      .where(eq(ledgerEntriesTable.id, params.data.entryId))
-      .returning();
+    const mutation = await db.transaction(async (tx) => {
+      if (!(await actorCanWrite(tx, role, userId, businessId, party.id))) {
+        return { status: "denied" } as const;
+      }
+
+      const [currentParty] = await tx.select().from(partiesTable).where(and(
+        eq(partiesTable.id, party.id),
+        eq(partiesTable.businessId, businessId),
+      )).for("update").limit(1);
+      const [currentEntry] = await tx.select().from(ledgerEntriesTable).where(and(
+        eq(ledgerEntriesTable.id, params.data.entryId),
+        eq(ledgerEntriesTable.partyId, party.id),
+      )).for("update").limit(1);
+      if (!currentParty || !currentEntry) return { status: "missing" } as const;
+
+      const [saved] = await tx.update(ledgerEntriesTable)
+        .set(updateSet)
+        .where(and(
+          eq(ledgerEntriesTable.id, params.data.entryId),
+          eq(ledgerEntriesTable.partyId, party.id),
+        ))
+        .returning();
+      if (!saved) return { status: "missing" } as const;
+
+      if (body.data.amount !== undefined || body.data.type !== undefined) {
+        const oldAmount = Number(currentEntry.amount);
+        const newAmount = body.data.amount ?? oldAmount;
+        const oldType = currentEntry.type as "YOU_GAVE" | "YOU_GOT";
+        const newType = body.data.type ?? oldType;
+        const oldDelta = oldType === "YOU_GAVE" ? oldAmount : -oldAmount;
+        const newDelta = newType === "YOU_GAVE" ? newAmount : -newAmount;
+        const nextSigned = toSignedBalance(currentParty) - oldDelta + newDelta;
+        await tx.update(partiesTable)
+          .set(fromSignedBalance(nextSigned))
+          .where(eq(partiesTable.id, party.id));
+      }
+
+      return { status: "updated", updated: saved, oldBillImage: currentEntry.billImage } as const;
+    });
+    if (mutation.status === "denied") {
+      res.status(403).json({ error: "Party access was revoked" });
+      return;
+    }
+    if (mutation.status === "missing") {
+      res.status(404).json({ error: "Entry not found" });
+      return;
+    }
+    const updated = mutation.updated;
 
     // If billImage was replaced or nulled out, delete the superseded object
     // from storage.  We do this after the DB update so a storage failure cannot
@@ -707,41 +803,18 @@ router.patch(
     // fire-and-forget so a storage error never blocks the PATCH response.
     const billImageReplaced =
       body.data.billImage !== undefined &&          // caller sent billImage
-      entry.billImage !== null &&                    // entry previously had a photo
-      entry.billImage !== body.data.billImage &&    // the value actually changed
-      entry.billImage.startsWith("/objects/");       // it is a managed object path
+      mutation.oldBillImage !== null &&              // entry previously had a photo
+      mutation.oldBillImage !== body.data.billImage && // the value actually changed
+      mutation.oldBillImage.startsWith("/objects/"); // it is a managed object path
 
     if (billImageReplaced) {
       const storageService = new ObjectStorageService();
-      storageService.deleteObjectEntity(entry.billImage!).catch((err: unknown) => {
+      storageService.deleteObjectEntity(mutation.oldBillImage!).catch((err: unknown) => {
         req.log?.error(
-          { err, objectPath: entry.billImage },
+          { err, objectPath: mutation.oldBillImage },
           "Failed to delete superseded bill photo from storage during entry patch",
         );
       });
-    }
-
-    // If the amount or direction changed we must recompute the party's
-    // running balance: reverse the old entry's effect, apply the new one.
-    const amountChanged = body.data.amount !== undefined;
-    const typeChanged   = body.data.type   !== undefined;
-
-    if (amountChanged || typeChanged) {
-      const oldAmount = Number(entry.amount);
-      const newAmount = body.data.amount ?? oldAmount;
-      const oldType   = entry.type as "YOU_GAVE" | "YOU_GOT";
-      const newType   = body.data.type   ?? oldType;
-
-      const currentSigned = toSignedBalance(party);
-      const oldDelta = oldType === "YOU_GAVE" ?  oldAmount : -oldAmount;
-      const newDelta = newType === "YOU_GAVE" ?  newAmount : -newAmount;
-      const nextSigned = currentSigned - oldDelta + newDelta;
-      const { currentBalance, balanceType } = fromSignedBalance(nextSigned);
-
-      await db
-        .update(partiesTable)
-        .set({ currentBalance, balanceType })
-        .where(eq(partiesTable.id, params.data.partyId));
     }
 
     broadcast(businessId, {

@@ -17,5 +17,7 @@ export interface LedgerEntryPatch {
   /** @nullable */
   billImage?: string | null;
   /** @nullable */
+  entryDate?: Date | null;
+  /** @nullable */
   dueDate?: Date | null;
 }

@@ -20,13 +20,14 @@ import {
 } from '@expo-google-fonts/inter';
 import { Redirect, Stack, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { ClerkProvider, ClerkLoaded, useAuth } from '@clerk/expo';
+import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth } from '@clerk/expo';
 import { tokenCache } from '@clerk/expo/token-cache';
 import { setBaseUrl } from '@workspace/api-client-react';
 import { LanguageProvider } from '@/lib/i18n';
 import { AuthRoleProvider, notifyMobileIdentityChanged, useAuthRole } from '@/lib/auth-role';
 import { useColors } from '@/hooks/useColors';
 import { LiveEntrySync } from '@/lib/use-live-entry-sync';
+import { StartupLoading } from '@/components/StartupLoading';
 
 // Set API base URL — Expo bundles run outside the web proxy and need an
 // absolute URL. EXPO_PUBLIC_DOMAIN is injected by the dev script.
@@ -56,7 +57,7 @@ function RootLayoutNav() {
   const needsIdentity = isAccess || isPartyDetail || isReport;
 
   if (needsIdentity) {
-    if (!isLoaded || loading) return null;
+    if (!isLoaded || loading) return <StartupLoading />;
     if (unauthorized || (!isSignedIn && !identity)) {
       return <Redirect href="/(auth)/sign-in" />;
     }
@@ -125,8 +126,11 @@ export default function RootLayout() {
       tokenCache={tokenCache}
       proxyUrl={proxyUrl}
     >
-      <ClerkLoaded>
-        <SafeAreaProvider>
+      <SafeAreaProvider>
+        <ClerkLoading>
+          <StartupLoading />
+        </ClerkLoading>
+        <ClerkLoaded>
           <ErrorBoundary>
             <QueryClientProvider client={queryClient}>
               <AuthRoleProvider>
@@ -141,8 +145,8 @@ export default function RootLayout() {
               </AuthRoleProvider>
             </QueryClientProvider>
           </ErrorBoundary>
-        </SafeAreaProvider>
-      </ClerkLoaded>
+        </ClerkLoaded>
+      </SafeAreaProvider>
     </ClerkProvider>
   );
 }

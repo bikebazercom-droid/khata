@@ -159,8 +159,16 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
     expect((await transfer(a, b)).status).toBe(403);
     expect((await request(app).get("/adjustment-targets").set("Authorization", authorization)).body)
       .toEqual([{ id: a, name: "A", role: "CUSTOMER" }]);
+    const deniedTransferEdit = await request(app)
+      .patch(`/parties/${a}/ledger-entries/${result.body.id}`)
+      .set("Authorization", authorization)
+      .send({ amount: 99 });
+    expect(deniedTransferEdit.status).toBe(403);
+    const sourceEntries = await request(app).get(`/parties/${a}/ledger-entries`).set("Authorization", authorization);
+    expect(sourceEntries.body.find((entry: { id: string }) => entry.id === result.body.id)?.amount)
+      .toBe(result.body.amount);
     expect((await request(app).patch(`/parties/${b}/ledger-entries/${result.body.id}`).set("Authorization", authorization)
-      .send({ amount: 99 })).status).toBe(403);
+      .send({ amount: 99 })).status).toBe(404);
     expect((await request(app).delete(`/parties/${b}/entries/${result.body.id}`).set("Authorization", authorization)).status).toBe(403);
   });
 

@@ -42,6 +42,7 @@ import { canAdjustParty, adjustmentDestinations, validAdjustmentSelection } from
 import { queueEntry, listEntries, subscribeOutbox, type QueuedEntry } from '@/lib/entry-outbox';
 import { v4 as uuidv4 } from 'uuid';
 import NetInfo from '@react-native-community/netinfo';
+import { customFetch } from '@/lib/api-transport';
 
 // ─── Module-level helpers ────────────────────────────────────────────────────
 
@@ -88,6 +89,19 @@ function isToday(dateStr: string): boolean {
   return d.getDate() === n.getDate() && d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
 }
 
+function todayInput(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+function validDateInput(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
 // ─── TransactionSheet ────────────────────────────────────────────────────────
 
 interface TransactionSheetProps {
@@ -109,6 +123,9 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
   const [type, setType] = useState<'YOU_GAVE' | 'YOU_GOT'>(initialType);
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
+  const [entryDate, setEntryDate] = useState(todayInput());
+  const [dueDate, setDueDate] = useState('');
+  const [billReference, setBillReference] = useState('');
   const [billImageUri, setBillImageUri] = useState<string | null>(null);
   const savingRef = useRef(false);
   const [saving, setSaving] = useState(false);
@@ -134,6 +151,7 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
 
   function reset() {
     setAmount(''); setDescription(''); setType(initialType);
+    setEntryDate(todayInput()); setDueDate(''); setBillReference('');
     setBillImageUri(null);
     setIsTransferMode(false); setTransferPartyId(null); setTransferSearch('');
   }
@@ -197,6 +215,10 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
       Alert.alert('অনুমতি নেই', 'অ্যাডজাস্টমেন্টের উৎস ও গন্তব্য—দুই খাতাতেই অনুমতি প্রয়োজন।');
       return;
     }
+    if (!validDateInput(entryDate) || (dueDate && !validDateInput(dueDate))) {
+      Alert.alert('তারিখ সঠিক নয়', 'তারিখ YYYY-MM-DD ফরম্যাটে লিখুন।');
+      return;
+    }
     try {
       savingRef.current = true;
       setSaving(true);
@@ -206,6 +228,9 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
           type,
           amount: parsed,
           description: description.trim() || undefined,
+          entryDate,
+          dueDate: dueDate || undefined,
+          billReference: billReference.trim() || undefined,
           ...(isTransferMode ? {
             isTransfer: isTransferMode || undefined,
             transferPartyId: isTransferMode ? transferPartyId : undefined,
@@ -315,6 +340,24 @@ function TransactionSheet({ visible, initialType = 'YOU_GAVE', partyId, partyNam
             placeholder="বিস্তারিত লিখুন (পণ্য, বিল নং, পরিমাণ ইত্যাদি)"
             placeholderTextColor={colors.mutedForeground}
             returnKeyType="done"
+          />
+
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 12, color: colors.mutedForeground, fontFamily: 'Inter_500Medium', marginBottom: 5 }}>এন্ট্রির তারিখ</Text>
+              <TextInput style={s.descInput} value={entryDate} onChangeText={setEntryDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.mutedForeground} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 12, color: colors.mutedForeground, fontFamily: 'Inter_500Medium', marginBottom: 5 }}>বকেয়ার তারিখ</Text>
+              <TextInput style={s.descInput} value={dueDate} onChangeText={setDueDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.mutedForeground} />
+            </View>
+          </View>
+          <TextInput
+            style={s.descInput}
+            value={billReference}
+            onChangeText={setBillReference}
+            placeholder="বিল / রেফারেন্স নম্বর (ঐচ্ছিক)"
+            placeholderTextColor={colors.mutedForeground}
           />
 
           {/* Bill photo: restricted for staff accounts */}
@@ -686,11 +729,19 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
   const router = useRouter();
+  const { identity } = useAuthRole();
+  const { getToken } = useAuth();
 
   const [entry, setEntry] = useState(init);
   const [isEditing, setIsEditing] = useState(false);
   const [editAmount, setEditAmount] = useState(String(init.amount));
   const [editDesc, setEditDesc] = useState(init.description || '');
+  const [editEntryDate, setEditEntryDate] = useState(init.createdAt.slice(0, 10));
+  const [editDueDate, setEditDueDate] = useState(init.dueDate?.slice(0, 10) || '');
+  const [editBillReference, setEditBillReference] = useState(init.billReference || '');
+  const [editBillImageUri, setEditBillImageUri] = useState<string | null>(null);
+  const [removeBillImage, setRemoveBillImage] = useState(false);
+  const [editImageAuthToken, setEditImageAuthToken] = useState<string | null>(null);
 
   // Resolve the other side of a transfer entry
   const transferPartyId = entry.isTransfer ? (entry.transferPartyId ?? '') : '';
@@ -701,12 +752,69 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
   useEffect(() => {
     if (visible) {
       setEntry(init); setEditAmount(String(init.amount));
-      setEditDesc(init.description || ''); setIsEditing(false);
+      setEditDesc(init.description || ''); setEditEntryDate(init.createdAt.slice(0, 10));
+      setEditDueDate(init.dueDate?.slice(0, 10) || '');
+      setEditBillReference(init.billReference || ''); setEditBillImageUri(null);
+      setRemoveBillImage(false); setIsEditing(false);
     }
   }, [visible, init.id]);
 
+  useEffect(() => {
+    if (entry.billImage?.startsWith('/objects/')) getToken().then(setEditImageAuthToken);
+  }, [entry.billImage, getToken]);
+
   const patch = usePatchLedgerEntry();
   const del = useDeleteLedgerEntry();
+
+  async function pickEditImage() {
+    if (identity?.role === 'staff') return;
+    Alert.alert('বিল সংযুক্ত করুন', 'উৎস বেছে নিন', [
+      {
+        text: 'ক্যামেরা',
+        onPress: async () => {
+          const perm = await ImagePicker.requestCameraPermissionsAsync();
+          if (!perm.granted) {
+            Alert.alert('অনুমতি প্রয়োজন', 'ছবি তুলতে ক্যামেরার অনুমতি দিন।');
+            return;
+          }
+          const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.6 });
+          if (!result.canceled && result.assets[0]) {
+            setEditBillImageUri(result.assets[0].uri); setRemoveBillImage(false);
+          }
+        },
+      },
+      {
+        text: 'ফটো লাইব্রেরি',
+        onPress: async () => {
+          const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (!perm.granted) {
+            Alert.alert('অনুমতি প্রয়োজন', 'ফটো লাইব্রেরির অনুমতি দিন।');
+            return;
+          }
+          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6 });
+          if (!result.canceled && result.assets[0]) {
+            setEditBillImageUri(result.assets[0].uri); setRemoveBillImage(false);
+          }
+        },
+      },
+      { text: 'বাতিল', style: 'cancel' },
+    ]);
+  }
+
+  async function uploadEditImage(uri: string): Promise<string> {
+    if (!identity?.businessId) throw new Error('ব্যবসার পরিচয় পাওয়া যায়নি');
+    const blob = await (await fetch(uri)).blob();
+    const meta = await customFetch<{ uploadURL: string; objectPath: string }>('/api/storage/uploads/request-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-business-id': identity.businessId },
+      body: JSON.stringify({ name: 'bill.jpg', size: blob.size, contentType: blob.type || 'image/jpeg' }),
+    });
+    const uploaded = await fetch(meta.uploadURL, {
+      method: 'PUT', body: blob, headers: { 'Content-Type': blob.type || 'image/jpeg' },
+    });
+    if (!uploaded.ok) throw new Error(`Bill upload failed: ${uploaded.status}`);
+    return meta.objectPath;
+  }
 
   const isGave = entry.type === 'YOU_GAVE';
   const amtColor = isGave ? colors.willGet : colors.willGive;
@@ -727,12 +835,25 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
       Alert.alert('ভুল পরিমাণ', 'শূন্যের বেশি একটি বৈধ পরিমাণ লিখুন।');
       return;
     }
+    if (!validDateInput(editEntryDate) || (editDueDate && !validDateInput(editDueDate))) {
+      Alert.alert('তারিখ সঠিক নয়', 'তারিখ YYYY-MM-DD ফরম্যাটে লিখুন।');
+      return;
+    }
     try {
+      const uploadedImage = editBillImageUri ? await uploadEditImage(editBillImageUri) : undefined;
       const updated = await patch.mutateAsync({
         partyId: entry.partyId, entryId: entry.id,
-        data: { amount: p, description: editDesc.trim() || undefined },
+        data: {
+          amount: p, description: editDesc.trim() || undefined,
+          entryDate: editEntryDate,
+          dueDate: editDueDate || null,
+          billReference: editBillReference.trim() || null,
+          ...(removeBillImage ? { billImage: null } : uploadedImage ? { billImage: uploadedImage } : {}),
+        },
       });
       setEntry(updated); setEditAmount(String(updated.amount)); setEditDesc(updated.description || '');
+      setEditEntryDate(updated.createdAt.slice(0, 10)); setEditDueDate(updated.dueDate?.slice(0, 10) || '');
+      setEditBillReference(updated.billReference || ''); setEditBillImageUri(null); setRemoveBillImage(false);
       qc.invalidateQueries({ queryKey: [`/api/parties/${entry.partyId}/ledger-entries`] });
       qc.invalidateQueries({ queryKey: [`/api/parties/${entry.partyId}`] });
       qc.invalidateQueries({ queryKey: ['/api/dashboard/summary'] });
@@ -861,6 +982,21 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
           </View>
 
           {/* Transfer / linked-party card */}
+          {(entry.billReference || entry.dueDate || entry.billImage) ? (
+            <View style={s.infoCard}>
+              {entry.billReference ? <Text style={s.smsBody}>বিল / রেফারেন্স: {entry.billReference}</Text> : null}
+              {entry.dueDate ? <Text style={s.smsBody}>বকেয়ার তারিখ: {formatDate(entry.dueDate)}</Text> : null}
+              {entry.billImage && billImageSrc(entry.billImage) ? (
+                <Image
+                  source={{ uri: billImageSrc(entry.billImage)!, ...(editImageAuthToken ? { headers: { Authorization: `Bearer ${editImageAuthToken}` } } : {}) }}
+                  style={{ width: 110, height: 110, borderRadius: 10, marginTop: 10 }}
+                  resizeMode="cover"
+                />
+              ) : null}
+            </View>
+          ) : null}
+
+          {/* Transfer / linked-party card */}
           {entry.isTransfer && transferPartyId ? (
             <TouchableOpacity
               style={[s.infoCard, { flexDirection: 'row', alignItems: 'center', gap: 14 }]}
@@ -948,6 +1084,36 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
               placeholderTextColor="#CBD5E1"
               returnKeyType="done"
             />
+            <Text style={s.editLabel}>এন্ট্রির তারিখ (YYYY-MM-DD)</Text>
+            <TextInput style={s.editInput} value={editEntryDate} onChangeText={setEditEntryDate} placeholder="YYYY-MM-DD" placeholderTextColor="#CBD5E1" />
+            <Text style={s.editLabel}>বকেয়ার তারিখ (YYYY-MM-DD)</Text>
+            <TextInput style={s.editInput} value={editDueDate} onChangeText={setEditDueDate} placeholder="YYYY-MM-DD (ঐচ্ছিক)" placeholderTextColor="#CBD5E1" />
+            <Text style={s.editLabel}>বিল / রেফারেন্স নম্বর</Text>
+            <TextInput style={s.editInput} value={editBillReference} onChangeText={setEditBillReference} placeholder="ঐচ্ছিক" placeholderTextColor="#CBD5E1" />
+            {identity?.role !== 'staff' ? (
+              <View style={{ marginBottom: 14 }}>
+                <Text style={s.editLabel}>বিলের ছবি</Text>
+                {editBillImageUri || (!removeBillImage && entry.billImage && billImageSrc(entry.billImage)) ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <Image
+                      source={{ uri: editBillImageUri ?? billImageSrc(entry.billImage)! }}
+                      style={{ width: 64, height: 64, borderRadius: 8 }}
+                    />
+                    <TouchableOpacity onPress={() => { setEditBillImageUri(null); setRemoveBillImage(true); }}>
+                      <Text style={{ color: colors.destructive, fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>ছবি সরান</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+                <TouchableOpacity
+                  style={{ marginTop: 9, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 11, alignItems: 'center' }}
+                  onPress={() => void pickEditImage()}
+                >
+                  <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium', fontSize: 13 }}>
+                    {editBillImageUri || entry.billImage ? 'ছবি পরিবর্তন করুন' : 'বিলের ছবি যোগ করুন'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
             <View style={s.editActions}>
               <TouchableOpacity style={s.cancelBtn} onPress={() => setIsEditing(false)}>
                 <Text style={s.cancelBtnText}>বাতিল</Text>

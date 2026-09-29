@@ -24,6 +24,11 @@ export interface LedgerEntryInput {
      * @nullable
      */
   billImage?: string | null;
+  /**
+     * Optional transaction date. Stored as the entry timestamp at midnight UTC.
+     * @nullable
+     */
+  entryDate?: Date | null;
   /** @nullable */
   dueDate?: Date | null;
   isTransfer?: boolean;
