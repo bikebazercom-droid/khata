@@ -15,6 +15,7 @@ import router from "./routes";
 import { logger } from "./lib/logger";
 import { ensureDefaultBusiness } from "./middlewares/requireAuth";
 import { migrateBillImages } from "./lib/migrateBillImages";
+import { mountFrontendHosting } from "./lib/frontend-hosting";
 import { trustedProxyCidrs } from "./middlewares/ipBlock";
 
 const app: Express = express();
@@ -114,6 +115,17 @@ app.use(
 );
 
 app.use("/api", router);
+
+// Hostinger's single Node app can serve the two built Vite apps on the same
+// origin. Replit keeps serving these as separate artifacts unless explicitly
+// enabled by the root production start command.
+if (process.env.SERVE_FRONTENDS === "true") {
+  mountFrontendHosting(app, {
+    websiteDir: path.resolve(__dirname_app, "../../khatabook/dist/public"),
+    adminDir: path.resolve(__dirname_app, "../../banglakhata-admin/dist/public"),
+    reservedPrefixes: [CLERK_PROXY_PATH],
+  });
+}
 
 // ── Fire-and-forget startup migrations ───────────────────────────────────────
 void ensureDefaultBusiness();

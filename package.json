@@ -8,8 +8,8 @@
   "license": "MIT",
   "scripts": {
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
-    "build:hostinger": "pnpm --filter @workspace/api-server run build",
-    "start": "node --enable-source-maps artifacts/api-server/dist/index.mjs",
+    "build:hostinger": "pnpm --filter @workspace/api-server run build && NODE_ENV=production BASE_PATH=/ pnpm --filter @workspace/khatabook run build && NODE_ENV=production BASE_PATH=/admin/ pnpm --filter @workspace/banglakhata-admin run build",
+    "start": "NODE_ENV=production SERVE_FRONTENDS=true node --enable-source-maps artifacts/api-server/dist/index.mjs",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
     "build:apk": "pnpm --filter @workspace/khatabook-mobile run build:apk",
