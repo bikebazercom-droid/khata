@@ -7,23 +7,23 @@ const colors = {
   light: {
     // Surfaces
     background: '#f8fafc',   // hsl(210 40% 98%)
-    foreground: '#0f172a',   // hsl(222 47% 11%)
+    foreground: '#132949',   // hsl(215 58% 18%)
     card: '#ffffff',
-    cardForeground: '#0f172a',
+    cardForeground: '#132949',
 
-    // Primary action (dark navy — matches web primary)
-    primary: '#0f172a',
-    primaryForeground: '#f8fafc',
+    // Primary action
+    primary: '#1b3c69',      // hsl(215 59% 26%)
+    primaryForeground: '#ffffff',
 
     // Secondary / muted
     secondary: '#f1f5f9',
-    secondaryForeground: '#0f172a',
+    secondaryForeground: '#132949',
     muted: '#f1f5f9',        // hsl(210 40% 96.1%)
     mutedForeground: '#64748b', // hsl(215.4 16.3% 46.9%)
 
     // Accent
-    accent: '#f1f5f9',
-    accentForeground: '#0f172a',
+    accent: '#f5a524',       // hsl(37 91% 55%)
+    accentForeground: '#ffffff',
 
     // Borders / inputs
     border: '#e2e8f0',       // hsl(214 32% 91%)
@@ -40,14 +40,14 @@ const colors = {
     willGiveBg: '#fef2f2', // red-50
 
     // Legacy
-    text: '#0f172a',
-    tint: '#0f172a',
+    text: '#132949',
+    tint: '#1b3c69',
   },
 
   dark: {
     background: '#0f172a',   // hsl(222 47% 11%)
     foreground: '#f8fafc',   // hsl(210 40% 98%)
-    card: '#1e293b',
+    card: '#0f172a',
     cardForeground: '#f8fafc',
 
     primary: '#f8fafc',
@@ -77,7 +77,7 @@ const colors = {
   },
 
   // Matches web --radius: 0.5rem = 8px
-  radius: 12,
+  radius: 8,
 };
 
 export default colors;

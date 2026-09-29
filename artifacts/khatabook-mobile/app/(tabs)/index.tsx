@@ -124,6 +124,23 @@ export default function HomeScreen() {
     balanceLabel: { fontSize: 11, fontFamily: 'Inter_500Medium', marginBottom: 6, opacity: 0.75 },
     balanceAmount: { fontSize: 22, fontFamily: 'Inter_700Bold' },
     balanceCount: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2, opacity: 0.6 },
+    reportCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 14,
+      borderWidth: 1,
+      borderRadius: colors.radius,
+    },
+    reportIcon: {
+      width: 42,
+      height: 42,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+    reportTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: colors.foreground },
+    reportDescription: { fontSize: 11, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, marginTop: 2 },
     section: { paddingHorizontal: 20, marginTop: 24 },
     sectionHeader: {
       flexDirection: 'row',
@@ -264,6 +281,25 @@ export default function HomeScreen() {
               {`${supplierCount} ${t('supplierLabel')}`}
             </Text>
           </View>
+        </View>
+
+        <View style={s.section}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            testID="open-business-report"
+            activeOpacity={0.78}
+            onPress={() => router.push('/report' as any)}
+            style={[s.reportCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+          >
+            <View style={[s.reportIcon, { backgroundColor: colors.muted }]}>
+              <Feather name="bar-chart-2" size={20} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.reportTitle}>ব্যবসার রিপোর্ট</Text>
+              <Text style={s.reportDescription}>সব কাস্টমার ও সাপ্লায়ারের লেনদেন</Text>
+            </View>
+            <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+          </TouchableOpacity>
         </View>
 
         {/* Recent parties */}
