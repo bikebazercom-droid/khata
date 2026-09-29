@@ -1,0 +1,210 @@
+import React from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  LedgerEntryType,
+  getGetDashboardSummaryQueryKey,
+  getGetPartyQueryKey,
+  getListLedgerEntriesQueryKey,
+  getListPartiesQueryKey,
+} from '@workspace/api-client-react';
+
+const mocks = vi.hoisted(() => ({
+  createLedgerEntry: vi.fn(),
+  useListAdjustmentTargets: vi.fn(),
+  uploadBillImage: vi.fn(),
+  scanDocument: vi.fn(),
+  queueEntry: vi.fn(),
+}));
+
+vi.mock('@workspace/api-client-react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@workspace/api-client-react')>();
+  return {
+    ...actual,
+    createLedgerEntry: mocks.createLedgerEntry,
+    useListAdjustmentTargets: mocks.useListAdjustmentTargets,
+  };
+});
+
+vi.mock('@/App', () => ({
+  useAppAuth: () => ({
+    role: 'owner',
+    adjustmentPartyIds: [],
+    userId: 'user-1',
+  }),
+}));
+
+vi.mock('@/lib/businessContext', () => ({
+  useBusinessContext: () => ({ selectedBusinessId: 'business-1' }),
+}));
+
+vi.mock('@/context/connection-state', () => ({
+  useConnectionState: () => ({ isOnline: true }),
+}));
+
+vi.mock('@/lib/billImageStorage', () => ({
+  uploadBillImage: mocks.uploadBillImage,
+  billImageSrc: (value: string | null | undefined) => value ?? null,
+}));
+
+vi.mock('@/lib/document-scan', () => ({
+  scanDocument: mocks.scanDocument,
+}));
+
+vi.mock('@/lib/entryOutbox', () => ({
+  queueEntry: mocks.queueEntry,
+}));
+
+import { TransactionEntryScreen } from '../components/modals/transaction-entry-screen';
+
+const PARTY_ID = 'source-party';
+
+function setBrowserOnline(value: boolean) {
+  Object.defineProperty(navigator, 'onLine', { configurable: true, value });
+}
+
+function renderEntry() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+  const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+  const onClose = vi.fn();
+  const view = render(
+    <QueryClientProvider client={queryClient}>
+      <TransactionEntryScreen
+        partyId={PARTY_ID}
+        partyName="রহিম"
+        type={LedgerEntryType.YOU_GAVE}
+        onClose={onClose}
+      />
+    </QueryClientProvider>,
+  );
+  return { ...view, queryClient, invalidateQueries, onClose };
+}
+
+function enterAmount(amount = '1') {
+  for (const digit of amount) fireEvent.click(screen.getByRole('button', { name: digit }));
+}
+
+function saveEntry() {
+  fireEvent.click(screen.getByRole('button', { name: 'এন্ট্রি নিশ্চিত করুন' }));
+}
+
+async function attachBillImage() {
+  const input = document.querySelector<HTMLInputElement>('input[type="file"]');
+  expect(input).not.toBeNull();
+  const file = new File(['bill'], 'bill.jpg', { type: 'image/jpeg' });
+  fireEvent.change(input!, { target: { files: [file] } });
+  await waitFor(() => expect(screen.getByAltText('সংযুক্ত বিল')).toBeInTheDocument());
+}
+
+describe('browser ledger entry submission', () => {
+  beforeEach(() => {
+    setBrowserOnline(true);
+    mocks.createLedgerEntry.mockReset();
+    mocks.useListAdjustmentTargets.mockReset();
+    mocks.useListAdjustmentTargets.mockReturnValue({
+      data: [{ id: 'target-party', name: 'করিম' }],
+    });
+    mocks.uploadBillImage.mockReset();
+    mocks.uploadBillImage.mockResolvedValue({ ok: true, objectPath: '/objects/uploads/bill-1' });
+    mocks.scanDocument.mockReset();
+    mocks.scanDocument.mockResolvedValue('data:image/jpeg;base64,captured-bill');
+    mocks.queueEntry.mockReset();
+    mocks.createLedgerEntry.mockResolvedValue({ id: 'entry-1' });
+  });
+
+  afterEach(() => {
+    setBrowserOnline(true);
+  });
+
+  it('does not POST or queue a new draft while offline and leaves the form open', () => {
+    setBrowserOnline(false);
+    const { onClose } = renderEntry();
+
+    enterAmount();
+    saveEntry();
+
+    expect(mocks.createLedgerEntry).not.toHaveBeenCalled();
+    expect(mocks.queueEntry).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'এন্ট্রি নিশ্চিত করুন' })).toBeInTheDocument();
+  });
+
+  it('POSTs the transfer and uploaded bill object path directly, then closes and invalidates ledger views', async () => {
+    const { onClose, invalidateQueries } = renderEntry();
+    enterAmount();
+    await attachBillImage();
+    fireEvent.click(screen.getByTestId('button-toggle-adjustment'));
+    fireEvent.click(screen.getByTestId('button-adjustment-party-target-party'));
+
+    saveEntry();
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    expect(mocks.uploadBillImage).toHaveBeenCalledWith('data:image/jpeg;base64,captured-bill');
+    expect(mocks.createLedgerEntry).toHaveBeenCalledOnce();
+    expect(mocks.createLedgerEntry).toHaveBeenCalledWith(
+      PARTY_ID,
+      expect.objectContaining({
+        type: LedgerEntryType.YOU_GAVE,
+        amount: 1,
+        isTransfer: true,
+        transferPartyId: 'target-party',
+        billImage: '/objects/uploads/bill-1',
+        clientRequestId: expect.any(String),
+      }),
+      { headers: { 'x-business-id': 'business-1' } },
+    );
+    expect(mocks.createLedgerEntry.mock.calls[0][1]).not.toHaveProperty('imageBase64');
+    expect(mocks.queueEntry).not.toHaveBeenCalled();
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: getListLedgerEntriesQueryKey(PARTY_ID),
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: getGetPartyQueryKey(PARTY_ID) });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: getListPartiesQueryKey() });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: getGetDashboardSummaryQueryKey(),
+    });
+    expect(invalidateQueries).toHaveBeenCalledTimes(4);
+  });
+
+  it('keeps the form open on API failure and reuses the same request ID for an unchanged retry', async () => {
+    mocks.createLedgerEntry
+      .mockRejectedValueOnce(new Error('network failure'))
+      .mockResolvedValueOnce({ id: 'entry-1' });
+    const { onClose } = renderEntry();
+    enterAmount();
+
+    saveEntry();
+    await waitFor(() => expect(mocks.createLedgerEntry).toHaveBeenCalledOnce());
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'এন্ট্রি নিশ্চিত করুন' })).toBeInTheDocument();
+
+    saveEntry();
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+
+    const firstRequest = mocks.createLedgerEntry.mock.calls[0][1];
+    const retryRequest = mocks.createLedgerEntry.mock.calls[1][1];
+    expect(retryRequest.clientRequestId).toBe(firstRequest.clientRequestId);
+    expect(mocks.queueEntry).not.toHaveBeenCalled();
+  });
+
+  it('does not POST or close the form when the bill image upload fails', async () => {
+    mocks.uploadBillImage.mockResolvedValue({ ok: false, reason: 'upload-failed' });
+    const { onClose } = renderEntry();
+    enterAmount();
+    await attachBillImage();
+
+    saveEntry();
+
+    await waitFor(() => expect(mocks.uploadBillImage).toHaveBeenCalledOnce());
+    expect(mocks.createLedgerEntry).not.toHaveBeenCalled();
+    expect(mocks.queueEntry).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'এন্ট্রি নিশ্চিত করুন' })).toBeInTheDocument();
+  });
+});
