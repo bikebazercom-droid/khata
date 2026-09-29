@@ -11,3 +11,4 @@
 - [API integration test concurrency](api-integration-test-concurrency.md) — database-backed suites can fail nondeterministically when Vitest runs test files in parallel.
 - [Expo mobile auth loading](expo-mobile-auth-loading.md) — web sign-in is separate from Expo; bound token/API waits and only refresh identity after it loads.
 - [PostgreSQL pooler compatibility](supabase-postgres-pooler.md) — the event bus needs persistent LISTEN/NOTIFY; Supabase transaction pooling is incompatible.
+- [Hostinger Node entry file](hostinger-node-entry-file.md) — Hostinger's Entry File must point to the compiled server file, not the package command `pnpm start`.
