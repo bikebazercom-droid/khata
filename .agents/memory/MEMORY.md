@@ -10,3 +10,4 @@
 - [Offline shell validation](offline-shell-validation.md) — service-worker checks need compiled assets and a browser-reachable secure origin.
 - [API integration test concurrency](api-integration-test-concurrency.md) — database-backed suites can fail nondeterministically when Vitest runs test files in parallel.
 - [Expo mobile auth loading](expo-mobile-auth-loading.md) — web sign-in is separate from Expo; bound token/API waits and only refresh identity after it loads.
+- [PostgreSQL pooler compatibility](supabase-postgres-pooler.md) — the event bus needs persistent LISTEN/NOTIFY; Supabase transaction pooling is incompatible.
