@@ -22,6 +22,10 @@ import {
   useGetBusinessSettings,
   useListGlobalLedgerEntries,
 } from '@workspace/api-client-react';
+import {
+  buildGlobalLedgerReportQuery,
+  calculateGlobalLedgerReportTotals,
+} from '@workspace/api-client-react/global-ledger-report';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
@@ -33,7 +37,6 @@ import {
   buildBusinessReportHtml,
   formatBusinessCurrency,
   formatBusinessDate,
-  resolveBusinessReportRange,
   toBengaliDigits,
   type BusinessReportPeriod,
 } from '@/lib/business-report';
@@ -225,18 +228,11 @@ export default function BusinessReportScreen() {
   const [shareBusy, setShareBusy] = useState(false);
   const folderInProgress = useRef(false);
 
-  const range = useMemo(
-    () => resolveBusinessReportRange(period, customStart, customEnd),
-    [period, customStart, customEnd],
-  );
   const params = useMemo(
-    () => ({
-      startDate: range.startDate,
-      endDate: range.endDate,
-      search: search.trim() || undefined,
-    }),
-    [range.startDate, range.endDate, search],
+    () => buildGlobalLedgerReportQuery(period, customStart, customEnd, search),
+    [period, customStart, customEnd, search],
   );
+  const range = params;
   const {
     data: entries = [],
     isLoading,
@@ -250,19 +246,7 @@ export default function BusinessReportScreen() {
     },
   });
 
-  const totals = useMemo(() => {
-    let totalDebit = 0;
-    let totalCredit = 0;
-    for (const entry of entries) {
-      if (entry.type === 'YOU_GAVE') totalDebit += entry.amount;
-      else totalCredit += entry.amount;
-    }
-    return {
-      totalDebit,
-      totalCredit,
-      netBalance: totalCredit - totalDebit,
-    };
-  }, [entries]);
+  const totals = useMemo(() => calculateGlobalLedgerReportTotals(entries), [entries]);
 
   const periodLabel = useMemo(() => {
     if (period === 'CUSTOM_RANGE') {

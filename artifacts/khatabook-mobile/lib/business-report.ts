@@ -1,12 +1,11 @@
+import {
+  resolveGlobalLedgerReportRange,
+  type GlobalLedgerReportPeriod,
+  type GlobalLedgerReportRange,
+} from '@workspace/api-client-react/global-ledger-report';
 import type { GlobalLedgerEntry } from '@workspace/api-client-react';
 
-export type BusinessReportPeriod =
-  | 'ALL'
-  | 'THIS_MONTH'
-  | 'SINGLE_DAY'
-  | 'LAST_WEEK'
-  | 'LAST_MONTH'
-  | 'CUSTOM_RANGE';
+export type BusinessReportPeriod = GlobalLedgerReportPeriod;
 
 export const BUSINESS_REPORT_PERIODS: { key: BusinessReportPeriod; label: string }[] = [
   { key: 'ALL', label: 'সব' },
@@ -17,10 +16,7 @@ export const BUSINESS_REPORT_PERIODS: { key: BusinessReportPeriod; label: string
   { key: 'CUSTOM_RANGE', label: 'তারিখের পরিসর' },
 ];
 
-export interface BusinessReportRange {
-  startDate?: string;
-  endDate?: string;
-}
+export type BusinessReportRange = GlobalLedgerReportRange;
 
 const BENGALI_DIGITS: Record<string, string> = {
   '0': '০', '1': '১', '2': '২', '3': '৩', '4': '৪',
@@ -49,50 +45,13 @@ export function formatBusinessCurrency(value: number): string {
   return `৳${toBengaliDigits(formatted)}`;
 }
 
-function dateOnly(date: Date): string {
-  const year = String(date.getFullYear()).padStart(4, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 export function resolveBusinessReportRange(
   period: BusinessReportPeriod,
   customStart: Date | null,
   customEnd: Date | null,
   now = new Date(),
 ): BusinessReportRange {
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  switch (period) {
-    case 'ALL':
-      return {};
-    case 'THIS_MONTH':
-      return {
-        startDate: dateOnly(new Date(today.getFullYear(), today.getMonth(), 1)),
-        endDate: dateOnly(new Date(today.getFullYear(), today.getMonth() + 1, 0)),
-      };
-    case 'SINGLE_DAY': {
-      const day = customStart ?? today;
-      return { startDate: dateOnly(day), endDate: dateOnly(day) };
-    }
-    case 'LAST_WEEK': {
-      const start = new Date(today);
-      start.setDate(start.getDate() - 6);
-      return { startDate: dateOnly(start), endDate: dateOnly(today) };
-    }
-    case 'LAST_MONTH': {
-      const previousMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      return {
-        startDate: dateOnly(previousMonth),
-        endDate: dateOnly(new Date(previousMonth.getFullYear(), previousMonth.getMonth() + 1, 0)),
-      };
-    }
-    case 'CUSTOM_RANGE':
-      return {
-        startDate: customStart ? dateOnly(customStart) : undefined,
-        endDate: customEnd ? dateOnly(customEnd) : undefined,
-      };
-  }
+  return resolveGlobalLedgerReportRange(period, customStart, customEnd, now);
 }
 
 function escapeHtml(value: string): string {

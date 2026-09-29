@@ -5,16 +5,14 @@ import {
   getListGlobalLedgerEntriesQueryKey,
   useGetBusinessSettings,
 } from '@workspace/api-client-react';
+import {
+  buildGlobalLedgerReportQuery,
+  calculateGlobalLedgerReportTotals,
+} from '@workspace/api-client-react/global-ledger-report';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { ChevronLeft, Calendar as CalendarIcon, Search, ChevronDown, FileDown, Loader2 } from 'lucide-react';
-import {
-  format,
-  startOfMonth,
-  endOfMonth,
-  subMonths,
-  subDays,
-} from 'date-fns';
+import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -34,37 +32,6 @@ const PERIOD_LABELS: Record<ReportPeriod, string> = {
   LAST_MONTH: 'গত মাসের',
   CUSTOM_RANGE: 'তারিখের পরিসর',
 };
-
-function toDateOnly(date: Date) {
-  return format(date, 'yyyy-MM-dd');
-}
-
-function resolveDateRange(period: ReportPeriod, customStart: Date | null, customEnd: Date | null) {
-  const today = new Date();
-  switch (period) {
-    case 'ALL':
-      return { startDate: undefined, endDate: undefined };
-    case 'THIS_MONTH':
-      return { startDate: toDateOnly(startOfMonth(today)), endDate: toDateOnly(endOfMonth(today)) };
-    case 'LAST_MONTH': {
-      const lastMonth = subMonths(today, 1);
-      return { startDate: toDateOnly(startOfMonth(lastMonth)), endDate: toDateOnly(endOfMonth(lastMonth)) };
-    }
-    case 'LAST_WEEK':
-      return { startDate: toDateOnly(subDays(today, 6)), endDate: toDateOnly(today) };
-    case 'SINGLE_DAY': {
-      const day = customStart ?? today;
-      return { startDate: toDateOnly(day), endDate: toDateOnly(day) };
-    }
-    case 'CUSTOM_RANGE':
-      return {
-        startDate: customStart ? toDateOnly(customStart) : undefined,
-        endDate: customEnd ? toDateOnly(customEnd) : undefined,
-      };
-    default:
-      return { startDate: undefined, endDate: undefined };
-  }
-}
 
 export function ReportView() {
   const [, navigate] = useLocation();
@@ -91,25 +58,20 @@ export function ReportView() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
-  const { startDate: rangeStart, endDate: rangeEnd } = resolveDateRange(period, startDate, endDate);
-
-  const { data: entries = [], isLoading } = useListGlobalLedgerEntries({
-    startDate: rangeStart,
-    endDate: rangeEnd,
-    search: search || undefined,
-  }, {
+  const params = useMemo(
+    () => buildGlobalLedgerReportQuery(period, startDate, endDate, search),
+    [period, startDate, endDate, search],
+  );
+  const { data: entries = [], isLoading } = useListGlobalLedgerEntries(params, {
     query: {
-      queryKey: getListGlobalLedgerEntriesQueryKey({
-        startDate: rangeStart,
-        endDate: rangeEnd,
-        search: search || undefined,
-      })
+      queryKey: getListGlobalLedgerEntriesQueryKey(params),
     }
   });
 
-  const totalDebit  = useMemo(() => entries.reduce((s, e) => e.type === 'YOU_GAVE' ? s + e.amount : s, 0), [entries]);
-  const totalCredit = useMemo(() => entries.reduce((s, e) => e.type === 'YOU_GOT'  ? s + e.amount : s, 0), [entries]);
-  const netBalance  = totalCredit - totalDebit;
+  const { totalDebit, totalCredit, netBalance } = useMemo(
+    () => calculateGlobalLedgerReportTotals(entries),
+    [entries],
+  );
 
   const periodLabel = useMemo(() => {
     if (period === 'CUSTOM_RANGE' && startDate && endDate)
