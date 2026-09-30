@@ -9,6 +9,7 @@
     "check": "pnpm run typecheck && pnpm run test",
     "build:apk": "eas build -p android --profile preview --non-interactive",
     "build:apk:dev": "eas build -p android --profile development --non-interactive",
+    "build:apk:external": "test -n \"$EXTERNAL_CLERK_PUBLISHABLE_KEY\" || { echo 'EXTERNAL_CLERK_PUBLISHABLE_KEY is required' >&2; exit 1; }; EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=\"$EXTERNAL_CLERK_PUBLISHABLE_KEY\" CLERK_PUBLISHABLE_KEY=\"$EXTERNAL_CLERK_PUBLISHABLE_KEY\" EXPO_PUBLIC_CLERK_PROXY_URL='' CLERK_PROXY_URL='' eas build -p android --profile production-apk --non-interactive",
     "build:aab": "eas build -p android --profile production --non-interactive",
     "serve": "node server/serve.js",
     "test": "node --test lib/*.test.mjs",
