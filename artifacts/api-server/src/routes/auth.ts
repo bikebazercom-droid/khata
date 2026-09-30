@@ -335,25 +335,36 @@ router.post("/auth/presence", requireAuth, async (req: Request, res: Response): 
 
 // ─── GET /api/auth/me ─────────────────────────────────────────────────────────
 
-router.get("/auth/me", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const auth = req as AuthenticatedRequest;
-  const [business] = await db.select({ name: businessesTable.name }).from(businessesTable)
-    .where(eq(businessesTable.id, auth.businessId)).limit(1);
-  const [user] = await db.select({ ids: appUsersTable.adjustmentPartyIds }).from(appUsersTable)
-    .where(eq(appUsersTable.id, auth.userId)).limit(1);
-  const targets = auth.role === "staff" && user?.ids.length
-    ? await db.select({ id: partiesTable.id }).from(partiesTable)
-      .where(and(eq(partiesTable.businessId, auth.businessId), inArray(partiesTable.id, user.ids)))
-    : [];
-  res.json({
-    role: auth.role,
-    businessId: auth.businessId,
-    userId: auth.userId,
-    businessName: business?.name ?? "",
-    authMethod: auth.authMethod,
-    adjustmentPartyIds: auth.role === "staff" ? targets.map((party) => party.id) : [],
-    ...(auth.phone ? { phone: auth.phone } : {}),
-  });
-});
+router.get(
+  "/auth/me",
+  (_req, res, next) => {
+    // This identity response is user-specific and is also the frontend's
+    // initial connectivity probe. Do not let browser/CDN caches revalidate it
+    // into a body-less 304 that the probe can mistake for an offline server.
+    res.setHeader("Cache-Control", "private, no-store");
+    next();
+  },
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const auth = req as AuthenticatedRequest;
+    const [business] = await db.select({ name: businessesTable.name }).from(businessesTable)
+      .where(eq(businessesTable.id, auth.businessId)).limit(1);
+    const [user] = await db.select({ ids: appUsersTable.adjustmentPartyIds }).from(appUsersTable)
+      .where(eq(appUsersTable.id, auth.userId)).limit(1);
+    const targets = auth.role === "staff" && user?.ids.length
+      ? await db.select({ id: partiesTable.id }).from(partiesTable)
+        .where(and(eq(partiesTable.businessId, auth.businessId), inArray(partiesTable.id, user.ids)))
+      : [];
+    res.json({
+      role: auth.role,
+      businessId: auth.businessId,
+      userId: auth.userId,
+      businessName: business?.name ?? "",
+      authMethod: auth.authMethod,
+      adjustmentPartyIds: auth.role === "staff" ? targets.map((party) => party.id) : [],
+      ...(auth.phone ? { phone: auth.phone } : {}),
+    });
+  },
+);
 
 export default router;

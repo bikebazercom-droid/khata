@@ -19,12 +19,17 @@ describe('cold auth connectivity gate', () => {
   afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); clearOfflineIdentity(); });
 
   it('shows only the scoped read-only offline path when navigator claims online but fetch throws TypeError', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    vi.stubGlobal('fetch', fetchMock);
     const clear = vi.fn();
     const { result, unmount } = renderHook(() => useAuthConnectivity(clear));
     expect(result.current.phase).toBe('probing'); // no Clerk, SSE, or mutations mounted
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(result.current.phase).toBe('offline');
+    expect(fetchMock).toHaveBeenCalledWith('/api/auth/me', expect.objectContaining({
+      credentials: 'include',
+      cache: 'no-store',
+    }));
     expect(isNetworkWriteAuthorized()).toBe(false);
     expect(readOfflineIdentity()?.userId).toBe('actor');
     expect(clear).toHaveBeenCalled();

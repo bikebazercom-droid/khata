@@ -52,6 +52,7 @@ describe("phone session logout", () => {
   it("revokes a copied mobile bearer token and records the explicit logout", async () => {
     const before = await request(app).get("/auth/me").set("Authorization", `Bearer ${token}`);
     expect(before.status, before.text).toBe(200);
+    expect(before.headers["cache-control"]).toContain("no-store");
 
     const logout = await request(app).post("/auth/phone/logout").set("Authorization", `Bearer ${token}`);
     expect(logout.status).toBe(200);
@@ -61,6 +62,7 @@ describe("phone session logout", () => {
 
     const replay = await request(app).get("/auth/me").set("Authorization", `Bearer ${token}`);
     expect(replay.status).toBe(401);
+    expect(replay.headers["cache-control"]).toContain("no-store");
     const again = await request(app).post("/auth/phone/logout").set("Authorization", `Bearer ${token}`);
     expect(again.status).toBe(200);
     const [afterRetry] = await db.select().from(appUsersTable).where(eq(appUsersTable.id, userId));

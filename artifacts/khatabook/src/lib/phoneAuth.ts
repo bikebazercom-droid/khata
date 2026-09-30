@@ -17,7 +17,7 @@ export interface MeResponse {
 }
 
 export async function fetchMe(signal?: AbortSignal): Promise<MeResponse> {
-  const res = await fetch(`/api/auth/me`, { credentials: "include", signal });
+  const res = await fetch(`/api/auth/me`, { credentials: "include", cache: "no-store", signal });
   if (!res.ok) {
     const error = new Error(res.status === 401 || res.status === 403 ? "Session expired or access denied" : "Authentication server unavailable") as Error & { status: number };
     error.status = res.status;
