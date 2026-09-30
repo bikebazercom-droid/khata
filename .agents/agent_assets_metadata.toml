@@ -140,3 +140,17 @@ mtime_ms = 1790598139668
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/1ff77b88-9d9e-409d-9b1a-32779530829e/4043e0cc-3659-4472-b3d1-59ddf85ee74e"
 storage_version_token = "1790598303696473"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "qOOS7L8mrJWKPnD12dxPO"
+uri = "file://exports/BanglaKhataAndroidStudio.zip"
+type = "unspecified"
+title = "BanglaKhata Android Studio project (.zip)"
+description = "Updated standalone Android Studio project for https://banglakhata.com, with persistent WebView cookies, photo capture/file selection, and download support. Open with JDK 17 and Android SDK 35."
+logical_id = "8b3df50c-4294-4a2c-bcea-1e30f269c2a6"
+content_hash = "sha256:030365e5cecff3dcb047ac2172b6b3f1f1e66877b7fdf85a45d8d4fab4fec9ad"
+size = 69255
+mtime_ms = 1790770763531
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/8b3df50c-4294-4a2c-bcea-1e30f269c2a6/55178e94-f9f4-406c-aa83-900b740fdcd9"
+storage_version_token = "1790770769766598"
+content_type = "application/octet-stream"
