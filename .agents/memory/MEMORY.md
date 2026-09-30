@@ -1,7 +1,7 @@
 - [Mobile single-page layout height](mobile-fixed-height-layout.md) — outer app shell must use fixed `h-[100dvh]`, not `min-h-[100dvh]`, or absolutely-positioned full-screen overlays inherit unbounded height and cause page scroll.
 - [Collapsible panel animation](collapsible-panel-css-trick.md) — prefer `max-height` transition over CSS Grid `0fr`/`1fr` trick for animating a section to/from zero height; the grid trick was unreliable here.
 - [Orval date query-param coercion bug](orval-date-query-param-coercion.md) — generated zod schemas use bare `zod.date()` for `format: date` query params, always failing req.query parsing.
-- [Khatabook auth & multi-tenancy](khatabook-auth-multitenancy.md) — seed business UUID, requireAuth dual-session, drizzle push TTY workaround, lib/db rebuild requirement.
+- [Khatabook auth & multi-tenancy](khatabook-auth-multitenancy.md) — seed business, dual-session auth, persistent phone-session revocation, and DB setup gotchas.
 - [Expo + Clerk Metro config fix](expo-clerk-metro-config.md) — Metro crashes watching @clerk/backend_tmp_* dirs; add blockList pattern to metro.config.js.
 - [Worker invitation identity](worker-invite-identity.md) — one pending invite per verified identity across businesses avoids arbitrary first-sign-in claims.
 - [Android export validation](android-export-validation.md) — Gradle task discovery is not source compilation; API-only compiler checks are not APK builds.

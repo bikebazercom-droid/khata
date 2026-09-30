@@ -20,7 +20,14 @@ description: Architecture and gotchas for the khatabook multi-user cloud account
 ## Phone OTP
 - Routes: POST /api/auth/phone/send-otp, POST /api/auth/phone/verify-otp, POST /api/auth/phone/logout, GET /api/auth/me
 - Currently logs OTP to console — Twilio connector still needs connecting and wiring in auth.ts
-- `phone_session` JWT signed with SESSION_SECRET, 30-day expiry, httpOnly lax
+- `phone_session` JWT is signed with SESSION_SECRET and stored in an httpOnly, lax browser cookie
+
+## Phone sessions persist until explicit logout
+
+Phone-session JWT expiry is not the revocation boundary. The server validates the account status and `phoneSessionVersion`; explicit logout increments that version. Continue accepting older signed phone JWTs that still carry an `exp`, and strip their legacy expiry when renewing the browser cookie. Browser cookies use a rolling 400-day lifetime.
+
+**Why:** Users should remain signed in across restarts until they choose Log Out. Existing mobile tokens with a 30-day expiry must not silently expire after an app update, while server-side version checks still allow explicit revocation.
+**How to apply:** Keep expiry bypass limited to phone-session verification and phone logout verification; preserve active-user/version checks, and refresh the browser cookie on authenticated requests. Clerk session lifetime remains controlled by its provider.
 
 ## lib/db rebuild required after schema changes
 - lib/db uses `composite: true` + `emitDeclarationOnly` — must run `cd lib/db && pnpm exec tsc --build` after any schema file change, or api-server tsc won't see new types
