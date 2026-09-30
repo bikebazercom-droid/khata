@@ -52,3 +52,10 @@ After deleting an account, do not send any further authenticated app API request
 
 **Why:** Auth middleware provisions a replacement identity when it sees a valid Clerk session without an app user.
 **How to apply:** When changing deletion or logout flows, keep logout reporting before deletion only, and assert deletion leaves no user or business behind.
+
+## Replit-managed to external Clerk migration
+
+Before switching a deployment to another Clerk tenant, complete Replit's required managed-user migration step and obtain a verified old-to-new identity mapping. Do not relink ledger owners by email alone.
+
+**Why:** Ledger ownership is attached to the local app user linked to a Clerk user ID; matching email does not prove that a new tenant identity should inherit existing business data. Replit's managed-Clerk migration requires a manual support step.
+**How to apply:** Keep production keys unchanged until the identity migration plan is confirmed. If IDs change, use an explicit, reviewed mapping for owner and staff accounts, and preserve the existing business/user rows.

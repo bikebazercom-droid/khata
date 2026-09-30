@@ -42,8 +42,11 @@
     },
     "production-apk": {
       "autoIncrement": true,
+      "environment": "production",
       "env": {
-        "EXPO_USE_METRO_WORKSPACE_ROOT": "1"
+        "EXPO_USE_METRO_WORKSPACE_ROOT": "1",
+        "EXPO_PUBLIC_CLERK_AUTH_MODE": "external",
+        "EXPO_PUBLIC_CLERK_PROXY_URL": ""
       },
       "android": {
         "buildType": "apk"

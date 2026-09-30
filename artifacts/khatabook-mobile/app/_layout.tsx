@@ -44,8 +44,22 @@ const queryClient = new QueryClient({
   },
 });
 
-const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
-const proxyUrl = process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
+const clerkAuthMode = process.env.EXPO_PUBLIC_CLERK_AUTH_MODE;
+const isExternalClerk = clerkAuthMode === 'external';
+const publishableKey = isExternalClerk
+  ? process.env.EXPO_PUBLIC_EXTERNAL_CLERK_PUBLISHABLE_KEY
+  : process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
+if (!publishableKey) {
+  throw new Error(
+    isExternalClerk
+      ? 'EXPO_PUBLIC_EXTERNAL_CLERK_PUBLISHABLE_KEY is required when EXPO_PUBLIC_CLERK_AUTH_MODE=external'
+      : 'EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is required',
+  );
+}
+const requiredPublishableKey: string = publishableKey;
+const proxyUrl = isExternalClerk
+  ? undefined
+  : process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
 
 function RootLayoutNav() {
   const segments = useSegments();
@@ -126,7 +140,7 @@ export default function RootLayout() {
 
   return (
     <ClerkProvider
-      publishableKey={publishableKey}
+      publishableKey={requiredPublishableKey}
       tokenCache={tokenCache}
       proxyUrl={proxyUrl}
     >
