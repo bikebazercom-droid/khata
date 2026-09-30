@@ -1,4 +1,5 @@
 import express from "express";
+import cookieParser from "cookie-parser";
 import request from "supertest";
 import jwt from "jsonwebtoken";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -6,6 +7,7 @@ import { eq } from "drizzle-orm";
 import {
   appUserLoginSessionsTable, appUsersTable, businessesTable, db, userBusinessesTable,
 } from "@workspace/db";
+import { PHONE_SESSION_COOKIE_MAX_AGE_MS } from "../middlewares/requireAuth";
 import authRouter from "./auth";
 
 const clerkSession = vi.hoisted(() => ({ userId: "", oldSessionId: "", newSessionId: "" }));
@@ -30,6 +32,7 @@ describe("phone session logout", () => {
 
   const app = express();
   app.use(express.json());
+  app.use(cookieParser());
   app.use(authRouter);
 
   beforeAll(async () => {
@@ -39,7 +42,7 @@ describe("phone session logout", () => {
     const [user] = await db.insert(appUsersTable).values({ businessId, phone, role: "staff" }).returning();
     userId = user!.id;
     await db.insert(userBusinessesTable).values({ businessId, userId });
-    token = jwt.sign({ userId, businessId, phone, sessionVersion: 0 }, process.env.SESSION_SECRET!, { expiresIn: "30d" });
+    token = jwt.sign({ userId, businessId, phone, sessionVersion: 0 }, process.env.SESSION_SECRET!);
   });
 
   afterAll(async () => {
@@ -47,6 +50,30 @@ describe("phone session logout", () => {
     await db.delete(userBusinessesTable).where(eq(userBusinessesTable.userId, userId));
     await db.delete(appUsersTable).where(eq(appUsersTable.id, userId));
     await db.delete(businessesTable).where(eq(businessesTable.id, businessId));
+  });
+
+  it("keeps phone sessions valid across browser restarts and renews the persistent cookie", async () => {
+    expect(jwt.decode(token)).not.toHaveProperty("exp");
+
+    const firstOpen = await request(app).get("/auth/me")
+      .set("Cookie", `phone_session=${token}`);
+    expect(firstOpen.status, firstOpen.text).toBe(200);
+
+    const rawCookies = firstOpen.headers["set-cookie"];
+    const cookies = Array.isArray(rawCookies) ? rawCookies : rawCookies ? [rawCookies] : [];
+    const cookie = cookies
+      .find((value) => value.startsWith("phone_session="));
+    expect(cookie).toContain(`Max-Age=${PHONE_SESSION_COOKIE_MAX_AGE_MS / 1000}`);
+    expect(cookie).toContain("HttpOnly");
+
+    const refreshedToken = cookie?.split(";")[0]?.slice("phone_session=".length);
+    expect(refreshedToken).toBeTruthy();
+    expect(jwt.decode(refreshedToken!)).not.toHaveProperty("exp");
+
+    // A fresh request with the saved cookie models reopening the browser.
+    const reopened = await request(app).get("/auth/me")
+      .set("Cookie", `phone_session=${refreshedToken}`);
+    expect(reopened.status, reopened.text).toBe(200);
   });
 
   it("revokes a copied mobile bearer token and records the explicit logout", async () => {
@@ -73,7 +100,7 @@ describe("phone session logout", () => {
     const [user] = await db.select().from(appUsersTable).where(eq(appUsersTable.id, userId));
     const storedToken = jwt.sign({
       userId, businessId, phone, sessionVersion: user!.phoneSessionVersion,
-    }, process.env.SESSION_SECRET!, { expiresIn: "30d" });
+    }, process.env.SESSION_SECRET!);
     const failingQuery = vi.spyOn(db, "select").mockImplementationOnce(() => {
       throw new Error("Test database outage");
     });
@@ -88,6 +115,35 @@ describe("phone session logout", () => {
     expect(afterFailure?.phoneSessionVersion).toBe(user!.phoneSessionVersion);
     const stillValid = await request(app).get("/auth/me").set("Authorization", `Bearer ${storedToken}`);
     expect(stillValid.status).toBe(200);
+  });
+
+  it("migrates old expired phone tokens while keeping explicit logout revocation", async () => {
+    const [user] = await db.select().from(appUsersTable).where(eq(appUsersTable.id, userId));
+    const legacyToken = jwt.sign({
+      userId, businessId, phone, sessionVersion: user!.phoneSessionVersion,
+    }, process.env.SESSION_SECRET!, { expiresIn: -1 });
+    expect(jwt.decode(legacyToken)).toHaveProperty("exp");
+
+    const mobileSession = await request(app).get("/auth/me")
+      .set("Authorization", `Bearer ${legacyToken}`);
+    expect(mobileSession.status, mobileSession.text).toBe(200);
+
+    const browserSession = await request(app).get("/auth/me")
+      .set("Cookie", `phone_session=${legacyToken}`);
+    expect(browserSession.status, browserSession.text).toBe(200);
+    const rawCookies = browserSession.headers["set-cookie"];
+    const cookies = Array.isArray(rawCookies) ? rawCookies : rawCookies ? [rawCookies] : [];
+    const refreshedCookie = cookies.find((value) => value.startsWith("phone_session="));
+    const refreshedToken = refreshedCookie?.split(";")[0]?.slice("phone_session=".length);
+    expect(refreshedToken).toBeTruthy();
+    expect(jwt.decode(refreshedToken!)).not.toHaveProperty("exp");
+
+    const logout = await request(app).post("/auth/phone/logout")
+      .set("Authorization", `Bearer ${legacyToken}`);
+    expect(logout.status).toBe(200);
+    const replay = await request(app).get("/auth/me")
+      .set("Authorization", `Bearer ${legacyToken}`);
+    expect(replay.status).toBe(401);
   });
 
   it("rejects the old Clerk bearer session after explicit sign-out but allows a different session", async () => {

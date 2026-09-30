@@ -246,7 +246,8 @@ router.post(
     // Also return the JWT token in the response body so mobile clients
     // (which have no cookie jar) can store it in SecureStore and attach
     // it as a Bearer token on subsequent API requests.
-    const token = jwt.sign(sessionPayload, process.env.SESSION_SECRET!, { expiresIn: "30d" });
+    // Mobile keeps this token in SecureStore; phoneSessionVersion revokes it on logout.
+    const token = jwt.sign(sessionPayload, process.env.SESSION_SECRET!);
 
     res.json({
       success: true,
@@ -266,7 +267,7 @@ router.post("/auth/phone/logout", async (req: Request, res: Response): Promise<v
   if (token) {
     let payload: { userId?: string; phone?: string; sessionVersion?: number } | null = null;
     try {
-      payload = jwt.verify(token, process.env.SESSION_SECRET!) as {
+      payload = jwt.verify(token, process.env.SESSION_SECRET!, { ignoreExpiration: true }) as {
         userId?: string; phone?: string; sessionVersion?: number;
       };
     } catch {

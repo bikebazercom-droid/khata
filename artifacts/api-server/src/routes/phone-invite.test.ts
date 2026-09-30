@@ -2,11 +2,15 @@ import express, { type NextFunction, type Request, type Response } from "express
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
+import jwt from "jsonwebtoken";
 import {
   appUsersTable, businessesTable, db, otpCodesTable, partiesTable, userLoginEventsTable,
   userBusinessesTable, workerInvitesTable, workerPartyAssignmentsTable,
 } from "@workspace/db";
-import { type AuthenticatedRequest } from "../middlewares/requireAuth";
+import {
+  PHONE_SESSION_COOKIE_MAX_AGE_MS,
+  type AuthenticatedRequest,
+} from "../middlewares/requireAuth";
 import { ensureSmsReady, sendOtpSms } from "../services/sms";
 import authRouter from "./auth";
 import ownerRouter from "./owner";
@@ -93,6 +97,13 @@ describe("phone worker invitation and verified first sign-in", () => {
       .set("X-Forwarded-For", "8.8.8.8").send({ phone, code });
     expect(verified.status, verified.text).toBe(200);
     expect(verified.body.token).toEqual(expect.any(String));
+    expect(jwt.decode(verified.body.token)).not.toHaveProperty("exp");
+    const rawCookies = verified.headers["set-cookie"];
+    const cookies = Array.isArray(rawCookies) ? rawCookies : rawCookies ? [rawCookies] : [];
+    expect(cookies.some((cookie) =>
+      cookie.startsWith("phone_session=") &&
+      cookie.includes(`Max-Age=${PHONE_SESSION_COOKIE_MAX_AGE_MS / 1000}`),
+    )).toBe(true);
     const [staff] = await db.select().from(appUsersTable).where(eq(appUsersTable.phone, normalized));
     expect(staff?.role).toBe("staff");
     expect(staff?.businessId).toBe(businessId);

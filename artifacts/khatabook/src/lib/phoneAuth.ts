@@ -54,8 +54,11 @@ export async function verifyOtp(phone: string, code: string): Promise<MeResponse
 }
 
 export async function phoneLogout(): Promise<void> {
-  await fetch(`/api/auth/phone/logout`, {
+  const response = await fetch(`/api/auth/phone/logout`, {
     method: "POST",
     credentials: "include",
   });
+  if (!response.ok) {
+    throw new Error("Could not revoke the phone session");
+  }
 }

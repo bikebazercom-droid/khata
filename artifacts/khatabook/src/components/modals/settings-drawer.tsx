@@ -75,7 +75,7 @@ export function SettingsDrawer({
   const queryClient = useQueryClient();
   const { signOut } = useClerk();
   const { isSignedIn } = useAuth();
-  const { role } = useAppAuth();
+  const { isAuthenticated, role } = useAppAuth();
   const { data: settings } = useGetBusinessSettings({
     query: { enabled: role === 'owner', queryKey: getGetBusinessSettingsQueryKey() },
   });
@@ -178,7 +178,12 @@ export function SettingsDrawer({
     if (isLoggingOut) return;
     setIsLoggingOut(true);
     try {
-      await fetch('/api/auth/logout-event', { method: 'POST', credentials: 'include' }).catch(() => {});
+      const logoutEvent = await fetch('/api/auth/logout-event', { method: 'POST', credentials: 'include' });
+      if (!logoutEvent.ok && logoutEvent.status !== 401) {
+        throw new Error('The server could not confirm logout');
+      }
+      await phoneLogout();
+      if (isSignedIn) await signOut();
       queryClient.clear();
       revokeNetworkWrites();
       const actor = readOfflineIdentity()?.userId;
@@ -186,12 +191,11 @@ export function SettingsDrawer({
       clearOfflineIdentity();
       localStorage.removeItem('selected_business_id');
       clearAllPendingUploads();
-      if (isSignedIn) await signOut();
-      await phoneLogout().catch(() => {});
       onOpenChange(false);
       navigate('/sign-in');
     } catch (err) {
       console.error('Logout failed:', err);
+      toast.error('লগআউট নিশ্চিত করা যায়নি। আবার চেষ্টা করুন।');
       setIsLoggingOut(false);
     }
   }
@@ -286,7 +290,7 @@ export function SettingsDrawer({
 
             {activeMenu === 'auth' && (
               <div className={rowBody}>
-                {isSignedIn ? (
+                {isAuthenticated ? (
                   <>
                     <button
                       type="button"

@@ -337,7 +337,9 @@ export async function verifyClerkSessionCreationTime(
 
 const SESSION_SECRET = process.env.SESSION_SECRET!;
 const COOKIE_NAME = "phone_session";
-const COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+// Browsers cap persistent cookies at roughly 400 days. Renew the cookie on
+// authenticated requests so active phone sessions remain signed in until logout.
+export const PHONE_SESSION_COOKIE_MAX_AGE_MS = 400 * 24 * 60 * 60 * 1000;
 
 interface PhoneSessionPayload {
   userId: string;
@@ -350,12 +352,19 @@ export function issuePhoneSession(
   res: Response,
   payload: PhoneSessionPayload,
 ): void {
-  const token = jwt.sign(payload, SESSION_SECRET, { expiresIn: "30d" });
+  // Sign only application claims to strip exp/iat from tokens created by old clients.
+  // Explicit logout increments phoneSessionVersion server-side.
+  const token = jwt.sign({
+    userId: payload.userId,
+    businessId: payload.businessId,
+    phone: payload.phone,
+    sessionVersion: payload.sessionVersion,
+  }, SESSION_SECRET);
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: COOKIE_MAX_AGE_MS,
+    maxAge: PHONE_SESSION_COOKIE_MAX_AGE_MS,
     path: "/",
   });
 }
@@ -366,7 +375,9 @@ export function clearPhoneSession(res: Response): void {
 
 function verifyPhoneSession(token: string): PhoneSessionPayload | null {
   try {
-    return jwt.verify(token, SESSION_SECRET) as PhoneSessionPayload;
+    // Older mobile clients hold signed tokens with a 30-day exp. Session
+    // version/status checks below are the revocation boundary for all phone JWTs.
+    return jwt.verify(token, SESSION_SECRET, { ignoreExpiration: true }) as PhoneSessionPayload;
   } catch {
     return null;
   }
@@ -518,6 +529,7 @@ export async function requireAuth(
         res.status(403).json({ error: "Business membership required" });
         return;
       }
+      if (cookieToken) issuePhoneSession(res, payload);
       (req as AuthenticatedRequest).userId = user.id;
       (req as AuthenticatedRequest).businessId = user.businessId;
       (req as AuthenticatedRequest).role = user.role;

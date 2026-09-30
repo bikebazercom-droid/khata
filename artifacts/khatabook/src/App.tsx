@@ -428,6 +428,14 @@ function HomeRoute() {
   return <LandingPage />;
 }
 
+function SignInRoute() {
+  const { isAuthenticated, isLoading } = useAppAuth();
+
+  if (isLoading) return <AppSplash />;
+  if (isAuthenticated) return <Redirect to="/" />;
+  return <SignInPage />;
+}
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 function AuthServerReporter({ onNetworkFailure, onSettled }: { onNetworkFailure: () => void; onSettled: () => void }) {
@@ -489,7 +497,7 @@ function AppRouter({ onNetworkFailure, onSettled }: { onNetworkFailure: () => vo
             {/* Public */}
             <Route path="/" component={HomeRoute} />
             {/* REQUIRED — copy "/sign-in/*?" verbatim */}
-            <Route path="/sign-in/*?" component={SignInPage} />
+            <Route path="/sign-in/*?" component={SignInRoute} />
             <Route path="/sign-up/*?" component={SignUpPage} />
             {/* Protected */}
             <Route path="/access">

@@ -68,7 +68,13 @@ function RootLayoutNav() {
   const isAccess = segments[0] === 'access';
   const isPartyDetail = segments[0] === 'party';
   const isReport = segments[0] === 'report';
+  const isAuthRoute = segments[0] === '(auth)';
   const needsIdentity = isAccess || isPartyDetail || isReport;
+
+  if (isAuthRoute) {
+    if (!isLoaded || loading) return <StartupLoading />;
+    if (!unauthorized && identity) return <Redirect href="/(tabs)" />;
+  }
 
   if (needsIdentity) {
     if (!isLoaded || loading) return <StartupLoading />;
