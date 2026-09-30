@@ -11,7 +11,6 @@ import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
-import android.webkit.WebChromeClient.FileChooserParams;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -154,12 +153,12 @@ public final class MainActivity extends ComponentActivity {
                 progress.setVisibility(value == 100 ? View.GONE : View.VISIBLE);
             }
             @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback,
-                                                       FileChooserParams params) {
+                                                       WebChromeClient.FileChooserParams params) {
                 if (fileCallback != null) fileCallback.onReceiveValue(null);
                 fileCallback = callback;
                 try {
                     Intent chooser = Intent.createChooser(params.createIntent(), getString(R.string.choose_file));
-                    if (acceptsImages(params)) {
+                    if (acceptsImages(params.getAcceptTypes(), params.isCaptureEnabled())) {
                         try {
                             pendingCameraFile = createCameraCaptureFile();
                             pendingCameraUri = FileProvider.getUriForFile(
@@ -186,9 +185,8 @@ public final class MainActivity extends ComponentActivity {
         });
     }
 
-    private boolean acceptsImages(FileChooserParams params) {
-        if (params.isCaptureEnabled()) return true;
-        String[] types = params.getAcceptTypes();
+    private boolean acceptsImages(String[] types, boolean captureEnabled) {
+        if (captureEnabled) return true;
         if (types == null || types.length == 0) return true;
         for (String type : types) {
             if (type == null || type.isBlank() || "*/*".equals(type) ||

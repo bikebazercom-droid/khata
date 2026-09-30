@@ -154,3 +154,17 @@ mtime_ms = 1790770763531
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/8b3df50c-4294-4a2c-bcea-1e30f269c2a6/55178e94-f9f4-406c-aa83-900b740fdcd9"
 storage_version_token = "1790770769766598"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "77ZEo30Q4Gbg0u8GxN2k3"
+uri = "file://exports/BanglaKhataAndroidStudio-Fixed.zip"
+type = "unspecified"
+title = "BanglaKhata Android Studio project — fixed ZIP"
+description = "Corrected WebView wrapper for https://banglakhata.com. The photo chooser helper no longer references FileChooserParams directly. Open in Android Studio with JDK 17 and Android SDK 35."
+logical_id = "3c827869-977f-40f5-bc4e-38d7a390809b"
+content_hash = "sha256:3eaa2aad1574055793d2c6c276037438bb8801fcd0319a432c02999a2f018346"
+size = 69253
+mtime_ms = 1790771077334
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/3c827869-977f-40f5-bc4e-38d7a390809b/0b821fd8-a40b-4fb1-8723-42ca5342cee8"
+storage_version_token = "1790771085782852"
+content_type = "application/octet-stream"
