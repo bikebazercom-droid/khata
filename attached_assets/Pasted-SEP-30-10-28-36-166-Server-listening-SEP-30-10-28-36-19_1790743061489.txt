@@ -1,0 +1,333 @@
+SEP 30,10:28:36.166
+Server listening
+SEP 30,10:28:36.195
+request completed
+SEP 30,10:28:36.219
+[migrateBillImages] migration failed
+SEP 30,10:28:36.220
+[startup] ensureDefaultBusiness failed: Error: Failed query: insert into "businesses" ("id", "name", "created_at") values ($1, $2, default) on conflict do nothing
+params: 00000000-0000-0000-0000-000000000001,আমার খাতা
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f090-d568-7250-8d4d-8a8b192308b8/nodejs/artifacts/api-server/dist/index.mjs:77277:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+at async ensureDefaultBusiness (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f090-d568-7250-8d4d-8a8b192308b8/nodejs/artifacts/api-server/dist/index.mjs:89478:5)
+SEP 30,10:28:41.066
+Server listening
+SEP 30,10:28:41.107
+request completed
+SEP 30,10:28:41.122
+[startup] ensureDefaultBusiness failed: Error: Failed query: insert into "businesses" ("id", "name", "created_at") values ($1, $2, default) on conflict do nothing
+params: 00000000-0000-0000-0000-000000000001,আমার খাতা
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f090-d568-7250-8d4d-8a8b192308b8/nodejs/artifacts/api-server/dist/index.mjs:77277:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+at async ensureDefaultBusiness (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f090-d568-7250-8d4d-8a8b192308b8/nodejs/artifacts/api-server/dist/index.mjs:89478:5)
+SEP 30,10:28:41.123
+[migrateBillImages] migration failed
+SEP 30,10:28:41.985
+Server listening
+SEP 30,10:28:42.024
+request completed
+SEP 30,10:28:42.040
+[startup] ensureDefaultBusiness failed: Error: Failed query: insert into "businesses" ("id", "name", "created_at") values ($1, $2, default) on conflict do nothing
+params: 00000000-0000-0000-0000-000000000001,আমার খাতা
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f090-d568-7250-8d4d-8a8b192308b8/nodejs/artifacts/api-server/dist/index.mjs:77277:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+at async ensureDefaultBusiness (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f090-d568-7250-8d4d-8a8b192308b8/nodejs/artifacts/api-server/dist/index.mjs:89478:5)
+SEP 30,10:28:42.041
+[migrateBillImages] migration failed
+SEP 30,10:28:51.909
+Server listening
+SEP 30,10:28:51.954
+request completed
+SEP 30,10:28:51.969
+[migrateBillImages] migration failed
+SEP 30,10:28:51.970
+[startup] ensureDefaultBusiness failed: Error: Failed query: insert into "businesses" ("id", "name", "created_at") values ($1, $2, default) on conflict do nothing
+params: 00000000-0000-0000-0000-000000000001,আমার খাতা
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f090-d568-7250-8d4d-8a8b192308b8/nodejs/artifacts/api-server/dist/index.mjs:77277:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+at async ensureDefaultBusiness (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f090-d568-7250-8d4d-8a8b192308b8/nodejs/artifacts/api-server/dist/index.mjs:89478:5)
+SEP 30,10:28:51.974
+request completed
+SEP 30,10:28:52.197
+request completed
+SEP 30,10:28:52.211
+request completed
+SEP 30,10:28:52.623
+request completed
+SEP 30,10:28:52.625
+request completed
+SEP 30,10:28:52.626
+request completed
+SEP 30,10:28:52.835
+request completed
+SEP 30,10:28:52.837
+request completed
+SEP 30,10:28:52.851
+request completed
+SEP 30,10:28:53.030
+request completed
+SEP 30,10:28:53.064
+request completed
+SEP 30,10:28:53.098
+request completed
+SEP 30,10:28:53.222
+request completed
+SEP 30,10:28:53.266
+request completed
+SEP 30,10:28:53.295
+request completed
+SEP 30,10:28:53.457
+request completed
+SEP 30,10:29:02.948
+request completed
+SEP 30,10:29:05.128
+request completed
+SEP 30,10:29:06.118
+Server listening
+SEP 30,10:29:06.154
+request completed
+SEP 30,10:29:06.161
+request completed
+SEP 30,10:29:06.180
+[migrateBillImages] migration failed
+SEP 30,10:29:06.181
+[startup] ensureDefaultBusiness failed: Error: Failed query: insert into "businesses" ("id", "name", "created_at") values ($1, $2, default) on conflict do nothing
+params: 00000000-0000-0000-0000-000000000001,আমার খাতা
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f090-d568-7250-8d4d-8a8b192308b8/nodejs/artifacts/api-server/dist/index.mjs:77277:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+at async ensureDefaultBusiness (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f090-d568-7250-8d4d-8a8b192308b8/nodejs/artifacts/api-server/dist/index.mjs:89478:5)
+SEP 30,10:29:07.103
+request completed
+SEP 30,10:29:15.564
+request completed
+SEP 30,10:29:25.549
+request completed
+SEP 30,10:29:35.542
+request completed
+SEP 30,10:29:45.559
+request completed
+SEP 30,10:29:56.512
+request completed
+SEP 30,10:30:06.520
+request completed
+SEP 30,10:30:16.513
+request completed
+SEP 30,10:30:19.794
+request completed
+SEP 30,10:30:26.505
+request completed
+SEP 30,10:30:36.513
+request completed
+SEP 30,10:30:46.511
+request completed
+SEP 30,10:30:57.737
+request completed
+SEP 30,10:30:57.739
+request completed
+SEP 30,10:31:16.500
+request completed
+SEP 30,10:31:26.502
+request completed
+SEP 30,10:31:29.389
+request completed
+SEP 30,10:31:29.550
+request completed
+SEP 30,10:31:29.575
+request completed
+SEP 30,10:31:30.147
+request completed
+SEP 30,10:31:31.753
+request completed
+SEP 30,10:31:31.901
+request completed
+SEP 30,10:31:31.904
+request completed
+SEP 30,10:31:31.917
+request completed
+SEP 30,10:31:32.023
+request completed
+SEP 30,10:31:32.091
+request completed
+SEP 30,10:31:32.098
+request completed
+SEP 30,10:31:32.132
+request completed
+SEP 30,10:31:32.203
+request completed
+SEP 30,10:31:32.206
+request completed
+SEP 30,10:31:32.250
+request completed
+SEP 30,10:31:32.299
+request completed
+SEP 30,10:31:36.513
+request completed
+SEP 30,10:31:40.161
+request completed
+SEP 30,10:31:46.508
+request completed
+SEP 30,10:31:48.768
+request completed
+SEP 30,10:31:48.870
+request completed
+SEP 30,10:31:48.882
+request completed
+SEP 30,10:31:49.145
+request completed
+SEP 30,10:31:50.509
+request completed
+SEP 30,10:31:50.853
+request completed
+SEP 30,10:31:56.525
+request completed
+SEP 30,10:31:59.157
+request completed
+SEP 30,10:32:00.510
+request completed
+SEP 30,10:32:06.947
+request completed
+SEP 30,10:32:08.478
+request completed
+SEP 30,10:32:10.040
+request completed
+SEP 30,10:32:10.148
+request completed
+SEP 30,10:32:10.284
+request completed
+SEP 30,10:32:10.289
+request completed
+SEP 30,10:32:10.464
+request completed
+SEP 30,10:32:10.501
+request completed
+SEP 30,10:32:12.054
+request completed
+SEP 30,10:32:20.505
+request completed
+SEP 30,10:32:22.138
+ValidationError: The 'X-Forwarded-For' header is set but the Express 'trust proxy' setting is false (default). This could indicate a misconfiguration which would prevent express-rate-limit from accurately identifying users. See https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/ for more information.
+at Object.xForwardedForHeader (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f090-d568-7250-8d4d-8a8b192308b8/nodejs/artifacts/api-server/dist/index.mjs:94491:13)
+at wrappedValidations.<computed> [as xForwardedForHeader] (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f090-d568-7250-8d4d-8a8b192308b8/nodejs/artifacts/api-server/dist/index.mjs:94815:22)
+at Object.keyGenerator (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f090-d568-7250-8d4d-8a8b192308b8/nodejs/artifacts/api-server/dist/index.mjs:94923:20)
+at file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f090-d568-7250-8d4d-8a8b192308b8/nodejs/artifacts/api-server/dist/index.mjs:95013:33
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f090-d568-7250-8d4d-8a8b192308b8/nodejs/artifacts/api-server/dist/index.mjs:94966:5
+SEP 30,10:32:22.142
+request completed
+SEP 30,10:32:23.240
+admin/stats error
+SEP 30,10:32:23.241
+request errored
+SEP 30,10:32:23.259
+admin/users error
+SEP 30,10:32:23.259
+request errored
+SEP 30,10:32:23.261
+admin/otp-config error
+SEP 30,10:32:23.262
+request errored
+SEP 30,10:32:24.393
+admin/stats error
+SEP 30,10:32:24.393
+request errored
+SEP 30,10:32:24.416
+admin/users error
+SEP 30,10:32:24.416
+request errored
+SEP 30,10:32:24.428
+admin/otp-config error
+SEP 30,10:32:24.428
+request errored
+SEP 30,10:32:30.520
+request completed
+SEP 30,10:32:34.107
+admin/users error
+SEP 30,10:32:34.108
+request errored
+SEP 30,10:32:35.287
+admin/users error
+SEP 30,10:32:35.287
+request errored
+SEP 30,10:32:35.763
+request completed
+SEP 30,10:32:36.547
+request completed
+SEP 30,10:32:36.571
+admin/download-configs GET error
+SEP 30,10:32:36.572
+request errored
+SEP 30,10:32:36.579
+admin/otp-config error
+SEP 30,10:32:36.580
+request errored
+SEP 30,10:32:36.587
+admin/blocked-ips error
+SEP 30,10:32:36.588
+request errored
+SEP 30,10:32:37.746
+admin/blocked-ips error
+SEP 30,10:32:37.746
+request errored
+SEP 30,10:32:37.751
+admin/otp-config error
+SEP 30,10:32:37.752
+request errored
+SEP 30,10:32:40.391
+admin/stats error
+SEP 30,10:32:40.392
+request errored
+SEP 30,10:32:40.393
+admin/users error
+SEP 30,10:32:40.393
+request errored
+SEP 30,10:32:40.397
+admin/otp-config error
+SEP 30,10:32:40.397
+request errored
+SEP 30,10:32:40.512
+request completed
+SEP 30,10:32:41.592
+admin/otp-config error
+SEP 30,10:32:41.593
+request errored
+SEP 30,10:32:41.596
+admin/stats error
+SEP 30,10:32:41.597
+request errored
+SEP 30,10:32:41.598
+admin/users error
+SEP 30,10:32:41.598
+request errored
+SEP 30,10:32:46.503
+request completed
+SEP 30,10:32:56.530
+request completed
+SEP 30,10:32:59.891
+Server listening
+SEP 30,10:32:59.932
+request completed
+SEP 30,10:32:59.948
+[migrateBillImages] migration failed
+SEP 30,10:32:59.955
+[startup] ensureDefaultBusiness failed: Error: Failed query: insert into "businesses" ("id", "name", "created_at") values ($1, $2, default) on conflict do nothing
+params: 00000000-0000-0000-0000-000000000001,আমার খাতা
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f090-d568-7250-8d4d-8a8b192308b8/nodejs/artifacts/api-server/dist/index.mjs:77277:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+at async ensureDefaultBusiness (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f090-d568-7250-8d4d-8a8b192308b8/nodejs/artifacts/api-server/dist/index.mjs:89478:5)
+SEP 30,10:33:01.753
+Server listening
+SEP 30,10:33:01.795
+request completed
+SEP 30,10:33:01.808
+[startup] ensureDefaultBusiness failed: Error: Failed query: insert into "businesses" ("id", "name", "created_at") values ($1, $2, default) on conflict do nothing
+params: 00000000-0000-0000-0000-000000000001,আমার খাতা
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f090-d568-7250-8d4d-8a8b192308b8/nodejs/artifacts/api-server/dist/index.mjs:77277:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+at async ensureDefaultBusiness (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f090-d568-7250-8d4d-8a8b192308b8/nodejs/artifacts/api-server/dist/index.mjs:89478:5)
+SEP 30,10:33:01.809
+[migrateBillImages] migration failed
+SEP 30,10:33:06.506
+request completed
+SEP 30,10:33:16.538
+request completed
+SEP 30,10:33:26.510
+request completed
