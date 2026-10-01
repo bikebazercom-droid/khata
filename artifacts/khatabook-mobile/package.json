@@ -7,6 +7,7 @@
     "dev": "sh -c 'if [ -n \"$REPLIT_EXPO_SESSION_SECRET\" ]; then pnpm exec create-launch login --session \"$REPLIT_EXPO_SESSION_SECRET\" || true; fi' && EXPO_PACKAGER_PROXY_URL=https://$REPLIT_EXPO_DEV_DOMAIN EXPO_PUBLIC_DOMAIN=$REPLIT_DEV_DOMAIN EXPO_PUBLIC_REPL_ID=$REPL_ID REACT_NATIVE_PACKAGER_HOSTNAME=$REPLIT_DEV_DOMAIN pnpm exec expo start --localhost --port $PORT",
     "build": "node scripts/build.js",
     "serve": "node server/serve.js",
+    "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
@@ -16,6 +17,7 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "@stardazed/streams-text-encoding": "^1.0.2",
     "@tanstack/react-query": "catalog:",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "~19.2.2",
     "@types/react-dom": "~19.2.2",
     "@ungap/structured-clone": "^1.3.0",
@@ -39,6 +41,7 @@
     "expo-symbols": "~57.0.1",
     "expo-system-ui": "~57.0.1",
     "expo-web-browser": "~57.0.1",
+    "jsdom": "^29.1.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
@@ -51,6 +54,7 @@
     "react-native-web": "~0.21.0",
     "react-native-worklets": "0.10.1",
     "typescript": "~6.0.3",
+    "vitest": "^4.1.10",
     "zod": "catalog:",
     "zod-validation-error": "^3.4.0"
   },
