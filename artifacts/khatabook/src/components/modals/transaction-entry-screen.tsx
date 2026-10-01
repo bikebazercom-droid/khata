@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type SyntheticEvent } from 'react';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -26,7 +26,7 @@ import {
 import { ChevronLeft, Camera, X, ArrowLeftRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { cn, evaluateCalculatorExpression, formatCurrency, formatCurrencyTyping, formatExpressionForDisplay, toBengaliDigits, trimNumberForExpression } from '@/lib/utils';
+import { cn, evaluateCalculatorExpression, formatCurrency, formatExpressionForDisplay, toBengaliDigits, trimNumberForExpression } from '@/lib/utils';
 import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic';
 import { CameraCaptureModal } from '@/components/modals/camera-capture-modal';
 import { scanDocument } from '@/lib/document-scan';
@@ -38,6 +38,20 @@ import { useConnectionState } from '@/context/connection-state';
 
 type KeyKind = 'digit' | 'muted' | 'accent';
 type KeyDef = { label: string; value: string; kind: KeyKind; span?: number };
+type TextSelection = { start: number; end: number };
+
+function normalizeCalculatorInput(raw: string): string {
+  return raw
+    .replace(/[০-৯]/g, (digit) => String(digit.charCodeAt(0) - 0x09e6))
+    .replace(/[×]/g, '*')
+    .replace(/[÷]/g, '/')
+    .replace(/[−]/g, '-')
+    .replace(/[^0-9.+\-*/%]/g, '');
+}
+
+function isCalculatorOperator(value: string | undefined): boolean {
+  return value === '+' || value === '-' || value === '*' || value === '/';
+}
 
 const ROW_MEMORY: KeyDef[] = [
   { label: 'C', value: 'C', kind: 'muted' },
@@ -79,6 +93,7 @@ const Key = memo(function Key({ def, onPress }: { def: KeyDef; onPress: (value: 
   return (
     <button
       type="button"
+      data-testid={`calculator-key-${def.value}`}
       onClick={() => onPress(def.value)}
       style={{
         ...(def.span ? { gridColumn: `span ${def.span}` } : undefined),
@@ -168,24 +183,64 @@ export function TransactionEntryScreen({
   // read the ref for same-tick math (no stale-closure risk from batched
   // setState) while `memoryValue` state still drives the on-screen render.
   const memoryValueRef = useRef(0);
-  // Mirrors `expression` so pressKey (a stable, zero-dependency useCallback)
-  // can read the latest typed value without closing over stale state or
-  // embedding side effects inside a setState updater function — updaters
-  // must stay pure, so all M+/M- bookkeeping happens outside of one.
+  // Mirrors `expression` so keypad handlers can synchronously insert at the
+  // current caret without stale state or side effects inside a state updater.
   const expressionRef = useRef('');
-  useEffect(() => {
+  const amountInputRef = useRef<HTMLInputElement>(null);
+  const selectionRef = useRef<TextSelection>({ start: 0, end: 0 });
+  const pendingSelectionRef = useRef<TextSelection | null>(null);
+  const setExpressionAtSelection = useCallback((next: string, selection: TextSelection) => {
+    const clamped = {
+      start: Math.max(0, Math.min(selection.start, next.length)),
+      end: Math.max(0, Math.min(selection.end, next.length)),
+    };
+    expressionRef.current = next;
+    selectionRef.current = clamped;
+    pendingSelectionRef.current = clamped;
+    setExpression(next);
+  }, []);
+  useLayoutEffect(() => {
     expressionRef.current = expression;
+    const pending = pendingSelectionRef.current;
+    const input = amountInputRef.current;
+    if (pending && input) {
+      input.setSelectionRange(pending.start, pending.end);
+      selectionRef.current = pending;
+      pendingSelectionRef.current = null;
+    }
   }, [expression]);
+  const captureAmountSelection = useCallback((event: SyntheticEvent<HTMLInputElement>) => {
+    const { selectionStart, selectionEnd } = event.currentTarget;
+    const end = selectionEnd ?? expressionRef.current.length;
+    selectionRef.current = {
+      start: selectionStart ?? end,
+      end,
+    };
+  }, []);
+  const handleAmountChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const raw = event.currentTarget.value;
+    const rawStart = event.currentTarget.selectionStart ?? raw.length;
+    const rawEnd = event.currentTarget.selectionEnd ?? rawStart;
+    const next = normalizeCalculatorInput(raw);
+    const start = normalizeCalculatorInput(raw.slice(0, rawStart)).length;
+    const end = normalizeCalculatorInput(raw.slice(0, rawEnd)).length;
+    setShowError(false);
+    setLastFormulaText('');
+    setHasInteracted(true);
+    justRecalledRef.current = false;
+    setExpressionAtSelection(next, { start, end });
+  }, [setExpressionAtSelection]);
   const handleMrcTap = useCallback(() => {
     if (justRecalledRef.current) {
       clearMemory();
       justRecalledRef.current = false;
       return;
     }
-    setExpression(trimNumberForExpression(memoryValueRef.current));
+    const recalled = trimNumberForExpression(memoryValueRef.current);
+    setExpressionAtSelection(recalled, { start: recalled.length, end: recalled.length });
     setHasInteracted(true);
     justRecalledRef.current = true;
-  }, [clearMemory]);
+  }, [clearMemory, setExpressionAtSelection]);
   const [description, setDescription] = useState(initialEntry?.description ?? '');
   const [dueDate, setDueDate] = useState(() => {
     if (isEditMode) {
@@ -246,26 +301,6 @@ export function TransactionEntryScreen({
     return evaluateCalculatorExpression(expression) ?? 0;
   }, [expression]);
 
-  // Split expression into:
-  //   accumulatedExpr — everything up to and including the last operator
-  //                     e.g. "500+200+" → "500+200+",  "500+" → "500+"
-  //   currentOperand  — whatever the user is typing right now (after last op)
-  //                     e.g. "500+200"  → "200",        "500+" → ""
-  // A leading '-' (negative literal) is never treated as an operator here.
-  const [currentOperand, accumulatedExpr] = useMemo(() => {
-    if (!expression) return ['', ''];
-    let lastOpIdx = -1;
-    for (let i = expression.length - 1; i > 0; i--) {
-      const c = expression[i];
-      if (c === '+' || c === '-' || c === '*' || c === '/') {
-        lastOpIdx = i;
-        break;
-      }
-    }
-    if (lastOpIdx === -1) return [expression, ''];
-    return [expression.slice(lastOpIdx + 1), expression.slice(0, lastOpIdx + 1)];
-  }, [expression]);
-
   // Sub-bar formula text — always shows the full expression + live result
   // e.g. "500× = 500", "500×100 = 50000", and after = stays as "500×100 = 50000".
   const formulaPreviewText = useMemo(() => {
@@ -319,43 +354,6 @@ export function TransactionEntryScreen({
   // The authoritative amount used for saving and the header title — always
   // the fully-evaluated expression result, or the memory total.
   const displayAmount = memoryHistory.length > 0 ? memoryValue : (liveResult ?? 0);
-
-  // Classic calculator big-display — mirrors the reference screenshots:
-  //   Memory mode           → formatted running total (e.g. ৳1,500)
-  //   No operator yet       → formatted number being typed (e.g. ৳500)
-  //   Operator just pressed → number + operator symbol  (e.g. ৳500×)
-  //                           currentOperand is "" in this state
-  //   Second operand typing → formatted second operand  (e.g. ৳100)
-  const bigDisplayText = useMemo(() => {
-    if (memoryHistory.length > 0) return formatCurrency(memoryValue);
-    if (!expression) return null;
-
-    if (accumulatedExpr) {
-      if (currentOperand !== '') {
-        // Second operand is being typed — mirror exactly what the user typed.
-        // formatCurrencyTyping shows only as many decimal places as typed
-        // (e.g. "0.5" → "৳০.৫", not "৳০.৫০") so trailing zeros never appear
-        // unless the user explicitly pressed that digit.
-        const num = parseFloat(currentOperand);
-        const base = formatCurrencyTyping(currentOperand, isNaN(num) ? 0 : num);
-        return currentOperand.endsWith('.') ? base + '.' : base;
-      }
-      // Operator was just pressed — show "৳500×".
-      // accumulatedExpr ends with the operator char (+, -, *, /)
-      const opChar = accumulatedExpr.slice(-1);
-      const opSymbol = opChar === '*' ? '×' : opChar === '/' ? '÷' : opChar === '-' ? '−' : '+';
-      const numPart = accumulatedExpr.slice(0, -1);
-      // Evaluate the accumulated number part (handles chained ops like 500+200)
-      const num = evaluateCalculatorExpression(numPart) ?? parseFloat(numPart);
-      return `${formatCurrency(isNaN(num) ? 0 : num)}${opSymbol}`;
-    }
-
-    // No operator — plain number being typed.
-    // Use formatCurrencyTyping so "0.5" shows as "৳০.৫", not "৳০.৫০".
-    const num = parseFloat(expression);
-    const base = formatCurrencyTyping(expression, isNaN(num) ? 0 : num);
-    return expression.endsWith('.') ? base + '.' : base;
-  }, [memoryHistory.length, memoryValue, expression, accumulatedExpr, currentOperand]);
 
   // isActive: true whenever there's something meaningful to save
   const isActive = memoryHistory.length > 0 ? memoryValue !== 0 : expression.length > 0;
@@ -423,33 +421,42 @@ export function TransactionEntryScreen({
     [processCapturedImage]
   );
 
-  // Stable across renders (useCallback with a functional-setState style body
-  // that reads current expression/memory via refs) so the memoized <Key>
-  // grid never has to re-render just because this identity changed —
-  // keystrokes stay off the render path entirely except for the one state
-  // update they actually need.
+  // Stable across renders so the memoized key grid doesn't re-render while
+  // the user edits the expression or moves the cursor.
   const pressKey = useCallback((value: string) => {
     setShowError(false);
     // Any keypad press other than the MRC bar breaks the recall→clear combo.
     justRecalledRef.current = false;
+    const current = expressionRef.current;
+    const start = Math.max(0, Math.min(selectionRef.current.start, current.length));
+    const end = Math.max(start, Math.min(selectionRef.current.end, current.length));
     if (value === 'C') {
-      setExpression('');
+      setLastFormulaText('');
+      setExpressionAtSelection('', { start: 0, end: 0 });
       return;
     }
     if (value === 'DEL') {
-      setExpression((prev) => prev.slice(0, -1));
+      if (start !== end) {
+        setLastFormulaText('');
+        setExpressionAtSelection(current.slice(0, start) + current.slice(end), { start, end: start });
+      } else if (start > 0) {
+        const caret = start - 1;
+        setLastFormulaText('');
+        setExpressionAtSelection(current.slice(0, caret) + current.slice(end), { start: caret, end: caret });
+      }
       return;
     }
     if (value === '=') {
-      const result = evaluateCalculatorExpression(expressionRef.current);
+      const result = evaluateCalculatorExpression(current);
       if (result === null) {
         setShowError(true);
         return;
       }
       // Save the formula so sub-bar keeps showing "500×100 = 50000" after =
-      const formulaDisplay = formatExpressionForDisplay(expressionRef.current);
+      const formulaDisplay = formatExpressionForDisplay(current);
       setLastFormulaText(`${formulaDisplay} = ${trimNumberForExpression(result)}`);
-      setExpression(trimNumberForExpression(result));
+      const resolved = trimNumberForExpression(result);
+      setExpressionAtSelection(resolved, { start: resolved.length, end: resolved.length });
       return;
     }
     // Any key other than = clears the saved formula (new calculation starts)
@@ -460,7 +467,7 @@ export function TransactionEntryScreen({
       // operation. The log label keeps the raw typed expression (e.g.
       // "500×") rather than its evaluated value, so multi-step entries stay
       // legible in the history.
-      const currentExpression = expressionRef.current;
+      const currentExpression = current;
       const result = currentExpression ? evaluateCalculatorExpression(currentExpression) : 0;
       const safeValue = result !== null && Number.isFinite(result) ? result : 0;
       const label = currentExpression ? formatExpressionForDisplay(currentExpression) : '0';
@@ -470,46 +477,39 @@ export function TransactionEntryScreen({
       setMemoryHistory((prev) => [...prev, `${value}(${label})=${newMemoryValue.toFixed(1)}`]);
       // Clear the typed expression so the next number starts fresh for the
       // following memory entry.
-      expressionRef.current = '';
-      setExpression('');
+      setExpressionAtSelection('', { start: 0, end: 0 });
       justRecalledRef.current = false;
       // Silent by design: no toast/alert here — the running total and
       // history list already update instantly, so a notification would
       // just interrupt fast, repeated M+/M- entry.
       return;
     }
-    // Guard: prevent a second decimal point in the current operand.
-    //
-    // The expression is a sequence of operands separated by operators
-    // (+, -, *, /). We slice off everything after the last operator to get
-    // the "current operand" being typed, and block "." if that segment
-    // already contains one — matching the behaviour of every physical
-    // calculator and preventing unparseable strings like "23.4.5".
-    //
-    // Example: expression = "100+23.4", user presses "."
-    //   lastOpIdx = 3  (the "+")
-    //   currentOperand = "23.4"  → already has "." → block, return "100+23.4"
     if (value === '.') {
       setHasInteracted(true);
-      setExpression((prev) => {
-        const lastOpIdx = Math.max(
-          prev.lastIndexOf('+'),
-          prev.lastIndexOf('-'),
-          prev.lastIndexOf('*'),
-          prev.lastIndexOf('/'),
-        );
-        const currentOperand = prev.slice(lastOpIdx + 1);
-        if (currentOperand.includes('.')) return prev;   // already has decimal — block
-        if (currentOperand === '') return prev + '0.';   // empty operand → "0." auto-prepend
-        return prev + '.';
-      });
+      let operandStart = start;
+      while (operandStart > 0 && !isCalculatorOperator(current[operandStart - 1])) operandStart--;
+      let operandEnd = end;
+      while (operandEnd < current.length && !isCalculatorOperator(current[operandEnd])) operandEnd++;
+      const operandWithoutSelection = current.slice(operandStart, start) + current.slice(end, operandEnd);
+      if (operandWithoutSelection.includes('.')) return;
+      const insertion = operandWithoutSelection ? '.' : '0.';
+      const next = current.slice(0, start) + insertion + current.slice(end);
+      setExpressionAtSelection(next, { start: start + insertion.length, end: start + insertion.length });
       return;
     }
 
-    // Any numeric/operator key press permanently unlocks the metadata panel.
+    // Insert at the current cursor or replace the selected text.
     setHasInteracted(true);
-    setExpression((prev) => prev + value);
-  }, []);
+    let replaceStart = start;
+    let replaceEnd = end;
+    if (isCalculatorOperator(value) && start === end && start > 0 && isCalculatorOperator(current[start - 1])) {
+      replaceStart = start - 1;
+      replaceEnd = start;
+    }
+    const next = current.slice(0, replaceStart) + value + current.slice(replaceEnd);
+    const caret = replaceStart + value.length;
+    setExpressionAtSelection(next, { start: caret, end: caret });
+  }, [setExpressionAtSelection]);
 
   /**
    * Edit-mode save: issues an optimistic PATCH for the existing entry.
@@ -795,10 +795,30 @@ export function TransactionEntryScreen({
         {/* Amount card + live formula sub-bar */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden shrink-0">
           <div className="px-4 py-3 flex items-center gap-3">
-            <span className={cn('text-2xl font-extrabold tracking-tight', isGet ? 'text-emerald-600' : 'text-red-500')}>
-              {bigDisplayText ?? formatCurrency(0)}
+            <span aria-hidden="true" className={cn('text-2xl font-extrabold tracking-tight', isGet ? 'text-emerald-600' : 'text-red-500')}>
+              ৳
             </span>
-            {!isActive && <p className="text-sm font-semibold text-slate-400">পরিমাণ লিখুন</p>}
+            <input
+              ref={amountInputRef}
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              aria-label="পরিমাণ লিখুন"
+              data-testid="input-transaction-amount"
+              value={toBengaliDigits(formatExpressionForDisplay(expression))}
+              onChange={handleAmountChange}
+              onSelect={captureAmountSelection}
+              onClick={captureAmountSelection}
+              onKeyUp={captureAmountSelection}
+              onBlur={captureAmountSelection}
+              placeholder="পরিমাণ লিখুন"
+              className={cn(
+                'min-w-0 flex-1 bg-transparent text-right text-2xl font-extrabold tracking-tight tabular-nums placeholder:text-slate-300 focus:outline-none',
+                isGet ? 'text-emerald-600' : 'text-red-500',
+              )}
+            />
           </div>
           {/* Live memory history list: every M+/M- entry logged this session,
               newest at the bottom, scrollable once it grows past a few

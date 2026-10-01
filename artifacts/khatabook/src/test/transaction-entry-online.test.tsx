@@ -90,6 +90,10 @@ function enterAmount(amount = '1') {
   for (const digit of amount) fireEvent.click(screen.getByRole('button', { name: digit }));
 }
 
+function pressCalculatorKey(value: string) {
+  fireEvent.click(screen.getByTestId(`calculator-key-${value}`));
+}
+
 function saveEntry() {
   fireEvent.click(screen.getByRole('button', { name: 'এন্ট্রি নিশ্চিত করুন' }));
 }
@@ -133,6 +137,49 @@ describe('browser ledger entry submission', () => {
     expect(mocks.queueEntry).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'এন্ট্রি নিশ্চিত করুন' })).toBeInTheDocument();
+  });
+
+  it('supports manual typing, cursor insertion, selection replacement, and one-character keypad backspace', () => {
+    renderEntry();
+    const amount = screen.getByRole('textbox', { name: 'পরিমাণ লিখুন' }) as HTMLInputElement;
+
+    fireEvent.change(amount, { target: { value: '১২৩৪' } });
+    expect(amount.value).toBe('১২৩৪');
+
+    amount.setSelectionRange(2, 2);
+    fireEvent.select(amount);
+    pressCalculatorKey('9');
+    expect(amount.value).toBe('১২৯৩৪');
+    expect(amount.selectionStart).toBe(3);
+
+    pressCalculatorKey('DEL');
+    expect(amount.value).toBe('১২৩৪');
+
+    amount.setSelectionRange(1, 3);
+    fireEvent.select(amount);
+    pressCalculatorKey('7');
+    expect(amount.value).toBe('১৭৪');
+
+    pressCalculatorKey('DEL');
+    expect(amount.value).toBe('১৪');
+  });
+
+  it('lets every digit, decimal, and arithmetic operator update the editable expression', () => {
+    renderEntry();
+    const amount = screen.getByRole('textbox', { name: 'পরিমাণ লিখুন' }) as HTMLInputElement;
+
+    for (const digit of '0123456789') pressCalculatorKey(digit);
+    expect(amount.value).toBe('০১২৩৪৫৬৭৮৯');
+    pressCalculatorKey('C');
+    expect(amount.value).toBe('');
+
+    for (const key of ['1', '0', '+', '5', '.', '5', '-', '2', '*', '3', '/', '2']) {
+      pressCalculatorKey(key);
+    }
+    expect(amount.value).toBe('১০+৫.৫−২×৩÷২');
+
+    pressCalculatorKey('=');
+    expect(amount.value).toBe('২০.২৫');
   });
 
   it('POSTs the transfer and uploaded bill object path directly, then closes and invalidates ledger views', async () => {
