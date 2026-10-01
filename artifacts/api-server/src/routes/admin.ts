@@ -203,9 +203,7 @@ router.get("/admin/otp-config", async (_req, res) => {
       provider: gateway.provider,
       apiKeyConfigured: gateway.apiKeyConfigured,
       updatedAt: config?.updatedAt?.toISOString() ?? null,
-      connectionError: gateway.apiKeyConfigured
-        ? null
-        : "SMS_NET_BD_API_KEY is not configured in Replit Secrets.",
+      connectionError: gateway.configurationError,
     });
   } catch (err) {
     logger.error({ err }, "admin/otp-config error");
@@ -215,13 +213,16 @@ router.get("/admin/otp-config", async (_req, res) => {
 router.put("/admin/otp-config", async (req, res) => {
   if (typeof req.body?.enabled !== "boolean" ||
       Object.keys(req.body ?? {}).some((key) => key !== "enabled")) {
-    res.status(400).json({ error: "Only the enabled setting is accepted. Provider credentials are managed in Replit Secrets." }); return;
+    res.status(400).json({ error: "Only the enabled setting is accepted. Provider credentials are configured on the backend host." }); return;
   }
   if (req.body.enabled) {
     try {
       await ensureSmsReady();
     } catch {
-      res.status(503).json({ error: "sms.net.bd API key is not configured. OTP settings were not changed." });
+      const gateway = getSmsGatewayStatus();
+      res.status(503).json({
+        error: gateway.configurationError ?? "SMS gateway is not ready. OTP settings were not changed.",
+      });
       return;
     }
   }
@@ -241,9 +242,7 @@ router.put("/admin/otp-config", async (req, res) => {
       provider: gateway.provider,
       apiKeyConfigured: gateway.apiKeyConfigured,
       updatedAt: config!.updatedAt?.toISOString() ?? null,
-      connectionError: gateway.apiKeyConfigured
-        ? null
-        : "SMS_NET_BD_API_KEY is not configured in Replit Secrets.",
+      connectionError: gateway.configurationError,
     });
   } catch (err) {
     logger.error({ err }, "admin/otp-config update error");

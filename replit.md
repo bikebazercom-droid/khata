@@ -10,7 +10,7 @@ A mobile-first, fully Bengali-localized billing & ledger web app for shop owners
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec (run after editing `lib/api-spec/openapi.yaml`)
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Required server environment variables and Hostinger setup: see `HOSTINGER_ENVIRONMENT.md`. The API needs `DATABASE_URL`, `SESSION_SECRET`, `ADMIN_SECRET`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD`; configure Clerk and SMS variables when those sign-in methods are enabled.
 
 ## Stack
 
@@ -37,7 +37,7 @@ A mobile-first, fully Bengali-localized billing & ledger web app for shop owners
 - A party's balance is stored as an unsigned `currentBalance` + a `balanceType` enum (`YOU_WILL_GIVE` / `YOU_WILL_GET`) rather than a signed number, matching the OpenAPI contract. Server-side helpers (`toSignedBalance`/`fromSignedBalance` in `khatabook.ts`) convert to/from a signed value to make the add/subtract math simple.
 - Balance recalculation happens entirely server-side when a ledger entry is created — the client never computes or sends the new balance.
 - `BusinessSettings` is a lazily-created singleton row (`getOrCreateBusinessSettings`), not a fixed seeded row, so the schema doesn't need a hardcoded ID.
-- No auth, no real i18n, no real SMS/payment gateway — the settings-drawer language picker is an intentionally non-functional stub (writes to `BusinessSettings.language` for display only); only the Payment Reminder button calls a real (mocked-response) endpoint.
+- Authentication supports Clerk and phone OTP; phone verification SMS is sent through sms.net.bd using a server-side API key. The settings-drawer language picker is an intentionally non-functional stub (writes to `BusinessSettings.language` for display only); the Payment Reminder button still uses a mocked response.
 - The entire UI is hardcoded Bengali (not translated at runtime); currency is always displayed with ৳ via `formatCurrency` in `lib/utils.ts`.
 - The mock SMS reminder message is built server-side in the `/parties/:id/reminder` route with the exact Bengali template the product spec requires; the frontend shows it in a copyable dialog, not a toast.
 - DB stays PostgreSQL + Drizzle (established monorepo stack) even though a later spec text-mentioned SQLite — treated as a UI/UX-layer spec, not a stack migration request, to stay consistent with the rest of the project.

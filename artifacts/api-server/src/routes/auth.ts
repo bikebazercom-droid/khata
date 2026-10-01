@@ -30,7 +30,7 @@ import {
   requireAuth,
   type AuthenticatedRequest,
 } from "../middlewares/requireAuth";
-import { sendOtpSms } from "../services/sms";
+import { ensureSmsReady, sendOtpSms, SmsGatewayError } from "../services/sms";
 import { clientIp } from "../middlewares/ipBlock";
 import { deviceDescription } from "../lib/authTelemetry";
 import { normalizeBdPhone } from "../lib/bdPhone";
@@ -83,6 +83,28 @@ const sendOtpPhoneLimiter = rateLimit({
 function otpDigest(phone: string, code: string): string {
   return createHmac("sha256", process.env.SESSION_SECRET!)
     .update(`${phone}:${code}`).digest("hex");
+}
+
+function safeFailureCode(error: unknown): string {
+  if (error instanceof SmsGatewayError) return error.code;
+  if (typeof error === "object" && error !== null && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === "string" && /^[A-Za-z0-9_-]{1,40}$/.test(code)) return code;
+  }
+  return error instanceof Error ? error.name : "unknown_error";
+}
+
+function smsFailureLogFields(error: unknown) {
+  if (!(error instanceof SmsGatewayError)) {
+    return { errorCode: safeFailureCode(error) };
+  }
+  return {
+    errorCode: error.code,
+    ...(error.httpStatus !== undefined ? { httpStatus: error.httpStatus } : {}),
+    ...(error.providerErrorCode !== undefined
+      ? { providerErrorCode: error.providerErrorCode }
+      : {}),
+  };
 }
 
 /**
@@ -145,19 +167,65 @@ router.post(
       return;
     }
 
-    const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
-    const [record] = await db.transaction(async (tx) => {
-      await tx.delete(otpCodesTable).where(eq(otpCodesTable.phone, normalized));
-      return tx.insert(otpCodesTable).values({
-        phone: normalized,
-        code: otpDigest(normalized, code),
-        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-      }).returning({ id: otpCodesTable.id });
-    });
+    try {
+      await ensureSmsReady();
+    } catch (error) {
+      req.log.error({
+        stage: "sms_configuration",
+        ...smsFailureLogFields(error),
+      }, "Phone OTP request cannot proceed because SMS delivery is not configured");
+      res.status(503).json({ error: "Phone OTP is temporarily unavailable. Please try again later." });
+      return;
+    }
+
+    let code: string;
+    try {
+      code = randomInt(0, 1_000_000).toString().padStart(6, "0");
+    } catch (error) {
+      req.log.error({
+        stage: "otp_generation",
+        errorCode: safeFailureCode(error),
+      }, "Phone OTP code generation failed");
+      res.status(503).json({ error: "Could not prepare a sign-in code. Please try again later." });
+      return;
+    }
+
+    let recordId: string;
+    try {
+      const [record] = await db.transaction(async (tx) => {
+        await tx.delete(otpCodesTable).where(eq(otpCodesTable.phone, normalized));
+        return tx.insert(otpCodesTable).values({
+          phone: normalized,
+          code: otpDigest(normalized, code),
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        }).returning({ id: otpCodesTable.id });
+      });
+      if (!record?.id) throw new Error("otp_record_not_returned");
+      recordId = record.id;
+    } catch (error) {
+      req.log.error({
+        stage: "otp_persist",
+        errorCode: safeFailureCode(error),
+      }, "Generated phone OTP could not be stored");
+      res.status(503).json({ error: "Could not prepare a sign-in code. Please try again later." });
+      return;
+    }
+
     try {
       await sendOtpSms(normalized, code);
-    } catch {
-      await db.delete(otpCodesTable).where(eq(otpCodesTable.id, record!.id));
+    } catch (error) {
+      req.log.error({
+        stage: "sms_delivery",
+        ...smsFailureLogFields(error),
+      }, "Phone OTP SMS delivery failed");
+      try {
+        await db.delete(otpCodesTable).where(eq(otpCodesTable.id, recordId));
+      } catch (cleanupError) {
+        req.log.error({
+          stage: "otp_cleanup",
+          errorCode: safeFailureCode(cleanupError),
+        }, "Undelivered phone OTP record could not be removed");
+      }
       res.status(503).json({ error: "Could not send the SMS code. Please try again later." });
       return;
     }

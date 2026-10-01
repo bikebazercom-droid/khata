@@ -1,5 +1,26 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { getSmsGatewayStatus } from "./services/sms";
+
+if (!process.env.SESSION_SECRET?.trim()) {
+  throw new Error(
+    "SESSION_SECRET environment variable is required for phone sessions, OTP hashing, and rate limits.",
+  );
+}
+
+const smsGateway = getSmsGatewayStatus();
+if (smsGateway.configurationErrorCode) {
+  logger.warn({
+    code: smsGateway.configurationErrorCode,
+    apiKeyConfigured: smsGateway.apiKeyConfigured,
+    gatewayConfigured: smsGateway.gatewayConfigured,
+  }, "SMS OTP delivery is unavailable; the API will continue running");
+} else {
+  logger.info({
+    provider: smsGateway.provider,
+    gatewayUrl: smsGateway.gatewayUrl,
+  }, "SMS OTP gateway configuration is ready");
+}
 
 const rawPort = process.env["PORT"];
 

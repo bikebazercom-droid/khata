@@ -637,7 +637,7 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <CardTitle className="text-lg">OTP Gateway Integration</CardTitle>
-                  <CardDescription>Bangladesh phone OTPs are delivered through sms.net.bd. The API key stays in Replit Secrets and is never shown here.</CardDescription>
+                  <CardDescription>Bangladesh phone OTPs are delivered through sms.net.bd. The API key stays server-side and is never shown here.</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -646,7 +646,11 @@ export default function SettingsPage() {
               <div className="text-sm space-y-2">
                 <p>Provider: <strong>{config?.provider ?? "sms.net.bd"}</strong></p>
                 <p>API key: <strong>{config?.apiKeyConfigured ? "Configured" : "Missing"}</strong></p>
-                <p className="text-xs text-muted-foreground">Set SMS_NET_BD_API_KEY in Replit Secrets to enable delivery. Saving settings does not send a test SMS.</p>
+                <p className="text-xs text-muted-foreground">
+                  Set <code>SMS_NET_BD_API_KEY</code> as a secret in the backend host.{" "}
+                  <code>SMS_NET_BD_API_URL</code> defaults to https://api.sms.net.bd/sendsms.
+                  Saving settings does not send a test SMS.
+                </p>
               </div>
               <label className="flex items-center gap-3 text-sm font-medium">
                 <input type="checkbox" checked={otpEnabled} onChange={e => setOtpEnabled(e.target.checked)} />
