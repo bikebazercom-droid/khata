@@ -370,7 +370,11 @@ export async function customFetch<T = unknown>(
 
   const requestInfo = { method, url: resolveUrl(input) };
 
-  const response = await fetch(input, { ...init, method, headers });
+  const browserCredentials =
+    typeof window !== "undefined" && typeof document !== "undefined"
+      ? { credentials: init.credentials ?? "include" }
+      : {};
+  const response = await fetch(input, { ...init, ...browserCredentials, method, headers });
 
   if (!response.ok) {
     const errorData = await parseErrorBody(response, method);

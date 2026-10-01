@@ -15,11 +15,13 @@ type PendingRead = {
 
 const flow = vi.hoisted(() => ({
   secureToken: null as string | null,
+  platform: 'ios',
   pendingRead: null as PendingRead | null,
   events: [] as string[],
   requestTokens: [] as Array<string | null>,
   getToken: null as null | (() => Promise<string | null>),
   identityError: null as unknown,
+  logout: vi.fn(),
   identity: {
     role: 'owner' as const,
     businessId: 'test-business',
@@ -33,6 +35,10 @@ const flow = vi.hoisted(() => ({
 const routerMock = vi.hoisted(() => ({
   replace: vi.fn(),
   push: vi.fn(),
+}));
+
+vi.mock('react-native', () => ({
+  Platform: { get OS() { return flow.platform; } },
 }));
 
 vi.mock('expo-secure-store', () => ({
@@ -85,7 +91,7 @@ vi.mock('@workspace/api-client-react', async () => {
     useListParties: () => useTestQuery('party-list', ['parties']),
     useGetParty: (partyId: string) => useTestQuery('party-detail', ['party', partyId]),
     useListLedgerEntries: (partyId: string) => useTestQuery('ledger', ['ledger', partyId]),
-    useLogoutPhoneOtp: () => ({ mutateAsync: async () => undefined }),
+    useLogoutPhoneOtp: () => ({ mutateAsync: flow.logout }),
   };
 });
 
@@ -160,12 +166,14 @@ function renderWithAuth(children: ReactNode, queryClient = createQueryClient()) 
 
 describe('mobile phone-session restoration', () => {
   beforeEach(() => {
+    flow.platform = 'ios';
     flow.secureToken = null;
     flow.pendingRead = null;
     flow.events.length = 0;
     flow.requestTokens.length = 0;
     flow.getToken = getSavedAuthToken;
     flow.identityError = null;
+    flow.logout.mockReset().mockResolvedValue(undefined);
     routerMock.replace.mockReset();
     routerMock.replace.mockImplementation((route: string) => {
       routeSetState?.(route);
@@ -266,6 +274,41 @@ describe('mobile phone-session restoration', () => {
 
     expect(flow.secureToken).toBeNull();
     expect(flow.events).toContain('secure-delete');
+
+    view.unmount();
+    view.queryClient.clear();
+  });
+
+  it('restores and accepts a web cookie session without touching SecureStore or keeping the bearer token', async () => {
+    flow.platform = 'web';
+    flow.getToken = null;
+    let currentState: AuthState | undefined;
+    const view = renderWithAuth(
+      <>
+        <AuthProbe capture={(state) => { currentState = state; }} />
+        <MockRouteTree />
+      </>,
+    );
+
+    await waitFor(() => expect(currentState?.identity?.userId).toBe('test-owner'));
+    await waitFor(() => expect(routerMock.replace).toHaveBeenCalledWith('/(tabs)/home'));
+    expect(flow.events).not.toContain('secure-read-start');
+
+    await act(async () => {
+      await currentState?.acceptSession({ token: 'web-response-bearer-must-not-persist' });
+    });
+    await waitFor(() => expect(flow.events.filter((event) => event === 'identity-query-start')).toHaveLength(2));
+    expect(currentState?.token).toBeNull();
+    expect(flow.secureToken).toBeNull();
+    expect(flow.events).not.toContain('secure-write');
+    expect(flow.events).not.toContain('secure-read-start');
+
+    await act(async () => {
+      await currentState?.signOut();
+    });
+    expect(flow.logout).toHaveBeenCalledOnce();
+    expect(flow.events).not.toContain('secure-delete');
+    expect(flow.events).not.toContain('secure-write');
 
     view.unmount();
     view.queryClient.clear();

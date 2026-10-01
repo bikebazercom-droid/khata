@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { Platform } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { getGetAuthMeQueryKey, useGetAuthMe, useLogoutPhoneOtp, type AuthMe } from '@workspace/api-client-react';
 import { clearSavedAuthToken, getSavedAuthToken, saveAuthToken } from '@/lib/authStorage';
@@ -27,7 +28,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
   const [storageError, setStorageError] = useState<string | null>(null);
   const identityQuery = useGetAuthMe({
     query: {
-      enabled: ready && !!token,
+      enabled: ready && (Platform.OS === 'web' || !!token),
       queryKey: getGetAuthMeQueryKey(),
       retry: false,
       staleTime: 60_000,
@@ -53,14 +54,16 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
   }, []);
 
   useEffect(() => {
-    if (!token || !identityQuery.error || !isUnauthorized(identityQuery.error)) return;
+    if (Platform.OS === 'web' || !token || !identityQuery.error || !isUnauthorized(identityQuery.error)) return;
     clearSavedAuthToken().catch(() => undefined);
     setToken(null);
   }, [identityQuery.error, token]);
 
   const acceptSession = useCallback(async (session: PhoneSession) => {
-    await saveAuthToken(session.token);
-    setToken(session.token);
+    if (Platform.OS !== 'web') {
+      await saveAuthToken(session.token);
+      setToken(session.token);
+    }
     setStorageError(null);
     await queryClient.invalidateQueries({ queryKey: getGetAuthMeQueryKey() });
   }, [queryClient]);
@@ -91,7 +94,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     ready,
     token,
     identity: identityQuery.data,
-    identityLoading: !ready || (!!token && identityQuery.isLoading),
+    identityLoading: !ready || ((Platform.OS === 'web' || !!token) && identityQuery.isLoading),
     identityError: identityQuery.error,
     storageError,
     acceptSession,

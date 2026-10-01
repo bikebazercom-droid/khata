@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -23,8 +24,8 @@ SplashScreen.preventAutoHideAsync();
 const apiDomain = process.env.EXPO_PUBLIC_DOMAIN;
 if (!apiDomain) throw new Error('EXPO_PUBLIC_DOMAIN is required to connect BanglaKhata Mobile to the API.');
 setBaseUrl(`https://${apiDomain}`);
-setAuthTokenGetter(getSavedAuthToken);
-setExtraHeaders({ 'x-client-platform': 'mobile' });
+setAuthTokenGetter(Platform.OS === 'web' ? null : getSavedAuthToken);
+setExtraHeaders({ 'x-client-platform': Platform.OS === 'web' ? 'web' : 'mobile' });
 
 const queryClient = new QueryClient({
   defaultOptions: {
