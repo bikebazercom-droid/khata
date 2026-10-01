@@ -59,6 +59,7 @@ export default function HomeScreen() {
       <View style={{ gap: 10 }}>
         <AppButton title="নতুন হিসাব যোগ করুন" icon="plus" variant="accent" onPress={() => router.push('/party/new')} testID="home-add-party" />
         <AppButton title="লেনদেন লিখুন" icon="repeat" variant="primary" onPress={() => router.push('/entry/new')} testID="home-add-entry" />
+        <AppButton title="হিসাবের PDF রিপোর্ট" icon="file-text" variant="secondary" onPress={() => router.push('/reports')} testID="home-open-reports" />
       </View>
 
       <SectionTitle title="সাম্প্রতিক লেনদেন" action="সব দেখুন" onAction={() => router.push('/(tabs)/activity')} />

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Image, Platform, Text, View } from 'react-native';
+import { Image, Platform, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSendPhoneOtp, useVerifyPhoneOtp } from '@workspace/api-client-react';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
@@ -20,14 +20,24 @@ export default function SignInScreen() {
   const [error, setError] = useState('');
   const sendMutation = useSendPhoneOtp();
   const verifyMutation = useVerifyPhoneOtp();
+  const normalizedPhone = `+880${phone}`;
+  const isPhoneValid = /^1[3-9]\d{8}$/.test(phone);
+
+  const updatePhone = (value: string) => {
+    let digits = value
+      .replace(/[০-৯]/g, (digit) => String(digit.charCodeAt(0) - 0x09e6))
+      .replace(/\D/g, '');
+    if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
+    setPhone(digits.slice(0, 10));
+  };
 
   const sendCode = async () => {
     setError('');
     setNotice('');
     try {
-      await sendMutation.mutateAsync({ data: { phone: phone.trim() } });
+      await sendMutation.mutateAsync({ data: { phone: normalizedPhone } });
       setStep('code');
-      setNotice(`কোড পাঠানো হয়েছে ${phone.trim()} নম্বরে। ১০ মিনিটের মধ্যে কোডটি ব্যবহার করুন।`);
+      setNotice(`কোড পাঠানো হয়েছে ${normalizedPhone} নম্বরে। ১০ মিনিটের মধ্যে কোডটি ব্যবহার করুন।`);
     } catch (requestError) {
       setError(errorMessage(requestError, 'কোড পাঠানো যায়নি। নম্বরটি দেখে আবার চেষ্টা করুন।'));
     }
@@ -37,7 +47,7 @@ export default function SignInScreen() {
     setError('');
     try {
       const session = await verifyMutation.mutateAsync({
-        data: { phone: phone.trim(), code: code.replace(/[০-৯]/g, (digit) => String(digit.charCodeAt(0) - 0x09e6)).trim() },
+        data: { phone: normalizedPhone, code: code.replace(/[০-৯]/g, (digit) => String(digit.charCodeAt(0) - 0x09e6)).trim() },
       });
       await acceptSession(session);
       router.replace('/');
@@ -74,23 +84,53 @@ export default function SignInScreen() {
 
         {step === 'phone' ? (
           <>
-            <Field
-              label="মোবাইল নম্বর"
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="01XXXXXXXXX"
-              keyboardType="phone-pad"
-              testID="sign-in-phone"
-            />
+            <View style={{ gap: 7 }}>
+              <Text style={{ color: colors.foreground, fontSize: 14, fontWeight: '700' }}>মোবাইল নম্বর</Text>
+              <View style={{
+                minHeight: 52,
+                flexDirection: 'row',
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: colors.input,
+                borderRadius: 10,
+                backgroundColor: colors.card,
+                overflow: 'hidden',
+              }}>
+                <View accessibilityLabel="বাংলাদেশ, +৮৮০" style={{
+                  minHeight: 50,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 7,
+                  paddingHorizontal: 13,
+                  backgroundColor: colors.secondary,
+                  borderRightWidth: 1,
+                  borderRightColor: colors.border,
+                }}>
+                  <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '800' }}>BD</Text>
+                  <Text style={{ color: colors.foreground, fontSize: 15, fontWeight: '700' }}>+880</Text>
+                </View>
+                <TextInput
+                  value={phone}
+                  onChangeText={updatePhone}
+                  placeholder="1XXXXXXXXX"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="phone-pad"
+                  maxLength={11}
+                  testID="sign-in-phone"
+                  accessibilityLabel="বাংলাদেশি মোবাইল নম্বর"
+                  style={{ flex: 1, minHeight: 50, paddingHorizontal: 14, color: colors.foreground, fontSize: 16 }}
+                />
+              </View>
+            </View>
             <Text style={{ color: colors.mutedForeground, fontSize: 13, lineHeight: 20 }}>
-              নতুন নম্বর হলে যাচাইয়ের পর আপনার খাতা তৈরি হবে। বাংলাদেশি নম্বর লিখুন।
+              +৮৮০-এর পর ১০ সংখ্যার নম্বর লিখুন—শুরুর ০ ছাড়া। নতুন নম্বর হলে যাচাইয়ের পর আপনার খাতা তৈরি হবে।
             </Text>
             <AppButton
               title="এসএমএস কোড পাঠান"
               icon="message-circle"
               onPress={() => { void sendCode(); }}
               loading={sendMutation.isPending}
-              disabled={phone.replace(/\D/g, '').length < 10}
+              disabled={!isPhoneValid}
               testID="send-otp-button"
             />
           </>

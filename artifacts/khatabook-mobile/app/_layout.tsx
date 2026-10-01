@@ -41,6 +41,8 @@ function RootLayoutNav() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="party/new" options={{ presentation: 'modal' }} />
       <Stack.Screen name="party/[partyId]" />
+      <Stack.Screen name="party/[partyId]/report" />
+      <Stack.Screen name="reports" />
       <Stack.Screen name="entry/new" options={{ presentation: 'modal' }} />
       <Stack.Screen name="entry/[entryId]" options={{ presentation: 'modal' }} />
     </Stack>

@@ -1,0 +1,220 @@
+import { Platform } from 'react-native';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import { formatDate, formatMoney, type LedgerRecord, type PartyRecord } from '@/lib/domain';
+
+export type StatementPeriod = 'all' | 'month' | '30days';
+
+export type PartyStatement = {
+  entries: LedgerRecord[];
+  entriesAscending: LedgerRecord[];
+  openingBalance: number;
+  gave: number;
+  received: number;
+  closingBalance: number;
+  runningBalances: Map<string, number>;
+};
+
+function entryDelta(entry: LedgerRecord): number {
+  return entry.type === 'YOU_GAVE' ? entry.amount : -entry.amount;
+}
+
+export function calculatePartyStatement(
+  entries: LedgerRecord[],
+  period: StatementPeriod,
+  now = new Date(),
+): PartyStatement {
+  let start: Date | null = null;
+  if (period === 'month') start = new Date(now.getFullYear(), now.getMonth(), 1);
+  if (period === '30days') start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+  const end = new Date(now.getTime());
+
+  const inRange = (entry: LedgerRecord) => {
+    const time = new Date(entry.createdAt).getTime();
+    return Number.isFinite(time) && (!start || (time >= start.getTime() && time <= end.getTime()));
+  };
+  const filtered = entries.filter(inRange);
+  const openingBalance = start
+    ? entries
+      .filter((entry) => new Date(entry.createdAt).getTime() < start!.getTime())
+      .reduce((balance, entry) => balance + entryDelta(entry), 0)
+    : 0;
+  const entriesAscending = [...filtered].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+  let runningBalance = openingBalance;
+  const runningBalances = new Map<string, number>();
+  for (const entry of entriesAscending) {
+    runningBalance += entryDelta(entry);
+    runningBalances.set(entry.id, runningBalance);
+  }
+  const gave = filtered.reduce((total, entry) => total + (entry.type === 'YOU_GAVE' ? entry.amount : 0), 0);
+  const received = filtered.reduce((total, entry) => total + (entry.type === 'YOU_GOT' ? entry.amount : 0), 0);
+
+  return {
+    entries: [...filtered].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    entriesAscending,
+    openingBalance,
+    gave,
+    received,
+    closingBalance: openingBalance + gave - received,
+    runningBalances,
+  };
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character] ?? character);
+}
+
+function money(value: number): string {
+  return escapeHtml(formatMoney(value));
+}
+
+function balanceLabel(value: number): string {
+  if (Math.abs(value) < 0.005) return 'হিসাব সমান';
+  return `${money(Math.abs(value))} ${value > 0 ? 'পাওনা' : 'দেনা'}`;
+}
+
+function reportShell(title: string, businessName: string, body: string): string {
+  return `<!doctype html>
+  <html lang="bn">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <style>
+        @page { size: A4; margin: 16mm 14mm; }
+        * { box-sizing: border-box; }
+        body { margin: 0; color: #13283e; font-family: system-ui, "Noto Sans Bengali", "Noto Sans", sans-serif; font-size: 12px; }
+        .brand { padding: 14px 18px; background: #1b426f; color: #fff; border-radius: 8px 8px 0 0; }
+        .brand-name { font-size: 16px; font-weight: 700; }
+        .brand-caption { margin-top: 4px; opacity: .8; font-size: 10px; }
+        .body { padding: 20px 4px 8px; }
+        h1 { margin: 0 0 6px; text-align: center; font-size: 20px; }
+        .subtitle { text-align: center; color: #64748b; margin-bottom: 18px; }
+        .summary { display: flex; gap: 8px; margin: 14px 0 20px; }
+        .summary-card { flex: 1; border: 1px solid #dce5ee; border-radius: 8px; padding: 10px; }
+        .summary-label { color: #64748b; font-size: 10px; margin-bottom: 5px; }
+        .summary-value { font-weight: 700; font-size: 13px; }
+        .red { color: #b42318; } .green { color: #16845b; }
+        table { width: 100%; border-collapse: collapse; font-size: 10px; }
+        th, td { padding: 7px 6px; border: 1px solid #dce5ee; text-align: left; vertical-align: top; }
+        th { background: #f0f4f8; font-weight: 700; }
+        .right { text-align: right; white-space: nowrap; }
+        .footer { color: #64748b; border-top: 1px solid #dce5ee; margin-top: 20px; padding-top: 10px; font-size: 9px; }
+        tr { page-break-inside: avoid; }
+      </style>
+    </head>
+    <body>
+      <header class="brand">
+        <div class="brand-name">${escapeHtml(businessName || 'বাংলাখাতা')}</div>
+        <div class="brand-caption">BanglaKhata · ${escapeHtml(formatDate(new Date().toISOString()))}</div>
+      </header>
+      <main class="body">
+        <h1>${escapeHtml(title)}</h1>
+        ${body}
+      </main>
+      <footer class="footer">বাংলাখাতা · এই প্রতিবেদনটি অ্যাপ থেকে তৈরি করা হয়েছে।</footer>
+    </body>
+  </html>`;
+}
+
+export function buildPartyStatementHtml({
+  businessName,
+  party,
+  periodLabel,
+  statement,
+}: {
+  businessName: string;
+  party: PartyRecord;
+  periodLabel: string;
+  statement: PartyStatement;
+}): string {
+  const rows = statement.entriesAscending.map((entry) => {
+    const isGave = entry.type === 'YOU_GAVE';
+    const amount = money(entry.amount);
+    const runningBalance = statement.runningBalances.get(entry.id) ?? 0;
+    const description = entry.description || (entry.isTransfer ? 'ট্রান্সফার' : isGave ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন');
+    return `<tr>
+      <td>${escapeHtml(formatDate(entry.createdAt))}</td>
+      <td>${escapeHtml(description)}${entry.billReference ? `<br><span style="color:#64748b">রেফ: ${escapeHtml(entry.billReference)}</span>` : ''}</td>
+      <td class="right ${isGave ? 'red' : ''}">${isGave ? amount : '—'}</td>
+      <td class="right ${!isGave ? 'green' : ''}">${isGave ? '—' : amount}</td>
+      <td class="right">${escapeHtml(balanceLabel(runningBalance))}</td>
+    </tr>`;
+  }).join('');
+  const roleLabel = party.role === 'CUSTOMER' ? 'কাস্টমার' : 'সাপ্লায়ার';
+  const body = `
+    <div class="subtitle">${escapeHtml(party.name)} · ${roleLabel}${party.phone ? ` · ${escapeHtml(party.phone)}` : ''}<br>${escapeHtml(periodLabel)}</div>
+    <div class="summary">
+      <div class="summary-card"><div class="summary-label">আপনি দিয়েছেন</div><div class="summary-value red">${money(statement.gave)}</div></div>
+      <div class="summary-card"><div class="summary-label">আপনি পেয়েছেন</div><div class="summary-value green">${money(statement.received)}</div></div>
+      <div class="summary-card"><div class="summary-label">বর্তমান ব্যালেন্স</div><div class="summary-value">${escapeHtml(balanceLabel(statement.closingBalance))}</div></div>
+    </div>
+    <p>ওপেনিং ব্যালেন্স: <strong>${escapeHtml(balanceLabel(statement.openingBalance))}</strong></p>
+    <table>
+      <thead><tr><th>তারিখ</th><th>বিবরণ</th><th class="right">দেওয়া</th><th class="right">পাওয়া</th><th class="right">ব্যালেন্স</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="5" style="text-align:center;color:#64748b">এই সময়ে কোনো লেনদেন নেই</td></tr>'}</tbody>
+    </table>`;
+  return reportShell(`${roleLabel} স্টেটমেন্ট`, businessName, body);
+}
+
+export function buildPartyBalancesHtml({
+  businessName,
+  parties,
+  role,
+}: {
+  businessName: string;
+  parties: PartyRecord[];
+  role: 'ALL' | 'CUSTOMER' | 'SUPPLIER';
+}): string {
+  const totalGet = parties.reduce((sum, party) => sum + (party.balanceType === 'YOU_WILL_GET' ? party.currentBalance : 0), 0);
+  const totalGive = parties.reduce((sum, party) => sum + (party.balanceType === 'YOU_WILL_GIVE' ? party.currentBalance : 0), 0);
+  const roleLabel = role === 'ALL' ? 'সব হিসাব' : role === 'CUSTOMER' ? 'কাস্টমার' : 'সাপ্লায়ার';
+  const rows = parties.map((party) => {
+    const owes = party.balanceType === 'YOU_WILL_GET';
+    return `<tr>
+      <td>${escapeHtml(party.name)}</td>
+      <td>${escapeHtml(party.phone || '—')}</td>
+      <td class="right ${!owes && party.currentBalance ? 'red' : ''}">${!owes ? money(party.currentBalance) : '—'}</td>
+      <td class="right ${owes && party.currentBalance ? 'green' : ''}">${owes ? money(party.currentBalance) : '—'}</td>
+      <td>${escapeHtml(party.lastTransactionAt ? formatDate(party.lastTransactionAt) : '—')}</td>
+    </tr>`;
+  }).join('');
+  const body = `
+    <div class="subtitle">${roleLabel} · ${parties.length}টি হিসাব</div>
+    <div class="summary">
+      <div class="summary-card"><div class="summary-label">আপনি পাবেন</div><div class="summary-value green">${money(totalGet)}</div></div>
+      <div class="summary-card"><div class="summary-label">আপনি দেবেন</div><div class="summary-value red">${money(totalGive)}</div></div>
+      <div class="summary-card"><div class="summary-label">মোট হিসাব</div><div class="summary-value">${parties.length}</div></div>
+    </div>
+    <table>
+      <thead><tr><th>নাম</th><th>ফোন</th><th class="right">দিতে হবে</th><th class="right">পাওনা</th><th>শেষ লেনদেন</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="5" style="text-align:center;color:#64748b">কোনো হিসাব নেই</td></tr>'}</tbody>
+    </table>`;
+  return reportShell(`${roleLabel} রিপোর্ট`, businessName, body);
+}
+
+export async function shareReportPdf(html: string, title: string): Promise<'shared' | 'printed'> {
+  if (Platform.OS === 'web') {
+    await Print.printAsync({ html });
+    return 'printed';
+  }
+
+  const file = await Print.printToFileAsync({ html });
+  if (!(await Sharing.isAvailableAsync())) {
+    await Print.printAsync({ html });
+    return 'printed';
+  }
+  await Sharing.shareAsync(file.uri, {
+    mimeType: 'application/pdf',
+    UTI: 'com.adobe.pdf',
+    dialogTitle: title,
+  });
+  return 'shared';
+}

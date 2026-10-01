@@ -71,6 +71,7 @@ export default function PartyDetailScreen() {
       </Card>
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <AppButton title="লেনদেন লিখুন" icon="plus" onPress={() => router.push({ pathname: '/entry/new', params: { partyId } })} testID="party-add-entry" />
+        <AppButton title="স্টেটমেন্ট" icon="file-text" variant="secondary" onPress={() => router.push({ pathname: '/party/[partyId]/report', params: { partyId } })} testID="party-open-statement" />
       </View>
       {party.dueDate ? <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>বাকি পাওয়ার তারিখ: {party.dueDate}</Text> : null}
       <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: '800', marginTop: 4 }}>লেনদেনের ইতিহাস</Text>

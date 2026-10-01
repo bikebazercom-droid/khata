@@ -4,6 +4,7 @@ import { useColors } from '@/hooks/useColors';
 import { evaluateCalculatorExpression, formatExpression, formatMoney, trimNumberForExpression } from '@/lib/domain';
 
 type Key = { label: string; value: string; tone?: 'muted' | 'operator' | 'accent' };
+type TextSelection = { start: number; end: number };
 
 const KEYS: Key[][] = [
   [{ label: 'C', value: 'C', tone: 'muted' }, { label: 'M+', value: 'M+', tone: 'muted' }, { label: 'M−', value: 'M-', tone: 'muted' }, { label: '⌫', value: 'DEL', tone: 'muted' }],
@@ -24,26 +25,38 @@ export function Calculator({
 }) {
   const colors = useColors();
   const [expression, setExpression] = useState(initialAmount > 0 ? trimNumberForExpression(initialAmount) : '');
+  const [selection, setSelection] = useState<TextSelection>(() => {
+    const caret = initialAmount > 0 ? trimNumberForExpression(initialAmount).length : 0;
+    return { start: caret, end: caret };
+  });
   const [memoryValue, setMemoryValue] = useState(0);
   const [memoryHistory, setMemoryHistory] = useState<string[]>([]);
   const [justRecalled, setJustRecalled] = useState(false);
   const result = evaluateCalculatorExpression(expression);
   const displayAmount = memoryHistory.length ? memoryValue : result ?? 0;
 
-  const updateExpression = (next: string) => {
+  const updateExpression = (next: string, nextSelection?: TextSelection) => {
     setExpression(next);
+    if (nextSelection) setSelection(nextSelection);
     setJustRecalled(false);
     onAmountChange(memoryHistory.length ? memoryValue : evaluateCalculatorExpression(next));
   };
 
   const handleKey = (key: Key) => {
     if (disabled) return;
+    const start = Math.max(0, Math.min(selection.start, expression.length));
+    const end = Math.max(start, Math.min(selection.end, expression.length));
     if (key.value === 'C') {
-      updateExpression('');
+      updateExpression('', { start: 0, end: 0 });
       return;
     }
     if (key.value === 'DEL') {
-      updateExpression(expression.slice(0, -1));
+      if (start !== end) {
+        updateExpression(`${expression.slice(0, start)}${expression.slice(end)}`, { start, end: start });
+      } else if (start > 0) {
+        const caret = start - 1;
+        updateExpression(`${expression.slice(0, caret)}${expression.slice(start)}`, { start: caret, end: caret });
+      }
       return;
     }
     if (key.value === 'M+' || key.value === 'M-') {
@@ -52,20 +65,28 @@ export function Calculator({
       setMemoryValue(nextMemory);
       setMemoryHistory((previous) => [...previous, `${key.value}(${formatExpression(expression || '0')})=${nextMemory.toFixed(1)}`]);
       setExpression('');
+      setSelection({ start: 0, end: 0 });
       setJustRecalled(false);
       onAmountChange(nextMemory);
       return;
     }
     if (key.value === '=') {
-      if (result !== null) updateExpression(trimNumberForExpression(result));
+      if (result !== null) {
+        const next = trimNumberForExpression(result);
+        updateExpression(next, { start: next.length, end: next.length });
+      }
       return;
     }
     const isOperator = ['+', '-', '*', '/'].includes(key.value);
-    if (isOperator && !expression) return;
-    const next = isOperator && /[+\-*/]$/.test(expression)
-      ? `${expression.slice(0, -1)}${key.value}`
-      : `${expression}${key.value}`;
-    updateExpression(next);
+    let replaceStart = start;
+    let replaceEnd = end;
+    if (isOperator && replaceStart === replaceEnd && /[+\-*/]/.test(expression[replaceStart - 1] ?? '')) {
+      replaceStart -= 1;
+    }
+    if (isOperator && replaceStart === 0) return;
+    const next = `${expression.slice(0, replaceStart)}${key.value}${expression.slice(replaceEnd)}`;
+    const caret = replaceStart + key.value.length;
+    updateExpression(next, { start: caret, end: caret });
   };
 
   const handleMemoryRecall = () => {
@@ -78,6 +99,7 @@ export function Calculator({
     }
     const recalled = trimNumberForExpression(memoryValue);
     setExpression(recalled);
+    setSelection({ start: recalled.length, end: recalled.length });
     setJustRecalled(true);
     onAmountChange(memoryValue);
   };
@@ -92,9 +114,10 @@ export function Calculator({
         <TextInput
           value={expression}
           onChangeText={updateExpression}
+          selection={selection}
+          onSelectionChange={(event) => setSelection(event.nativeEvent.selection)}
           keyboardType="numbers-and-punctuation"
           editable={!disabled}
-          selectTextOnFocus
           accessibilityLabel="হিসাবের অঙ্ক"
           testID="calculator-expression"
           style={[styles.expressionInput, { color: colors.foreground }]}
