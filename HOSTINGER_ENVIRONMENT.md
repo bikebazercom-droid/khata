@@ -59,10 +59,25 @@ request body or contacting sms.net.bd. The database must contain
 for an empty/invalid phone request, this table or its database connection may be
 missing; that failure happens before the SMS gateway is called.
 
-For an existing Hostinger database, run the additive, repeatable SQL in
-`exports/BanglaKhata-cPanel/database/otp-rate-limit-counters-migration.sql`
-against the same database used by `DATABASE_URL`, then restart the Node app.
-The cPanel bootstrap SQL also includes this table for new installs.
+For an existing Hostinger database, run the additive, repeatable SQL in either
+`exports/BanglaKhata-cPanel/database/otp-rate-limit-counters-migration.sql` or
+`exports/BanglaKhata-Core-Backend/database/otp-rate-limit-counters-migration.sql`
+against the same database used by `DATABASE_URL`.
+Both Hostinger bootstrap SQL files include this table for new installs.
+For an existing database, run only the focused migration above; do not rerun a
+full bootstrap over live ledger data. The table is available as soon as the SQL
+transaction commits, so an app restart is not normally required.
+
+Verify the table and cleanup index in that same database with:
+
+```sql
+SELECT to_regclass('public.otp_rate_limit_counters') AS rate_limit_table;
+
+SELECT indexname
+FROM pg_indexes
+WHERE schemaname = 'public'
+  AND tablename = 'otp_rate_limit_counters';
+```
 
 ## File storage for Hostinger
 
