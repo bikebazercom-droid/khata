@@ -85,34 +85,7 @@ app.use(
   })),
 );
 
-// Resolve the public/downloads directory relative to the compiled bundle so the
-// path is correct in both dev (cwd = artifacts/api-server) and production
-// (cwd = workspace root, bundle lives at artifacts/api-server/dist/index.mjs).
 const __dirname_app   = path.dirname(fileURLToPath(import.meta.url));
-const DOWNLOADS_DIR_APP = path.resolve(__dirname_app, "../public/downloads");
-
-// Serve downloadable files (APK, etc.) from the public/downloads directory.
-// Accessible at /api/downloads/<filename> in both dev and production.
-app.use(
-  "/api/downloads",
-  express.static(DOWNLOADS_DIR_APP, {
-    dotfiles: "ignore",
-    setHeaders(res, filePath) {
-      if (filePath.endsWith(".apk")) {
-        res.setHeader("Content-Type", "application/vnd.android.package-archive");
-        res.setHeader("Content-Disposition", 'attachment; filename="banglakhata.apk"');
-      }
-      if (filePath.endsWith(".exe")) {
-        res.setHeader("Content-Type", "application/octet-stream");
-        res.setHeader("Content-Disposition", 'attachment; filename="banglakhata-windows.exe"');
-      }
-      if (filePath.endsWith(".dmg")) {
-        res.setHeader("Content-Type", "application/x-apple-diskimage");
-        res.setHeader("Content-Disposition", 'attachment; filename="banglakhata-mac.dmg"');
-      }
-    },
-  }),
-);
 
 app.use("/api", router);
 

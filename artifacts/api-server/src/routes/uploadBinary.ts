@@ -1,8 +1,8 @@
 /**
  * Admin-protected binary upload routes.
  *
- *   POST /admin/upload-app-binary  — upload APK, EXE, or DMG (field: "apk" | "exe" | "mac")
- *   GET  /admin/binary-info        — returns file size + mtime for all three binaries
+ *   POST /admin/upload-app-binary  — upload desktop installers (field: "exe" | "mac")
+ *   GET  /admin/binary-info        — returns file size + mtime for desktop installers
  */
 import { Router } from "express";
 import multer from "multer";
@@ -19,14 +19,12 @@ const DOWNLOADS_DIR = path.resolve(__dirname, "../public/downloads");
 
 // Map accepted field names to their fixed filenames on disk.
 const FILE_MAP: Record<string, string> = {
-  apk: "banglakhata.apk",
   exe: "banglakhata-windows.exe",
   mac: "banglakhata-mac.dmg",
 };
 
 // Accepted extensions per field
 const ACCEPTED_EXT: Record<string, string[]> = {
-  apk: [".apk"],
   exe: [".exe"],
   mac: [".dmg", ".zip", ".tar.gz"],
 };
@@ -40,7 +38,7 @@ const storage = multer.diskStorage({
   },
   filename(_req, file, cb) {
     const dest = FILE_MAP[file.fieldname];
-    if (!dest) return cb(new Error(`Unknown field '${file.fieldname}'. Use 'apk', 'exe', or 'mac'.`), "");
+    if (!dest) return cb(new Error(`Unknown field '${file.fieldname}'. Use 'exe' or 'mac'.`), "");
     cb(null, dest);
   },
 });
@@ -50,7 +48,7 @@ const upload = multer({
   limits: { fileSize: 200 * 1024 * 1024 }, // 200 MB
   fileFilter(_req, file, cb) {
     if (!Object.keys(FILE_MAP).includes(file.fieldname)) {
-      return cb(new Error(`Invalid field name '${file.fieldname}'. Use 'apk', 'exe', or 'mac'.`));
+      return cb(new Error(`Invalid field name '${file.fieldname}'. Use 'exe' or 'mac'.`));
     }
     const lc   = file.originalname.toLowerCase();
     const exts = ACCEPTED_EXT[file.fieldname] ?? [];
@@ -76,14 +74,14 @@ router.post(
     if (files.length === 0) {
       return res
         .status(400)
-        .json({ error: "No file uploaded. Send a multipart field named 'apk', 'exe', or 'mac'." });
+        .json({ error: "No file uploaded. Send a multipart field named 'exe' or 'mac'." });
     }
 
     const file = files[0];
     if (!FILE_MAP[file.fieldname]) {
       return res
         .status(400)
-        .json({ error: `Invalid field: '${file.fieldname}'. Use 'apk', 'exe', or 'mac'.` });
+        .json({ error: `Invalid field: '${file.fieldname}'. Use 'exe' or 'mac'.` });
     }
 
     logger.info(
@@ -114,7 +112,6 @@ router.get("/admin/binary-info", requireAdmin as any, (_req: any, res: any) => {
   }
 
   res.json({
-    apk: stat("banglakhata.apk"),
     exe: stat("banglakhata-windows.exe"),
     mac: stat("banglakhata-mac.dmg"),
   });

@@ -10,15 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { MessageSquare, Save, Download, Smartphone, Monitor, Upload, CheckCircle2, FileUp, AlertCircle, Apple } from "lucide-react";
+import { MessageSquare, Save, Download, Monitor, Upload, CheckCircle2, FileUp, AlertCircle, Apple } from "lucide-react";
 import { formatDate } from "@/lib/format";
 
 // ── Download-config types & hook ─────────────────────────────────────────────
 
 interface DownloadConfigRow {
-  androidStoreUrl: string;
-  androidApkUrl:   string;
-  iosStoreUrl:     string;
   windowsExeUrl:   string;
   updatedAt:       string | null;
 }
@@ -70,7 +67,7 @@ function useDownloadConfig() {
 // ── Binary file info types & hook ─────────────────────────────────────────────
 
 interface BinaryFileInfo { exists: boolean; size: number; mtime: string | null; }
-interface BinaryInfo     { apk: BinaryFileInfo; exe: BinaryFileInfo; mac: BinaryFileInfo; }
+interface BinaryInfo     { exe: BinaryFileInfo; mac: BinaryFileInfo; }
 
 function fmtBytes(b: number) {
   if (b < 1024)            return `${b} B`;
@@ -99,7 +96,7 @@ function useBinaryInfo() {
 /** Upload a binary via XHR so we get upload-progress events. */
 function uploadBinaryFile(
   file: File,
-  fieldname: "apk" | "exe",
+  fieldname: "exe" | "mac",
   onProgress: (pct: number) => void,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -136,7 +133,6 @@ function DownloadTestCard({ binInfo }: { binInfo: BinaryInfo | null }) {
   }
 
   function handleDownload(
-    platform: "android" | "windows" | "mac",
     fileInfo: BinaryFileInfo | undefined,
     url: string,
     filename: string,
@@ -153,7 +149,7 @@ function DownloadTestCard({ binInfo }: { binInfo: BinaryInfo | null }) {
   }
 
   const buttons: Array<{
-    platform: "android" | "windows" | "mac";
+    platform: "windows" | "mac";
     label: string;
     sublabel: string;
     icon: React.ReactNode;
@@ -163,19 +159,6 @@ function DownloadTestCard({ binInfo }: { binInfo: BinaryInfo | null }) {
     colorClass: string;
     badgeClass: string;
   }> = [
-    {
-      platform: "android",
-      label: "Android",
-      sublabel: ".apk",
-      icon: <Smartphone className="w-5 h-5" />,
-      fileInfo: binInfo?.apk,
-      url: "/api/downloads/banglakhata.apk",
-      filename: "banglakhata.apk",
-      colorClass: "bg-green-600 hover:bg-green-700 text-white",
-      badgeClass: binInfo?.apk && !isPlaceholder(binInfo.apk)
-        ? "bg-green-100 text-green-700"
-        : "bg-amber-100 text-amber-700",
-    },
     {
       platform: "windows",
       label: "Windows",
@@ -221,14 +204,14 @@ function DownloadTestCard({ binInfo }: { binInfo: BinaryInfo | null }) {
       </CardHeader>
 
       <CardContent className="pt-4 border-t">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {buttons.map((btn) => {
             const ready = btn.fileInfo && !isPlaceholder(btn.fileInfo);
             return (
               <button
                 key={btn.platform}
                 type="button"
-                onClick={() => handleDownload(btn.platform, btn.fileInfo, btn.url, btn.filename)}
+                onClick={() => handleDownload(btn.fileInfo, btn.url, btn.filename)}
                 className={`group flex flex-col items-center gap-3 rounded-xl p-5 transition-all ${
                   ready
                     ? `${btn.colorClass} shadow-sm hover:shadow-md`
@@ -322,17 +305,11 @@ export default function SettingsPage() {
   // ── Download config ─────────────────────────────────────────────────────────
   const { data: dlCfg, loading: dlLoading, saving: dlSaving, save: dlSave } = useDownloadConfig();
 
-  const [androidStoreUrl, setAndroidStoreUrl] = useState("");
-  const [androidApkUrl,   setAndroidApkUrl]   = useState("");
-  const [iosStoreUrl,     setIosStoreUrl]     = useState("");
   const [windowsExeUrl,   setWindowsExeUrl]   = useState("");
 
   const dlInitialized = useRef(false);
   useEffect(() => {
     if (dlCfg && !dlInitialized.current) {
-      setAndroidStoreUrl(dlCfg.androidStoreUrl);
-      setAndroidApkUrl(dlCfg.androidApkUrl);
-      setIosStoreUrl(dlCfg.iosStoreUrl);
       setWindowsExeUrl(dlCfg.windowsExeUrl);
       dlInitialized.current = true;
     }
@@ -340,21 +317,19 @@ export default function SettingsPage() {
 
   const handleDlSave = (e: React.FormEvent) => {
     e.preventDefault();
-    void dlSave({ androidStoreUrl, androidApkUrl, iosStoreUrl, windowsExeUrl });
+    void dlSave({ windowsExeUrl });
   };
 
   // ── Binary file upload ──────────────────────────────────────────────────────
   const { info: binInfo, reload: reloadBinInfo } = useBinaryInfo();
-  const apkInputRef = useRef<HTMLInputElement>(null);
   const exeInputRef = useRef<HTMLInputElement>(null);
   const macInputRef = useRef<HTMLInputElement>(null);
-  const [apkProgress, setApkProgress] = useState<number | null>(null);
   const [exeProgress, setExeProgress] = useState<number | null>(null);
   const [macProgress, setMacProgress] = useState<number | null>(null);
 
   const handleFileUpload = useCallback(async (
     file: File,
-    fieldname: "apk" | "exe",
+    fieldname: "exe" | "mac",
     setProgress: (p: number | null) => void,
   ) => {
     setProgress(0);
@@ -431,9 +406,9 @@ export default function SettingsPage() {
                   <Download className="w-5 h-5 text-emerald-600" />
                 </div>
                 <div>
-                  <CardTitle className="text-lg">ডাউনলোড ও অ্যাপ লিংক সেটিংস</CardTitle>
+                  <CardTitle className="text-lg">ডেস্কটপ ডাউনলোড সেটিংস</CardTitle>
                   <CardDescription>
-                    Landing page-এর Download বাটনগুলোর URL এখান থেকে কন্ট্রোল করুন
+                    কম্পিউটার সংস্করণের ডাউনলোড লিংক এখান থেকে কন্ট্রোল করুন
                   </CardDescription>
                 </div>
               </div>
@@ -441,75 +416,7 @@ export default function SettingsPage() {
 
             <CardContent className="space-y-7 pt-4 border-t">
 
-              {/* Android */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Smartphone className="w-4 h-4 text-green-600" />
-                  <span className="text-sm font-semibold text-slate-700">Android</span>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                    Play Store URL
-                  </label>
-                  <Input
-                    type="url"
-                    placeholder="https://play.google.com/store/apps/details?id=com.banglakhata"
-                    value={androidStoreUrl}
-                    onChange={e => setAndroidStoreUrl(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    সেট থাকলে বাটন Play Store-এ নিয়ে যাবে।
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                    Direct APK Download URL <span className="normal-case font-normal">(fallback)</span>
-                  </label>
-                  <Input
-                    type="url"
-                    placeholder="https://example.com/banglakhata.apk  অথবা  /api/downloads/banglakhata.apk"
-                    value={androidApkUrl}
-                    onChange={e => setAndroidApkUrl(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Play Store URL না থাকলে এই লিংক থেকে APK সরাসরি ডাউনলোড হবে।
-                    ফাঁকা রাখলে সার্ভারে রাখা ফাইল ব্যবহার হবে।
-                  </p>
-                </div>
-              </div>
-
-              <div className="border-t" />
-
-              {/* iOS */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <svg className="w-4 h-4 text-slate-600" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-                  </svg>
-                  <span className="text-sm font-semibold text-slate-700">iOS / App Store</span>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                    App Store URL
-                  </label>
-                  <Input
-                    type="url"
-                    placeholder="https://apps.apple.com/app/id..."
-                    value={iosStoreUrl}
-                    onChange={e => setIosStoreUrl(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    সেট না থাকলে iOS বাটনে QR কোড মোডাল দেখাবে।
-                  </p>
-                </div>
-              </div>
-
-              <div className="border-t" />
-
-              {/* Windows */}
+              {/* Windows desktop */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <Monitor className="w-4 h-4 text-blue-600" />
@@ -547,7 +454,7 @@ export default function SettingsPage() {
           </Card>
         </form>
 
-        {/* ── App Binary File Upload ─────────────────────────────────────── */}
+        {/* ── Desktop Software File Upload ───────────────────────────────── */}
         <Card className="shadow-sm border-none bg-white">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-2 mb-1">
@@ -555,9 +462,9 @@ export default function SettingsPage() {
                 <FileUp className="w-5 h-5 text-violet-600" />
               </div>
               <div>
-                <CardTitle className="text-lg">অ্যাপ বাইনারি আপলোড</CardTitle>
+                  <CardTitle className="text-lg">ডেস্কটপ সফটওয়্যার আপলোড</CardTitle>
                 <CardDescription>
-                  সরাসরি সার্ভারে APK ও EXE ফাইল আপলোড করুন — ডাউনলোড বাটন স্বয়ংক্রিয়ভাবে আপডেট হবে
+                    Windows এবং macOS সফটওয়্যার সরাসরি সার্ভারে আপলোড করুন
                 </CardDescription>
               </div>
             </div>
@@ -566,17 +473,6 @@ export default function SettingsPage() {
           <CardContent className="space-y-6 pt-4 border-t">
 
             {/* Hidden file inputs */}
-            <input
-              ref={apkInputRef}
-              type="file"
-              accept=".apk"
-              className="hidden"
-              onChange={e => {
-                const f = e.target.files?.[0];
-                if (f) void handleFileUpload(f, "apk", setApkProgress);
-                e.target.value = "";
-              }}
-            />
             <input
               ref={exeInputRef}
               type="file"
@@ -595,71 +491,10 @@ export default function SettingsPage() {
               className="hidden"
               onChange={e => {
                 const f = e.target.files?.[0];
-                if (f) void handleFileUpload(f, "mac" as any, setMacProgress);
+                if (f) void handleFileUpload(f, "mac", setMacProgress);
                 e.target.value = "";
               }}
             />
-
-            {/* ── Android APK ────────────────────────────────────────────── */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Smartphone className="w-4 h-4 text-green-600" />
-                <span className="text-sm font-semibold text-slate-700">🤖 Android APK (.apk)</span>
-              </div>
-
-              {/* Current file status badge */}
-              {binInfo?.apk ? (
-                isPlaceholder(binInfo.apk) ? (
-                  <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    <span>
-                      Placeholder file active ({fmtBytes(binInfo.apk.size)}) — real APK আপলোড করুন
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                    <span>
-                      APK আপলোড হয়েছে · {fmtBytes(binInfo.apk.size)}
-                      {binInfo.apk.mtime
-                        ? ` · Last updated: ${new Date(binInfo.apk.mtime).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
-                        : ""}
-                    </span>
-                  </div>
-                )
-              ) : (
-                <div className="h-8 w-64 bg-slate-100 animate-pulse rounded-lg" />
-              )}
-
-              {/* Upload button or progress bar */}
-              {apkProgress !== null ? (
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs text-slate-500">
-                    <span>আপলোড হচ্ছে…</span>
-                    <span className="font-medium tabular-nums">{apkProgress}%</span>
-                  </div>
-                  <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-green-500 transition-all duration-200 ease-linear rounded-full"
-                      style={{ width: `${apkProgress}%` }}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-2 border-green-200 text-green-700 hover:bg-green-50 hover:border-green-300"
-                  onClick={() => apkInputRef.current?.click()}
-                >
-                  <Upload className="w-4 h-4" />
-                  Android APK আপলোড করুন
-                </Button>
-              )}
-            </div>
-
-            <div className="border-t" />
 
             {/* ── Windows EXE ────────────────────────────────────────────── */}
             <div className="space-y-3">

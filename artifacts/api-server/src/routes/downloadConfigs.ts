@@ -24,7 +24,6 @@ const router = Router();
 
 const __dirname    = path.dirname(fileURLToPath(import.meta.url));
 const DOWNLOADS    = path.resolve(__dirname, "../public/downloads");
-const APK_FILE     = path.join(DOWNLOADS, "banglakhata.apk");
 const WINDOWS_FILE = path.join(DOWNLOADS, "banglakhata-windows.exe");
 
 async function getConfig() {
@@ -38,25 +37,12 @@ router.get("/public/download-configs", async (_req, res) => {
   try {
     const cfg = await getConfig();
 
-    // Android: DB store URL > DB APK URL > local file
-    const androidStoreUrl = cfg?.androidStoreUrl || null;
-    const apkAvailable    = fs.existsSync(APK_FILE);
-    const androidApkUrl   = cfg?.androidApkUrl
-      || (apkAvailable ? "/api/downloads/banglakhata.apk" : null);
-
-    // iOS
-    const iosStoreUrl = cfg?.iosStoreUrl || null;
-
     // Windows: DB URL > local file
     const windowsAvailable = fs.existsSync(WINDOWS_FILE);
     const windowsUrl       = cfg?.windowsExeUrl
       || (windowsAvailable ? "/api/downloads/banglakhata-windows.exe" : null);
 
     res.json({
-      androidStoreUrl,
-      androidApkUrl,
-      apkAvailable: !!(androidApkUrl),
-      iosStoreUrl,
       windowsAvailable: !!(windowsUrl),
       windowsUrl,
     });
@@ -71,12 +57,9 @@ router.get("/public/download-configs", async (_req, res) => {
 router.get("/admin/download-configs", requireAdmin as any, async (_req, res) => {
   try {
     const cfg = await getConfig();
-    res.json(cfg ?? {
-      androidStoreUrl: "",
-      androidApkUrl:   "",
-      iosStoreUrl:     "",
-      windowsExeUrl:   "",
-      updatedAt:       null,
+    res.json({
+      windowsExeUrl: cfg?.windowsExeUrl ?? "",
+      updatedAt: cfg?.updatedAt ?? null,
     });
   } catch (err) {
     logger.error({ err }, "admin/download-configs GET error");
@@ -89,14 +72,8 @@ router.get("/admin/download-configs", requireAdmin as any, async (_req, res) => 
 router.post("/admin/download-configs", requireAdmin as any, async (req, res) => {
   try {
     const {
-      androidStoreUrl = "",
-      androidApkUrl   = "",
-      iosStoreUrl     = "",
       windowsExeUrl   = "",
     } = req.body as {
-      androidStoreUrl?: string;
-      androidApkUrl?:   string;
-      iosStoreUrl?:     string;
       windowsExeUrl?:   string;
     };
 
@@ -107,17 +84,20 @@ router.post("/admin/download-configs", requireAdmin as any, async (req, res) => 
     if (existing) {
       [row] = await db
         .update(downloadConfigsTable)
-        .set({ androidStoreUrl, androidApkUrl, iosStoreUrl, windowsExeUrl, updatedAt: now })
+        .set({ windowsExeUrl, updatedAt: now })
         .where(eq(downloadConfigsTable.id, existing.id))
         .returning();
     } else {
       [row] = await db
         .insert(downloadConfigsTable)
-        .values({ androidStoreUrl, androidApkUrl, iosStoreUrl, windowsExeUrl, updatedAt: now })
+        .values({ windowsExeUrl, updatedAt: now })
         .returning();
     }
 
-    res.json(row);
+    res.json({
+      windowsExeUrl: row?.windowsExeUrl ?? windowsExeUrl,
+      updatedAt: row?.updatedAt ?? now,
+    });
   } catch (err) {
     logger.error({ err }, "admin/download-configs POST error");
     res.status(500).json({ error: "Internal server error" });

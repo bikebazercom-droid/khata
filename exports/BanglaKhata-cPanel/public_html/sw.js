@@ -17,10 +17,10 @@ function isAppNavigation(url, origin, base) {
     /^party\/[^/]+(?:\/(?:entry\/[^/]+|profile|report))?$/.test(route);
 }
 const BASE = "/";
-const ASSETS = ["/assets/index-BaFHj1lp.css","/assets/index-DIFp7kOe.js","/assets/index.es-m4jvVTMu.js","/assets/purify.es-VaSPOPhr.js","/fonts/NotoSansBengali-Regular.ttf","/icon-192.png","/icon-512.png","/index.html","/logo-icon.svg","/logo.svg","/manifest.webmanifest"];
+const ASSETS = ["/assets/index-CojSBV0Q.js","/assets/index-CyDZttXR.css","/assets/index.es-B0Z-dlcQ.js","/assets/purify.es-VaSPOPhr.js","/fonts/NotoSansBengali-Regular.ttf","/icon-192.png","/icon-512.png","/index.html","/logo-icon.svg","/logo.svg","/manifest.webmanifest"];
 const SHELL = BASE + 'index.html';
 const CACHE_PREFIX = 'banglakhata-shell:' + BASE + ':';
-const CACHE = CACHE_PREFIX + "bb27cea2fcb95906";
+const CACHE = CACHE_PREFIX + "2c8358d9a93090db";
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);

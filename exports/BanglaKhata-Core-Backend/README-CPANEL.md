@@ -1,9 +1,8 @@
-# BanglaKhata cPanel Core Backend & Mobile Source
+# BanglaKhata cPanel Core Backend Package
 
-This package is the Node.js API, database bootstrap, and Android Studio source
-for the mobile client. The public website and `/admin` static files are in a
-separate `public_html` package. This is not a `public_html`-only application:
-PHP/Apache static hosting cannot run the API.
+This package contains the Node.js API and database bootstrap. The public website
+and `/admin` static files are in a separate `public_html` package. This is not a
+`public_html`-only application: PHP/Apache static hosting cannot run the API.
 
 ## Before deployment
 
@@ -11,7 +10,7 @@ Confirm that the hosting account provides a Node.js Application Manager or
 Passenger, supports Node.js 20 or newer, and can route `https://helmetbazar.shop/api/*`
 to the Node application **without removing the `/api` prefix**. This has not
 been tested on the target cPanel account. If any of these are unavailable, the
-API needs a separate Node host and the web/mobile API origins must be changed.
+API needs a separate Node host and the website API origin must be changed.
 
 Also prepare:
 
@@ -26,11 +25,9 @@ Also prepare:
 - `node-app/` — compiled API, production Node dependencies, and start script.
 - `database/helmetba_bkdb-bootstrap.sql` — GUI-importable PostgreSQL schema
   for the `helmetba_bkdb` database (19 tables, foreign keys, and indexes).
-- `mobile-app/` — Android Studio source; it is not a signed production APK.
 
-No APK or Windows installer is included. The existing APK is a debug build, not
-a production release. Build and sign the Android release and prepare a Windows
-installer separately, then upload them through `/admin` after the API is live.
+No client source or release binaries are included. Desktop installers can be
+uploaded through `/admin` after the API is live.
 
 ## Create the PostgreSQL tables from a GUI
 
@@ -116,26 +113,15 @@ The database SQL creates tables, but it does not configure or start Passenger.
   only when the app is actually running in Replit. SMS delivery has not been
   tested against the target Twilio account.
 - Google sign-in is provided by Clerk. Set production Clerk keys in cPanel and
-  in the mobile build, and configure the production Google provider and allowed
-  proxy/origin in Clerk. Development Clerk users do not carry over to production.
+  configure the production Google provider and allowed proxy/origin in Clerk.
+  Development Clerk users do not carry over to production.
 - The web bundle contains the Clerk **public** key used when it was built. If
-  you change Clerk tenants, rebuild the web and mobile clients with the matching
-  public key; never put a Clerk secret in a client build.
-- The Android source is configured for `https://helmetbazar.shop`. If the
-  production host differs, update `mobile-app/mobile/public-build.json` to the
-  HTTPS origin (without a trailing `/api`) before making a release build.
-- To build the Android release from the included source, install the required
-  Node.js/Android SDK toolchain, then run `corepack pnpm install --frozen-lockfile`,
-  `corepack pnpm typecheck`, and `corepack pnpm android:release` from
-  `mobile-app/`. The APK is written to
-  `mobile-app/mobile/android/app/build/outputs/apk/release/app-release.apk`.
-  No signing key is included; create and protect your own production signing
-  key before distributing updates.
-- `/admin` can upload the APK and Windows installer after deployment. Until
-  valid release files are uploaded, their public download buttons must remain
-  unavailable.
+  you change Clerk tenants, rebuild the website with the matching public key;
+  never put a Clerk secret in a client build.
+- `/admin` can upload desktop installers after deployment. The public download
+  button remains unavailable until a valid installer is uploaded.
 
 The API typecheck, bundle build, and automated tests run in the Replit
-workspace. The cPanel account, database, SMS provider, signed Android release,
-Windows installer, and physical Android device have not been tested. This is a
-deployment package, not a claim of a verified production cutover.
+workspace. The cPanel account, database, SMS provider, and desktop installers
+have not been tested. This is a deployment package, not a claim of a verified
+production cutover.

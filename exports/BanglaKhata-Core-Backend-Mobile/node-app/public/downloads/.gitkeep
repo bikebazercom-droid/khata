@@ -1,6 +1,0 @@
-# Place your APK file here as `banglakhata.apk` and it will be served
-# at /api/downloads/banglakhata.apk (production: hazarikhata.replit.app/api/downloads/banglakhata.apk)
-#
-# Store listing URLs are configured via environment variables:
-#   ANDROID_STORE_URL  — Play Store listing URL
-#   IOS_STORE_URL      — App Store listing URL
