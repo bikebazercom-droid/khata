@@ -7,7 +7,7 @@ Retain idempotency receipts even after deleting a posted entry; a replay key mus
 
 **Why:** An offline device can retry an old request after another device deletes the resulting transaction. Deleting its receipt would recreate that transaction and change balances unexpectedly.
 
-**How to apply:** Any retention or cleanup policy must preserve replay protection. Check the current actor, business and permissions before returning an old result. Do not transfer pending drafts across accounts.
+**How to apply:** Any retention or cleanup policy must preserve replay protection. On permanent entry deletion, redact the receipt's transaction payload but retain its business, actor, request ID and fingerprint, then reject matching retries. Check the current actor, business and permissions before returning an old result. Do not transfer pending drafts across accounts.
 
 Pending drafts do not contribute to confirmed balances.
 

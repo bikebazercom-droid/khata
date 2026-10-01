@@ -321,7 +321,7 @@ export function PartyProfileView() {
           <AlertDialogHeader>
             <AlertDialogTitle>{roleLabel} ডিলিট করুন</AlertDialogTitle>
             <AlertDialogDescription className="text-slate-600">
-              আপনি কি নিশ্চিত? এই {roleLabel}-এর সমস্ত হিসাব মুছে যাবে এবং এই কাজটি পূর্বাবস্থায় ফেরানো যাবে না।
+              এই {roleLabel}-এর সব লেনদেন স্থায়ীভাবে মুছে যাবে। সংযুক্ত ট্রান্সফার অন্য খাতা থেকেও মুছে সেই পক্ষের ব্যালেন্স সংশোধন হবে। এই কাজ পূর্বাবস্থায় ফেরানো যাবে না।
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

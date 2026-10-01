@@ -1,7 +1,16 @@
 import { Router, type IRouter } from "express";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { createHash } from "node:crypto";
-import { db, appUsersTable, ledgerEntriesTable, ledgerRequestReceiptsTable, partiesTable, userBusinessesTable, workerPartyAssignmentsTable } from "@workspace/db";
+import {
+  db,
+  appUsersTable,
+  ledgerEntriesTable,
+  ledgerRequestReceiptsTable,
+  partiesTable,
+  userBusinessesTable,
+  workerInvitesTable,
+  workerPartyAssignmentsTable,
+} from "@workspace/db";
 import { broadcast } from "../lib/eventBus";
 import {
   ListPartiesQueryParams,
@@ -104,6 +113,21 @@ async function staffCanWrite(tx: Parameters<Parameters<typeof db.transaction>[0]
 
 type EntryTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type ReceiptEntry = typeof ledgerEntriesTable.$inferSelect;
+const DELETED_RECEIPT_SOURCE = { __deletedEntry: true };
+
+async function redactDeletedEntryReceipts(
+  tx: EntryTransaction,
+  businessId: string,
+  entryIds: string[],
+): Promise<void> {
+  if (!entryIds.length) return;
+  await tx.update(ledgerRequestReceiptsTable)
+    .set({ sourceEntry: DELETED_RECEIPT_SOURCE })
+    .where(and(
+      eq(ledgerRequestReceiptsTable.businessId, businessId),
+      inArray(sql`${ledgerRequestReceiptsTable.sourceEntry}->>'id'`, entryIds),
+    ));
+}
 
 async function actorCanWrite(tx: EntryTransaction, role: string, userId: string,
   businessId: string, sourceId: string, destinationId?: string) {
@@ -126,7 +150,8 @@ async function actorCanWrite(tx: EntryTransaction, role: string, userId: string,
 // including response-loss retries. The unique index remains the backstop.
 async function existingRequest(tx: EntryTransaction, businessId: string, userId: string,
   requestId: string | undefined, fingerprint: string): Promise<
-  { status: "new" } | { status: "replayed"; entry: ReceiptEntry } | { status: "conflict" }
+  { status: "new" } | { status: "replayed"; entry: ReceiptEntry } |
+  { status: "conflict" } | { status: "deleted" }
 > {
   if (!requestId) return { status: "new" };
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${businessId + ":" + userId}), hashtext(${requestId}))`);
@@ -137,6 +162,9 @@ async function existingRequest(tx: EntryTransaction, businessId: string, userId:
   )).limit(1);
   if (!receipt) return { status: "new" };
   if (receipt.fingerprint !== fingerprint) return { status: "conflict" };
+  if ((receipt.sourceEntry as { __deletedEntry?: unknown } | null)?.__deletedEntry === true) {
+    return { status: "deleted" };
+  }
   return { status: "replayed", entry: receipt.sourceEntry as ReceiptEntry };
 }
 
@@ -518,6 +546,10 @@ router.post(
       });
       if (result.status === "denied") { res.status(403).json({ error: "Adjustment is not permitted" }); return; }
       if (result.status === "conflict") { res.status(409).json({ error: "Request ID was already used for different entry data" }); return; }
+      if (result.status === "deleted") {
+        res.status(409).json({ error: "This transaction was deleted and cannot be restored by an offline retry" });
+        return;
+      }
       if (result.status === "replayed") {
         res.setHeader("X-Idempotent-Replay", "true");
         res.status(200).json(CreateLedgerEntryResponse.parse({
@@ -589,6 +621,10 @@ router.post(
     });
     if (result.status === "denied") { res.status(403).json({ error: "Party access was revoked" }); return; }
     if (result.status === "conflict") { res.status(409).json({ error: "Request ID was already used for different entry data" }); return; }
+    if (result.status === "deleted") {
+      res.status(409).json({ error: "This transaction was deleted and cannot be restored by an offline retry" });
+      return;
+    }
     if (result.status === "replayed") {
       res.setHeader("X-Idempotent-Replay", "true");
       res.status(200).json(CreateLedgerEntryResponse.parse({
@@ -906,6 +942,7 @@ router.delete(
         const [currentCounter] = linkedEntry ? await tx.select().from(ledgerEntriesTable)
           .where(and(eq(ledgerEntriesTable.id, linkedEntryId), eq(ledgerEntriesTable.partyId, linkedEntry.partyId)))
           .for("update").limit(1) : [];
+        const deletedEntryIds = [entryId];
         // Reverse primary party's balance.
         const primarySigned = toSignedBalance(currentParty);
         const primaryDelta = currentEntry.type === "YOU_GAVE" ? Number(currentEntry.amount) : -Number(currentEntry.amount);
@@ -936,7 +973,9 @@ router.delete(
           await tx
             .delete(ledgerEntriesTable)
             .where(eq(ledgerEntriesTable.id, linkedEntryId));
+          deletedEntryIds.push(linkedEntryId);
         }
+        await redactDeletedEntryReceipts(tx, businessId, deletedEntryIds);
       });
 
       // DB transaction committed — delete any bill photos from storage.
@@ -983,6 +1022,7 @@ router.delete(
       await tx
         .delete(ledgerEntriesTable)
         .where(eq(ledgerEntriesTable.id, entryId));
+      await redactDeletedEntryReceipts(tx, businessId, [entryId]);
 
       await tx
         .update(partiesTable)
@@ -994,12 +1034,13 @@ router.delete(
     // Done post-commit so a storage failure cannot leave the DB inconsistent.
     if (entry.billImage && entry.billImage.startsWith("/objects/")) {
       const storageService = new ObjectStorageService();
-      storageService.deleteObjectEntity(entry.billImage).catch((err: unknown) => {
+      const [result] = await Promise.allSettled([storageService.deleteObjectEntity(entry.billImage)]);
+      if (result?.status === "rejected") {
         req.log?.error(
-          { err, objectPath: entry.billImage },
+          { err: result.reason, objectPath: entry.billImage },
           "Failed to delete bill photo from storage during entry delete",
         );
-      });
+      }
     }
 
     broadcast(businessId, { type: "ledger.deleted", payload: { partyId, entryId } });
@@ -1016,62 +1057,136 @@ router.delete("/parties/:partyId", async (req, res): Promise<void> => {
     return;
   }
 
-  const [party] = await db
-    .select({ id: partiesTable.id })
-    .from(partiesTable)
-    .where(
-      and(
-        eq(partiesTable.id, parsed.data.partyId),
-        eq(partiesTable.businessId, businessId),
-      ),
-    );
+  const deletion = await db.transaction(async (tx) => {
+    const [party] = await tx.select().from(partiesTable).where(and(
+      eq(partiesTable.id, parsed.data.partyId),
+      eq(partiesTable.businessId, businessId),
+    )).for("update").limit(1);
+    if (!party) return null;
 
-  if (!party) {
+    const partyEntries = await tx.select().from(ledgerEntriesTable)
+      .where(eq(ledgerEntriesTable.partyId, party.id)).for("update");
+    const possibleCounterEntries = await tx.select().from(ledgerEntriesTable).where(and(
+      eq(ledgerEntriesTable.transferPartyId, party.id),
+      eq(ledgerEntriesTable.isTransfer, true),
+    )).for("update");
+    const candidatePartyIds = [...new Set(possibleCounterEntries
+      .map((entry) => entry.partyId)
+      .filter((id) => id !== party.id))];
+    const counterparties = candidatePartyIds.length
+      ? await tx.select().from(partiesTable).where(and(
+        eq(partiesTable.businessId, businessId),
+        inArray(partiesTable.id, candidatePartyIds),
+      )).orderBy(partiesTable.id).for("update")
+      : [];
+    const counterpartPartyIds = new Set(counterparties.map((counterparty) => counterparty.id));
+    const counterEntries = possibleCounterEntries.filter((entry) =>
+      entry.partyId !== party.id && counterpartPartyIds.has(entry.partyId),
+    );
+    const entriesToDelete = [...partyEntries, ...counterEntries];
+    const deletedEntryIds = [...new Set(entriesToDelete.map((entry) => entry.id))];
+    const billImagePaths = [...new Set(entriesToDelete
+      .map((entry) => entry.billImage)
+      .filter((path): path is string => typeof path === "string" && path.startsWith("/objects/")))];
+
+    const balanceDeltas = new Map<string, number>();
+    for (const entry of counterEntries) {
+      const delta = entry.type === "YOU_GAVE" ? Number(entry.amount) : -Number(entry.amount);
+      balanceDeltas.set(entry.partyId, (balanceDeltas.get(entry.partyId) ?? 0) + delta);
+    }
+
+    if (deletedEntryIds.length) {
+      await tx.delete(ledgerEntriesTable).where(inArray(ledgerEntriesTable.id, deletedEntryIds));
+      await redactDeletedEntryReceipts(tx, businessId, deletedEntryIds);
+    }
+
+    // Remove stale party references from staff scopes and outstanding invites.
+    const affectedUsers = await tx.select({
+      id: appUsersTable.id,
+      adjustmentPartyIds: appUsersTable.adjustmentPartyIds,
+    }).from(appUsersTable).where(
+      sql`${appUsersTable.adjustmentPartyIds} @> ${JSON.stringify([party.id])}::jsonb`,
+    );
+    for (const user of affectedUsers) {
+      await tx.update(appUsersTable).set({
+        adjustmentPartyIds: user.adjustmentPartyIds.filter((id) => id !== party.id),
+      }).where(eq(appUsersTable.id, user.id));
+    }
+
+    const affectedInvites = await tx.select().from(workerInvitesTable).where(or(
+      sql`${workerInvitesTable.partyIds} @> ${JSON.stringify([party.id])}::jsonb`,
+      sql`${workerInvitesTable.adjustmentPartyIds} @> ${JSON.stringify([party.id])}::jsonb`,
+    ));
+    for (const invite of affectedInvites) {
+      await tx.update(workerInvitesTable).set({
+        partyIds: invite.partyIds.filter((id) => id !== party.id),
+        adjustmentPartyIds: invite.adjustmentPartyIds.filter((id) => id !== party.id),
+      }).where(eq(workerInvitesTable.id, invite.id));
+    }
+
+    for (const counterparty of counterparties) {
+      const delta = balanceDeltas.get(counterparty.id);
+      if (delta === undefined) continue;
+      const balance = fromSignedBalance(toSignedBalance(counterparty) - delta);
+      const [latestEntry] = await tx.select({ createdAt: ledgerEntriesTable.createdAt })
+        .from(ledgerEntriesTable)
+        .where(eq(ledgerEntriesTable.partyId, counterparty.id))
+        .orderBy(desc(ledgerEntriesTable.createdAt))
+        .limit(1);
+      await tx.update(partiesTable).set({
+        ...balance,
+        lastTransactionAt: latestEntry?.createdAt ?? null,
+      }).where(and(
+        eq(partiesTable.id, counterparty.id),
+        eq(partiesTable.businessId, businessId),
+      ));
+    }
+
+    await tx.delete(partiesTable).where(and(
+      eq(partiesTable.id, party.id),
+      eq(partiesTable.businessId, businessId),
+    ));
+
+    return {
+      id: party.id,
+      billImagePaths,
+      deletedCounterEntries: counterEntries.map(({ id, partyId }) => ({ id, partyId })),
+    };
+  });
+
+  if (!deletion) {
     res.status(404).json({ error: "Party not found" });
     return;
   }
-
-  // Collect bill image paths BEFORE deleting entries so we know what to clean
-  // up from object storage after the DB transaction succeeds.
-  const entriesWithImages = await db
-    .select({ billImage: ledgerEntriesTable.billImage })
-    .from(ledgerEntriesTable)
-    .where(eq(ledgerEntriesTable.partyId, party.id));
-
-  const billImagePaths = entriesWithImages
-    .map((e) => e.billImage)
-    .filter((p): p is string => typeof p === "string" && p.startsWith("/objects/"));
-
-  await db.transaction(async (tx) => {
-    await tx
-      .delete(ledgerEntriesTable)
-      .where(eq(ledgerEntriesTable.partyId, party.id));
-
-    await tx.delete(partiesTable).where(eq(partiesTable.id, party.id));
-  });
 
   // DB transaction committed — now delete the associated bill photos from
   // object storage.  We do this post-commit so a storage failure cannot leave
   // the database in a partially-deleted state.  Each deletion is attempted
   // independently so a single failure doesn't block the rest.
-  if (billImagePaths.length > 0) {
+  if (deletion.billImagePaths.length > 0) {
     const storageService = new ObjectStorageService();
     const results = await Promise.allSettled(
-      billImagePaths.map((p) => storageService.deleteObjectEntity(p)),
+      deletion.billImagePaths.map((p) => storageService.deleteObjectEntity(p)),
     );
     results.forEach((result, i) => {
       if (result.status === "rejected") {
         req.log?.error(
-          { err: result.reason, objectPath: billImagePaths[i] },
+          { err: result.reason, objectPath: deletion.billImagePaths[i] },
           "Failed to delete bill photo from storage during party delete",
         );
       }
     });
   }
 
-  broadcast(businessId, { type: 'party.deleted', payload: { partyId: party.id } });
+  broadcast(businessId, { type: 'party.deleted', payload: { partyId: deletion.id } });
+  for (const entry of deletion.deletedCounterEntries) {
+    broadcast(businessId, {
+      type: "ledger.deleted",
+      payload: { partyId: entry.partyId, entryId: entry.id },
+    });
+  }
 
-  res.json(DeletePartyResponse.parse({ success: true, id: party.id }));
+  res.json(DeletePartyResponse.parse({ success: true, id: deletion.id }));
 });
 
 router.post(

@@ -15,6 +15,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { randomUUID } from "node:crypto";
 import express, { type Request, type Response, type NextFunction } from "express";
 import request from "supertest";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -23,6 +24,7 @@ import * as schema from "@workspace/db";
 import {
   partiesTable,
   ledgerEntriesTable,
+  ledgerRequestReceiptsTable,
   businessesTable,
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
@@ -82,10 +84,15 @@ function makeApp(businessId: string) {
   app.use((req: Request, _res: Response, next: NextFunction) => {
     (req as unknown as AuthenticatedRequest).businessId = businessId;
     (req as unknown as AuthenticatedRequest).userId = "test-user";
+    (req as unknown as AuthenticatedRequest).role = "owner";
     next();
   });
 
   app.use(partiesRouter);
+  app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    console.error("Parties integration-test request failed:", error);
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  });
   return app;
 }
 
@@ -120,6 +127,7 @@ afterAll(async () => {
 async function createParty(opts: {
   name: string;
   signedBalance?: number;
+  role?: "CUSTOMER" | "SUPPLIER";
 }) {
   const signed = opts.signedBalance ?? 0;
   const balanceType = signed < 0 ? "YOU_WILL_GIVE" : "YOU_WILL_GET";
@@ -131,7 +139,7 @@ async function createParty(opts: {
       businessId,
       name: opts.name,
       phone: "",
-      role: "CUSTOMER",
+      role: opts.role ?? "CUSTOMER",
       currentBalance,
       balanceType,
     })
@@ -202,6 +210,106 @@ describe("DELETE /parties/:partyId/entries/:entryId — normal entry", () => {
     // Bystander balance must be untouched.
     const updatedBystander = await fetchParty(bystander.id);
     expect(toSigned(updatedBystander!)).toBeCloseTo(500, 2);
+  });
+});
+
+describe("DELETE /parties/:partyId — permanent party deletion", () => {
+  it("hard-deletes a supplier and its transfer counterpart, then recalculates the surviving balance", async () => {
+    const app = makeApp(businessId);
+    const supplier = await createParty({ name: "Supplier to delete", signedBalance: 320, role: "SUPPLIER" });
+    const customer = await createParty({ name: "Transfer customer", signedBalance: -320 });
+    const bystander = await createParty({ name: "Unrelated party", signedBalance: 130 });
+
+    const supplierEntry = await createEntry({
+      partyId: supplier.id,
+      type: "YOU_GAVE",
+      amount: 320,
+      isTransfer: true,
+      transferPartyId: customer.id,
+    });
+    const customerEntry = await createEntry({
+      partyId: customer.id,
+      type: "YOU_GOT",
+      amount: 320,
+      isTransfer: true,
+      transferPartyId: supplier.id,
+    });
+    await crossLink(supplierEntry.id, customerEntry.id);
+
+    const supplierRequestId = randomUUID();
+    const customerRequestId = randomUUID();
+    await testDb.insert(ledgerRequestReceiptsTable).values([
+      {
+        businessId,
+        actorId: "test-user",
+        clientRequestId: supplierRequestId,
+        fingerprint: "supplier-entry",
+        sourceEntry: supplierEntry,
+      },
+      {
+        businessId,
+        actorId: "test-user",
+        clientRequestId: customerRequestId,
+        fingerprint: "customer-entry",
+        sourceEntry: customerEntry,
+      },
+    ]);
+
+    const response = await request(app).delete(`/parties/${supplier.id}`).expect(200);
+    expect(response.body).toEqual({ success: true, id: supplier.id });
+    expect(await fetchParty(supplier.id)).toBeNull();
+    expect(await fetchEntry(supplierEntry.id)).toBeNull();
+    expect(await fetchEntry(customerEntry.id)).toBeNull();
+    expect(toSigned((await fetchParty(customer.id))!)).toBeCloseTo(0, 2);
+    expect(toSigned((await fetchParty(bystander.id))!)).toBeCloseTo(130, 2);
+
+    const receipts = await testDb.select().from(ledgerRequestReceiptsTable)
+      .where(and(
+        eq(ledgerRequestReceiptsTable.businessId, businessId),
+        eq(ledgerRequestReceiptsTable.actorId, "test-user"),
+      ));
+    const deletedReceipts = receipts.filter((receipt) =>
+      receipt.clientRequestId === supplierRequestId || receipt.clientRequestId === customerRequestId,
+    );
+    expect(deletedReceipts).toHaveLength(2);
+    expect(deletedReceipts.every((receipt) =>
+      (receipt.sourceEntry as { __deletedEntry?: boolean }).__deletedEntry === true,
+    )).toBe(true);
+  });
+
+  it("redacts deleted transaction details and rejects a delayed offline retry", async () => {
+    const app = makeApp(businessId);
+    const party = await createParty({ name: "Retry guard party" });
+    const payload = {
+      clientRequestId: randomUUID(),
+      type: "YOU_GAVE",
+      amount: 38.5,
+      description: "private transaction detail",
+    };
+
+    const created = await request(app)
+      .post(`/parties/${party.id}/ledger-entries`)
+      .send(payload)
+      .expect(201);
+
+    await request(app)
+      .delete(`/parties/${party.id}/entries/${created.body.id}`)
+      .expect(200);
+
+    const [receipt] = await testDb.select().from(ledgerRequestReceiptsTable).where(and(
+      eq(ledgerRequestReceiptsTable.businessId, businessId),
+      eq(ledgerRequestReceiptsTable.actorId, "test-user"),
+      eq(ledgerRequestReceiptsTable.clientRequestId, payload.clientRequestId),
+    ));
+    expect(receipt?.sourceEntry).toEqual({ __deletedEntry: true });
+
+    await request(app)
+      .post(`/parties/${party.id}/ledger-entries`)
+      .send(payload)
+      .expect(409);
+
+    expect(await fetchEntry(created.body.id)).toBeNull();
+    expect(toSigned((await fetchParty(party.id))!)).toBeCloseTo(0, 2);
   });
 });
 
@@ -1077,11 +1185,12 @@ describe("DELETE /parties/:partyId — atomicity on failure", () => {
     let callCount = 0;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const forcedRollbackImpl: any = async (callback: (tx: unknown) => Promise<void>) => {
+    const forcedRollbackImpl: any = async (callback: (tx: unknown) => Promise<unknown>) => {
       callCount++;
+      let callbackResult: unknown;
       try {
         await originalTransaction(async (tx) => {
-          await callback(tx);
+          callbackResult = await callback(tx);
           throw new Error("__FORCED_ROLLBACK__");
         });
       } catch (err: unknown) {
@@ -1090,6 +1199,7 @@ describe("DELETE /parties/:partyId — atomicity on failure", () => {
         }
         // swallow — Postgres transaction is already rolled back
       }
+      return callbackResult;
     };
     vi.spyOn(db, "transaction").mockImplementationOnce(forcedRollbackImpl);
 

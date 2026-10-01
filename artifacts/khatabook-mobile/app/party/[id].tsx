@@ -31,8 +31,11 @@ import {
   useSendPaymentReminder,
   usePatchLedgerEntry,
   useDeleteLedgerEntry,
+  useDeleteParty,
   getGetPartyQueryKey,
   getListLedgerEntriesQueryKey,
+  getListPartiesQueryKey,
+  getGetDashboardSummaryQueryKey,
 } from '@workspace/api-client-react';
 import type { LedgerEntry, Party } from '@workspace/api-client-react';
 import { useColors } from '@/hooks/useColors';
@@ -872,7 +875,9 @@ function EntryDetailSheet({ entry: init, party, visible, onClose, onDeleted, onU
     }
     Alert.alert(
       'এন্ট্রি মুছুন',
-      'এই এন্ট্রিটি স্থায়ীভাবে মুছে যাবে। আপনি কি নিশ্চিত?',
+      entry.isTransfer
+        ? 'এই ট্রান্সফার এবং অন্য খাতার সংযুক্ত এন্ট্রিটিও স্থায়ীভাবে মুছে যাবে। দুই পক্ষের ব্যালেন্স আপডেট হবে।'
+        : 'এই এন্ট্রিটি স্থায়ীভাবে মুছে যাবে। আপনি কি নিশ্চিত?',
       [
         { text: 'বাতিল', style: 'cancel' },
         {
@@ -1144,6 +1149,8 @@ export default function PartyDetailScreen() {
   const router = useRouter();
   const { identity } = useAuthRole();
   const isStaff = identity?.role === 'staff';
+  const queryClient = useQueryClient();
+  const deleteParty = useDeleteParty();
 
   const [showSheet, setShowSheet] = useState(false);
   const [pendingType, setPendingType] = useState<'YOU_GAVE' | 'YOU_GOT'>('YOU_GAVE');
@@ -1231,6 +1238,41 @@ export default function PartyDetailScreen() {
 
   const initials = party.name.slice(0, 2).toUpperCase();
   const roleLabel = party.role === 'CUSTOMER' ? 'গ্রাহক' : 'সরবরাহকারী';
+  const partyId = party.id;
+
+  function confirmPartyDelete() {
+    Alert.alert(
+      `${roleLabel} মুছুন`,
+      `এই ${roleLabel}-এর সব লেনদেন এবং অন্য খাতার সংযুক্ত ট্রান্সফারও স্থায়ীভাবে মুছে যাবে। অন্য পক্ষের ব্যালেন্স সংশোধন হবে। ফিরিয়ে আনা যাবে না।`,
+      [
+        { text: 'বাতিল', style: 'cancel' },
+        {
+          text: 'স্থায়ীভাবে মুছুন',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              const connection = await NetInfo.fetch().catch(() => null);
+              if (!connection || connection.isConnected !== true || connection.isInternetReachable === false) {
+                Alert.alert('ইন্টারনেট প্রয়োজন', 'অনলাইনে এলে আবার চেষ্টা করুন।');
+                return;
+              }
+              try {
+                await deleteParty.mutateAsync({ partyId });
+                queryClient.removeQueries({ queryKey: getGetPartyQueryKey(partyId) });
+                queryClient.removeQueries({ queryKey: getListLedgerEntriesQueryKey(partyId) });
+                await queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
+                await queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                router.replace('/');
+              } catch {
+                Alert.alert('Error', 'কাস্টমার বা সাপ্লায়ার মুছে ফেলা যায়নি।');
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }
 
   const quickActions = isStaff ? [
     { icon: 'edit-3' as const, label: 'এন্ট্রি', onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setPendingType('YOU_GAVE'); setShowSheet(true); } },
@@ -1244,10 +1286,23 @@ export default function PartyDetailScreen() {
     <View style={s.container}>
       {/* Header */}
       <View style={s.header}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-          <Feather name="chevron-left" size={18} color="rgba(255,255,255,0.8)" />
-          <Text style={s.backText}>পেছনে</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+            <Feather name="chevron-left" size={18} color="rgba(255,255,255,0.8)" />
+            <Text style={s.backText}>পেছনে</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={confirmPartyDelete}
+            disabled={deleteParty.isPending}
+            accessibilityRole="button"
+            accessibilityLabel={`${roleLabel} মুছুন`}
+            style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.14)', opacity: deleteParty.isPending ? 0.5 : 1 }}
+          >
+            {deleteParty.isPending
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Feather name="trash-2" size={18} color="#fff" />}
+          </TouchableOpacity>
+        </View>
         <View style={s.partyAv}><Text style={s.partyAvText}>{initials}</Text></View>
         <Text style={s.partyName}>{party.name}</Text>
         {party.phone ? <Text style={s.partyPhone}>{party.phone}</Text> : null}

@@ -442,9 +442,11 @@ export function TransactionDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>লেনদেন মুছে ফেলুন?</AlertDialogTitle>
             <AlertDialogDescription className="text-slate-600">
-              এই লেনদেন মুছে গেলে{' '}
-              <span className="font-semibold text-slate-800">{party.name}</span>-এর
-              ব্যালেন্স আপডেট হয়ে যাবে। এটি পূর্বাবস্থায় ফেরানো যাবে না।
+              {entry.isTransfer ? (
+                <>এই ট্রান্সফার এবং অন্য খাতার সংযুক্ত এন্ট্রিটিও স্থায়ীভাবে মুছে যাবে। দুই পক্ষের ব্যালেন্স আপডেট হবে। এটি পূর্বাবস্থায় ফেরানো যাবে না।</>
+              ) : (
+                <>এই লেনদেন মুছে গেলে <span className="font-semibold text-slate-800">{party.name}</span>-এর ব্যালেন্স আপডেট হবে। এটি পূর্বাবস্থায় ফেরানো যাবে না।</>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
