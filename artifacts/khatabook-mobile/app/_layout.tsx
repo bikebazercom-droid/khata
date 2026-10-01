@@ -26,7 +26,7 @@ const apiDomain = process.env.EXPO_PUBLIC_DOMAIN;
 if (!apiDomain) throw new Error('EXPO_PUBLIC_DOMAIN is required to connect BanglaKhata Mobile to the API.');
 setBaseUrl(`https://${apiDomain}`);
 setExtraHeaders({ 'x-client-platform': Platform.OS === 'web' ? 'web' : 'mobile' });
-const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
+const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 if (!clerkPublishableKey) throw new Error('EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is required for Email and Google sign-in.');
 
 const queryClient = new QueryClient({
@@ -74,7 +74,7 @@ export default function RootLayout() {
         <ClerkProvider
           publishableKey={clerkPublishableKey}
           tokenCache={tokenCache}
-          clerkProxyUrl={process.env.EXPO_PUBLIC_CLERK_PROXY_URL}
+          proxyUrl={process.env.EXPO_PUBLIC_CLERK_PROXY_URL}
         >
           <QueryClientProvider client={queryClient}>
             <AuthProvider>

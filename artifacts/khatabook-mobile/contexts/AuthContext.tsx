@@ -5,10 +5,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth as useClerkAuth } from '@clerk/expo';
 import {
   getGetAuthMeQueryKey,
+  logoutPhoneOtp,
+  reportAuthLogoutEvent,
   setAuthTokenGetter,
   useGetAuthMe,
-  useLogoutPhoneOtp,
-  useReportAuthLogoutEvent,
   type AuthMe,
 } from '@workspace/api-client-react';
 import { clearSavedAuthToken, getSavedAuthToken, saveAuthToken } from '@/lib/authStorage';
@@ -74,9 +74,6 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     if (authMethod === 'phone') return token ?? getSavedAuthToken();
     return null;
   }, [accountDeleted, authMethod, clerkAuth.getToken, token]);
-
-  const logoutMutation = useLogoutPhoneOtp();
-  const logoutEventMutation = useReportAuthLogoutEvent();
 
   useEffect(() => {
     let active = true;
@@ -148,15 +145,32 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
 
   const signOut = useCallback(async (): Promise<unknown | null> => {
     let requestError: unknown | null = null;
+    let phoneToken = token;
+    if (Platform.OS !== 'web' && !phoneToken) {
+      try {
+        phoneToken = await getSavedAuthToken();
+      } catch (error) {
+        requestError = error;
+      }
+    }
+
     const clerkSessionPresent = !!clerkAuth.isSignedIn;
-    const phoneSessionPresent = !!token || (Platform.OS === 'web' && identityQuery.data?.authMethod === 'phone');
+    // On web the phone JWT is HttpOnly, so call the cookie logout endpoint even
+    // when a simultaneous Clerk session currently takes precedence in auth/me.
+    const phoneSessionPresent = Platform.OS === 'web' || !!phoneToken;
     let clerkRevoked = !clerkSessionPresent;
     let phoneRevoked = !phoneSessionPresent;
     let clerkSignedOut = !clerkSessionPresent;
 
     if (clerkSessionPresent) {
       try {
-        await logoutEventMutation.mutateAsync();
+        const clerkToken = Platform.OS === 'web' ? null : await clerkAuth.getToken();
+        if (Platform.OS !== 'web' && !clerkToken) {
+          throw new Error('The Clerk session token is unavailable.');
+        }
+        await reportAuthLogoutEvent(clerkToken
+          ? { headers: { Authorization: `Bearer ${clerkToken}` } }
+          : undefined);
         clerkRevoked = true;
       } catch (error) {
         requestError = error;
@@ -165,7 +179,13 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
 
     if (phoneSessionPresent) {
       try {
-        await logoutMutation.mutateAsync();
+        if (Platform.OS === 'web') {
+          await logoutPhoneOtp();
+        } else if (phoneToken) {
+          await logoutPhoneOtp({ headers: { Authorization: `Bearer ${phoneToken}` } });
+        } else {
+          throw new Error('The phone session token is unavailable.');
+        }
         phoneRevoked = true;
       } catch (error) {
         requestError = requestError ?? error;
@@ -181,7 +201,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
       }
     }
 
-    if (phoneRevoked && token) {
+    if (phoneRevoked && phoneToken) {
       try {
         await clearSavedAuthToken();
       } catch (error) {
@@ -196,8 +216,7 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     queryClient.clear();
     return requestError;
   }, [
-    clerkAuth.isSignedIn, clerkAuth.signOut, identityQuery.data?.authMethod,
-    logoutEventMutation, logoutMutation, queryClient, token,
+    clerkAuth.getToken, clerkAuth.isSignedIn, clerkAuth.signOut, queryClient, token,
   ]);
 
   const clearAfterAccountDeletion = useCallback(async (): Promise<unknown | null> => {

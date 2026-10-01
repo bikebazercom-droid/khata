@@ -16,12 +16,16 @@ type PendingRead = {
 const flow = vi.hoisted(() => ({
   secureToken: null as string | null,
   platform: 'ios',
+  clerkSignedIn: false,
   pendingRead: null as PendingRead | null,
   events: [] as string[],
   requestTokens: [] as Array<string | null>,
   getToken: null as null | (() => Promise<string | null>),
   identityError: null as unknown,
   logout: vi.fn(),
+  logoutEvent: vi.fn(),
+  clerkGetToken: vi.fn(),
+  clerkSignOut: vi.fn(),
   identity: {
     role: 'owner' as const,
     businessId: 'test-business',
@@ -39,6 +43,23 @@ const routerMock = vi.hoisted(() => ({
 
 vi.mock('react-native', () => ({
   Platform: { get OS() { return flow.platform; } },
+}));
+
+vi.mock('@react-native-async-storage/async-storage', () => ({
+  default: {
+    getItem: vi.fn(async () => null),
+    removeItem: vi.fn(async () => undefined),
+    setItem: vi.fn(async () => undefined),
+  },
+}));
+
+vi.mock('@clerk/expo', () => ({
+  useAuth: () => ({
+    isLoaded: true,
+    isSignedIn: flow.clerkSignedIn,
+    getToken: flow.clerkGetToken,
+    signOut: flow.clerkSignOut,
+  }),
 }));
 
 vi.mock('expo-secure-store', () => ({
@@ -82,6 +103,9 @@ vi.mock('@workspace/api-client-react', async () => {
 
   return {
     getGetAuthMeQueryKey: () => ['auth', 'me'] as const,
+    setAuthTokenGetter: (getter: (() => Promise<string | null>) | null) => {
+      flow.getToken = getter;
+    },
     useGetAuthMe: (options: {
       query: { enabled?: boolean; queryKey: readonly unknown[]; staleTime?: number };
     }) => useTestQuery('identity', options.query.queryKey, {
@@ -91,7 +115,8 @@ vi.mock('@workspace/api-client-react', async () => {
     useListParties: () => useTestQuery('party-list', ['parties']),
     useGetParty: (partyId: string) => useTestQuery('party-detail', ['party', partyId]),
     useListLedgerEntries: (partyId: string) => useTestQuery('ledger', ['ledger', partyId]),
-    useLogoutPhoneOtp: () => ({ mutateAsync: flow.logout }),
+    logoutPhoneOtp: flow.logout,
+    reportAuthLogoutEvent: flow.logoutEvent,
   };
 });
 
@@ -167,6 +192,7 @@ function renderWithAuth(children: ReactNode, queryClient = createQueryClient()) 
 describe('mobile phone-session restoration', () => {
   beforeEach(() => {
     flow.platform = 'ios';
+    flow.clerkSignedIn = false;
     flow.secureToken = null;
     flow.pendingRead = null;
     flow.events.length = 0;
@@ -174,6 +200,11 @@ describe('mobile phone-session restoration', () => {
     flow.getToken = getSavedAuthToken;
     flow.identityError = null;
     flow.logout.mockReset().mockResolvedValue(undefined);
+    flow.logoutEvent.mockReset().mockResolvedValue(undefined);
+    flow.clerkGetToken.mockReset().mockResolvedValue(null);
+    flow.clerkSignOut.mockReset().mockImplementation(async () => {
+      flow.clerkSignedIn = false;
+    });
     routerMock.replace.mockReset();
     routerMock.replace.mockImplementation((route: string) => {
       routeSetState?.(route);
@@ -309,6 +340,56 @@ describe('mobile phone-session restoration', () => {
     expect(flow.logout).toHaveBeenCalledOnce();
     expect(flow.events).not.toContain('secure-delete');
     expect(flow.events).not.toContain('secure-write');
+
+    view.unmount();
+    view.queryClient.clear();
+  });
+
+  it('revokes simultaneous Clerk and phone sessions with their own bearer tokens', async () => {
+    flow.secureToken = 'phone-session-token';
+    flow.clerkSignedIn = true;
+    flow.clerkGetToken.mockResolvedValue('clerk-session-token');
+
+    let currentState: AuthState | undefined;
+    const view = renderWithAuth(<AuthProbe capture={(state) => { currentState = state; }} />);
+    await waitFor(() => expect(currentState?.token).toBe('phone-session-token'));
+
+    let signOutError: unknown;
+    await act(async () => {
+      signOutError = await currentState?.signOut();
+    });
+
+    expect(signOutError).toBeNull();
+    expect(flow.logoutEvent).toHaveBeenCalledWith({
+      headers: { Authorization: 'Bearer clerk-session-token' },
+    });
+    expect(flow.logout).toHaveBeenCalledWith({
+      headers: { Authorization: 'Bearer phone-session-token' },
+    });
+    expect(flow.clerkSignOut).toHaveBeenCalledOnce();
+    expect(flow.secureToken).toBeNull();
+
+    view.unmount();
+    view.queryClient.clear();
+  });
+
+  it('keeps the saved phone credential when server revocation fails', async () => {
+    flow.secureToken = 'phone-session-token';
+    flow.logout.mockRejectedValueOnce(new Error('revocation failed'));
+
+    let currentState: AuthState | undefined;
+    const view = renderWithAuth(<AuthProbe capture={(state) => { currentState = state; }} />);
+    await waitFor(() => expect(currentState?.token).toBe('phone-session-token'));
+
+    let signOutError: unknown;
+    await act(async () => {
+      signOutError = await currentState?.signOut();
+    });
+
+    expect(signOutError).toBeInstanceOf(Error);
+    expect(flow.secureToken).toBe('phone-session-token');
+    expect(flow.events).not.toContain('secure-delete');
+    expect(flow.clerkSignOut).not.toHaveBeenCalled();
 
     view.unmount();
     view.queryClient.clear();

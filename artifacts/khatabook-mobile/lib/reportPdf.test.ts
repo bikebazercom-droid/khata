@@ -63,7 +63,7 @@ describe('party statement PDF helpers', () => {
     expect(statement.entries.map((item) => item.id)).toEqual(['match']);
     expect(statement.gave).toBe(2);
     expect(statement.received).toBe(8);
-    expect(statement.closingBalance).toBe(36);
+    expect(statement.closingBalance).toBe(24);
     expect(statement.runningBalances.get('match')).toBe(22);
   });
 

@@ -19,7 +19,7 @@ description: Architecture and gotchas for the khatabook multi-user cloud account
 
 ## Phone OTP
 - Routes: POST /api/auth/phone/send-otp, POST /api/auth/phone/verify-otp, POST /api/auth/phone/logout, GET /api/auth/me
-- Currently logs OTP to console — Twilio connector still needs connecting and wiring in auth.ts
+- OTP delivery uses the configured sms.net.bd provider; delivery failures return an error and remove the unusable code.
 - `phone_session` JWT is signed with SESSION_SECRET and stored in an httpOnly, lax browser cookie
 
 ## Phone sessions persist until explicit logout
@@ -45,6 +45,13 @@ Count a Clerk sign-in once when a verified session is first observed, not on eve
 
 **Why:** Frequent API requests otherwise make a last-login timestamp look current when no new sign-in occurred, and an expired session is not evidence of intentional sign-out.
 **How to apply:** Keep session-level idempotency for sign-in observations, and distinguish explicit sign-out events from automatic expiration anywhere owner access activity is displayed.
+
+## Expo Clerk custom SSO
+
+For Expo custom Google sign-in, use `useSSO` from `@clerk/expo/experimental`. In the installed Core SDK, that hook finalizes completed OAuth flows itself and returns `signIn` / `signUp` resources when more verification or profile fields are required. A null `createdSessionId` alone does not prove failure because an existing session may have been activated. Do not copy the root `@clerk/expo` hook's manual `setActive` pattern into the experimental flow.
+
+**Why:** The root and experimental hooks have different contracts; treating every non-cancel result as success can route an incomplete flow into the authenticated app.
+**How to apply:** Only accept the session after a created session, a completed returned future resource, or a confirmed existing Clerk session. Show a useful error for missing requirements, and recheck installed SDK types after upgrades.
 
 ## Sign-out must invalidate the server session
 
