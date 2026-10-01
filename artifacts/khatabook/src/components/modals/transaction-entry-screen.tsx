@@ -35,6 +35,7 @@ import { uploadBillImage, billImageSrc, type BillImageUploadResult } from '@/lib
 import { savePendingUpload } from '@/lib/pendingUploads';
 import { useBusinessContext } from '@/lib/businessContext';
 import { useConnectionState } from '@/context/connection-state';
+import { notifyEntrySaved } from '@/components/ui/entry-saved-feedback';
 
 type KeyKind = 'digit' | 'muted' | 'accent';
 type KeyDef = { label: string; value: string; kind: KeyKind; span?: number };
@@ -760,8 +761,8 @@ export function TransactionEntryScreen({
       uploadedCreateImageRef.current = null;
       pendingBase64Ref.current = null;
       clearMemory();
+      notifyEntrySaved();
       onClose();
-      toast.success('হিসাব সার্ভারে সংরক্ষণ হয়েছে');
     } catch (error) {
       console.error('Online ledger entry save failed:', error);
       toast.error('সার্ভারে হিসাব জমা হয়নি', {

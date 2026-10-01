@@ -32,6 +32,7 @@ import { drainEntries, ENTRY_OUTBOX_CHANGED } from '@/lib/entryOutbox';
 import { clearAllPendingUploads } from '@/lib/pendingUploads';
 import { useBusinessContext } from '@/lib/businessContext';
 import { isNetworkWriteAuthorized, markServerReauthenticated, revokeNetworkWrites, useAuthConnectivity } from '@/lib/useAuthConnectivity';
+import { EntrySavedFeedbackHost } from '@/components/ui/entry-saved-feedback';
 
 // ─── Clerk setup ──────────────────────────────────────────────────────────────
 
@@ -547,6 +548,7 @@ function AppRouter({ onNetworkFailure, onSettled }: { onNetworkFailure: () => vo
           </Switch>
         </TooltipProvider>
         <Toaster position="bottom-right" richColors />
+        <EntrySavedFeedbackHost />
         <BusinessSwitcherDrawer />
         </ConnectionStateProvider>
         </LanguageProvider>
