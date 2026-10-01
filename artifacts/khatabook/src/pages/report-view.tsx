@@ -11,7 +11,7 @@ import {
 } from '@workspace/api-client-react/global-ledger-report';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { ChevronLeft, Calendar as CalendarIcon, Search, ChevronDown, FileDown, Loader2 } from 'lucide-react';
+import { ChevronLeft, Calendar as CalendarIcon, Search, ChevronDown, FileDown, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -23,6 +23,7 @@ import { ReportPeriodDrawer, type ReportPeriod } from '@/components/modals/repor
 import { BillImageLightbox } from '@/components/modals/bill-image-lightbox';
 import { billImageSrc } from '@/lib/billImageStorage';
 import { loadShopProfile } from '@/components/modals/settings-drawer';
+import { buildGlobalLedgerReportCsv } from '@/lib/global-ledger-report-csv';
 
 const PERIOD_LABELS: Record<ReportPeriod, string> = {
   ALL: 'সব',
@@ -56,6 +57,7 @@ export function ReportView() {
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isExportingCsv, setIsExportingCsv] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const params = useMemo(
@@ -230,6 +232,45 @@ export function ReportView() {
     }
   };
 
+  const handleCsvExport = async () => {
+    setIsExportingCsv(true);
+    try {
+      const csv = buildGlobalLedgerReportCsv(entries);
+      const filename = `Banglakhata_${isSupplier ? 'Supplier' : 'Customer'}_Ledger_${new Date().toISOString().slice(0, 10)}.csv`;
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const file = new File([blob], filename, { type: 'text/csv;charset=utf-8' });
+      let shared = false;
+
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: `${roleLabel} লেনদেনের CSV রিপোর্ট` });
+          shared = true;
+        } catch (error) {
+          if ((error as DOMException).name === 'AbortError') return;
+        }
+      }
+
+      if (!shared) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      toast.success(shared ? 'CSV রিপোর্ট শেয়ার করা হয়েছে' : 'CSV রিপোর্ট ডাউনলোড হয়েছে');
+    } catch (error) {
+      console.error('Report CSV export failed:', error);
+      toast.error('CSV রিপোর্ট তৈরি করতে সমস্যা হয়েছে।');
+    } finally {
+      setIsExportingCsv(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full w-full bg-white relative">
       {/* Deep blue header */}
@@ -390,8 +431,9 @@ export function ReportView() {
         )}
       </div>
 
-      {/* Sticky PDF download footer */}
+      {/* Sticky report export footer */}
       <div className="absolute bottom-0 left-0 right-0 px-3 pt-3 pb-[calc(0.75rem+var(--safe-bottom))] bg-white border-t border-slate-200 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.08)] shrink-0 z-20">
+        <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
           onClick={handleDownload}
@@ -401,6 +443,17 @@ export function ReportView() {
           {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileDown className="w-5 h-5" />}
           {isGenerating ? 'তৈরি হচ্ছে…' : '📥 ডাউনলোড'}
         </button>
+        <button
+          type="button"
+          onClick={handleCsvExport}
+          disabled={isLoading || isExportingCsv}
+          className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl border border-[#0b57d0] bg-white text-[#0b57d0] font-extrabold text-sm active:scale-[0.98] transition-all disabled:opacity-60"
+          aria-label="CSV রিপোর্ট ডাউনলোড বা শেয়ার করুন"
+        >
+          {isExportingCsv ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileSpreadsheet className="w-5 h-5" />}
+          {isExportingCsv ? 'তৈরি হচ্ছে…' : 'CSV ডাউনলোড'}
+        </button>
+        </div>
       </div>
 
       <ReportPeriodDrawer open={isPeriodOpen} onOpenChange={setIsPeriodOpen} value={period} onSelect={setPeriod} />
