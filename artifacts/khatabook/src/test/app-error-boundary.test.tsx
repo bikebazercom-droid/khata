@@ -22,5 +22,6 @@ describe('AppErrorBoundary', () => {
 
     expect(screen.getByTestId('app-error-boundary')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'পৃষ্ঠা আবার লোড করুন' })).toBeInTheDocument();
+    expect(screen.getByTestId('app-error-diagnostic')).toHaveTextContent('Error: simulated render failure');
   });
 });

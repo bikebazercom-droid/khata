@@ -6,17 +6,24 @@ interface AppErrorBoundaryProps {
 
 interface AppErrorBoundaryState {
   hasError: boolean;
+  diagnostic: string;
 }
 
 export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorBoundaryState> {
-  state: AppErrorBoundaryState = { hasError: false };
+  state: AppErrorBoundaryState = { hasError: false, diagnostic: '' };
 
-  static getDerivedStateFromError(): AppErrorBoundaryState {
-    return { hasError: true };
+  static getDerivedStateFromError(error: unknown): Partial<AppErrorBoundaryState> {
+    return {
+      hasError: true,
+      diagnostic: error instanceof Error ? `${error.name}: ${error.message}` : String(error ?? 'Unknown error'),
+    };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[BanglaKhata] UI render error', error, info.componentStack);
+    this.setState((state) => ({
+      diagnostic: [state.diagnostic, info.componentStack].filter(Boolean).join('\n\n'),
+    }));
   }
 
   private reloadApp = () => {
@@ -56,6 +63,29 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
           <p style={{ margin: '12px 0 24px', color: '#475569', lineHeight: 1.6 }}>
             আপনার হিসাবের তথ্য অক্ষত আছে। পৃষ্ঠাটি আবার লোড করে চেষ্টা করুন।
           </p>
+          <details style={{ marginBottom: 20, textAlign: 'left' }}>
+            <summary style={{ cursor: 'pointer', color: '#475569', fontSize: 13 }}>
+              সমস্যার বিবরণ
+            </summary>
+            <pre
+              data-testid="app-error-diagnostic"
+              style={{
+                maxHeight: 180,
+                overflow: 'auto',
+                margin: '10px 0 0',
+                padding: 10,
+                borderRadius: 8,
+                background: '#f1f5f9',
+                color: '#334155',
+                fontSize: 11,
+                lineHeight: 1.5,
+                whiteSpace: 'pre-wrap',
+                overflowWrap: 'anywhere',
+              }}
+            >
+              {this.state.diagnostic || 'ত্রুটির বিবরণ পাওয়া যায়নি।'}
+            </pre>
+          </details>
           <button
             type="button"
             data-testid="button-reload-app"

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { ClerkProvider, useAuth } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
@@ -23,19 +23,20 @@ import { clearAllPendingUploads } from '@/lib/pendingUploads';
 import { useBusinessContext } from '@/lib/businessContext';
 import { isNetworkWriteAuthorized, markServerReauthenticated, revokeNetworkWrites, useAuthConnectivity } from '@/lib/useAuthConnectivity';
 import { EntrySavedFeedbackHost } from '@/components/ui/entry-saved-feedback';
+import { lazyWithChunkRecovery } from '@/lib/lazyWithChunkRecovery';
 
-const HomeView = lazy(() => import('@/pages/home').then((module) => ({ default: module.HomeView })));
-const PartyView = lazy(() => import('@/pages/party-view').then((module) => ({ default: module.PartyView })));
-const PartyProfileView = lazy(() => import('@/pages/party-profile').then((module) => ({ default: module.PartyProfileView })));
-const TransactionDetailPage = lazy(() => import('@/pages/transaction-detail').then((module) => ({ default: module.TransactionDetailPage })));
-const ReportView = lazy(() => import('@/pages/report-view').then((module) => ({ default: module.ReportView })));
-const PartyReportView = lazy(() => import('@/pages/party-report-view').then((module) => ({ default: module.PartyReportView })));
-const StaffDeploymentPage = lazy(() => import('@/pages/staff-deployment').then((module) => ({ default: module.StaffDeploymentPage })));
-const AccessPage = lazy(() => import('@/pages/access').then((module) => ({ default: module.AccessPage })));
-const RejectedDraftsPage = lazy(() => import('@/pages/rejected-drafts').then((module) => ({ default: module.RejectedDraftsPage })));
-const SignInPage = lazy(() => import('@/pages/sign-in').then((module) => ({ default: module.SignInPage })));
-const SignUpPage = lazy(() => import('@/pages/sign-up').then((module) => ({ default: module.SignUpPage })));
-const NotFound = lazy(() => import('@/pages/not-found'));
+const HomeView = lazyWithChunkRecovery(() => import('@/pages/home').then((module) => ({ default: module.HomeView })));
+const PartyView = lazyWithChunkRecovery(() => import('@/pages/party-view').then((module) => ({ default: module.PartyView })));
+const PartyProfileView = lazyWithChunkRecovery(() => import('@/pages/party-profile').then((module) => ({ default: module.PartyProfileView })));
+const TransactionDetailPage = lazyWithChunkRecovery(() => import('@/pages/transaction-detail').then((module) => ({ default: module.TransactionDetailPage })));
+const ReportView = lazyWithChunkRecovery(() => import('@/pages/report-view').then((module) => ({ default: module.ReportView })));
+const PartyReportView = lazyWithChunkRecovery(() => import('@/pages/party-report-view').then((module) => ({ default: module.PartyReportView })));
+const StaffDeploymentPage = lazyWithChunkRecovery(() => import('@/pages/staff-deployment').then((module) => ({ default: module.StaffDeploymentPage })));
+const AccessPage = lazyWithChunkRecovery(() => import('@/pages/access').then((module) => ({ default: module.AccessPage })));
+const RejectedDraftsPage = lazyWithChunkRecovery(() => import('@/pages/rejected-drafts').then((module) => ({ default: module.RejectedDraftsPage })));
+const SignInPage = lazyWithChunkRecovery(() => import('@/pages/sign-in').then((module) => ({ default: module.SignInPage })));
+const SignUpPage = lazyWithChunkRecovery(() => import('@/pages/sign-up').then((module) => ({ default: module.SignUpPage })));
+const NotFound = lazyWithChunkRecovery(() => import('@/pages/not-found'));
 
 // ─── Clerk setup ──────────────────────────────────────────────────────────────
 
