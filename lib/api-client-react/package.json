@@ -7,10 +7,8 @@
     ".": "./src/index.ts",
     "./global-ledger-report": "./src/global-ledger-report.ts"
   },
-  "dependencies": {
-    "@tanstack/react-query": "catalog:"
-  },
   "peerDependencies": {
+    "@tanstack/react-query": "catalog:",
     "react": ">=18"
   }
 }
