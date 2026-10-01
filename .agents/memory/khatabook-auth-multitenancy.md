@@ -26,7 +26,7 @@ description: Architecture and gotchas for the khatabook multi-user cloud account
 
 Phone-session JWT expiry is not the revocation boundary. The server validates the account status and `phoneSessionVersion`; explicit logout increments that version. Continue accepting older signed phone JWTs that still carry an `exp`, and strip their legacy expiry when renewing the browser cookie. Browser cookies use a rolling 400-day lifetime.
 
-**Why:** Users should remain signed in across restarts until they choose Log Out. Existing mobile tokens with a 30-day expiry must not silently expire after an app update, while server-side version checks still allow explicit revocation.
+**Why:** Users should remain signed in across restarts until they choose Log Out. Legacy phone-session JWTs with a 30-day expiry must not silently expire, while server-side version checks still allow explicit revocation.
 **How to apply:** Keep expiry bypass limited to phone-session verification and phone logout verification; preserve active-user/version checks, and refresh the browser cookie on authenticated requests. Clerk session lifetime remains controlled by its provider.
 
 ## lib/db rebuild required after schema changes
@@ -48,7 +48,7 @@ Count a Clerk sign-in once when a verified session is first observed, not on eve
 
 ## Sign-out must invalidate the server session
 
-Do not treat removing a mobile credential or calling a client SDK's sign-out as sufficient proof that a previously copied bearer token is unusable. Revoke phone-session versions or Clerk session IDs server-side, and preserve the local credential when revocation fails so users can retry.
+Do not treat removing a local credential or calling a client SDK's sign-out as sufficient proof that a previously copied bearer token is unusable. Revoke phone-session versions or Clerk session IDs server-side, and preserve the local credential when revocation fails so users can retry.
 
 **Why:** Clearing storage affects only one device; old tokens can otherwise keep accessing a ledger until expiry, even though the UI says the user signed out.
 **How to apply:** Test an old bearer token against a protected API route after sign-out. Let retries complete if server revocation succeeded but client SDK sign-out failed.

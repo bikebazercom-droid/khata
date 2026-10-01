@@ -58,34 +58,6 @@ storage_version_token = "1790415892971330"
 content_type = "application/octet-stream"
 
 [[outputs]]
-id = "DCFKHT2BtUXl8Kgys0Ye5"
-uri = "file://exports/BanglaKhata-Native-AndroidStudio.zip"
-type = "unspecified"
-title = "BanglaKhata — Native Android Studio Project"
-description = "২.৯ MB ZIP: বর্তমান নেটিভ মোবাইল অ্যাপ, Android Gradle প্রজেক্ট ও বাংলা বিল্ড নির্দেশনা। WebView নয়; Expo Go লাগে না। সম্পূর্ণ APK বিল্ড ও ডিভাইস পরীক্ষা এখানে করা যায়নি।"
-logical_id = "c2d8062b-eb41-4010-be2b-20a5991a9032"
-content_hash = "sha256:2e47f8def12d901420a4dd4b8bdb2fb7e90d30f7f3aadd73401d53f90072fa9c"
-size = 2978565
-mtime_ms = 1790491068383
-storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/c2d8062b-eb41-4010-be2b-20a5991a9032/61e3468f-727b-4bcc-bd1c-00f70f220c8d"
-storage_version_token = "1790491207926576"
-content_type = "application/octet-stream"
-
-[[outputs]]
-id = "czkWQUucUMhOxXMlhpqcE"
-uri = "file://exports/BanglaKhata-Native-AndroidStudio-DirectServer.zip"
-type = "unspecified"
-title = "BanglaKhata Native Android Studio Project"
-description = "Windows-friendly native Android Studio source project configured to call https://helmetbazar.shop directly. Clean install, typecheck, and Android JS bundle passed; this is source, not a tested APK."
-logical_id = "0fc4ef5b-702f-4d35-849f-c4e2622c940f"
-content_hash = "sha256:f5e55c1a972d82f55b7eb6f9968d6b179fb67f99aca9bd118ca750668086e1aa"
-size = 4398963
-mtime_ms = 1790515141107
-storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/0fc4ef5b-702f-4d35-849f-c4e2622c940f/50aa7894-eb72-4cd4-bf6a-9a090d852333"
-storage_version_token = "1790515346659155"
-content_type = "application/octet-stream"
-
-[[outputs]]
 id = "0KTxgyctf8ZSoHgRjSqoU"
 uri = "file://exports/BanglaKhata-cPanel-Server.zip"
 type = "unspecified"
@@ -125,20 +97,6 @@ size = 1541593
 mtime_ms = 1790598119098
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/f98c6712-a382-48ab-b67e-66727f200553/0dbeba77-4df3-4453-8361-1e2708013aca"
 storage_version_token = "1790598299186904"
-content_type = "application/octet-stream"
-
-[[outputs]]
-id = "-0O-j7eJuOqfSj8Fku8BS"
-uri = "file://exports/BanglaKhata-Core-Backend-Mobile-cPanel.zip"
-type = "unspecified"
-title = "BanglaKhata Core Backend + Mobile Source (cPanel)"
-description = "Node.js API and production dependencies, PostgreSQL bootstrap SQL, and Android Studio source."
-logical_id = "1ff77b88-9d9e-409d-9b1a-32779530829e"
-content_hash = "sha256:aafa0746ef269da1cfac4a1887780859aa5794a15960c51b716e7eb0eb068575"
-size = 80823522
-mtime_ms = 1790598139668
-storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/1ff77b88-9d9e-409d-9b1a-32779530829e/4043e0cc-3659-4472-b3d1-59ddf85ee74e"
-storage_version_token = "1790598303696473"
 content_type = "application/octet-stream"
 
 [[outputs]]

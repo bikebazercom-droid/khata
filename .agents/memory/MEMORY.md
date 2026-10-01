@@ -2,14 +2,11 @@
 - [Collapsible panel animation](collapsible-panel-css-trick.md) — prefer `max-height` transition over CSS Grid `0fr`/`1fr` trick for animating a section to/from zero height; the grid trick was unreliable here.
 - [Orval date query-param coercion bug](orval-date-query-param-coercion.md) — generated zod schemas use bare `zod.date()` for `format: date` query params, always failing req.query parsing.
 - [Khatabook auth & multi-tenancy](khatabook-auth-multitenancy.md) — seed business, dual-session auth, persistent phone-session revocation, and DB setup gotchas.
-- [Expo + Clerk Metro config fix](expo-clerk-metro-config.md) — Metro crashes watching @clerk/backend_tmp_* dirs; add blockList pattern to metro.config.js.
 - [Worker invitation identity](worker-invite-identity.md) — one pending invite per verified identity across businesses avoids arbitrary first-sign-in claims.
 - [Android export validation](android-export-validation.md) — Gradle task discovery is not source compilation; API-only compiler checks are not APK builds.
-- [Expo folder exports](expo-folder-save-constraints.md) — SAF writes need bounded memory; Android restricts root folder grants and provider cleanup can fail silently.
 - [Offline ledger replay](offline-ledger-replay.md) — keep replay protection after deletion and pending drafts separate from confirmed balances.
-- [Browser and APK write boundary](browser-apk-write-boundary.md) — web creates post online; preserve legacy web drafts and Android's separate offline queue/live sync.
+- [Browser legacy outbox transition](browser-legacy-outbox.md) — new browser entries go online; keep prior drafts recoverable during the transition.
 - [Offline shell validation](offline-shell-validation.md) — service-worker checks need compiled assets and a browser-reachable secure origin.
 - [API integration test concurrency](api-integration-test-concurrency.md) — database-backed suites can fail nondeterministically when Vitest runs test files in parallel.
-- [Expo mobile auth loading](expo-mobile-auth-loading.md) — web sign-in is separate from Expo; bound token/API waits and only refresh identity after it loads.
 - [PostgreSQL pooler compatibility](supabase-postgres-pooler.md) — the event bus needs persistent LISTEN/NOTIFY; Supabase transaction pooling is incompatible.
 - [Hostinger Node entry file](hostinger-node-entry-file.md) — Hostinger's Entry File must point to the compiled server file, not the package command `pnpm start`.

@@ -14,9 +14,9 @@ website; it does not include the website source, API server, or database.
 4. Select **Build → Build Bundle(s) / APK(s) → Build APK(s)**. The debug APK is
    written to `app/build/outputs/apk/debug/app-debug.apk`.
 
-No Expo Go or separate application command-line setup is required. The included
-Gradle wrapper is available for developers who prefer `./gradlew assembleDebug`
-or `gradlew.bat assembleDebug`.
+No extra mobile framework setup is required. The included Gradle wrapper is
+available for developers who prefer `./gradlew assembleDebug` or
+`gradlew.bat assembleDebug`.
 
 ## Included behavior
 

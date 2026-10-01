@@ -11,9 +11,7 @@
     "build:hostinger": "test -n \"$HOSTINGER_EXTERNAL_CLERK_PUBLISHABLE_KEY\" || { echo 'HOSTINGER_EXTERNAL_CLERK_PUBLISHABLE_KEY is required for Hostinger builds' >&2; exit 1; }; pnpm --filter @workspace/api-server run build && VITE_CLERK_PUBLISHABLE_KEY=\"$HOSTINGER_EXTERNAL_CLERK_PUBLISHABLE_KEY\" VITE_CLERK_PROXY_URL= NODE_ENV=production BASE_PATH=/ pnpm --filter @workspace/khatabook run build && NODE_ENV=production BASE_PATH=/admin/ pnpm --filter @workspace/banglakhata-admin run build",
     "start": "NODE_ENV=production SERVE_FRONTENDS=true node --enable-source-maps artifacts/api-server/dist/index.mjs",
     "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
-    "build:apk": "pnpm --filter @workspace/khatabook-mobile run build:apk",
-    "build:all": "bash scripts/build-all.sh"
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },
   "private": true,
   "dependencies": {
