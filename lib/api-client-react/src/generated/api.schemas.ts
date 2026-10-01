@@ -60,6 +60,63 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface PhoneOtpSendInput {
+  /** Bangladeshi phone number in 01XXXXXXXXX format. */
+  phone: string;
+}
+
+export interface PhoneOtpSendResult {
+  success: boolean;
+}
+
+export interface PhoneOtpVerifyInput {
+  phone: string;
+  /**
+     * @minLength 6
+     * @maxLength 6
+     */
+  code: string;
+}
+
+export interface PhoneOtpSession {
+  success: boolean;
+  userId: string;
+  businessId: string;
+  phone: string;
+  /** App-issued bearer token. Store in secure native storage. */
+  token: string;
+}
+
+export interface PhoneOtpLogoutResult {
+  success: boolean;
+}
+
+export type AuthMeRole = typeof AuthMeRole[keyof typeof AuthMeRole];
+
+
+export const AuthMeRole = {
+  owner: 'owner',
+  staff: 'staff',
+} as const;
+
+export type AuthMeAuthMethod = typeof AuthMeAuthMethod[keyof typeof AuthMeAuthMethod];
+
+
+export const AuthMeAuthMethod = {
+  phone: 'phone',
+  clerk: 'clerk',
+} as const;
+
+export interface AuthMe {
+  role: AuthMeRole;
+  businessId: string;
+  userId: string;
+  businessName: string;
+  authMethod: AuthMeAuthMethod;
+  adjustmentPartyIds: string[];
+  phone?: string;
+}
+
 export type PartyRole = typeof PartyRole[keyof typeof PartyRole];
 
 

@@ -22,6 +22,8 @@ tags:
     description: Object storage upload and serving endpoints.
   - name: admin
     description: Admin console operations
+  - name: auth
+    description: Phone OTP authentication and signed-in identity
 paths:
   /scan/bengali-ledger:
     post:
@@ -72,6 +74,102 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /auth/phone/send-otp:
+    post:
+      operationId: sendPhoneOtp
+      tags: [auth]
+      summary: Send a phone sign-in code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PhoneOtpSendInput"
+      responses:
+        "200":
+          description: Code sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhoneOtpSendResult"
+        "400":
+          description: Invalid phone number
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: OTP temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /auth/phone/verify-otp:
+    post:
+      operationId: verifyPhoneOtp
+      tags: [auth]
+      summary: Verify a phone sign-in code and issue a bearer session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PhoneOtpVerifyInput"
+      responses:
+        "200":
+          description: Signed-in phone session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhoneOtpSession"
+        "401":
+          description: Invalid or expired code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: Account access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: OTP temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /auth/phone/logout:
+    post:
+      operationId: logoutPhoneOtp
+      tags: [auth]
+      summary: Revoke the current phone bearer session
+      responses:
+        "200":
+          description: Session revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhoneOtpLogoutResult"
+  /auth/me:
+    get:
+      operationId: getAuthMe
+      tags: [auth]
+      summary: Get the current user's business identity and permissions
+      responses:
+        "200":
+          description: Signed-in identity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMe"
+        "401":
+          description: Invalid or revoked session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /dashboard/summary:
     get:
       operationId: getDashboardSummary
@@ -698,6 +796,72 @@ components:
           type: string
       required:
         - status
+    PhoneOtpSendInput:
+      type: object
+      required: [phone]
+      properties:
+        phone:
+          type: string
+          description: Bangladeshi phone number in 01XXXXXXXXX format.
+    PhoneOtpSendResult:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+    PhoneOtpVerifyInput:
+      type: object
+      required: [phone, code]
+      properties:
+        phone:
+          type: string
+        code:
+          type: string
+          minLength: 6
+          maxLength: 6
+    PhoneOtpSession:
+      type: object
+      required: [success, userId, businessId, phone, token]
+      properties:
+        success:
+          type: boolean
+        userId:
+          type: string
+        businessId:
+          type: string
+        phone:
+          type: string
+        token:
+          type: string
+          description: App-issued bearer token. Store in secure native storage.
+    PhoneOtpLogoutResult:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+    AuthMe:
+      type: object
+      required: [role, businessId, userId, businessName, authMethod, adjustmentPartyIds]
+      properties:
+        role:
+          type: string
+          enum: [owner, staff]
+        businessId:
+          type: string
+        userId:
+          type: string
+        businessName:
+          type: string
+        authMethod:
+          type: string
+          enum: [phone, clerk]
+        adjustmentPartyIds:
+          type: array
+          items:
+            type: string
+        phone:
+          type: string
     PartyRole:
       type: string
       enum: [CUSTOMER, SUPPLIER]

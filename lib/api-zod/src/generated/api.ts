@@ -55,6 +55,62 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary Send a phone sign-in code
+ */
+export const SendPhoneOtpBody = zod.object({
+  "phone": zod.string().describe('Bangladeshi phone number in 01XXXXXXXXX format.')
+})
+
+export const SendPhoneOtpResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Verify a phone sign-in code and issue a bearer session
+ */
+export const verifyPhoneOtpBodyCodeMin = 6;
+export const verifyPhoneOtpBodyCodeMax = 6;
+
+
+
+export const VerifyPhoneOtpBody = zod.object({
+  "phone": zod.string(),
+  "code": zod.string().min(verifyPhoneOtpBodyCodeMin).max(verifyPhoneOtpBodyCodeMax)
+})
+
+export const VerifyPhoneOtpResponse = zod.object({
+  "success": zod.boolean(),
+  "userId": zod.string(),
+  "businessId": zod.string(),
+  "phone": zod.string(),
+  "token": zod.string().describe('App-issued bearer token. Store in secure native storage.')
+})
+
+
+/**
+ * @summary Revoke the current phone bearer session
+ */
+export const LogoutPhoneOtpResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Get the current user's business identity and permissions
+ */
+export const GetAuthMeResponse = zod.object({
+  "role": zod.enum(['owner', 'staff']),
+  "businessId": zod.string(),
+  "userId": zod.string(),
+  "businessName": zod.string(),
+  "authMethod": zod.enum(['phone', 'clerk']),
+  "adjustmentPartyIds": zod.array(zod.string()),
+  "phone": zod.string().optional()
+})
+
+
+/**
  * @summary Get aggregated dashboard totals
  */
 export const GetDashboardSummaryResponse = zod.object({

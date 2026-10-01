@@ -29,6 +29,7 @@ import type {
   AdminUserDetail,
   AdminUserUpdate,
   AdminUsersPage,
+  AuthMe,
   BengaliLedgerBulkSaveInput,
   BengaliLedgerBulkSaveResult,
   BengaliLedgerScanInput,
@@ -51,6 +52,11 @@ import type {
   ListPartiesParams,
   Party,
   PartyInput,
+  PhoneOtpLogoutResult,
+  PhoneOtpSendInput,
+  PhoneOtpSendResult,
+  PhoneOtpSession,
+  PhoneOtpVerifyInput,
   ReminderMessage,
   UploadUrlRequest,
   UploadUrlResponse
@@ -293,6 +299,296 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getHealthCheckQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSendPhoneOtpUrl = () => {
+
+
+
+
+  return `/api/auth/phone/send-otp`
+}
+
+/**
+ * @summary Send a phone sign-in code
+ */
+export const sendPhoneOtp = async (phoneOtpSendInput: PhoneOtpSendInput, options?: RequestInit): Promise<PhoneOtpSendResult> => {
+
+  return customFetch<PhoneOtpSendResult>(getSendPhoneOtpUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(phoneOtpSendInput)
+  }
+);}
+
+
+
+
+
+export const getSendPhoneOtpMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendPhoneOtp>>, TError,{data: BodyType<PhoneOtpSendInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendPhoneOtp>>, TError,{data: BodyType<PhoneOtpSendInput>}, TContext> => {
+
+const mutationKey = ['sendPhoneOtp'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendPhoneOtp>>, {data: BodyType<PhoneOtpSendInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  sendPhoneOtp(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendPhoneOtpMutationResult = NonNullable<Awaited<ReturnType<typeof sendPhoneOtp>>>
+    export type SendPhoneOtpMutationBody = BodyType<PhoneOtpSendInput>
+    export type SendPhoneOtpMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Send a phone sign-in code
+ */
+export const useSendPhoneOtp = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendPhoneOtp>>, TError,{data: BodyType<PhoneOtpSendInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendPhoneOtp>>,
+        TError,
+        {data: BodyType<PhoneOtpSendInput>},
+        TContext
+      > => {
+      return useMutation(getSendPhoneOtpMutationOptions(options));
+    }
+
+export const getVerifyPhoneOtpUrl = () => {
+
+
+
+
+  return `/api/auth/phone/verify-otp`
+}
+
+/**
+ * @summary Verify a phone sign-in code and issue a bearer session
+ */
+export const verifyPhoneOtp = async (phoneOtpVerifyInput: PhoneOtpVerifyInput, options?: RequestInit): Promise<PhoneOtpSession> => {
+
+  return customFetch<PhoneOtpSession>(getVerifyPhoneOtpUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(phoneOtpVerifyInput)
+  }
+);}
+
+
+
+
+
+export const getVerifyPhoneOtpMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyPhoneOtp>>, TError,{data: BodyType<PhoneOtpVerifyInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifyPhoneOtp>>, TError,{data: BodyType<PhoneOtpVerifyInput>}, TContext> => {
+
+const mutationKey = ['verifyPhoneOtp'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifyPhoneOtp>>, {data: BodyType<PhoneOtpVerifyInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  verifyPhoneOtp(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VerifyPhoneOtpMutationResult = NonNullable<Awaited<ReturnType<typeof verifyPhoneOtp>>>
+    export type VerifyPhoneOtpMutationBody = BodyType<PhoneOtpVerifyInput>
+    export type VerifyPhoneOtpMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Verify a phone sign-in code and issue a bearer session
+ */
+export const useVerifyPhoneOtp = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyPhoneOtp>>, TError,{data: BodyType<PhoneOtpVerifyInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof verifyPhoneOtp>>,
+        TError,
+        {data: BodyType<PhoneOtpVerifyInput>},
+        TContext
+      > => {
+      return useMutation(getVerifyPhoneOtpMutationOptions(options));
+    }
+
+export const getLogoutPhoneOtpUrl = () => {
+
+
+
+
+  return `/api/auth/phone/logout`
+}
+
+/**
+ * @summary Revoke the current phone bearer session
+ */
+export const logoutPhoneOtp = async ( options?: RequestInit): Promise<PhoneOtpLogoutResult> => {
+
+  return customFetch<PhoneOtpLogoutResult>(getLogoutPhoneOtpUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getLogoutPhoneOtpMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutPhoneOtp>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof logoutPhoneOtp>>, TError,void, TContext> => {
+
+const mutationKey = ['logoutPhoneOtp'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof logoutPhoneOtp>>, void> = () => {
+
+
+          return  logoutPhoneOtp(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LogoutPhoneOtpMutationResult = NonNullable<Awaited<ReturnType<typeof logoutPhoneOtp>>>
+
+    export type LogoutPhoneOtpMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Revoke the current phone bearer session
+ */
+export const useLogoutPhoneOtp = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutPhoneOtp>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof logoutPhoneOtp>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getLogoutPhoneOtpMutationOptions(options));
+    }
+
+export const getGetAuthMeUrl = () => {
+
+
+
+
+  return `/api/auth/me`
+}
+
+/**
+ * @summary Get the current user's business identity and permissions
+ */
+export const getAuthMe = async ( options?: RequestInit): Promise<AuthMe> => {
+
+  return customFetch<AuthMe>(getGetAuthMeUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAuthMeQueryKey = () => {
+    return [
+    `/api/auth/me`
+    ] as const;
+    }
+
+
+export const getGetAuthMeQueryOptions = <TData = Awaited<ReturnType<typeof getAuthMe>>, TError = ErrorType<ErrorEnvelope>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuthMe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAuthMeQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAuthMe>>> = ({ signal }) => getAuthMe({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAuthMe>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAuthMeQueryResult = NonNullable<Awaited<ReturnType<typeof getAuthMe>>>
+export type GetAuthMeQueryError = ErrorType<ErrorEnvelope>
+
+
+/**
+ * @summary Get the current user's business identity and permissions
+ */
+
+export function useGetAuthMe<TData = Awaited<ReturnType<typeof getAuthMe>>, TError = ErrorType<ErrorEnvelope>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAuthMe>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAuthMeQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -1,0 +1,24 @@
+kind = "mobile"
+previewPath = "/khatabook-mobile/"
+title = "BanglaKhata Mobile"
+description = "A native BanglaKhata companion for shop owners and staff to sign in by phone, manage parties and ledgers, record payments and transfers, and maintain accurate balances through the existing business API."
+version = "1.0.0"
+id = "artifacts/khatabook-mobile"
+router = "expo-domain"
+
+[[services]]
+name = "expo"
+ensurePreviewReachable = "/status"
+paths = [ "/khatabook-mobile/" ]
+localPort = 24238
+
+[services.development]
+run = "pnpm --filter @workspace/khatabook-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/khatabook-mobile", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/khatabook-mobile", "run", "serve" ]
+
+[services.env]
+PORT = "24238"
+BASE_PATH = "/khatabook-mobile/"

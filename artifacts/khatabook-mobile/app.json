@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "BanglaKhata",
+    "slug": "khatabook-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "banglakhata",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "com.banglakhata.mobile",
+      "buildNumber": "1",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.banglakhata.mobile",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#F7F9FC"
+      }
+    },
+    "web": {
+      "favicon": "./assets/images/icon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "BanglaKhata uses your photo library to attach bill images to ledger entries.",
+          "cameraPermission": "BanglaKhata uses the camera to photograph bills for ledger entries."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#F7F9FC"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
