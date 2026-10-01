@@ -807,7 +807,7 @@ export function TransactionEntryScreen({
               spellCheck={false}
               aria-label="পরিমাণ লিখুন"
               data-testid="input-transaction-amount"
-              value={toBengaliDigits(formatExpressionForDisplay(expression))}
+              value={toBengaliDigits(formatExpressionForDisplay(expression).replace(/-/g, '−'))}
               onChange={handleAmountChange}
               onSelect={captureAmountSelection}
               onClick={captureAmountSelection}
