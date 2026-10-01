@@ -238,10 +238,17 @@ export function ReportView() {
       const csv = buildGlobalLedgerReportCsv(entries);
       const filename = `Banglakhata_${isSupplier ? 'Supplier' : 'Customer'}_Ledger_${new Date().toISOString().slice(0, 10)}.csv`;
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-      const file = new File([blob], filename, { type: 'text/csv;charset=utf-8' });
+      const file = new File([blob], filename, { type: 'text/csv' });
       let shared = false;
+      let canShareFile = false;
 
-      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      try {
+        canShareFile = Boolean(navigator.canShare?.({ files: [file] }));
+      } catch {
+        // Fall back to a normal download if this browser cannot inspect the file share payload.
+      }
+
+      if (canShareFile) {
         try {
           await navigator.share({ files: [file], title: `${roleLabel} লেনদেনের CSV রিপোর্ট` });
           shared = true;
