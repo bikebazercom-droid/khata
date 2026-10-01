@@ -34,32 +34,49 @@ import { sendOtpSms } from "../services/sms";
 import { clientIp } from "../middlewares/ipBlock";
 import { deviceDescription } from "../lib/authTelemetry";
 import { normalizeBdPhone } from "../lib/bdPhone";
+import { PostgresRateLimitStore } from "../lib/postgresRateLimitStore";
+import {
+  getNormalizedOtpPhoneRateLimitKey,
+  getVerifiedOtpIpRateLimitKey,
+  shouldSkipOtpIpRateLimit,
+} from "../lib/otpRateLimitKeys";
 
 const router: IRouter = Router();
 
 // ─── Rate limiters ────────────────────────────────────────────────────────────
 
+const SEND_OTP_IP_WINDOW_MS = 15 * 60_000;
+const SEND_OTP_PHONE_WINDOW_MS = 15 * 60_000;
+const VERIFY_OTP_IP_WINDOW_MS = 15 * 60_000;
+const VERIFY_OTP_PHONE_WINDOW_MS = 10 * 60_000;
+
+const verifiedOtpIpKey = (req: Request) =>
+  getVerifiedOtpIpRateLimitKey(req) ?? "unverified";
+
 /**
  * Send-OTP: 5 requests per IP per 15 minutes.
- * Prevents SMS gateway abuse / phone flooding from a single origin.
+ * Use only verified client IPs. With no configured IP policy, this one limiter
+ * is skipped rather than grouping every user behind a proxy into one bucket;
+ * the per-phone limiter remains active.
  */
 const sendOtpIpLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: SEND_OTP_IP_WINDOW_MS,
   limit: 5,
+  store: new PostgresRateLimitStore("otp-send-ip", SEND_OTP_IP_WINDOW_MS),
+  keyGenerator: verifiedOtpIpKey,
+  skip: shouldSkipOtpIpRateLimit,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: { error: "Too many OTP requests from this IP. Please wait 15 minutes before trying again." },
 });
 
 const sendOtpPhoneLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: SEND_OTP_PHONE_WINDOW_MS,
   limit: 3,
+  store: new PostgresRateLimitStore("otp-send-phone", SEND_OTP_PHONE_WINDOW_MS),
   standardHeaders: "draft-7",
   legacyHeaders: false,
-  keyGenerator: (req: Request) => {
-    const raw = typeof req.body?.phone === "string" ? req.body.phone.trim() : "";
-    return `phone:${normalizeBdPhone(raw) ?? (raw || "unknown")}`;
-  },
+  keyGenerator: getNormalizedOtpPhoneRateLimitKey,
   message: { error: "Too many codes requested for this phone. Please try again later." },
 });
 
@@ -73,8 +90,11 @@ function otpDigest(phone: string, code: string): string {
  * First line of defence against distributed brute-force.
  */
 const verifyOtpIpLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: VERIFY_OTP_IP_WINDOW_MS,
   limit: 10,
+  store: new PostgresRateLimitStore("otp-verify-ip", VERIFY_OTP_IP_WINDOW_MS),
+  keyGenerator: verifiedOtpIpKey,
+  skip: shouldSkipOtpIpRateLimit,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: { error: "Too many verification attempts from this IP. Please wait 15 minutes." },
@@ -89,13 +109,10 @@ const verifyOtpIpLimiter = rateLimit({
  * of the same number (01…, 8801…, +8801…) are counted against the same bucket.
  */
 const verifyOtpPhoneLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
+  windowMs: VERIFY_OTP_PHONE_WINDOW_MS,
   limit: 5,
-  keyGenerator: (req: Request) => {
-    const raw = typeof req.body?.phone === "string" ? req.body.phone.trim() : "";
-    const normalized = raw ? normalizeBdPhone(raw) : null;
-    return `phone:${(normalized ?? raw) || "unknown"}`;
-  },
+  store: new PostgresRateLimitStore("otp-verify-phone", VERIFY_OTP_PHONE_WINDOW_MS),
+  keyGenerator: getNormalizedOtpPhoneRateLimitKey,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: { error: "Too many verification attempts for this number. Please request a new code." },

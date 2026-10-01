@@ -20,6 +20,7 @@ BEGIN
        'app_user_login_sessions',
        'app_users',
        'otp_codes',
+       'otp_rate_limit_counters',
        'parties',
        'ledger_entries',
        'ledger_request_receipts',
@@ -115,6 +116,14 @@ CREATE TABLE "otp_codes" (
 	"verified" boolean DEFAULT false NOT NULL,
 	"expires_at" timestamp with time zone NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE TABLE "otp_rate_limit_counters" (
+"scope" text NOT NULL,
+"key_hash" text NOT NULL,
+"total_hits" integer NOT NULL,
+"reset_at" timestamp with time zone NOT NULL,
+CONSTRAINT "otp_rate_limit_counters_scope_key_hash_pk" PRIMARY KEY("scope","key_hash")
 );
 
 CREATE TABLE "parties" (
@@ -283,6 +292,7 @@ CREATE UNIQUE INDEX "worker_invites_pending_phone_unique" ON "worker_invites" US
 CREATE INDEX "user_login_events_user_time_idx" ON "user_login_events" USING btree ("user_id","occurred_at");
 CREATE INDEX "user_login_events_time_idx" ON "user_login_events" USING btree ("occurred_at");
 CREATE INDEX "user_presence_last_seen_idx" ON "user_presence" USING btree ("last_seen_at");
+CREATE INDEX "otp_rate_limit_counters_reset_at_idx" ON "otp_rate_limit_counters" USING btree ("reset_at");
 
 -- The API server uses a direct PostgreSQL connection; client-side Supabase
 -- roles must not be able to read ledger or administrative tables.
@@ -291,6 +301,7 @@ REVOKE ALL PRIVILEGES ON TABLE
   "public"."app_user_login_sessions",
   "public"."app_users",
   "public"."otp_codes",
+  "public"."otp_rate_limit_counters",
   "public"."parties",
   "public"."ledger_entries",
   "public"."ledger_request_receipts",

@@ -1,6 +1,7 @@
 export * from "./businesses";
 export * from "./appUsers";
 export * from "./otpCodes";
+export * from "./otpRateLimitCounters";
 export * from "./parties";
 export * from "./ledgerEntries";
 export * from "./ledgerRequestReceipts";

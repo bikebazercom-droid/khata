@@ -8,6 +8,7 @@ export default defineConfig({
     // inter-test interference and keep output readable.
     pool: "forks",
     singleFork: true,
+    fileParallelism: false,
     testTimeout: 30_000,
   },
 });

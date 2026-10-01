@@ -1,7 +1,8 @@
 import express, { type NextFunction, type Request, type Response } from "express";
+import { randomInt } from "node:crypto";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import {
   appUsersTable, businessesTable, db, otpCodesTable, partiesTable, userLoginEventsTable,
@@ -12,6 +13,12 @@ import {
   type AuthenticatedRequest,
 } from "../middlewares/requireAuth";
 import { ensureSmsReady, sendOtpSms } from "../services/sms";
+import { trustedProxyCidrs } from "../middlewares/ipBlock";
+import {
+  getNormalizedOtpPhoneRateLimitKey,
+  getVerifiedOtpIpRateLimitKey,
+} from "../lib/otpRateLimitKeys";
+import { PostgresRateLimitStore } from "../lib/postgresRateLimitStore";
 import authRouter from "./auth";
 import ownerRouter from "./owner";
 
@@ -129,5 +136,83 @@ describe("phone worker invitation and verified first sign-in", () => {
       .send({ phone: normalized.slice(1) });
     expect(fourth.status).toBe(429);
     expect(vi.mocked(sendOtpSms)).toHaveBeenCalledTimes(3);
+  });
+
+  it("shares send and verify IP limits through a trusted proxy across the real OTP routes", async () => {
+    const previousDirect = process.env.CLIENT_IP_MODE;
+    const previousTrusted = process.env.TRUSTED_PROXY_CIDRS;
+    const clientIp = "203.0.113.55";
+    const base = randomInt(10_000_000, 90_000_000);
+    const localPhone = (offset: number) => `017${String(base + offset).padStart(8, "0")}`;
+    const sendPhones = Array.from({ length: 6 }, (_, index) => localPhone(index));
+    const verifyPhones = Array.from({ length: 11 }, (_, index) => localPhone(index + 20));
+    process.env.TRUSTED_PROXY_CIDRS = "127.0.0.1/8";
+    delete process.env.CLIENT_IP_MODE;
+    let ipRateLimitKey: string | null = null;
+    const sendIpStore = new PostgresRateLimitStore("otp-send-ip", 15 * 60_000);
+    const verifyIpStore = new PostgresRateLimitStore("otp-verify-ip", 15 * 60_000);
+    const sendPhoneStore = new PostgresRateLimitStore("otp-send-phone", 15 * 60_000);
+    const verifyPhoneStore = new PostgresRateLimitStore("otp-verify-phone", 10 * 60_000);
+    const cleanupTestCounters = async () => {
+      if (ipRateLimitKey) {
+        await sendIpStore.resetKey(ipRateLimitKey);
+        await verifyIpStore.resetKey(ipRateLimitKey);
+      }
+      for (const phone of [...sendPhones, ...verifyPhones]) {
+        const key = getNormalizedOtpPhoneRateLimitKey({ body: { phone } } as Request);
+        if (sendPhones.includes(phone)) await sendPhoneStore.resetKey(key);
+        else await verifyPhoneStore.resetKey(key);
+      }
+      await db.delete(otpCodesTable).where(inArray(
+        otpCodesTable.phone,
+        [...sendPhones, ...verifyPhones].map((phone) => `+88${phone}`),
+      ));
+    };
+
+    const proxiedApp = express();
+    proxiedApp.set("trust proxy", trustedProxyCidrs());
+    proxiedApp.use(express.json(), authRouter);
+
+    try {
+      ipRateLimitKey = getVerifiedOtpIpRateLimitKey({
+        ip: clientIp,
+        ips: [clientIp],
+        body: {},
+      } as Request);
+      expect(ipRateLimitKey).toBe(clientIp);
+      await cleanupTestCounters();
+      vi.mocked(ensureSmsReady).mockReset();
+      vi.mocked(ensureSmsReady).mockResolvedValue(undefined);
+      vi.mocked(sendOtpSms).mockReset();
+      vi.mocked(sendOtpSms).mockResolvedValue(undefined);
+
+      const sendStatuses: number[] = [];
+      for (const phone of sendPhones) {
+        const response = await request(proxiedApp)
+          .post("/auth/phone/send-otp")
+          .set("X-Forwarded-For", clientIp)
+          .send({ phone });
+        sendStatuses.push(response.status);
+      }
+      expect(sendStatuses).toEqual([200, 200, 200, 200, 200, 429]);
+      expect(vi.mocked(sendOtpSms)).toHaveBeenCalledTimes(5);
+
+      const verifyStatuses: number[] = [];
+      for (const phone of verifyPhones) {
+        const response = await request(proxiedApp)
+          .post("/auth/phone/verify-otp")
+          .set("X-Forwarded-For", clientIp)
+          .send({ phone, code: "123456" });
+        verifyStatuses.push(response.status);
+      }
+      expect(verifyStatuses.slice(0, 10)).toEqual(Array(10).fill(401));
+      expect(verifyStatuses[10]).toBe(429);
+    } finally {
+      await cleanupTestCounters();
+      if (previousDirect === undefined) delete process.env.CLIENT_IP_MODE;
+      else process.env.CLIENT_IP_MODE = previousDirect;
+      if (previousTrusted === undefined) delete process.env.TRUSTED_PROXY_CIDRS;
+      else process.env.TRUSTED_PROXY_CIDRS = previousTrusted;
+    }
   });
 });

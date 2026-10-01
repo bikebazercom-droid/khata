@@ -1,4 +1,5 @@
 import express from "express";
+import { randomInt } from "node:crypto";
 import request from "supertest";
 import jwt from "jsonwebtoken";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -28,6 +29,7 @@ describe("admin security and foreground presence", () => {
   let oldConfig: typeof adminOtpConfigTable.$inferSelect | undefined;
   let createdConfigId: string | undefined;
   const ip = "127.0.0.1";
+  const otpTestPhone = `017${randomInt(10_000_000, 90_000_000)}`;
   const previousDirect = process.env.CLIENT_IP_MODE;
   const previousTrusted = process.env.TRUSTED_PROXY_CIDRS;
 
@@ -154,7 +156,8 @@ describe("admin security and foreground presence", () => {
     const changed = await request(app).put("/admin/otp-config").set("Authorization", admin)
       .send({ enabled: false });
     expect(changed.status).toBe(200);
-    expect((await request(app).post("/auth/phone/send-otp").send({ phone: "01712345678" })).status).toBe(503);
-    expect((await request(app).post("/auth/phone/verify-otp").send({ phone: "01712345678", code: "123456" })).status).toBe(503);
+    expect((await request(app).post("/auth/phone/send-otp").send({ phone: otpTestPhone })).status).toBe(503);
+    expect((await request(app).post("/auth/phone/verify-otp")
+      .send({ phone: otpTestPhone, code: "123456" })).status).toBe(503);
   });
 });
