@@ -142,6 +142,8 @@ describe('browser ledger entry submission', () => {
   it('supports manual typing, cursor insertion, selection replacement, and one-character keypad backspace', () => {
     renderEntry();
     const amount = screen.getByRole('textbox', { name: 'পরিমাণ লিখুন' }) as HTMLInputElement;
+    expect(amount).toHaveClass('text-left');
+    expect(amount).not.toHaveClass('text-right');
 
     fireEvent.change(amount, { target: { value: '১২৩৪' } });
     expect(amount.value).toBe('১২৩৪');

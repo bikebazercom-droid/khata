@@ -815,7 +815,7 @@ export function TransactionEntryScreen({
               onBlur={captureAmountSelection}
               placeholder="পরিমাণ লিখুন"
               className={cn(
-                'min-w-0 flex-1 bg-transparent text-right text-2xl font-extrabold tracking-tight tabular-nums placeholder:text-slate-300 focus:outline-none',
+                'min-w-0 flex-1 bg-transparent text-left text-2xl font-extrabold tracking-tight tabular-nums placeholder:text-slate-300 focus:outline-none',
                 isGet ? 'text-emerald-600' : 'text-red-500',
               )}
             />
