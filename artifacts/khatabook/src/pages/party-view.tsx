@@ -10,8 +10,6 @@ import {
   getListLedgerEntriesQueryKey,
   LedgerEntryType,
 } from '@workspace/api-client-react';
-import html2pdf from 'html2pdf.js';
-import html2canvas from 'html2canvas';
 import {
   ChevronLeft,
   Phone,
@@ -152,7 +150,7 @@ export function PartyView() {
   const groupedEntries = useMemo(() => groupByDay(descendingEntries), [descendingEntries]);
 
   /** Renders the hidden report DOM node into a jsPDF worker instance. */
-  const buildReportPdf = () => {
+  const buildReportPdf = (html2pdf: typeof import('html2pdf.js').default) => {
     if (!reportRef.current) return null;
     return html2pdf().set({
       margin: 10,
@@ -195,7 +193,8 @@ export function PartyView() {
         );
       }
 
-      const worker = buildReportPdf();
+      const { default: html2pdf } = await import('html2pdf.js');
+      const worker = buildReportPdf(html2pdf);
       if (!worker) throw new Error('report element not ready');
       await finalizeReportPdf(worker).save();
       // Silent by design: the browser's own download indicator is the
@@ -225,7 +224,8 @@ export function PartyView() {
         );
       }
 
-      const worker = buildReportPdf();
+      const { default: html2pdf } = await import('html2pdf.js');
+      const worker = buildReportPdf(html2pdf);
       if (!worker) throw new Error('report element not ready');
       const blob = await finalizeReportPdf(worker).outputPdf('blob');
       const filename = buildReportFilename(party.name);

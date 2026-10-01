@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { SignIn } from '@clerk/react';
 import { sendOtp, verifyOtp } from '@/lib/phoneAuth';
+import { authMeQueryKey } from '@/lib/authQueryKeys';
 import { useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -104,7 +105,7 @@ function ClerkSignIn() {
   );
 }
 
-function PhoneSignIn() {
+export function PhoneSignIn() {
   const [, setLocation] = useLocation();
   const qc = useQueryClient();
   const [phone, setPhone] = useState('');
@@ -135,7 +136,7 @@ function PhoneSignIn() {
       const me = await verifyOtp(phone, code);
       // Seed React Query's auth-me cache with the fresh response so
       // useAppAuth resolves immediately — no hard reload needed.
-      qc.setQueryData(['auth-me'], me);
+      qc.setQueryData(authMeQueryKey(), me);
       setLocation('/');
     } catch (err: any) {
       setError(err.message ?? 'Invalid code');
@@ -167,6 +168,7 @@ function PhoneSignIn() {
                 <input
                   type="tel"
                   placeholder="01XXXXXXXXX"
+                  data-testid="input-phone"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   className="flex-1 rounded-r-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 bg-white focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
@@ -178,6 +180,7 @@ function PhoneSignIn() {
             {error && <p className="text-sm text-red-600">{error}</p>}
             <button
               type="submit"
+              data-testid="button-send-otp"
               disabled={loading}
               className="w-full bg-slate-900 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-slate-800 disabled:opacity-50 transition-colors"
             >
@@ -202,6 +205,7 @@ function PhoneSignIn() {
                 type="text"
                 inputMode="numeric"
                 placeholder="123456"
+                data-testid="input-otp-code"
                 maxLength={6}
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
@@ -213,6 +217,7 @@ function PhoneSignIn() {
             {error && <p className="text-sm text-red-600">{error}</p>}
             <button
               type="submit"
+              data-testid="button-verify-otp"
               disabled={loading}
               className="w-full bg-slate-900 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-slate-800 disabled:opacity-50 transition-colors"
             >
@@ -220,6 +225,7 @@ function PhoneSignIn() {
             </button>
             <button
               type="button"
+              data-testid="button-back-to-phone"
               onClick={() => { setStep('phone'); setCode(''); setError(''); }}
               className="w-full text-sm text-slate-500 hover:text-slate-700 py-1"
             >

@@ -1,6 +1,4 @@
 import { useState, useCallback, useEffect } from 'react';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import { useLocation } from 'wouter';
 import { useBusinessContext } from '@/lib/businessContext';
 import {
@@ -178,6 +176,7 @@ export function HomeView() {
     document.body.appendChild(el);
 
     try {
+      const { default: html2canvas } = await import('html2canvas');
       const canvas = await html2canvas(el, { backgroundColor: '#ffffff', scale: 3, useCORS: true, logging: false });
       document.body.removeChild(el);
 
@@ -349,6 +348,10 @@ export function HomeView() {
     document.body.appendChild(container);
 
     try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ]);
       const canvas = await html2canvas(container, {
         scale: 2,
         useCORS: true,

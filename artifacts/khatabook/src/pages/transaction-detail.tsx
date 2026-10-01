@@ -33,7 +33,6 @@ import { billImageSrc } from '@/lib/billImageStorage';
 import { BillImageLightbox } from '@/components/modals/bill-image-lightbox';
 import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic';
 import { toast } from 'sonner';
-import html2canvas from 'html2canvas';
 import { useConnectionState } from '@/context/connection-state';
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -92,6 +91,7 @@ export function TransactionDetailPage() {
   const handleJpgShare = async () => {
     if (!receiptCardRef.current || !entry || !party) return;
     try {
+      const { default: html2canvas } = await import('html2canvas');
       const canvas = await html2canvas(receiptCardRef.current, {
         backgroundColor: '#ffffff',
         scale: 3,

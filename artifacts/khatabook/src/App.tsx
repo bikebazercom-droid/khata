@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { ClerkProvider, useAuth } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { shadcn } from '@clerk/themes';
@@ -8,20 +8,9 @@ import { Toaster, toast } from 'sonner';
 import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { MainLayout } from '@/components/layout/main-layout';
 import { ConnectionStateProvider, useConnectionState } from '@/context/connection-state';
-import { HomeView } from '@/pages/home';
-import { PartyView } from '@/pages/party-view';
-import { PartyProfileView } from '@/pages/party-profile';
-import { TransactionDetailPage } from '@/pages/transaction-detail';
-import { ReportView } from '@/pages/report-view';
-import { PartyReportView } from '@/pages/party-report-view';
-import { StaffDeploymentPage } from '@/pages/staff-deployment';
-import { AccessPage } from '@/pages/access';
-import { RejectedDraftsPage } from '@/pages/rejected-drafts';
 import { LandingPage } from '@/pages/landing';
-import { SignInPage } from '@/pages/sign-in';
-import { SignUpPage } from '@/pages/sign-up';
-import NotFound from '@/pages/not-found';
 import { fetchMe } from '@/lib/phoneAuth';
+import { authMeQueryKey } from '@/lib/authQueryKeys';
 import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import { useRetryPendingUploads } from '@/lib/useRetryPendingUploads';
 import { readOfflineIdentity, writeOfflineIdentity, clearOfflineIdentity, allowOfflineBusinesses } from '@/lib/authCache';
@@ -34,6 +23,19 @@ import { clearAllPendingUploads } from '@/lib/pendingUploads';
 import { useBusinessContext } from '@/lib/businessContext';
 import { isNetworkWriteAuthorized, markServerReauthenticated, revokeNetworkWrites, useAuthConnectivity } from '@/lib/useAuthConnectivity';
 import { EntrySavedFeedbackHost } from '@/components/ui/entry-saved-feedback';
+
+const HomeView = lazy(() => import('@/pages/home').then((module) => ({ default: module.HomeView })));
+const PartyView = lazy(() => import('@/pages/party-view').then((module) => ({ default: module.PartyView })));
+const PartyProfileView = lazy(() => import('@/pages/party-profile').then((module) => ({ default: module.PartyProfileView })));
+const TransactionDetailPage = lazy(() => import('@/pages/transaction-detail').then((module) => ({ default: module.TransactionDetailPage })));
+const ReportView = lazy(() => import('@/pages/report-view').then((module) => ({ default: module.ReportView })));
+const PartyReportView = lazy(() => import('@/pages/party-report-view').then((module) => ({ default: module.PartyReportView })));
+const StaffDeploymentPage = lazy(() => import('@/pages/staff-deployment').then((module) => ({ default: module.StaffDeploymentPage })));
+const AccessPage = lazy(() => import('@/pages/access').then((module) => ({ default: module.AccessPage })));
+const RejectedDraftsPage = lazy(() => import('@/pages/rejected-drafts').then((module) => ({ default: module.RejectedDraftsPage })));
+const SignInPage = lazy(() => import('@/pages/sign-in').then((module) => ({ default: module.SignInPage })));
+const SignUpPage = lazy(() => import('@/pages/sign-up').then((module) => ({ default: module.SignUpPage })));
+const NotFound = lazy(() => import('@/pages/not-found'));
 
 // ─── Clerk setup ──────────────────────────────────────────────────────────────
 
@@ -54,10 +56,6 @@ function stripBase(path: string): string {
   return basePath && path.startsWith(basePath)
     ? path.slice(basePath.length) || '/'
     : path;
-}
-
-if (!clerkPubKey) {
-  throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY');
 }
 
 const clerkAppearance = {
@@ -227,7 +225,7 @@ function AuthCacheInvalidator() {
   const { selectedBusinessId, setSelectedBusiness } = useBusinessContext();
   const { isLoaded, userId: clerkUserId } = useAuth();
   const { data: me, isError, error } = useQuery({
-    queryKey: ['auth-me', clerkUserId],
+    queryKey: authMeQueryKey(clerkUserId),
     queryFn: () => fetchMe(),
     enabled: isLoaded,
     retry: false,
@@ -311,7 +309,7 @@ export function useAppAuth() {
   const devBypass = import.meta.env.DEV && import.meta.env.VITE_DEV_AUTH_BYPASS === 'true';
   const enabled = isLoaded && !devBypass;
   const { data: authData, isLoading: authLoading, isError, error } = useQuery({
-    queryKey: ['auth-me', clerkUserId],
+    queryKey: authMeQueryKey(clerkUserId),
     queryFn: () => fetchMe(),
     enabled,
     staleTime: 0,
@@ -443,7 +441,7 @@ function SignInRoute() {
 function AuthServerReporter({ onNetworkFailure, onSettled }: { onNetworkFailure: () => void; onSettled: () => void }) {
   const { isLoaded, userId } = useAuth();
   const { data, isSuccess, isError, error } = useQuery({
-    queryKey: ['auth-me', userId],
+    queryKey: authMeQueryKey(userId),
     queryFn: () => fetchMe(),
     enabled: isLoaded,
     staleTime: 0,
@@ -468,8 +466,105 @@ function AuthServerReporter({ onNetworkFailure, onSettled }: { onNetworkFailure:
 }
 
 function AppRouter({ onNetworkFailure, onSettled }: { onNetworkFailure: () => void; onSettled: () => void }) {
+  return (
+    <>
+      <AuthServerReporter onNetworkFailure={onNetworkFailure} onSettled={onSettled} />
+      <LanguageProvider>
+        <ConnectionStateProvider>
+        <AuthCacheInvalidator />
+        <RealtimeSyncManager />
+        <TooltipProvider>
+          <Suspense fallback={<AppSplash />}>
+            <Switch>
+              {/* Public */}
+              <Route path="/" component={HomeRoute} />
+              {/* REQUIRED — copy "/sign-in/*?" verbatim */}
+              <Route path="/sign-in/*?" component={SignInRoute} />
+              <Route path="/sign-up/*?" component={SignUpPage} />
+              {/* Protected */}
+              <Route path="/access">
+                <OwnerLayout>
+                  <AccessPage />
+                </OwnerLayout>
+              </Route>
+              <Route path="/party/:partyId/entry/:entryId">
+                {() => (
+                  <OwnerLayout>
+                    <TransactionDetailPage />
+                  </OwnerLayout>
+                )}
+              </Route>
+              <Route path="/party/:id/report">
+                {() => (
+                  <OwnerLayout>
+                    <PartyReportView />
+                  </OwnerLayout>
+                )}
+              </Route>
+              <Route path="/party/:id/profile">
+                {() => (
+                  <OwnerLayout>
+                    <PartyProfileView />
+                  </OwnerLayout>
+                )}
+              </Route>
+              <Route path="/party/:id">
+                {() => (
+                  <ProtectedLayout>
+                    <PartyView />
+                  </ProtectedLayout>
+                )}
+              </Route>
+              <Route path="/reports">
+                <OwnerLayout>
+                  <ReportView />
+                </OwnerLayout>
+              </Route>
+              <Route path="/rejected-drafts">
+                <OwnerLayout>
+                  <RejectedDraftsPage />
+                </OwnerLayout>
+              </Route>
+              <Route path="/staff-deployment">
+                <OwnerLayout>
+                  <StaffDeploymentPage />
+                </OwnerLayout>
+              </Route>
+              <Route component={NotFound} />
+            </Switch>
+          </Suspense>
+        </TooltipProvider>
+        <Toaster position="bottom-right" richColors />
+        <EntrySavedFeedbackHost />
+        <BusinessSwitcherDrawer />
+        </ConnectionStateProvider>
+      </LanguageProvider>
+    </>
+  );
+}
+
+function AppClient() {
+  const clearQueries = useCallback(() => queryClient.clear(), []);
+  const { phase, goOffline, serverAuthSettled, retry } = useAuthConnectivity(clearQueries);
   const [, setLocation] = useLocation();
 
+  if (!clerkPubKey) {
+    return (
+      <main className="min-h-[100dvh] bg-slate-50 px-6 flex items-center justify-center">
+        <section role="alert" className="w-full max-w-sm rounded-2xl bg-white p-7 text-center shadow-sm border border-slate-100">
+          <h1 className="text-xl font-bold text-slate-900">অ্যাপটি এখন খোলা যাচ্ছে না</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-600">সাইন-ইন কনফিগারেশন পাওয়া যায়নি। পরে আবার চেষ্টা করুন।</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (phase === 'offline') {
+    return <OnlineConnectionRequired onRetry={() => { void retry(); }} />;
+  }
+
+  // Boot Clerk alongside the reachability probe, but keep authenticated routes,
+  // realtime listeners, and mutation-capable providers behind the online gate.
   return (
     <ClerkProvider
       publishableKey={clerkPubKey}
@@ -489,91 +584,19 @@ function AppRouter({ onNetworkFailure, onSettled }: { onNetworkFailure: () => vo
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
       <QueryClientProvider client={queryClient}>
-        <AuthServerReporter onNetworkFailure={onNetworkFailure} onSettled={onSettled} />
-        <LanguageProvider>
-        <ConnectionStateProvider>
-        <AuthCacheInvalidator />
-        <RealtimeSyncManager />
-        <TooltipProvider>
-          <Switch>
-            {/* Public */}
-            <Route path="/" component={HomeRoute} />
-            {/* REQUIRED — copy "/sign-in/*?" verbatim */}
-            <Route path="/sign-in/*?" component={SignInRoute} />
-            <Route path="/sign-up/*?" component={SignUpPage} />
-            {/* Protected */}
-            <Route path="/access">
-              <OwnerLayout>
-                <AccessPage />
-              </OwnerLayout>
-            </Route>
-            <Route path="/party/:partyId/entry/:entryId">
-              {() => (
-                <OwnerLayout>
-                  <TransactionDetailPage />
-                </OwnerLayout>
-              )}
-            </Route>
-            <Route path="/party/:id/report">
-              {() => (
-                <OwnerLayout>
-                  <PartyReportView />
-                </OwnerLayout>
-              )}
-            </Route>
-            <Route path="/party/:id/profile">
-              {() => (
-                <OwnerLayout>
-                  <PartyProfileView />
-                </OwnerLayout>
-              )}
-            </Route>
-            <Route path="/party/:id">
-              {(params) => (
-                <ProtectedLayout>
-                  <PartyView />
-                </ProtectedLayout>
-              )}
-            </Route>
-            <Route path="/reports">
-              <OwnerLayout>
-                <ReportView />
-              </OwnerLayout>
-            </Route>
-            <Route path="/rejected-drafts">
-              <OwnerLayout>
-                <RejectedDraftsPage />
-              </OwnerLayout>
-            </Route>
-            <Route path="/staff-deployment">
-              <OwnerLayout>
-                <StaffDeploymentPage />
-              </OwnerLayout>
-            </Route>
-            <Route component={NotFound} />
-          </Switch>
-        </TooltipProvider>
-        <Toaster position="bottom-right" richColors />
-        <EntrySavedFeedbackHost />
-        <BusinessSwitcherDrawer />
-        </ConnectionStateProvider>
-        </LanguageProvider>
+        {phase === 'probing'
+          ? <AppSplash />
+          : <AppRouter onNetworkFailure={goOffline} onSettled={serverAuthSettled} />}
       </QueryClientProvider>
     </ClerkProvider>
   );
 }
 
 function App() {
-  const clearQueries = useCallback(() => queryClient.clear(), []);
-  const { phase, goOffline, serverAuthSettled, retry } = useAuthConnectivity(clearQueries);
-  if (phase === 'probing') return <AppSplash />;
-  if (phase === 'offline') {
-    return <OnlineConnectionRequired onRetry={() => { void retry(); }} />;
-  }
   return (
     <BusinessContextProvider>
       <WouterRouter base={basePath}>
-        <AppRouter onNetworkFailure={goOffline} onSettled={serverAuthSettled} />
+        <AppClient />
       </WouterRouter>
     </BusinessContextProvider>
   );
