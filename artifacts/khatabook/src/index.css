@@ -124,7 +124,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .entry-saved-checkmark {
-    animation-timing-function: linear;
+    animation: none;
   }
 }
 
