@@ -6,24 +6,25 @@ import { AppButton, LoadingState, Notice, Page } from '@/components/Kit';
 import { errorMessage, isUnauthorized } from '@/lib/domain';
 
 export default function IndexScreen() {
-  const { ready, token, identity, identityLoading, identityError, storageError, refreshIdentity } = useAuth();
+  const { ready, hasSession, accountDeleted, identity, identityLoading, identityError, storageError, refreshIdentity } = useAuth();
   const isWeb = Platform.OS === 'web';
 
   useEffect(() => {
     if (!ready) return;
     if (isWeb) {
-      if (identity) router.replace('/(tabs)/home');
+      if (accountDeleted) router.replace('/sign-in');
+      else if (identity) router.replace('/(tabs)/home');
       else if (!identityLoading && identityError && isUnauthorized(identityError)) router.replace('/sign-in');
       return;
     }
-    if (!token) {
+    if (!hasSession) {
       router.replace('/sign-in');
     } else if (identity) {
       router.replace('/(tabs)/home');
     }
-  }, [ready, isWeb, token, identity, identityLoading, identityError]);
+  }, [ready, isWeb, hasSession, accountDeleted, identity, identityLoading, identityError]);
 
-  if (!ready || (isWeb ? identityLoading : token && identityLoading)) return <Page><LoadingState label="আপনার হিসাব খোলা হচ্ছে…" /></Page>;
+  if (!ready || (isWeb ? !accountDeleted && identityLoading : hasSession && identityLoading)) return <Page><LoadingState label="আপনার হিসাব খোলা হচ্ছে…" /></Page>;
   if (storageError) return <Page><Notice message={storageError} /></Page>;
   if (isWeb && identityError && !isUnauthorized(identityError)) {
     return (
@@ -33,7 +34,7 @@ export default function IndexScreen() {
       </Page>
     );
   }
-  if (token && identityError) {
+  if (hasSession && identityError) {
     return (
       <Page>
         <Notice message={errorMessage(identityError, 'সার্ভারের সঙ্গে সংযোগ করা যাচ্ছে না।')} tone="error" onRetry={() => { void refreshIdentity(); }} />

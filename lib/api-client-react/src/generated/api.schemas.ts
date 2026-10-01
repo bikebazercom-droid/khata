@@ -91,6 +91,10 @@ export interface PhoneOtpLogoutResult {
   success: boolean;
 }
 
+export interface AccountDeletionResult {
+  success: boolean;
+}
+
 export type AuthMeRole = typeof AuthMeRole[keyof typeof AuthMeRole];
 
 

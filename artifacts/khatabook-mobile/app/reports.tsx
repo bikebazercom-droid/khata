@@ -54,6 +54,12 @@ export default function ReportsScreen() {
   return (
     <Page onRefresh={() => { void partiesQuery.refetch(); }} refreshing={partiesQuery.isRefetching}>
       <PageHeader title="PDF রিপোর্ট" subtitle="হিসাবের সারাংশ ও পার্টির ব্যালেন্স" onBack={() => router.back()} />
+      <AppButton
+        title="লেনদেন রিপোর্ট খুলুন"
+        icon="file-text"
+        onPress={() => router.push('/transaction-report')}
+        testID="open-transaction-report"
+      />
       <View style={{ flexDirection: 'row', gap: 8 }}>
         {FILTERS.map((filter) => {
           const selected = role === filter.value;

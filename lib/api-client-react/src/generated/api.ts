@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AccountDeletionResult,
   AdjustmentTarget,
   AdminLoginInput,
   AdminLoginResult,
@@ -600,6 +601,148 @@ export function useGetAuthMe<TData = Awaited<ReturnType<typeof getAuthMe>>, TErr
 
 
 
+
+export const getReportAuthLogoutEventUrl = () => {
+
+
+
+
+  return `/api/auth/logout-event`
+}
+
+/**
+ * @summary Revoke the current Clerk session after explicit user sign-out
+ */
+export const reportAuthLogoutEvent = async ( options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getReportAuthLogoutEventUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getReportAuthLogoutEventMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportAuthLogoutEvent>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reportAuthLogoutEvent>>, TError,void, TContext> => {
+
+const mutationKey = ['reportAuthLogoutEvent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reportAuthLogoutEvent>>, void> = () => {
+
+
+          return  reportAuthLogoutEvent(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReportAuthLogoutEventMutationResult = NonNullable<Awaited<ReturnType<typeof reportAuthLogoutEvent>>>
+
+    export type ReportAuthLogoutEventMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Revoke the current Clerk session after explicit user sign-out
+ */
+export const useReportAuthLogoutEvent = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportAuthLogoutEvent>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reportAuthLogoutEvent>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getReportAuthLogoutEventMutationOptions(options));
+    }
+
+export const getDeleteUserAccountUrl = () => {
+
+
+
+
+  return `/api/user/account`
+}
+
+/**
+ * @summary Permanently delete the authenticated owner's account and business data
+ */
+export const deleteUserAccount = async ( options?: RequestInit): Promise<AccountDeletionResult> => {
+
+  return customFetch<AccountDeletionResult>(getDeleteUserAccountUrl(),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteUserAccountMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteUserAccount>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteUserAccount>>, TError,void, TContext> => {
+
+const mutationKey = ['deleteUserAccount'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteUserAccount>>, void> = () => {
+
+
+          return  deleteUserAccount(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteUserAccountMutationResult = NonNullable<Awaited<ReturnType<typeof deleteUserAccount>>>
+
+    export type DeleteUserAccountMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Permanently delete the authenticated owner's account and business data
+ */
+export const useDeleteUserAccount = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteUserAccount>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteUserAccount>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getDeleteUserAccountMutationOptions(options));
+    }
 
 export const getGetDashboardSummaryUrl = () => {
 

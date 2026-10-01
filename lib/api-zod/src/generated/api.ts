@@ -111,6 +111,20 @@ export const GetAuthMeResponse = zod.object({
 
 
 /**
+ * @summary Revoke the current Clerk session after explicit user sign-out
+ */
+export const ReportAuthLogoutEventResponse = zod.void()
+
+
+/**
+ * @summary Permanently delete the authenticated owner's account and business data
+ */
+export const DeleteUserAccountResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
  * @summary Get aggregated dashboard totals
  */
 export const GetDashboardSummaryResponse = zod.object({

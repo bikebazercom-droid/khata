@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './accountDeletionResult';
 export * from './adjustmentTarget';
 export * from './adminLoginEvent';
 export * from './adminLoginInput';

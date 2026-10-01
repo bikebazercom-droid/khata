@@ -19,5 +19,5 @@ export function useColors() {
     scheme === 'dark' && 'dark' in colors
       ? colors.dark
       : colors.light;
-  return { ...palette, radius: colors.radius };
+  return { ...palette, auth: colors.auth, radius: colors.radius };
 }

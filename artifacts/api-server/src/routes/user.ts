@@ -35,6 +35,16 @@ router.delete(
     const { userId } = req as unknown as AuthenticatedRequest;
 
     try {
+      const [authenticatedUser] = await db
+        .select({ role: appUsersTable.role })
+        .from(appUsersTable)
+        .where(eq(appUsersTable.id, userId))
+        .limit(1);
+      if (authenticatedUser?.role !== "owner") {
+        res.status(403).json({ error: "Only a business owner can delete the account." });
+        return;
+      }
+
       await db.transaction(async (tx) => {
         // 1. Collect all business IDs owned by this user.
         const userBizRows = await tx

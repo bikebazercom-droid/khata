@@ -170,6 +170,44 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+  /auth/logout-event:
+    post:
+      operationId: reportAuthLogoutEvent
+      tags: [auth]
+      summary: Revoke the current Clerk session after explicit user sign-out
+      responses:
+        "204":
+          description: Session revoked
+        "401":
+          description: Invalid or revoked session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /user/account:
+    delete:
+      operationId: deleteUserAccount
+      tags: [auth]
+      summary: Permanently delete the authenticated owner's account and business data
+      responses:
+        "200":
+          description: Account and business data deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountDeletionResult"
+        "403":
+          description: Only a business owner can delete the account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: Account deletion failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /dashboard/summary:
     get:
       operationId: getDashboardSummary
@@ -835,6 +873,12 @@ components:
           type: string
           description: App-issued bearer token. Store in secure native storage.
     PhoneOtpLogoutResult:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+    AccountDeletionResult:
       type: object
       required: [success]
       properties:

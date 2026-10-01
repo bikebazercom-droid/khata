@@ -1,9 +1,16 @@
 import { Platform } from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import { formatDate, formatMoney, type LedgerRecord, type PartyRecord } from '@/lib/domain';
+import { billImageUrl, formatDate, formatMoney, type GlobalLedgerRecord, type LedgerRecord, type PartyRecord } from '@/lib/domain';
+import { calculateGlobalLedgerReportTotals } from '@workspace/api-client-react/global-ledger-report';
 
-export type StatementPeriod = 'all' | 'month' | '30days';
+export type StatementPeriod = 'all' | 'month' | '30days' | 'custom';
+
+export type StatementOptions = {
+  startDate?: Date | null;
+  endDate?: Date | null;
+  search?: string;
+};
 
 export type PartyStatement = {
   entries: LedgerRecord[];
@@ -23,23 +30,33 @@ export function calculatePartyStatement(
   entries: LedgerRecord[],
   period: StatementPeriod,
   now = new Date(),
+  options: StatementOptions = {},
 ): PartyStatement {
   let start: Date | null = null;
   if (period === 'month') start = new Date(now.getFullYear(), now.getMonth(), 1);
   if (period === '30days') start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
-  const end = new Date(now.getTime());
+  if (period === 'custom') start = options.startDate ?? null;
+  const end = period === 'custom' && options.endDate
+    ? new Date(options.endDate.getFullYear(), options.endDate.getMonth(), options.endDate.getDate(), 23, 59, 59, 999)
+    : new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
   const inRange = (entry: LedgerRecord) => {
     const time = new Date(entry.createdAt).getTime();
-    return Number.isFinite(time) && (!start || (time >= start.getTime() && time <= end.getTime()));
+    return Number.isFinite(time)
+      && (!start || time >= start.getTime())
+      && (period === 'all' || time <= end.getTime());
   };
-  const filtered = entries.filter(inRange);
+  const dateFiltered = entries.filter(inRange);
+  const normalizedSearch = options.search?.trim().toLocaleLowerCase();
+  const filtered = normalizedSearch
+    ? dateFiltered.filter((entry) => (entry.description ?? '').toLocaleLowerCase().includes(normalizedSearch))
+    : dateFiltered;
   const openingBalance = start
     ? entries
       .filter((entry) => new Date(entry.createdAt).getTime() < start!.getTime())
       .reduce((balance, entry) => balance + entryDelta(entry), 0)
     : 0;
-  const entriesAscending = [...filtered].sort(
+  const entriesAscending = [...dateFiltered].sort(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
   );
   let runningBalance = openingBalance;
@@ -48,12 +65,12 @@ export function calculatePartyStatement(
     runningBalance += entryDelta(entry);
     runningBalances.set(entry.id, runningBalance);
   }
-  const gave = filtered.reduce((total, entry) => total + (entry.type === 'YOU_GAVE' ? entry.amount : 0), 0);
-  const received = filtered.reduce((total, entry) => total + (entry.type === 'YOU_GOT' ? entry.amount : 0), 0);
+  const gave = dateFiltered.reduce((total, entry) => total + (entry.type === 'YOU_GAVE' ? entry.amount : 0), 0);
+  const received = dateFiltered.reduce((total, entry) => total + (entry.type === 'YOU_GOT' ? entry.amount : 0), 0);
 
   return {
     entries: [...filtered].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-    entriesAscending,
+    entriesAscending: entriesAscending.filter((entry) => !normalizedSearch || (entry.description ?? '').toLocaleLowerCase().includes(normalizedSearch)),
     openingBalance,
     gave,
     received,
@@ -129,11 +146,13 @@ export function buildPartyStatementHtml({
   party,
   periodLabel,
   statement,
+  billImages = new Map(),
 }: {
   businessName: string;
   party: PartyRecord;
   periodLabel: string;
   statement: PartyStatement;
+  billImages?: Map<string, string>;
 }): string {
   const rows = statement.entriesAscending.map((entry) => {
     const isGave = entry.type === 'YOU_GAVE';
@@ -142,7 +161,7 @@ export function buildPartyStatementHtml({
     const description = entry.description || (entry.isTransfer ? 'ট্রান্সফার' : isGave ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন');
     return `<tr>
       <td>${escapeHtml(formatDate(entry.createdAt))}</td>
-      <td>${escapeHtml(description)}${entry.billReference ? `<br><span style="color:#64748b">রেফ: ${escapeHtml(entry.billReference)}</span>` : ''}</td>
+      <td>${escapeHtml(description)}${entry.billReference ? `<br><span style="color:#64748b">রেফ: ${escapeHtml(entry.billReference)}</span>` : ''}${billImages.has(entry.id) ? `<br><img src="${escapeHtml(billImages.get(entry.id) ?? '')}" alt="বিলের ছবি" style="width:64px;height:48px;object-fit:cover;margin-top:4px;border-radius:4px" />` : ''}</td>
       <td class="right ${isGave ? 'red' : ''}">${isGave ? amount : '—'}</td>
       <td class="right ${!isGave ? 'green' : ''}">${isGave ? '—' : amount}</td>
       <td class="right">${escapeHtml(balanceLabel(runningBalance))}</td>
@@ -162,6 +181,94 @@ export function buildPartyStatementHtml({
       <tbody>${rows || '<tr><td colspan="5" style="text-align:center;color:#64748b">এই সময়ে কোনো লেনদেন নেই</td></tr>'}</tbody>
     </table>`;
   return reportShell(`${roleLabel} স্টেটমেন্ট`, businessName, body);
+}
+
+export function buildGlobalLedgerReportHtml({
+  businessName,
+  entries,
+  periodLabel,
+}: {
+  businessName: string;
+  entries: GlobalLedgerRecord[];
+  periodLabel: string;
+}): string {
+  const totals = calculateGlobalLedgerReportTotals(entries);
+  const rows = [...entries].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()).map((entry) => {
+    const debit = entry.type === 'YOU_GAVE';
+    return `<tr>
+      <td>${escapeHtml(formatDate(entry.createdAt))}</td>
+      <td>${escapeHtml(entry.partyName)}${entry.partyPhone ? `<br><span style="color:#64748b">${escapeHtml(entry.partyPhone)}</span>` : ''}</td>
+      <td>${escapeHtml(entry.description || (entry.isTransfer ? 'ট্রান্সফার' : '—'))}${entry.billReference ? `<br><span style="color:#64748b">রেফ: ${escapeHtml(entry.billReference)}</span>` : ''}</td>
+      <td class="right ${debit ? 'red' : ''}">${debit ? money(entry.amount) : '—'}</td>
+      <td class="right ${!debit ? 'green' : ''}">${!debit ? money(entry.amount) : '—'}</td>
+    </tr>`;
+  }).join('');
+  const body = `
+    <div class="subtitle">${escapeHtml(periodLabel)} · ${entries.length}টি লেনদেন</div>
+    <div class="summary">
+      <div class="summary-card"><div class="summary-label">মোট ডেবিট</div><div class="summary-value red">${money(totals.totalDebit)}</div></div>
+      <div class="summary-card"><div class="summary-label">মোট ক্রেডিট</div><div class="summary-value green">${money(totals.totalCredit)}</div></div>
+      <div class="summary-card"><div class="summary-label">নিট ব্যালেন্স</div><div class="summary-value">${money(totals.netBalance)}</div></div>
+    </div>
+    <table>
+      <thead><tr><th>তারিখ</th><th>পার্টি</th><th>বিবরণ</th><th class="right">ডেবিট</th><th class="right">ক্রেডিট</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="5" style="text-align:center;color:#64748b">এই সময়ে কোনো লেনদেন নেই</td></tr>'}</tbody>
+    </table>`;
+  return reportShell('লেনদেন রিপোর্ট', businessName, body);
+}
+
+const MAX_EMBEDDED_IMAGE_BYTES = 1024 * 1024;
+
+function encodeBase64(bytes: Uint8Array): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  let result = '';
+  for (let index = 0; index < bytes.length; index += 3) {
+    const first = bytes[index];
+    const second = bytes[index + 1];
+    const third = bytes[index + 2];
+    result += alphabet[first >> 2];
+    result += alphabet[((first & 3) << 4) | ((second ?? 0) >> 4)];
+    result += second === undefined ? '=' : alphabet[((second & 15) << 2) | ((third ?? 0) >> 6)];
+    result += third === undefined ? '=' : alphabet[third & 63];
+  }
+  return result;
+}
+
+export async function embedPartyStatementBillImages(
+  entries: readonly LedgerRecord[],
+  token: string | null,
+): Promise<{ images: Map<string, string>; failedCount: number }> {
+  const images = new Map<string, string>();
+  let failedCount = 0;
+  const withImages = entries.filter((entry) => entry.billImage);
+  await Promise.all(withImages.map(async (entry) => {
+    try {
+      const image = entry.billImage!;
+      if (image.startsWith('data:')) {
+        if (!image.startsWith('data:image/') || image.length > MAX_EMBEDDED_IMAGE_BYTES * 1.4) {
+          throw new Error('Invalid or oversized embedded image');
+        }
+        images.set(entry.id, image);
+        return;
+      }
+      const url = billImageUrl(image);
+      if (!url) return;
+      const protectedObject = image.startsWith('/objects/');
+      const response = await fetch(url, {
+        credentials: protectedObject ? 'include' : 'omit',
+        headers: protectedObject && token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      if (!response.ok) throw new Error(`Image request failed (${response.status})`);
+      const contentType = response.headers.get('content-type')?.split(';')[0] ?? '';
+      if (!contentType.startsWith('image/')) throw new Error('Invalid image content type');
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (!bytes.length || bytes.length > MAX_EMBEDDED_IMAGE_BYTES) throw new Error('Image exceeds PDF limit');
+      images.set(entry.id, `data:${contentType};base64,${encodeBase64(bytes)}`);
+    } catch {
+      failedCount += 1;
+    }
+  }));
+  return { images, failedCount };
 }
 
 export function buildPartyBalancesHtml({

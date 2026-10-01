@@ -43,6 +43,17 @@ const colors = {
     border: '#2A3B50',
     input: '#2A3B50',
   },
+  auth: {
+    backgroundStart: '#1B3A6B',
+    backgroundEnd: '#2A5298',
+    card: '#FFFFFF',
+    foreground: '#13283E',
+    mutedForeground: '#64748B',
+    border: '#DCE5EE',
+    tabTrack: 'rgba(255, 255, 255, 0.18)',
+    tabInactive: 'rgba(255, 255, 255, 0.84)',
+    onBackground: '#FFFFFF',
+  },
   radius: 8,
 };
 

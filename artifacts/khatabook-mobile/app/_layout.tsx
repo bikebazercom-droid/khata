@@ -4,10 +4,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { setAuthTokenGetter, setBaseUrl, setExtraHeaders } from '@workspace/api-client-react';
+import { ClerkProvider } from '@clerk/expo';
+import { tokenCache } from '@clerk/expo/token-cache';
+import { setBaseUrl, setExtraHeaders } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { getSavedAuthToken } from '@/lib/authStorage';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -24,8 +25,9 @@ SplashScreen.preventAutoHideAsync();
 const apiDomain = process.env.EXPO_PUBLIC_DOMAIN;
 if (!apiDomain) throw new Error('EXPO_PUBLIC_DOMAIN is required to connect BanglaKhata Mobile to the API.');
 setBaseUrl(`https://${apiDomain}`);
-setAuthTokenGetter(Platform.OS === 'web' ? null : getSavedAuthToken);
 setExtraHeaders({ 'x-client-platform': Platform.OS === 'web' ? 'web' : 'mobile' });
+const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
+if (!clerkPublishableKey) throw new Error('EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is required for Email and Google sign-in.');
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -69,16 +71,22 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-          <GestureHandlerRootView style={{ flex: 1 }}>
-            <KeyboardProvider>
-              <StatusBar style="auto" />
-              <RootLayoutNav />
-            </KeyboardProvider>
-          </GestureHandlerRootView>
-          </AuthProvider>
-        </QueryClientProvider>
+        <ClerkProvider
+          publishableKey={clerkPublishableKey}
+          tokenCache={tokenCache}
+          clerkProxyUrl={process.env.EXPO_PUBLIC_CLERK_PROXY_URL}
+        >
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              <GestureHandlerRootView style={{ flex: 1 }}>
+                <KeyboardProvider>
+                  <StatusBar style="auto" />
+                  <RootLayoutNav />
+                </KeyboardProvider>
+              </GestureHandlerRootView>
+            </AuthProvider>
+          </QueryClientProvider>
+        </ClerkProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
   );
