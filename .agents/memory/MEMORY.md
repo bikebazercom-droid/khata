@@ -11,3 +11,4 @@
 - [PostgreSQL pooler compatibility](supabase-postgres-pooler.md) — the event bus needs persistent LISTEN/NOTIFY; Supabase transaction pooling is incompatible.
 - [Hostinger Node entry file](hostinger-node-entry-file.md) — Hostinger's Entry File must point to the compiled server file, not the package command `pnpm start`.
 - [Legacy download-channel compatibility](download-channel-compatibility.md) — retire inactive UI/API routes without dropping stored channel columns; static exports must keep their existing Clerk tenant and path settings.
+- [sms.net.bd API contract](sms-net-bd-contract.md) — provider docs now live at sms.bd/api; keep the API key in the POST body, not the URL.

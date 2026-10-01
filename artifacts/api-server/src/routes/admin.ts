@@ -7,7 +7,7 @@ import {
   userPresenceTable, blockedIpsTable,
 } from "@workspace/db";
 import { requireAdmin, signAdminToken } from "../middlewares/requireAdmin";
-import { getSmsAccountStatus } from "../services/sms";
+import { ensureSmsReady, getSmsGatewayStatus } from "../services/sms";
 import { logger } from "../lib/logger";
 import { clientIp, ipPolicy } from "../middlewares/ipBlock";
 
@@ -195,53 +195,59 @@ router.delete("/admin/blocked-ips/:ip", async (req, res) => {
 
 router.get("/admin/otp-config", async (_req, res) => {
   try {
-    const [config] = await db.select({ enabled: adminOtpConfigTable.enabled, sender: adminOtpConfigTable.sender,
+    const [config] = await db.select({ enabled: adminOtpConfigTable.enabled,
       updatedAt: adminOtpConfigTable.updatedAt }).from(adminOtpConfigTable).limit(1);
-    let twilio: Awaited<ReturnType<typeof getSmsAccountStatus>> | null = null;
-    let connectionError: string | null = null;
-    try { twilio = await getSmsAccountStatus(); }
-    catch {
-      connectionError = "Twilio account status is unavailable. Check the existing Twilio connection's API key and account permissions in Replit Integrations. No SMS test was sent.";
-    }
-    res.json({ enabled: config?.enabled ?? true, sender: config?.sender || "",
-      updatedAt: config?.updatedAt?.toISOString() ?? null, twilio, connectionError });
+    const gateway = getSmsGatewayStatus();
+    res.json({
+      enabled: config?.enabled ?? true,
+      provider: gateway.provider,
+      apiKeyConfigured: gateway.apiKeyConfigured,
+      updatedAt: config?.updatedAt?.toISOString() ?? null,
+      connectionError: gateway.apiKeyConfigured
+        ? null
+        : "SMS_NET_BD_API_KEY is not configured in Replit Secrets.",
+    });
   } catch (err) {
     logger.error({ err }, "admin/otp-config error");
     res.status(500).json({ error: "Unable to load OTP configuration" });
   }
 });
 router.put("/admin/otp-config", async (req, res) => {
-  if (typeof req.body?.enabled !== "boolean" || typeof req.body?.sender !== "string" ||
-      Object.keys(req.body).some((key) => key !== "enabled" && key !== "sender")) {
-    res.status(400).json({ error: "Only enabled and sender are accepted. Credentials and balance are managed by the connected provider." }); return;
+  if (typeof req.body?.enabled !== "boolean" ||
+      Object.keys(req.body ?? {}).some((key) => key !== "enabled")) {
+    res.status(400).json({ error: "Only the enabled setting is accepted. Provider credentials are managed in Replit Secrets." }); return;
   }
-  const sender = req.body.sender.trim();
-  if (sender && !/^\+[1-9]\d{7,14}$/.test(sender)) {
-    res.status(400).json({ error: "Sender must be a Twilio E.164 phone number" }); return;
+  if (req.body.enabled) {
+    try {
+      await ensureSmsReady();
+    } catch {
+      res.status(503).json({ error: "sms.net.bd API key is not configured. OTP settings were not changed." });
+      return;
+    }
   }
   try {
-    if (sender || req.body.enabled) {
-      const status = await getSmsAccountStatus();
-      const effectiveSender = sender || process.env.TWILIO_FROM_NUMBER ||
-        (status.senders.length === 1 ? status.senders[0] : null);
-      if (status.status !== "active" || (sender && !status.senders.includes(sender)) ||
-          (req.body.enabled && (!effectiveSender || !status.senders.includes(effectiveSender)))) {
-        res.status(400).json({ error: "Select an SMS-capable sender on the active Twilio connection before enabling OTP" });
-        return;
-      }
-    }
     const [existing] = await db.select({ id: adminOtpConfigTable.id }).from(adminOtpConfigTable).limit(1);
     if (existing) await db.update(adminOtpConfigTable)
-      .set({ enabled: req.body.enabled, sender, updatedAt: new Date() })
+      .set({ enabled: req.body.enabled, updatedAt: new Date() })
       .where(eq(adminOtpConfigTable.id, existing.id));
-    else await db.insert(adminOtpConfigTable).values({ enabled: req.body.enabled, sender, updatedAt: new Date() });
-    const [config] = await db.select({ enabled: adminOtpConfigTable.enabled, sender: adminOtpConfigTable.sender,
+    else await db.insert(adminOtpConfigTable).values({
+      enabled: req.body.enabled, sender: "", updatedAt: new Date(),
+    });
+    const [config] = await db.select({ enabled: adminOtpConfigTable.enabled,
       updatedAt: adminOtpConfigTable.updatedAt }).from(adminOtpConfigTable).limit(1);
-    res.json({ enabled: config!.enabled, sender: config!.sender,
-      updatedAt: config!.updatedAt?.toISOString() ?? null, twilio: null, connectionError: null });
+    const gateway = getSmsGatewayStatus();
+    res.json({
+      enabled: config!.enabled,
+      provider: gateway.provider,
+      apiKeyConfigured: gateway.apiKeyConfigured,
+      updatedAt: config!.updatedAt?.toISOString() ?? null,
+      connectionError: gateway.apiKeyConfigured
+        ? null
+        : "SMS_NET_BD_API_KEY is not configured in Replit Secrets.",
+    });
   } catch (err) {
     logger.error({ err }, "admin/otp-config update error");
-    res.status(503).json({ error: "Twilio connection unavailable; settings not changed" });
+    res.status(503).json({ error: "Unable to update OTP settings" });
   }
 });
 export default router;

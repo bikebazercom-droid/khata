@@ -429,30 +429,25 @@ export interface AdminUsersPage {
   pageSize: number;
 }
 
-export interface TwilioStatus {
-  status: string;
-  /** @nullable */
-  balance: string | null;
-  /** @nullable */
-  currency: string | null;
-  /** @nullable */
-  sender: string | null;
-  senders: string[];
-}
+export type AdminOtpConfigProvider = typeof AdminOtpConfigProvider[keyof typeof AdminOtpConfigProvider];
+
+
+export const AdminOtpConfigProvider = {
+  smsnetbd: 'sms.net.bd',
+} as const;
 
 export interface AdminOtpConfig {
   enabled: boolean;
-  sender: string;
+  provider: AdminOtpConfigProvider;
+  apiKeyConfigured: boolean;
   /** @nullable */
   updatedAt: string | null;
-  twilio: TwilioStatus | null;
   /** @nullable */
   connectionError: string | null;
 }
 
 export interface AdminOtpConfigInput {
   enabled: boolean;
-  sender: string;
 }
 
 export interface IpBlockInput {

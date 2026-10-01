@@ -575,15 +575,9 @@ export const UpdateAdminUserResponse = zod.object({
  */
 export const GetAdminOtpConfigResponse = zod.object({
   "enabled": zod.boolean(),
-  "sender": zod.string(),
+  "provider": zod.enum(['sms.net.bd']),
+  "apiKeyConfigured": zod.boolean(),
   "updatedAt": zod.coerce.date().nullable(),
-  "twilio": zod.union([zod.object({
-  "status": zod.string(),
-  "balance": zod.string().nullable(),
-  "currency": zod.string().nullable(),
-  "sender": zod.string().nullable(),
-  "senders": zod.array(zod.string())
-}),zod.null()]),
   "connectionError": zod.string().nullable()
 })
 
@@ -592,21 +586,14 @@ export const GetAdminOtpConfigResponse = zod.object({
  * @summary Update OTP gateway configuration
  */
 export const UpdateAdminOtpConfigBody = zod.object({
-  "enabled": zod.boolean(),
-  "sender": zod.string()
+  "enabled": zod.boolean()
 })
 
 export const UpdateAdminOtpConfigResponse = zod.object({
   "enabled": zod.boolean(),
-  "sender": zod.string(),
+  "provider": zod.enum(['sms.net.bd']),
+  "apiKeyConfigured": zod.boolean(),
   "updatedAt": zod.coerce.date().nullable(),
-  "twilio": zod.union([zod.object({
-  "status": zod.string(),
-  "balance": zod.string().nullable(),
-  "currency": zod.string().nullable(),
-  "sender": zod.string().nullable(),
-  "senders": zod.array(zod.string())
-}),zod.null()]),
   "connectionError": zod.string().nullable()
 })
 

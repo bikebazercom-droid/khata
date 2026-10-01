@@ -7,15 +7,16 @@ import { db, appUsersTable, businessesTable, userBusinessesTable, adminOtpConfig
   blockedIpsTable, userPresenceTable, userLoginEventsTable } from "@workspace/db";
 import { signAdminToken } from "../middlewares/requireAdmin";
 import { enforceIpBlock, trustedProxyCidrs } from "../middlewares/ipBlock";
+import { ensureSmsReady } from "../services/sms";
 import adminRouter from "./admin";
 import authRouter from "./auth";
 
 vi.mock("@clerk/express", () => ({ getAuth: () => ({ userId: null }) }));
 vi.mock("../services/sms", () => ({
   sendOtpSms: vi.fn(),
-  getSmsAccountStatus: vi.fn(async () => ({
-    status: "active", balance: "12.34", currency: "USD",
-    sender: "+15005550006", senders: ["+15005550006"],
+  ensureSmsReady: vi.fn(),
+  getSmsGatewayStatus: vi.fn(() => ({
+    provider: "sms.net.bd", apiKeyConfigured: true,
   })),
 }));
 
@@ -139,12 +140,19 @@ describe("admin security and foreground presence", () => {
     expect(leaked.body).not.toHaveProperty("apiKey");
     expect(leaked.body).not.toHaveProperty("apiKeyHint");
     expect(leaked.body).not.toHaveProperty("remainingBalance");
-    expect(leaked.body.twilio.balance).toBe("12.34");
+    expect(leaked.body).toMatchObject({
+      provider: "sms.net.bd",
+      apiKeyConfigured: true,
+    });
+    expect(leaked.body).not.toHaveProperty("twilio");
+    vi.mocked(ensureSmsReady).mockRejectedValueOnce(new Error("API key missing"));
+    expect((await request(app).put("/admin/otp-config").set("Authorization", admin)
+      .send({ enabled: true })).status).toBe(503);
     expect((await request(app).put("/admin/otp-config").set("Authorization", admin)
       .send({ enabled: true, sender: "", apiKey: "legacy", remainingBalance: 999 })).status).toBe(400);
-    expect((await request(app).put("/admin/otp-config").send({ enabled: false, sender: "" })).status).toBe(401);
+    expect((await request(app).put("/admin/otp-config").send({ enabled: false })).status).toBe(401);
     const changed = await request(app).put("/admin/otp-config").set("Authorization", admin)
-      .send({ enabled: false, sender: "" });
+      .send({ enabled: false });
     expect(changed.status).toBe(200);
     expect((await request(app).post("/auth/phone/send-otp").send({ phone: "01712345678" })).status).toBe(503);
     expect((await request(app).post("/auth/phone/verify-otp").send({ phone: "01712345678", code: "123456" })).status).toBe(503);

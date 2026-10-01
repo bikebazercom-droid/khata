@@ -1307,37 +1307,23 @@ components:
 
     AdminOtpConfig:
       type: object
-      required: [enabled, sender, updatedAt, twilio, connectionError]
+      required: [enabled, provider, apiKeyConfigured, updatedAt, connectionError]
       properties:
         enabled: { type: boolean }
-        sender: { type: string }
+        provider:
+          type: string
+          enum: ["sms.net.bd"]
+        apiKeyConfigured: { type: boolean }
         updatedAt:
           type: ["string", "null"]
           format: date-time
-        twilio:
-          oneOf:
-            - $ref: "#/components/schemas/TwilioStatus"
-            - type: "null"
         connectionError: { type: ["string", "null"] }
-
-    TwilioStatus:
-      type: object
-      required: [status, balance, currency, sender, senders]
-      properties:
-        status: { type: string }
-        balance: { type: ["string", "null"] }
-        currency: { type: ["string", "null"] }
-        sender: { type: ["string", "null"] }
-        senders:
-          type: array
-          items: { type: string }
 
     AdminOtpConfigInput:
       type: object
-      required: [enabled, sender]
+      required: [enabled]
       properties:
         enabled: { type: boolean }
-        sender: { type: string }
 
     IpBlockInput:
       type: object

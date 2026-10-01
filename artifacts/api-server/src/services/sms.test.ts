@@ -1,96 +1,86 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ensureSmsReady, sendOtpSms } from "./sms";
 
-const mocks = vi.hoisted(() => ({
-  rows: [] as Array<{ sender?: string }>,
-  connectorProxy: vi.fn(),
-}));
-
-vi.mock("@workspace/db", () => ({
-  db: {
-    select: () => ({
-      from: () => ({
-        limit: () => Promise.resolve(mocks.rows),
-      }),
-    }),
-  },
-  adminOtpConfigTable: { sender: "sender" },
-}));
-
-vi.mock("@replit/connectors-sdk", () => ({
-  ReplitConnectors: class {
-    proxy = mocks.connectorProxy;
-  },
-}));
-
-import { sendOtpSms } from "./sms";
-
-describe("Twilio SMS transport", () => {
-  const envKeys = [
-    "TWILIO_ACCOUNT_SID",
-    "TWILIO_AUTH_TOKEN",
-    "TWILIO_FROM_NUMBER",
-    "REPLIT_CONNECTORS_HOSTNAME",
-    "REPL_IDENTITY",
-  ] as const;
-  let previousEnv: Partial<Record<(typeof envKeys)[number], string | undefined>>;
-  let fetchMock: ReturnType<typeof vi.fn>;
+describe("sms.net.bd OTP delivery", () => {
+  const originalApiKey = process.env.SMS_NET_BD_API_KEY;
+  const fetchMock = vi.fn<typeof fetch>();
 
   beforeEach(() => {
-    previousEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
-    for (const key of envKeys) delete process.env[key];
-    mocks.rows = [];
-    mocks.connectorProxy.mockReset();
-    fetchMock = vi.fn();
+    process.env.SMS_NET_BD_API_KEY = "test-api-key";
+    fetchMock.mockReset();
     vi.stubGlobal("fetch", fetchMock);
   });
 
   afterEach(() => {
+    if (originalApiKey === undefined) delete process.env.SMS_NET_BD_API_KEY;
+    else process.env.SMS_NET_BD_API_KEY = originalApiKey;
     vi.unstubAllGlobals();
-    for (const key of envKeys) {
-      const value = previousEnv[key];
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
   });
 
-  it("sends OTP through Twilio REST API when cPanel credentials are configured", async () => {
-    process.env.TWILIO_ACCOUNT_SID = "AC_TEST";
-    process.env.TWILIO_AUTH_TOKEN = "test-auth-token";
-    process.env.TWILIO_FROM_NUMBER = "+8801700000000";
-    fetchMock
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        incoming_phone_numbers: [
-          { phone_number: "+8801700000000", capabilities: { sms: true } },
-        ],
-      }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        sid: "SM_TEST",
-        status: "queued",
-      }), { status: 201 }));
-
-    await sendOtpSms("+8801712345678", "123456");
-
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    const [senderUrl, senderInit] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(senderUrl).toContain("/Accounts/AC_TEST/IncomingPhoneNumbers.json");
-    expect((senderInit.headers as Record<string, string>).Authorization).toBe(
-      `Basic ${Buffer.from("AC_TEST:test-auth-token").toString("base64")}`,
+  it("POSTs the OTP parameters to sms.net.bd without putting the API key in the URL", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: 0,
+          msg: "Request successfully submitted",
+          data: { request_id: 1234 },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
     );
 
-    const [messageUrl, messageInit] = fetchMock.mock.calls[1] as [string, RequestInit];
-    expect(messageUrl).toContain("/Accounts/AC_TEST/Messages.json");
-    const messageBody = new URLSearchParams(String(messageInit.body));
-    expect(messageBody.get("To")).toBe("+8801712345678");
-    expect(messageBody.get("From")).toBe("+8801700000000");
-    expect(messageBody.get("Body")).toContain("123456");
-    expect(mocks.connectorProxy).not.toHaveBeenCalled();
+    await sendOtpSms("+880 (17) 1234-5678", "123456");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe("https://api.sms.net.bd/sendsms");
+    expect(init?.method).toBe("POST");
+    expect(init?.headers).toMatchObject({
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    });
+    const body = JSON.parse(String(init?.body));
+    expect(body.api_key).toBe("test-api-key");
+    expect(body.to).toBe("8801712345678");
+    expect(body.msg).toContain("123456");
+    expect(String(url)).not.toContain("test-api-key");
   });
 
-  it("fails clearly on an external host when Twilio credentials are missing", async () => {
-    await expect(sendOtpSms("+8801712345678", "123456")).rejects.toThrow(
-      "Twilio is not configured",
+  it("rejects non-Bangladeshi numbers before making a provider request", async () => {
+    await expect(sendOtpSms("+14155552671", "123456")).rejects.toThrow(
+      "supports Bangladeshi mobile numbers only",
     );
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(mocks.connectorProxy).not.toHaveBeenCalled();
+  });
+
+  it("fails generically when sms.net.bd rejects the request", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ error: 401, msg: "Invalid API key" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await expect(sendOtpSms("+8801712345678", "123456")).rejects.toThrow(
+      "sms.net.bd did not accept the SMS request",
+    );
+  });
+
+  it("fails if the provider returns an HTTP error or invalid JSON", async () => {
+    fetchMock.mockResolvedValue(new Response("upstream error", { status: 502 }));
+
+    await expect(sendOtpSms("+8801712345678", "123456")).rejects.toThrow(
+      "sms.net.bd did not accept the SMS request",
+    );
+  });
+
+  it("requires the API key before enabling or sending OTPs", async () => {
+    delete process.env.SMS_NET_BD_API_KEY;
+
+    await expect(ensureSmsReady()).rejects.toThrow("API key is not configured");
+    await expect(sendOtpSms("+8801712345678", "123456")).rejects.toThrow(
+      "API key is not configured",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

@@ -33,19 +33,9 @@ import {
 import { sendOtpSms } from "../services/sms";
 import { clientIp } from "../middlewares/ipBlock";
 import { deviceDescription } from "../lib/authTelemetry";
+import { normalizeBdPhone } from "../lib/bdPhone";
 
 const router: IRouter = Router();
-
-// Normalize a Bangladeshi phone number to E.164 format.
-// Accepts: 01XXXXXXXXX, +8801XXXXXXXXX, 8801XXXXXXXXX
-function normalizeBdPhone(raw: string): string | null {
-  const digits = raw.replace(/\D/g, "");
-  if (/^01[3-9]\d{8}$/.test(digits)) return `+88${digits}`;
-  if (/^8801[3-9]\d{8}$/.test(digits)) return `+${digits}`;
-  if (/^01[3-9]\d{8}$/.test(digits.replace(/^0/, ""))) return null; // odd length
-  if (/^\+?8801[3-9]\d{8}$/.test(raw)) return `+88${digits.slice(digits.length - 11)}`;
-  return null;
-}
 
 // ─── Rate limiters ────────────────────────────────────────────────────────────
 

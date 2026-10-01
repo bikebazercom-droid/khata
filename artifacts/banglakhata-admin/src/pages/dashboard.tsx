@@ -29,8 +29,8 @@ export default function DashboardPage() {
           { title: "Registered users", value: stats?.totalUsers, icon: Users, color: "bg-blue-50 text-blue-600" },
           { title: "Active now · last 5 min", value: stats?.activeUsers, icon: UserCheck, color: "bg-emerald-50 text-emerald-600" },
           { title: "New users today · UTC", value: stats?.newUsersToday, icon: UserPlus, color: "bg-violet-50 text-violet-600" },
-          { title: "Twilio balance", value: otp?.twilio?.balance != null
-            ? `${otp.twilio.balance} ${otp.twilio.currency ?? ""}` : "Unavailable",
+          { title: "SMS API key", value: otp?.apiKeyConfigured == null
+            ? "Unavailable" : otp.apiKeyConfigured ? "Configured" : "Missing",
             icon: MessageSquare, color: "bg-amber-50 text-amber-600" },
         ].map(({ title, value, icon: Icon, color }) => (
           <Card key={title} className="border-0 shadow-sm bg-white">

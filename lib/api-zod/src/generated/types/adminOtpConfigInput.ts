@@ -8,5 +8,4 @@
 
 export interface AdminOtpConfigInput {
   enabled: boolean;
-  sender: string;
 }

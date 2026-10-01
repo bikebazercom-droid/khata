@@ -275,13 +275,11 @@ export default function SettingsPage() {
   };
 
   const [otpEnabled, setOtpEnabled] = useState(true);
-  const [otpSender, setOtpSender] = useState("");
   const isInitialized = useRef(false);
 
   useEffect(() => {
     if (config && !isInitialized.current) {
       setOtpEnabled(config.enabled);
-      setOtpSender(config.sender);
       isInitialized.current = true;
     }
   }, [config]);
@@ -289,7 +287,7 @@ export default function SettingsPage() {
   const handleOtpSave = (e: React.FormEvent) => {
     e.preventDefault();
     updateMutation.mutate(
-      { data: { enabled: otpEnabled, sender: otpSender } },
+      { data: { enabled: otpEnabled } },
       {
         onSuccess: (updated) => {
           queryClient.setQueryData(getGetAdminOtpConfigQueryKey(), updated);
@@ -639,30 +637,22 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <CardTitle className="text-lg">OTP Gateway Integration</CardTitle>
-                  <CardDescription>Uses the secure connected Twilio account. Credentials are never entered or shown here.</CardDescription>
+                  <CardDescription>Bangladesh phone OTPs are delivered through sms.net.bd. The API key stays in Replit Secrets and is never shown here.</CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-6 pt-4 border-t">
               {config?.connectionError && <p role="alert" className="text-sm text-amber-700 bg-amber-50 p-3 rounded">{config.connectionError}</p>}
               <div className="text-sm space-y-2">
-                <p>Twilio account: <strong>{config?.twilio?.status ?? "Unavailable"}</strong></p>
-                <p>Live account balance: <strong>{config?.twilio?.balance != null
-                  ? `${config.twilio.balance} ${config.twilio.currency ?? ""}` : "Unavailable from provider"}</strong></p>
-                <p className="text-xs text-muted-foreground">Balance is in account currency, not remaining SMS messages or prepaid top-up count. No chargeable test message is sent here.</p>
+                <p>Provider: <strong>{config?.provider ?? "sms.net.bd"}</strong></p>
+                <p>API key: <strong>{config?.apiKeyConfigured ? "Configured" : "Missing"}</strong></p>
+                <p className="text-xs text-muted-foreground">Set SMS_NET_BD_API_KEY in Replit Secrets to enable delivery. Saving settings does not send a test SMS.</p>
               </div>
               <label className="flex items-center gap-3 text-sm font-medium">
                 <input type="checkbox" checked={otpEnabled} onChange={e => setOtpEnabled(e.target.checked)} />
-                Enable phone OTP sign-in and verification
+                Enable Bangladesh phone OTP sign-in and verification
               </label>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold">SMS sender</label>
-                <select className="w-full rounded-md border p-2 text-sm bg-white" value={otpSender} onChange={e => setOtpSender(e.target.value)}>
-                  <option value="">Automatic (only when one SMS-capable sender exists)</option>
-                  {config?.twilio?.senders.map((sender) => <option key={sender} value={sender}>{sender}</option>)}
-                </select>
-                <p className="text-xs text-muted-foreground">Only numbers verified as SMS-capable on your connected Twilio account can be selected.</p>
-              </div>
+              <p className="text-xs text-muted-foreground">Only Bangladeshi mobile numbers using 01XXXXXXXXX or +8801XXXXXXXXX format can receive an OTP.</p>
             </CardContent>
             <CardFooter className="bg-slate-50 border-t py-4 px-6 flex justify-between items-center rounded-b-xl">
               <div className="text-xs text-muted-foreground">

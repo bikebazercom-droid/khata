@@ -5,14 +5,14 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { TwilioStatus } from './twilioStatus';
+import type { AdminOtpConfigProvider } from './adminOtpConfigProvider';
 
 export interface AdminOtpConfig {
   enabled: boolean;
-  sender: string;
+  provider: AdminOtpConfigProvider;
+  apiKeyConfigured: boolean;
   /** @nullable */
   updatedAt: Date | null;
-  twilio: TwilioStatus | null;
   /** @nullable */
   connectionError: string | null;
 }
