@@ -51,6 +51,19 @@ secret-variable settings.
 - Saving the OTP setting does not send a test SMS. Confirm delivery only with an
   authorized test number and an intentional sign-in request.
 
+## Existing database schema for OTP rate limits
+
+The phone OTP routes use a PostgreSQL-backed rate limiter before validating the
+request body or contacting sms.net.bd. The database must contain
+`public.otp_rate_limit_counters`. If the live OTP endpoint returns HTTP 500 even
+for an empty/invalid phone request, this table or its database connection may be
+missing; that failure happens before the SMS gateway is called.
+
+For an existing Hostinger database, run the additive, repeatable SQL in
+`exports/BanglaKhata-cPanel/database/otp-rate-limit-counters-migration.sql`
+against the same database used by `DATABASE_URL`, then restart the Node app.
+The cPanel bootstrap SQL also includes this table for new installs.
+
 ## File storage for Hostinger
 
 For bill-photo/file uploads on Hostinger, use the local storage driver and

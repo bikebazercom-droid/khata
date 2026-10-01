@@ -61,6 +61,17 @@ CREATE TABLE IF NOT EXISTS "otp_codes" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS "otp_rate_limit_counters" (
+	"scope" text NOT NULL,
+	"key_hash" text NOT NULL,
+	"total_hits" integer NOT NULL,
+	"reset_at" timestamp with time zone NOT NULL,
+	CONSTRAINT "otp_rate_limit_counters_scope_key_hash_pk" PRIMARY KEY("scope","key_hash")
+);
+
+CREATE INDEX IF NOT EXISTS "otp_rate_limit_counters_reset_at_idx"
+	ON "otp_rate_limit_counters" USING btree ("reset_at");
+
 CREATE TABLE IF NOT EXISTS "parties" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"business_id" uuid,

@@ -1,0 +1,332 @@
+OCT 01,20:22:48.956
+Server listening
+OCT 01,20:22:48.977
+Attention: Clerk collects telemetry data from its SDKs when connected to development instances.
+OCT 01,20:22:48.978
+The data collected is used to inform Clerk's product roadmap.
+OCT 01,20:22:48.978
+To learn more, including how to opt-out from the telemetry program, visit: https://clerk.com/docs/telemetry.
+OCT 01,20:22:49.003
+request completed
+OCT 01,20:22:49.023
+[migrateBillImages] no base64 bill images found — nothing to migrate
+OCT 01,20:23:00.123
+Server listening
+OCT 01,20:23:00.137
+Attention: Clerk collects telemetry data from its SDKs when connected to development instances.
+OCT 01,20:23:00.138
+The data collected is used to inform Clerk's product roadmap.
+OCT 01,20:23:00.138
+To learn more, including how to opt-out from the telemetry program, visit: https://clerk.com/docs/telemetry.
+OCT 01,20:23:00.163
+request completed
+OCT 01,20:23:00.186
+[migrateBillImages] no base64 bill images found — nothing to migrate
+OCT 01,20:23:01.128
+request completed
+OCT 01,20:23:01.398
+request completed
+OCT 01,20:23:02.068
+request completed
+OCT 01,20:23:13.599
+Server listening
+OCT 01,20:23:13.611
+Attention: Clerk collects telemetry data from its SDKs when connected to development instances.
+OCT 01,20:23:13.611
+The data collected is used to inform Clerk's product roadmap.
+OCT 01,20:23:13.611
+To learn more, including how to opt-out from the telemetry program, visit: https://clerk.com/docs/telemetry.
+OCT 01,20:23:13.629
+request completed
+OCT 01,20:23:13.647
+[migrateBillImages] no base64 bill images found — nothing to migrate
+OCT 01,20:23:13.880
+request completed
+OCT 01,20:23:13.904
+request completed
+OCT 01,20:23:23.654
+request completed
+OCT 01,20:23:23.787
+request completed
+OCT 01,20:23:25.136
+request completed
+OCT 01,20:23:25.174
+request completed
+OCT 01,20:23:25.360
+request completed
+OCT 01,20:23:26.103
+request completed
+OCT 01,20:23:27.028
+request completed
+OCT 01,20:23:27.593
+request completed
+OCT 01,20:23:27.688
+request completed
+OCT 01,20:23:27.703
+request completed
+OCT 01,20:23:27.735
+request completed
+OCT 01,20:23:27.772
+request completed
+OCT 01,20:23:27.787
+request completed
+OCT 01,20:23:27.805
+request completed
+OCT 01,20:23:28.376
+request completed
+OCT 01,20:23:29.598
+request completed
+OCT 01,20:23:29.768
+request completed
+OCT 01,20:23:32.359
+request completed
+OCT 01,20:23:32.771
+request completed
+OCT 01,20:23:33.094
+request completed
+OCT 01,20:23:34.310
+request completed
+OCT 01,20:23:34.597
+request completed
+OCT 01,20:23:35.903
+request completed
+OCT 01,20:23:36.314
+request completed
+OCT 01,20:23:36.667
+request completed
+OCT 01,20:23:37.851
+request completed
+OCT 01,20:23:38.155
+request completed
+OCT 01,20:23:38.305
+request aborted
+OCT 01,20:23:39.592
+request completed
+OCT 01,20:23:39.990
+request completed
+OCT 01,20:23:40.312
+request completed
+OCT 01,20:23:40.924
+request completed
+OCT 01,20:23:41.151
+request completed
+OCT 01,20:23:41.156
+request completed
+OCT 01,20:23:41.516
+request completed
+OCT 01,20:23:41.803
+request completed
+OCT 01,20:23:51.760
+request completed
+OCT 01,20:23:51.788
+request completed
+OCT 01,20:23:52.824
+request completed
+OCT 01,20:23:52.985
+request completed
+OCT 01,20:23:58.064
+request completed
+OCT 01,20:23:59.171
+request completed
+OCT 01,20:23:59.300
+request completed
+OCT 01,20:24:00.355
+request completed
+OCT 01,20:24:00.870
+request completed
+OCT 01,20:24:03.449
+request completed
+OCT 01,20:24:04.359
+request completed
+OCT 01,20:24:04.530
+request completed
+OCT 01,20:24:05.812
+request completed
+OCT 01,20:24:06.170
+request completed
+OCT 01,20:24:14.423
+Unable to clean expired OTP rate-limit counters
+OCT 01,20:24:14.459
+request errored
+OCT 01,20:24:14.460
+Error: Failed query: insert into "otp_rate_limit_counters" ("scope", "key_hash", "total_hits", "reset_at") values ($1, $2, $3, now() + ($4 * interval '1 millisecond')) on conflict ("scope","key_hash") do update set "total_hits" = CASE
+WHEN "otp_rate_limit_counters"."reset_at" <= now() THEN 1
+ELSE "otp_rate_limit_counters"."total_hits" + 1
+END, "reset_at" = CASE
+WHEN "otp_rate_limit_counters"."reset_at" <= now()
+THEN now() + ($5 * interval '1 millisecond')
+ELSE "otp_rate_limit_counters"."reset_at"
+END returning "total_hits", "reset_at"
+params: otp-send-phone,7d1fc43d8b60ad426c52d05ecf11988f6d76d5c2a9ea7fcb70b0fa5582501960,1,900000,900000
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f7d7-4c52-71a7-8e35-befa42e8c566/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f7d7-4c52-71a7-8e35-befa42e8c566/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async PostgresRateLimitStore.increment (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f7d7-4c52-71a7-8e35-befa42e8c566/nodejs/artifacts/api-server/dist/index.mjs:95039:23)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f7d7-4c52-71a7-8e35-befa42e8c566/nodejs/artifacts/api-server/dist/index.mjs:94767:33
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f7d7-4c52-71a7-8e35-befa42e8c566/nodejs/artifacts/api-server/dist/index.mjs:94714:5
+OCT 01,20:26:22.383
+request completed
+OCT 01,20:26:22.797
+request completed
+OCT 01,20:26:22.963
+request completed
+OCT 01,20:26:23.451
+request completed
+OCT 01,20:26:23.689
+request completed
+OCT 01,20:26:24.053
+request completed
+OCT 01,20:26:24.277
+request completed
+OCT 01,20:26:24.696
+request completed
+OCT 01,20:26:24.872
+request completed
+OCT 01,20:26:25.204
+request completed
+OCT 01,20:26:25.368
+request completed
+OCT 01,20:26:25.721
+request completed
+OCT 01,20:26:25.897
+request completed
+OCT 01,20:26:40.595
+request completed
+OCT 01,20:26:40.909
+request completed
+OCT 01,20:26:40.914
+request completed
+OCT 01,20:26:46.169
+request completed
+OCT 01,20:26:46.172
+request completed
+OCT 01,20:26:47.324
+request completed
+OCT 01,20:26:47.574
+request completed
+OCT 01,20:26:55.159
+request errored
+OCT 01,20:26:55.159
+Error: Failed query: insert into "otp_rate_limit_counters" ("scope", "key_hash", "total_hits", "reset_at") values ($1, $2, $3, now() + ($4 * interval '1 millisecond')) on conflict ("scope","key_hash") do update set "total_hits" = CASE
+WHEN "otp_rate_limit_counters"."reset_at" <= now() THEN 1
+ELSE "otp_rate_limit_counters"."total_hits" + 1
+END, "reset_at" = CASE
+WHEN "otp_rate_limit_counters"."reset_at" <= now()
+THEN now() + ($5 * interval '1 millisecond')
+ELSE "otp_rate_limit_counters"."reset_at"
+END returning "total_hits", "reset_at"
+params: otp-send-phone,7d1fc43d8b60ad426c52d05ecf11988f6d76d5c2a9ea7fcb70b0fa5582501960,1,900000,900000
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f7d7-4c52-71a7-8e35-befa42e8c566/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f7d7-4c52-71a7-8e35-befa42e8c566/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async PostgresRateLimitStore.increment (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f7d7-4c52-71a7-8e35-befa42e8c566/nodejs/artifacts/api-server/dist/index.mjs:95039:23)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f7d7-4c52-71a7-8e35-befa42e8c566/nodejs/artifacts/api-server/dist/index.mjs:94767:33
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f7d7-4c52-71a7-8e35-befa42e8c566/nodejs/artifacts/api-server/dist/index.mjs:94714:5
+OCT 01,20:29:16.666
+Unable to clean expired OTP rate-limit counters
+OCT 01,20:29:16.689
+request errored
+OCT 01,20:29:16.689
+Error: Failed query: insert into "otp_rate_limit_counters" ("scope", "key_hash", "total_hits", "reset_at") values ($1, $2, $3, now() + ($4 * interval '1 millisecond')) on conflict ("scope","key_hash") do update set "total_hits" = CASE
+WHEN "otp_rate_limit_counters"."reset_at" <= now() THEN 1
+ELSE "otp_rate_limit_counters"."total_hits" + 1
+END, "reset_at" = CASE
+WHEN "otp_rate_limit_counters"."reset_at" <= now()
+THEN now() + ($5 * interval '1 millisecond')
+ELSE "otp_rate_limit_counters"."reset_at"
+END returning "total_hits", "reset_at"
+params: otp-send-phone,7d1fc43d8b60ad426c52d05ecf11988f6d76d5c2a9ea7fcb70b0fa5582501960,1,900000,900000
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f7d7-4c52-71a7-8e35-befa42e8c566/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f7d7-4c52-71a7-8e35-befa42e8c566/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async PostgresRateLimitStore.increment (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f7d7-4c52-71a7-8e35-befa42e8c566/nodejs/artifacts/api-server/dist/index.mjs:95039:23)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f7d7-4c52-71a7-8e35-befa42e8c566/nodejs/artifacts/api-server/dist/index.mjs:94767:33
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f7d7-4c52-71a7-8e35-befa42e8c566/nodejs/artifacts/api-server/dist/index.mjs:94714:5
+OCT 01,20:29:47.309
+request completed
+OCT 01,20:29:47.746
+request completed
+OCT 01,20:29:48.117
+request completed
+OCT 01,20:29:49.285
+request completed
+OCT 01,20:29:49.830
+request completed
+OCT 01,20:29:51.613
+request completed
+OCT 01,20:29:52.000
+request completed
+OCT 01,20:29:52.328
+request completed
+OCT 01,20:29:53.533
+request completed
+OCT 01,20:29:53.832
+request completed
+OCT 01,20:29:56.307
+request completed
+OCT 01,20:29:57.409
+request completed
+OCT 01,20:29:57.739
+request completed
+OCT 01,20:29:58.973
+request completed
+OCT 01,20:29:59.298
+request completed
+OCT 01,20:30:02.809
+request completed
+OCT 01,20:30:02.913
+request completed
+OCT 01,20:31:26.943
+request completed
+OCT 01,20:31:27.215
+request errored
+OCT 01,20:31:27.216
+Error: Failed query: insert into "otp_rate_limit_counters" ("scope", "key_hash", "total_hits", "reset_at") values ($1, $2, $3, now() + ($4 * interval '1 millisecond')) on conflict ("scope","key_hash") do update set "total_hits" = CASE
+WHEN "otp_rate_limit_counters"."reset_at" <= now() THEN 1
+ELSE "otp_rate_limit_counters"."total_hits" + 1
+END, "reset_at" = CASE
+WHEN "otp_rate_limit_counters"."reset_at" <= now()
+THEN now() + ($5 * interval '1 millisecond')
+ELSE "otp_rate_limit_counters"."reset_at"
+END returning "total_hits", "reset_at"
+params: otp-send-phone,1333fa3dff31d806ae01754a3d210261b3d9ae235d1b763047c7827fa3539d2d,1,900000,900000
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f7d7-4c52-71a7-8e35-befa42e8c566/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f7d7-4c52-71a7-8e35-befa42e8c566/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async PostgresRateLimitStore.increment (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f7d7-4c52-71a7-8e35-befa42e8c566/nodejs/artifacts/api-server/dist/index.mjs:95039:23)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f7d7-4c52-71a7-8e35-befa42e8c566/nodejs/artifacts/api-server/dist/index.mjs:94767:33
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a0f7d7-4c52-71a7-8e35-befa42e8c566/nodejs/artifacts/api-server/dist/index.mjs:94714:5
+OCT 01,20:32:03.693
+request completed
+OCT 01,20:32:04.210
+request completed
+OCT 01,20:32:04.297
+request completed
+OCT 01,20:32:04.346
+request completed
+OCT 01,20:32:04.497
+request completed
+OCT 01,20:32:05.177
+request completed
+OCT 01,20:32:05.207
+request completed
+OCT 01,20:32:05.462
+request completed
+OCT 01,20:32:06.381
+request completed
+OCT 01,20:32:13.659
+request completed
+OCT 01,20:32:13.671
+request completed
+OCT 01,20:32:14.060
+request completed
+OCT 01,20:32:26.673
+request completed
+OCT 01,20:32:26.851
+request completed
+OCT 01,20:32:26.893
+request completed
+OCT 01,20:32:27.468
+request completed
+OCT 01,20:32:30.031
+request completed
