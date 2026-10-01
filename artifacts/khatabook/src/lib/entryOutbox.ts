@@ -62,6 +62,68 @@ export async function listEntries(actorId: string, businessId: string | null): P
   return all.filter((entry) => entry.actorId === actorId && entry.businessId === businessId);
 }
 
+const REJECTION_FALLBACK = 'অনুমতি নেই বা তথ্য আর উপলভ্য নেই। খসড়াটি সংরক্ষিত আছে।';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function rejectionReason(error: unknown): string {
+  if (!isRecord(error)) return REJECTION_FALLBACK;
+  const response = isRecord(error.response) ? error.response : null;
+  const payload = isRecord(error.data)
+    ? error.data
+    : response && isRecord(response.data)
+      ? response.data
+      : null;
+
+  if (payload) {
+    for (const key of ['detail', 'message', 'error_description', 'error', 'title']) {
+      const value = payload[key];
+      if (typeof value === 'string' && value.trim()) return value.trim().slice(0, 500);
+    }
+  } else if (typeof error.data === 'string' && error.data.trim()) {
+    return error.data.trim().slice(0, 500);
+  }
+
+  if (typeof error.message === 'string' && error.message.trim()) {
+    const message = error.message.trim();
+    const withoutHttpPrefix = message.replace(/^HTTP\s+\d{3}(?:\s+[^:]+)?\s*:?\s*/i, '').trim();
+    if (withoutHttpPrefix && !/^HTTP\s+\d{3}\b/i.test(withoutHttpPrefix)) {
+      return withoutHttpPrefix.slice(0, 500);
+    }
+  }
+  return REJECTION_FALLBACK;
+}
+
+/** Rejected drafts only; optionally include legacy unscoped drafts for their verified business. */
+export async function listRejectedEntries(
+  actorId: string,
+  businessId: string,
+  includeLegacyUnscoped = false,
+): Promise<QueuedEntry[]> {
+  const entries = await listEntries(actorId, businessId);
+  if (includeLegacyUnscoped) entries.push(...await listEntries(actorId, null));
+  return entries.filter((entry) => entry.status === 'rejected');
+}
+
+/** Remove a rejected draft only when it still belongs to the current actor and business. */
+export async function discardRejectedEntry(
+  id: string,
+  actorId: string,
+  businessId: string,
+  includeLegacyUnscoped = false,
+): Promise<boolean> {
+  const entry = await transaction<QueuedEntry | undefined>('readonly', (store) => store.get(id));
+  const belongsToBusiness = entry?.businessId === businessId ||
+    (includeLegacyUnscoped && entry?.businessId === null);
+  if (!entry || entry.actorId !== actorId || entry.status !== 'rejected' || !belongsToBusiness) {
+    return false;
+  }
+  await removeEntry(id);
+  return true;
+}
+
 async function updateEntry(entry: QueuedEntry) {
   await transaction('readwrite', (store) => store.put(entry));
   changed();
@@ -116,7 +178,7 @@ export async function drainEntries(
           if (status === 401) break;
           if (status === 403 || status === 404 || status === 400 || status === 409) {
             entry.status = 'rejected';
-            entry.error = 'অনুমতি নেই বা তথ্য আর উপলব্ধ নেই। খসড়াটি সংরক্ষিত আছে।';
+            entry.error = rejectionReason(error);
             await updateEntry(entry);
             continue;
           }

@@ -19,6 +19,7 @@ const storage = {
       add(value: { id: string }) { records.set(value.id, structuredClone(value)); return request(undefined); },
       put(value: { id: string }) { records.set(value.id, structuredClone(value)); return request(undefined); },
       delete(id: string) { records.delete(id); return request(undefined); },
+      get(id: string) { return request(records.has(id) ? structuredClone(records.get(id)) : undefined); },
       getAll() { return request([...records.values()].map((value) => structuredClone(value))); },
     };
     function request(result: unknown) {
@@ -76,14 +77,37 @@ describe('persistent entry outbox', () => {
     expect(await restored.listEntries('staff-B', 'business-A')).toHaveLength(1);
   });
 
-  it('retains a denied draft and does not retry it automatically', async () => {
+  it.each([400, 403, 404, 409])('retains the server reason for rejected status %i and does not retry it', async (status) => {
     const outbox = await import('@/lib/entryOutbox');
     await outbox.queueEntry(draft('request-denied'));
-    send.mockRejectedValue({ status: 403 });
+    send.mockRejectedValue({ status, data: { error: 'স্টাফের এই হিসাবে প্রবেশাধিকার নেই।' } });
     await outbox.drainEntries('staff-A', 'business-A', () => true, () => {});
     await outbox.drainEntries('staff-A', 'business-A', () => true, () => {});
     expect(send).toHaveBeenCalledTimes(1);
-    expect((await outbox.listEntries('staff-A', 'business-A'))[0].status).toBe('rejected');
+    const [rejected] = await outbox.listRejectedEntries('staff-A', 'business-A');
+    expect(rejected.status).toBe('rejected');
+    expect(rejected.error).toBe('স্টাফের এই হিসাবে প্রবেশাধিকার নেই।');
+  });
+
+  it('lists rejected drafts only and discards only a confirmed draft in the matching actor and business scope', async () => {
+    const outbox = await import('@/lib/entryOutbox');
+    await outbox.queueEntry({ ...draft('rejected-A'), status: 'rejected', error: 'Server reason' });
+    await outbox.queueEntry(draft('pending-A'));
+    await outbox.queueEntry({ ...draft('rejected-B', 'staff-B'), status: 'rejected', error: 'Other actor' });
+    await outbox.queueEntry({ ...draft('rejected-C', 'staff-A', 'business-B'), status: 'rejected', error: 'Other business' });
+    await outbox.queueEntry({ ...draft('legacy-rejected', 'staff-A', null), status: 'rejected', error: 'Legacy reason' });
+
+    expect((await outbox.listRejectedEntries('staff-A', 'business-A')).map((entry) => entry.id))
+      .toEqual(['rejected-A']);
+    expect((await outbox.listRejectedEntries('staff-A', 'business-A', true)).map((entry) => entry.id))
+      .toEqual(['rejected-A', 'legacy-rejected']);
+
+    expect(await outbox.discardRejectedEntry('pending-A', 'staff-A', 'business-A')).toBe(false);
+    expect(await outbox.discardRejectedEntry('rejected-B', 'staff-A', 'business-A')).toBe(false);
+    expect(await outbox.discardRejectedEntry('rejected-C', 'staff-A', 'business-A')).toBe(false);
+    expect(await outbox.discardRejectedEntry('legacy-rejected', 'staff-A', 'business-A')).toBe(false);
+    expect(await outbox.discardRejectedEntry('legacy-rejected', 'staff-A', 'business-A', true)).toBe(true);
+    expect(await outbox.listEntries('staff-A', 'business-A')).toHaveLength(2);
   });
 
   it('stores a bill image with its draft and sends only a cloud object path after replay', async () => {

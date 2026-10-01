@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { useLocation } from 'wouter';
@@ -24,10 +24,12 @@ import { bn as bnLocale } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/i18n';
 import { useAppAuth } from '@/App';
+import { ENTRY_OUTBOX_CHANGED, listRejectedEntries } from '@/lib/entryOutbox';
+import { readOfflineIdentity } from '@/lib/authCache';
 
 export function HomeView() {
   const { openSwitcher, businesses, selectedBusinessId } = useBusinessContext();
-  const { role: userRole } = useAppAuth();
+  const { role: userRole, userId } = useAppAuth();
   const activeBusiness = businesses.find((b) => b.id === selectedBusinessId);
   const [role, setRole] = useState<PartyRole>(PartyRole.CUSTOMER);
   const [search, setSearch] = useState('');
@@ -72,10 +74,39 @@ export function HomeView() {
   const [isRenameStoreOpen, setIsRenameStoreOpen] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const businessScopeKey = userId && selectedBusinessId
+    ? JSON.stringify([userId, selectedBusinessId])
+    : '';
+  const [rejectedDraftSummary, setRejectedDraftSummary] = useState({ scope: '', count: 0 });
+  const rejectedDraftCount = rejectedDraftSummary.scope === businessScopeKey
+    ? rejectedDraftSummary.count
+    : 0;
 
   const { data: settings } = useGetBusinessSettings({ query: { enabled: userRole === 'owner', queryKey: getGetBusinessSettingsQueryKey() } });
   const { data: summaryParties = [] } = useListParties({ role });
   const { data: rawParties = [] } = useListParties({ role, search, dueFilter: apiDueFilter });
+
+  useEffect(() => {
+    if (userRole !== 'owner' || !userId || !selectedBusinessId) return;
+    let active = true;
+    const refresh = () => {
+      const identity = readOfflineIdentity();
+      const includeLegacyUnscoped = identity?.userId === userId && identity.businessId === selectedBusinessId;
+      void listRejectedEntries(userId, selectedBusinessId, includeLegacyUnscoped)
+        .then((entries) => {
+          if (active) setRejectedDraftSummary({ scope: businessScopeKey, count: entries.length });
+        })
+        .catch(() => {
+          if (active) setRejectedDraftSummary({ scope: businessScopeKey, count: 0 });
+        });
+    };
+    refresh();
+    window.addEventListener(ENTRY_OUTBOX_CHANGED, refresh);
+    return () => {
+      active = false;
+      window.removeEventListener(ENTRY_OUTBOX_CHANGED, refresh);
+    };
+  }, [userRole, userId, selectedBusinessId, businessScopeKey]);
 
   const parties = useMemo(() => {
     let result = rawParties;
@@ -496,6 +527,24 @@ export function HomeView() {
           )}
         </div>
       </div>
+
+      {userRole === 'owner' && rejectedDraftCount > 0 && (
+        <button
+          type="button"
+          onClick={() => navigate('/rejected-drafts')}
+          className="shrink-0 mx-4 mt-2 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-left active:bg-amber-100"
+        >
+          <FileText className="h-4 w-4 shrink-0 text-amber-800" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-bold text-amber-950">প্রত্যাখ্যাত খসড়া</span>
+            <span className="block truncate text-[11px] text-amber-800">সার্ভারের কারণ দেখুন</span>
+          </span>
+          <span className="rounded-full bg-amber-200 px-2 py-0.5 text-xs font-bold text-amber-950">
+            {rejectedDraftCount.toLocaleString('bn-BD')}
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-amber-800" />
+        </button>
+      )}
 
       {/* Utility bar */}
       <div className="shrink-0 flex items-center gap-2 px-4 pt-3 pb-2">

@@ -16,6 +16,7 @@ import { ReportView } from '@/pages/report-view';
 import { PartyReportView } from '@/pages/party-report-view';
 import { StaffDeploymentPage } from '@/pages/staff-deployment';
 import { AccessPage } from '@/pages/access';
+import { RejectedDraftsPage } from '@/pages/rejected-drafts';
 import { LandingPage } from '@/pages/landing';
 import { SignInPage } from '@/pages/sign-in';
 import { SignUpPage } from '@/pages/sign-up';
@@ -537,6 +538,11 @@ function AppRouter({ onNetworkFailure, onSettled }: { onNetworkFailure: () => vo
             <Route path="/reports">
               <OwnerLayout>
                 <ReportView />
+              </OwnerLayout>
+            </Route>
+            <Route path="/rejected-drafts">
+              <OwnerLayout>
+                <RejectedDraftsPage />
               </OwnerLayout>
             </Route>
             <Route path="/staff-deployment">
