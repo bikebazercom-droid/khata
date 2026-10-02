@@ -39,7 +39,12 @@ import { bn } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { formatCurrency, cn } from '@/lib/utils';
 import { ReportPeriodDrawer, type ReportPeriod } from '@/components/modals/report-period-drawer';
-import { buildPartyStatementRows, calculatePartyStatementSummary } from '@/lib/party-statement';
+import { getLedgerEntryDateKey } from '@/lib/date-time';
+import {
+  buildPartyStatementRows,
+  calculatePartyStatementSummary,
+  filterPartyStatementEntriesByRange,
+} from '@/lib/party-statement';
 
 // ─── Bengali helpers ──────────────────────────────────────────────────────────
 
@@ -348,13 +353,10 @@ export function PartyReportView() {
     [period, startDate, endDate],
   );
 
-  const dateFiltered = useMemo(() => {
-    if (!reportRange) return allEntries;
-    return allEntries.filter(e => {
-      const t = new Date(e.createdAt).getTime();
-      return t >= reportRange.start.getTime() && t <= reportRange.end.getTime();
-    });
-  }, [allEntries, reportRange]);
+  const dateFiltered = useMemo(
+    () => filterPartyStatementEntriesByRange(allEntries, reportRange),
+    [allEntries, reportRange],
+  );
 
   const statementSummary = useMemo(() => calculatePartyStatementSummary({
     allEntries,
@@ -368,7 +370,9 @@ export function PartyReportView() {
 
   const runningBalances = useMemo(() => {
     const sorted = [...dateFiltered].sort(
-      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      (a, b) =>
+        getLedgerEntryDateKey(a.dueDate, a.createdAt).localeCompare(getLedgerEntryDateKey(b.dueDate, b.createdAt)) ||
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     );
     // Start from opening balance so the badge always shows the real
     // cumulative balance (matching the Khatabook-style screenshot).
@@ -384,7 +388,9 @@ export function PartyReportView() {
   const filtered = useMemo(() => {
     const q    = search.toLowerCase().trim();
     const list = [...dateFiltered].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      (a, b) =>
+        getLedgerEntryDateKey(b.dueDate, b.createdAt).localeCompare(getLedgerEntryDateKey(a.dueDate, a.createdAt)) ||
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
     if (!q) return list;
     return list.filter(e => (e.description ?? '').toLowerCase().includes(q));
@@ -819,6 +825,8 @@ export function PartyReportView() {
                     const isDebit  = entry.type === 'YOU_GAVE';
                     const bal      = runningBalances.get(entry.id) ?? 0;
                     const isLast   = idx === filtered.length - 1;
+                    const [year, month, day] = getLedgerEntryDateKey(entry.dueDate, entry.createdAt).split('-').map(Number);
+                    const businessDate = new Date(year, month - 1, day);
                     return (
                       <div
                         key={entry.id}
@@ -828,7 +836,7 @@ export function PartyReportView() {
                         {/* Col 1: date + running balance — always white */}
                         <div className="bg-white px-3 py-3">
                           <p className="text-[13px] font-bold text-slate-800">
-                            {format(new Date(entry.createdAt), 'd MMM yy')}
+                            {format(businessDate, 'd MMM yy')}
                           </p>
                           <p className={cn(
                             'text-[11px] font-semibold mt-0.5',

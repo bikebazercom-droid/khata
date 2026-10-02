@@ -36,6 +36,21 @@ function signedDelta(entry: PartyStatementEntry): number {
   return entry.type === 'YOU_GAVE' ? entry.amount : -entry.amount;
 }
 
+export function filterPartyStatementEntriesByRange<T extends PartyStatementEntry>(
+  entries: readonly T[],
+  range: { start: Date; end: Date } | null,
+): T[] {
+  if (!range) return [...entries];
+
+  const startDayKey = getLedgerEntryDateKey(null, range.start);
+  const endDayKey = getLedgerEntryDateKey(null, range.end);
+
+  return entries.filter((entry) => {
+    const entryDayKey = getLedgerEntryDateKey(entry.dueDate, entry.createdAt);
+    return entryDayKey >= startDayKey && entryDayKey <= endDayKey;
+  });
+}
+
 export function calculatePartyStatementSummary({
   allEntries,
   statementEntries,
@@ -51,9 +66,10 @@ export function calculatePartyStatementSummary({
 }): PartyStatementSummary {
   const signedCurrentBalance = balanceType === 'YOU_WILL_GET' ? currentBalance : -currentBalance;
   const openingBeforeAllEntries = signedCurrentBalance - allEntries.reduce((sum, entry) => sum + signedDelta(entry), 0);
-  const openingBalance = openingBeforeAllEntries + (periodStart
+  const periodStartDayKey = periodStart ? getLedgerEntryDateKey(null, periodStart) : null;
+  const openingBalance = openingBeforeAllEntries + (periodStartDayKey
     ? allEntries
-      .filter((entry) => new Date(entry.createdAt).getTime() < periodStart.getTime())
+      .filter((entry) => getLedgerEntryDateKey(entry.dueDate, entry.createdAt) < periodStartDayKey)
       .reduce((sum, entry) => sum + signedDelta(entry), 0)
     : 0);
 
