@@ -19,7 +19,7 @@ export function buildGlobalLedgerReportCsv(entries: readonly CsvEntry[]): string
   const rows = entries.map((entry) => {
     const isDebit = entry.type === 'YOU_GAVE';
     return [
-      format(new Date(entry.createdAt), 'yyyy-MM-dd HH:mm:ss'),
+      format(new Date(entry.createdAt), 'yyyy-MM-dd hh:mm:ss a'),
       entry.partyName,
       entry.description ?? '',
       isDebit ? entry.amount.toFixed(2) : '',

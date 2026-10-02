@@ -22,7 +22,7 @@ function formatCreatedAt(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? 'তারিখ জানা নেই'
-    : date.toLocaleString('bn-BD', { dateStyle: 'medium', timeStyle: 'short' });
+    : date.toLocaleString('bn-BD', { dateStyle: 'medium', timeStyle: 'short', hour12: true });
 }
 
 export function RejectedDraftsPage() {

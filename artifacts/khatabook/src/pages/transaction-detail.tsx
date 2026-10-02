@@ -81,7 +81,7 @@ export function TransactionDetailPage() {
 
   const txDateKey = entry ? entryDateKey(entry) : '';
   const transactionDate = txDateKey ? format(new Date(`${txDateKey}T00:00:00`), 'd MMM yy') : '';
-  const transactionTime = entry ? formatLocalTime(entry.createdAt as string, true) : '';
+  const transactionTime = entry ? formatLocalTime(entry.createdAt as string) : '';
 
   const balanceColor = party?.balanceType === 'YOU_WILL_GET' ? '#047857' : '#DC2626';
   const amountColor = isGave ? '#DC2626' : '#047857';

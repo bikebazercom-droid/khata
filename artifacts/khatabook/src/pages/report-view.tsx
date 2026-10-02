@@ -89,7 +89,7 @@ export function ReportView() {
     const shopProfile = loadShopProfile();
     const storeName  = shopProfile.businessName || settings?.storeName || 'Banglakhata';
     const dateStr    = new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
-    const timeStr    = new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' });
+    const timeStr    = new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit', hour12: true });
     const footerAddress = shopProfile.address || '';
     const footerPhone   = shopProfile.phone   || '';
 

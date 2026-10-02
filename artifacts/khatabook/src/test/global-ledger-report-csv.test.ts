@@ -16,7 +16,7 @@ function makeEntry(overrides: Partial<CsvEntry> = {}): CsvEntry {
 }
 
 describe('buildGlobalLedgerReportCsv', () => {
-  it('exports Bengali headings, sortable timestamps, and debit/credit values', () => {
+  it('exports Bengali headings, local 12-hour timestamps, and debit/credit values', () => {
     const csv = buildGlobalLedgerReportCsv([
       makeEntry(),
       makeEntry({
@@ -30,8 +30,8 @@ describe('buildGlobalLedgerReportCsv', () => {
 
     expect(csv).toBe(
       '\uFEFFতারিখ,পার্টির নাম,বিবরণ,ডেবিট (-),ক্রেডিট (+)\r\n' +
-      '2026-09-15 17:30:00,"রহিম, ""মিয়া""","প্রথম লাইন\r\nদ্বিতীয় লাইন",125.50,\r\n' +
-      '2026-09-16 09:05:00,করিম,পেমেন্ট,,80.00\r\n',
+      '2026-09-15 05:30:00 PM,"রহিম, ""মিয়া""","প্রথম লাইন\r\nদ্বিতীয় লাইন",125.50,\r\n' +
+      '2026-09-16 09:05:00 AM,করিম,পেমেন্ট,,80.00\r\n',
     );
   });
 
