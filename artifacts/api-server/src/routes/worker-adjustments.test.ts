@@ -117,6 +117,40 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
     expect(all.body.map((p: { id: string }) => p.id).sort()).toEqual([a, b, c].sort());
   });
 
+  it("preserves the selected business date on both sides of a transfer", async () => {
+    const selectedDate = "2021-01-01";
+    const dateOnly = (value: string | Date | null | undefined) =>
+      value instanceof Date ? value.toISOString().slice(0, 10) : value?.slice(0, 10);
+    const created = await request(app)
+      .post(`/parties/${a}/ledger-entries`)
+      .set("Authorization", "Bearer owner")
+      .send({
+        type: "YOU_GAVE",
+        amount: 10,
+        dueDate: selectedDate,
+        isTransfer: true,
+        transferPartyId: b,
+      });
+
+    expect(created.status).toBe(201);
+    expect(dateOnly(created.body.dueDate)).toBe(selectedDate);
+
+    const [source] = await db.select().from(ledgerEntriesTable).where(eq(ledgerEntriesTable.id, created.body.id));
+    expect(dateOnly(source?.dueDate)).toBe(selectedDate);
+    expect(source?.linkedEntryId).toBeTruthy();
+
+    const [counter] = await db.select().from(ledgerEntriesTable)
+      .where(eq(ledgerEntriesTable.id, source!.linkedEntryId!));
+    expect(dateOnly(counter?.dueDate)).toBe(selectedDate);
+
+    const [sourceLedger, counterLedger] = await Promise.all([
+      request(app).get(`/parties/${a}/ledger-entries`).set("Authorization", "Bearer owner"),
+      request(app).get(`/parties/${b}/ledger-entries`).set("Authorization", "Bearer owner"),
+    ]);
+    expect(dateOnly(sourceLedger.body.find((entry: { id: string }) => entry.id === source!.id)?.dueDate)).toBe(selectedDate);
+    expect(dateOnly(counterLedger.body.find((entry: { id: string }) => entry.id === counter!.id)?.dueDate)).toBe(selectedDate);
+  });
+
   it("retains independent adjustment grants on assignment edit and explicit [] revokes them", async () => {
     const trimmed = await patch({ partyIds: [a, c] });
     expect(trimmed.status).toBe(200);

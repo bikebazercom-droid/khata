@@ -508,6 +508,7 @@ router.post(
             amount: amount.toFixed(2),
             description: counterDesc,
             ...(entryDateValue ? { createdAt: new Date(`${entryDateValue}T00:00:00.000Z`) } : {}),
+            dueDate: toDateOnlyString(dueDate ?? null),
             isTransfer: true,
             transferPartyId: party.id,
           })
