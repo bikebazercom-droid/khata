@@ -23,8 +23,6 @@ import {
   Share2,
   Loader2,
   Check,
-  ChevronLeft as ChevLeft,
-  ChevronRight as ChevRight,
 } from 'lucide-react';
 import {
   format,
@@ -38,6 +36,8 @@ import {
 import { bn } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { formatCurrency, cn } from '@/lib/utils';
+import { BengaliCalendarModal } from '@/components/modals/bengali-calendar-modal';
+import { formatBengaliDateInput } from '@/lib/bengali-date';
 import { ReportPeriodDrawer, type ReportPeriod } from '@/components/modals/report-period-drawer';
 import { getLedgerEntryDateKey } from '@/lib/date-time';
 import {
@@ -45,167 +45,6 @@ import {
   calculatePartyStatementSummary,
   filterPartyStatementEntriesByRange,
 } from '@/lib/party-statement';
-
-// ─── Bengali helpers ──────────────────────────────────────────────────────────
-
-const BN_DIGITS = ['০','১','২','৩','৪','৫','৬','৭','৮','৯'];
-const toBn = (n: number) =>
-  String(n).split('').map(d => BN_DIGITS[+d] ?? d).join('');
-
-const BN_MONTHS = [
-  'জানুয়ারি','ফেব্রুয়ারি','মার্চ','এপ্রিল','মে','জুন',
-  'জুলাই','আগস্ট','সেপ্টেম্বর','অক্টোবর','নভেম্বর','ডিসেম্বর',
-];
-const BN_MONTHS_SHORT = [
-  'জান.','ফেব.','মার.','এপ্রি.','মে','জুন',
-  'জুল.','আগ.','সেপ.','অক্টো.','নভে.','ডিসে.',
-];
-const BN_DAYS_COL   = ['র','সো','ম','বু','বৃ','শু','শ'];   // column headers (Sun–Sat)
-const BN_DAYS_SHORT = ['রবি','সোম','মঙ্গল','বুধ','বৃহস্পতি','শুক্র','শনি'];
-
-// ─── Bengali Calendar Modal ───────────────────────────────────────────────────
-
-function BengaliCalendarModal({
-  value,
-  onConfirm,
-  onCancel,
-  onClear,
-}: {
-  value: Date | null;
-  onConfirm: (d: Date) => void;
-  onCancel: () => void;
-  onClear: () => void;
-}) {
-  const today = new Date();
-  const init  = value ?? today;
-  const [tempDate,  setTempDate]  = useState<Date>(init);
-  const [viewYear,  setViewYear]  = useState(init.getFullYear());
-  const [viewMonth, setViewMonth] = useState(init.getMonth());
-
-  const firstWeekday = new Date(viewYear, viewMonth, 1).getDay();   // 0=Sun
-  const daysInMonth  = new Date(viewYear, viewMonth + 1, 0).getDate();
-
-  const cells: (number | null)[] = [
-    ...Array(firstWeekday).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-  ];
-  // pad to complete rows
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  const prevMonth = () => {
-    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
-    else setViewMonth(m => m - 1);
-  };
-  const nextMonth = () => {
-    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0); }
-    else setViewMonth(m => m + 1);
-  };
-
-  const isSelected = (d: number) =>
-    tempDate.getFullYear() === viewYear &&
-    tempDate.getMonth()    === viewMonth &&
-    tempDate.getDate()     === d;
-
-  const isToday = (d: number) =>
-    today.getFullYear() === viewYear &&
-    today.getMonth()    === viewMonth &&
-    today.getDate()     === d;
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
-      onClick={onCancel}
-    >
-      <div
-        className="bg-white rounded-2xl overflow-hidden w-full max-w-sm shadow-2xl"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* ── Blue header ── */}
-        <div className="bg-[#1565C0] px-5 pt-5 pb-6 text-white">
-          <p className="text-[13px] opacity-70 mb-1 font-medium">{toBn(viewYear)}</p>
-          <p className="text-[28px] font-extrabold leading-none">
-            {BN_DAYS_SHORT[tempDate.getDay()].slice(0, 4)}&nbsp;
-            {toBn(tempDate.getDate())}&nbsp;
-            {BN_MONTHS_SHORT[tempDate.getMonth()]}
-          </p>
-        </div>
-
-        {/* ── Month navigation ── */}
-        <div className="flex items-center justify-between px-3 py-3">
-          <button
-            onClick={prevMonth}
-            className="w-9 h-9 flex items-center justify-center rounded-full active:bg-slate-100 text-slate-600"
-          >
-            <ChevLeft className="w-5 h-5" />
-          </button>
-          <p className="text-[15px] font-bold text-slate-800">
-            {BN_MONTHS[viewMonth]} {toBn(viewYear)}
-          </p>
-          <button
-            onClick={nextMonth}
-            className="w-9 h-9 flex items-center justify-center rounded-full active:bg-slate-100 text-slate-600"
-          >
-            <ChevRight className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* ── Weekday column headers ── */}
-        <div className="grid grid-cols-7 px-3 mb-1">
-          {BN_DAYS_COL.map(d => (
-            <div key={d} className="text-center text-[13px] font-semibold text-slate-400 py-1">
-              {d}
-            </div>
-          ))}
-        </div>
-
-        {/* ── Date cells ── */}
-        <div className="grid grid-cols-7 px-3 pb-2">
-          {cells.map((d, i) => (
-            <div key={i} className="flex items-center justify-center py-[3px]">
-              {d !== null && (
-                <button
-                  onClick={() => setTempDate(new Date(viewYear, viewMonth, d))}
-                  className={cn(
-                    'w-9 h-9 rounded-full text-[14px] font-medium flex items-center justify-center transition-all active:scale-95',
-                    isSelected(d)
-                      ? 'bg-[#1565C0] text-white font-bold shadow-md'
-                      : isToday(d)
-                      ? 'border-2 border-[#1565C0] text-[#1565C0] font-bold'
-                      : 'text-slate-800 hover:bg-slate-100 active:bg-slate-200'
-                  )}
-                >
-                  {toBn(d)}
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* ── Action buttons ── */}
-        <div className="flex flex-col items-end gap-4 px-6 pt-2 pb-5">
-          <button
-            onClick={() => onConfirm(tempDate)}
-            className="text-[#1565C0] font-bold text-[14px] active:opacity-60 transition-opacity"
-          >
-            ঠিক আছে
-          </button>
-          <button
-            onClick={onCancel}
-            className="text-[#1565C0] font-bold text-[14px] active:opacity-60 transition-opacity"
-          >
-            বাতিল করুন
-          </button>
-          <button
-            onClick={onClear}
-            className="text-[#1565C0] font-bold text-[14px] active:opacity-60 transition-opacity"
-          >
-            সরিয়ে দিন
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── Report Options Bottom Sheet ──────────────────────────────────────────────
 
@@ -733,7 +572,7 @@ export function PartyReportView() {
             <div className="min-w-0">
               <p className="text-[9px] font-bold text-white/60 uppercase tracking-wider">আরম্ভের তারিখ</p>
               <p className={cn('text-[12px] font-bold truncate', startDate ? 'text-white' : 'text-white/50')}>
-                {startDate ? format(startDate, 'd MMM yyyy', { locale: bn }) : 'নির্বাচন করুন'}
+                {startDate ? formatBengaliDateInput(startDate) : 'নির্বাচন করুন'}
               </p>
             </div>
           </button>
@@ -750,7 +589,7 @@ export function PartyReportView() {
             <div className="min-w-0">
               <p className="text-[9px] font-bold text-white/60 uppercase tracking-wider">শেষের তারিখ</p>
               <p className={cn('text-[12px] font-bold truncate', endDate ? 'text-white' : 'text-white/50')}>
-                {endDate ? format(endDate, 'd MMM yyyy', { locale: bn }) : 'নির্বাচন করুন'}
+                {endDate ? formatBengaliDateInput(endDate) : 'নির্বাচন করুন'}
               </p>
             </div>
           </button>

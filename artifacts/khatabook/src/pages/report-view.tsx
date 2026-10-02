@@ -17,8 +17,8 @@ import { bn } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
+import { BengaliCalendarModal } from '@/components/modals/bengali-calendar-modal';
+import { formatBengaliDateInput } from '@/lib/bengali-date';
 import { ReportPeriodDrawer, type ReportPeriod } from '@/components/modals/report-period-drawer';
 import { BillImageLightbox } from '@/components/modals/bill-image-lightbox';
 import { billImageSrc } from '@/lib/billImageStorage';
@@ -33,9 +33,6 @@ const PERIOD_LABELS: Record<ReportPeriod, string> = {
   LAST_MONTH: 'গত মাসের',
   CUSTOM_RANGE: 'তারিখের পরিসর',
 };
-
-const DATE_PICKER_POPOVER_CLASS =
-  'w-auto max-w-[calc(100vw_-_1.5rem)] max-h-[calc(100dvh_-_1.5rem)] overflow-auto rounded-xl border-slate-200 bg-white p-0 shadow-lg';
 
 export function ReportView() {
   const [, navigate] = useLocation();
@@ -59,6 +56,7 @@ export function ReportView() {
   const [search, setSearch] = useState('');
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
+  const [calendarFor, setCalendarFor] = useState<'start' | 'end' | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExportingCsv, setIsExportingCsv] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
@@ -296,67 +294,37 @@ export function ReportView() {
       <div className="flex-1 overflow-y-auto pb-24">
         {/* Date range pickers */}
         <div className="grid grid-cols-2 gap-2.5 p-4">
-          <Popover>
-            <PopoverTrigger asChild>
-              <button type="button" className="flex items-center gap-2 border border-slate-200 bg-slate-50 rounded-xl px-3 py-3 text-left active:scale-[0.98] transition-all">
-                <CalendarIcon className="w-4 h-4 text-slate-400 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">আরম্ভের তারিখ</p>
-                  <p className="text-[13px] font-bold text-slate-800 truncate">
-                    {startDate ? format(startDate, 'd MMM yyyy', { locale: bn }) : 'নির্বাচন করুন'}
-                  </p>
-                </div>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              className={DATE_PICKER_POPOVER_CLASS}
-              side="bottom"
-              sideOffset={8}
-              align="center"
-              collisionPadding={12}
-              avoidCollisions
-            >
-              <Calendar
-                mode="single"
-                selected={startDate ?? undefined}
-                onSelect={(date) => {
-                  setStartDate(date ?? null);
-                  if (period !== 'CUSTOM_RANGE' && period !== 'SINGLE_DAY') setPeriod('CUSTOM_RANGE');
-                }}
-              />
-            </PopoverContent>
-          </Popover>
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded={calendarFor === 'start'}
+            onClick={() => setCalendarFor('start')}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-left transition-all active:scale-[0.98]"
+          >
+            <CalendarIcon className="h-4 w-4 shrink-0 text-slate-400" />
+            <div className="min-w-0">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">আরম্ভের তারিখ</p>
+              <p className="truncate text-[13px] font-bold text-slate-800">
+                {startDate ? formatBengaliDateInput(startDate) : 'নির্বাচন করুন'}
+              </p>
+            </div>
+          </button>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <button type="button" className="flex items-center gap-2 border border-slate-200 bg-slate-50 rounded-xl px-3 py-3 text-left active:scale-[0.98] transition-all">
-                <CalendarIcon className="w-4 h-4 text-slate-400 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">শেষের তারিখ</p>
-                  <p className="text-[13px] font-bold text-slate-800 truncate">
-                    {endDate ? format(endDate, 'd MMM yyyy', { locale: bn }) : 'নির্বাচন করুন'}
-                  </p>
-                </div>
-              </button>
-            </PopoverTrigger>
-            <PopoverContent
-              className={DATE_PICKER_POPOVER_CLASS}
-              side="bottom"
-              sideOffset={8}
-              align="center"
-              collisionPadding={12}
-              avoidCollisions
-            >
-              <Calendar
-                mode="single"
-                selected={endDate ?? undefined}
-                onSelect={(date) => {
-                  setEndDate(date ?? null);
-                  setPeriod('CUSTOM_RANGE');
-                }}
-              />
-            </PopoverContent>
-          </Popover>
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded={calendarFor === 'end'}
+            onClick={() => setCalendarFor('end')}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-left transition-all active:scale-[0.98]"
+          >
+            <CalendarIcon className="h-4 w-4 shrink-0 text-slate-400" />
+            <div className="min-w-0">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">শেষের তারিখ</p>
+              <p className="truncate text-[13px] font-bold text-slate-800">
+                {endDate ? formatBengaliDateInput(endDate) : 'নির্বাচন করুন'}
+              </p>
+            </div>
+          </button>
         </div>
 
         {/* Search + period dropdown */}
@@ -481,6 +449,39 @@ export function ReportView() {
       </div>
 
       <ReportPeriodDrawer open={isPeriodOpen} onOpenChange={setIsPeriodOpen} value={period} onSelect={setPeriod} />
+      {calendarFor === 'start' && (
+        <BengaliCalendarModal
+          ariaLabel="আরম্ভের তারিখ নির্বাচন করুন"
+          value={startDate}
+          onConfirm={(date) => {
+            setStartDate(date);
+            if (period !== 'CUSTOM_RANGE' && period !== 'SINGLE_DAY') setPeriod('CUSTOM_RANGE');
+            setCalendarFor(null);
+          }}
+          onCancel={() => setCalendarFor(null)}
+          onClear={() => {
+            setStartDate(null);
+            if (period === 'SINGLE_DAY') setPeriod('ALL');
+            setCalendarFor(null);
+          }}
+        />
+      )}
+      {calendarFor === 'end' && (
+        <BengaliCalendarModal
+          ariaLabel="শেষের তারিখ নির্বাচন করুন"
+          value={endDate}
+          onConfirm={(date) => {
+            setEndDate(date);
+            setPeriod('CUSTOM_RANGE');
+            setCalendarFor(null);
+          }}
+          onCancel={() => setCalendarFor(null)}
+          onClear={() => {
+            setEndDate(null);
+            setCalendarFor(null);
+          }}
+        />
+      )}
       {lightboxSrc && <BillImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
     </div>
   );
