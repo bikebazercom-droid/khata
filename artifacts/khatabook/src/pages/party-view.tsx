@@ -446,10 +446,10 @@ export function PartyView() {
         ) : (
           <>
             {/* Column headers */}
-            <div className="sticky top-0 z-[5] bg-[#f8fafc] grid grid-cols-[1fr_auto_auto] gap-3 px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            <div className="sticky top-0 z-[5] bg-[#f8fafc] grid grid-cols-[minmax(0,1fr)_minmax(0,5rem)_minmax(0,5rem)] gap-3 px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
               <span>এন্ট্রি</span>
-              <span className="w-20 text-center">আপনি দিয়েছেন</span>
-              <span className="w-20 text-right">আপনি পেয়েছেন</span>
+              <span className="w-20 min-w-0 text-center leading-tight">আপনি দিয়েছেন</span>
+              <span className="w-20 min-w-0 text-right leading-tight">আপনি পেয়েছেন</span>
             </div>
 
             {groupedEntries.map((group) => (
@@ -477,7 +477,7 @@ export function PartyView() {
                           if (userRole === 'owner' && e.key === 'Enter') navigate(`/party/${id}/entry/${entry.id}`);
                         }}
                         className={cn(
-                          "bg-white rounded-xl shadow-sm grid grid-cols-[1fr_auto_auto] gap-3 items-center overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both transition-colors",
+                          "bg-white rounded-xl shadow-sm grid grid-cols-[minmax(0,1fr)_minmax(0,5rem)_minmax(0,5rem)] gap-3 items-center overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both transition-colors",
                           userRole === 'owner' ? "cursor-pointer active:bg-slate-50" : ""
                         )}
                         style={{ animationDelay: `${i * 30}ms` }}
@@ -495,7 +495,10 @@ export function PartyView() {
                             'text-[11px] font-semibold mt-0.5',
                             entry.balanceAfter >= 0 ? 'text-emerald-500' : 'text-red-500',
                           )}>
-                            ব্যালেন্স: {formatCurrency(Math.abs(entry.balanceAfter))}
+                            ব্যালেন্স:{' '}
+                            <span className="inline-block max-w-full" style={{ overflowWrap: 'anywhere' }}>
+                              {formatCurrency(Math.abs(entry.balanceAfter))}
+                            </span>
                           </p>
                           {entry.isTransfer ? (
                             <p className={cn('text-[11px] font-bold mt-0.5 truncate', isGave ? 'text-red-500' : 'text-emerald-500')}>
@@ -535,15 +538,25 @@ export function PartyView() {
                           )}
                         </div>
                         {/* আপনি দিয়েছেন — always pink/red bg */}
-                        <div className="w-20 h-full flex items-center justify-center py-3 bg-[#FFF5F5]">
+                        <div className="min-w-0 h-full flex items-center justify-center px-1 py-3 bg-[#FFF5F5]">
                           {isGave && (
-                            <span className="text-sm font-extrabold text-red-700">{formatCurrency(entry.amount)}</span>
+                            <span
+                              className="block w-full min-w-0 text-center font-extrabold text-red-700 text-[clamp(10px,2.5vw,14px)] leading-tight"
+                              style={{ overflowWrap: 'anywhere' }}
+                            >
+                              {formatCurrency(entry.amount)}
+                            </span>
                           )}
                         </div>
                         {/* আপনি পেয়েছেন — always white bg */}
-                        <div className="w-20 h-full flex items-center justify-end py-3 pr-4 bg-white">
+                        <div className="min-w-0 h-full flex items-center justify-end px-1 py-3 bg-white">
                           {!isGave && (
-                            <span className="text-sm font-extrabold text-emerald-600">{formatCurrency(entry.amount)}</span>
+                            <span
+                              className="block w-full min-w-0 text-right font-extrabold text-emerald-600 text-[clamp(10px,2.5vw,14px)] leading-tight"
+                              style={{ overflowWrap: 'anywhere' }}
+                            >
+                              {formatCurrency(entry.amount)}
+                            </span>
                           )}
                         </div>
                       </div>
