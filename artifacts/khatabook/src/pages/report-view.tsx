@@ -34,6 +34,9 @@ const PERIOD_LABELS: Record<ReportPeriod, string> = {
   CUSTOM_RANGE: 'তারিখের পরিসর',
 };
 
+const DATE_PICKER_POPOVER_CLASS =
+  'w-auto max-w-[calc(100vw_-_1.5rem)] max-h-[calc(100dvh_-_1.5rem)] overflow-auto rounded-xl border-slate-200 bg-white p-0 shadow-lg';
+
 export function ReportView() {
   const [, navigate] = useLocation();
 
@@ -305,7 +308,14 @@ export function ReportView() {
                 </div>
               </button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
+            <PopoverContent
+              className={DATE_PICKER_POPOVER_CLASS}
+              side="bottom"
+              sideOffset={8}
+              align="center"
+              collisionPadding={12}
+              avoidCollisions
+            >
               <Calendar
                 mode="single"
                 selected={startDate ?? undefined}
@@ -329,7 +339,14 @@ export function ReportView() {
                 </div>
               </button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
+            <PopoverContent
+              className={DATE_PICKER_POPOVER_CLASS}
+              side="bottom"
+              sideOffset={8}
+              align="center"
+              collisionPadding={12}
+              avoidCollisions
+            >
               <Calendar
                 mode="single"
                 selected={endDate ?? undefined}
