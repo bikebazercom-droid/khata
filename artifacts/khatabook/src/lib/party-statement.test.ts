@@ -48,19 +48,12 @@ describe('party statement calculations', () => {
     });
   });
 
-  it('uses each entry note, amount column, and chronological running balance', () => {
+  it('uses each entry note and amount column in newest-first order with chronological balances', () => {
     const rows = buildPartyStatementRows(allEntries.slice(1), 110);
 
     expect(rows.map(({ id, details, debit, credit, balanceAfter }) => ({
       id, details, debit, credit, balanceAfter,
     }))).toEqual([
-      {
-        id: 'credit',
-        details: 'পুরোনো বাকি পরিশোধ',
-        debit: null,
-        credit: 40,
-        balanceAfter: 70,
-      },
       {
         id: 'debit',
         details: 'নগদ প্রদান (বিল: B-17)',
@@ -68,7 +61,57 @@ describe('party statement calculations', () => {
         credit: null,
         balanceAfter: 90,
       },
+      {
+        id: 'credit',
+        details: 'পুরোনো বাকি পরিশোধ',
+        debit: null,
+        credit: 40,
+        balanceAfter: 70,
+      },
     ]);
+  });
+
+  it('keeps backdated day groups contiguous and presents them newest first', () => {
+    const entries: PartyStatementEntry[] = [
+      {
+        id: 'october-first-created',
+        type: 'YOU_GOT',
+        amount: 500,
+        createdAt: '2026-10-02T16:45:00.000Z',
+        dueDate: '2026-10-02',
+      },
+      {
+        id: 'january-2025',
+        type: 'YOU_GAVE',
+        amount: 200,
+        createdAt: '2026-10-02T16:45:10.000Z',
+        dueDate: '2025-01-02',
+      },
+      {
+        id: 'october-second-created',
+        type: 'YOU_GOT',
+        amount: 5111,
+        createdAt: '2026-10-02T16:45:20.000Z',
+        dueDate: '2026-10-02',
+      },
+      {
+        id: 'january-2024',
+        type: 'YOU_GAVE',
+        amount: 80,
+        createdAt: '2026-10-02T16:46:00.000Z',
+        dueDate: '2024-01-01',
+      },
+    ];
+
+    const rows = buildPartyStatementRows(entries, 0);
+
+    expect(rows.map(({ id, dayKey }) => [id, dayKey])).toEqual([
+      ['october-second-created', '2026-10-02'],
+      ['october-first-created', '2026-10-02'],
+      ['january-2025', '2025-01-02'],
+      ['january-2024', '2024-01-01'],
+    ]);
+    expect(rows.map(({ balanceAfter }) => balanceAfter)).toEqual([-5331, -220, 280, 80]);
   });
 
   it('uses the entered business date and local creation time for each statement row', () => {

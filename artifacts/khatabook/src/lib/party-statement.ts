@@ -78,15 +78,22 @@ export function buildPartyStatementRows(
   entries: readonly PartyStatementEntry[],
   openingBalance: number,
 ): PartyStatementRow[] {
-  const sorted = [...entries].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-  );
+  const chronologicalEntries = entries
+    .map((entry, index) => ({
+      entry,
+      index,
+      dayKey: getLedgerEntryDateKey(entry.dueDate, entry.createdAt),
+    }))
+    .sort((a, b) =>
+      a.dayKey.localeCompare(b.dayKey) ||
+      new Date(a.entry.createdAt).getTime() - new Date(b.entry.createdAt).getTime() ||
+      a.index - b.index,
+    );
 
   let balance = openingBalance;
-  return sorted.map((entry) => {
+  const chronologicalRows = chronologicalEntries.map(({ entry, dayKey }) => {
     const isDebit = entry.type === 'YOU_GAVE';
     balance += signedDelta(entry);
-    const dayKey = getLedgerEntryDateKey(entry.dueDate, entry.createdAt);
     const date = new Date(`${dayKey}T00:00:00`);
     const description = entry.description?.trim() || (isDebit ? 'নগদ প্রদান' : 'নগদ গ্রহণ');
     const details = entry.billReference
@@ -104,4 +111,8 @@ export function buildPartyStatementRows(
       balanceAfter: balance,
     };
   });
+
+  // Balances are accumulated oldest-to-newest, then the finished statement
+  // rows are presented newest-to-oldest.
+  return chronologicalRows.reverse();
 }

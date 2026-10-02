@@ -423,12 +423,12 @@ export function PartyReportView() {
     const statementRows = buildPartyStatementRows(dateFiltered, openingBalance);
     let tableRows = '';
     let lastDayKey = '';
-    let isFirstGroup = true;
+    const openingBalanceDayKey = statementRows[statementRows.length - 1]?.dayKey;
 
     for (const row of statementRows) {
       if (row.dayKey !== lastDayKey) {
-        // Opening balance note on the right of the first group header
-        const openNote = isFirstGroup
+        // In newest-first order, the opening balance belongs to the oldest group.
+        const openNote = row.dayKey === openingBalanceDayKey
           ? `<td style="border:0;text-align:right;font-weight:400;color:#64748b;font-size:11px;white-space:nowrap;">(ওপেনিং ব্যালেন্স: ${fmtBal(openingBalance)})</td>`
           : '<td style="border:0;"></td>';
         tableRows += `<tr style="background:#f1f5f9;">
@@ -440,7 +440,6 @@ export function PartyReportView() {
           </td>
         </tr>`;
         lastDayKey   = row.dayKey;
-        isFirstGroup = false;
       }
 
       const details = escapeHtml(row.details);
