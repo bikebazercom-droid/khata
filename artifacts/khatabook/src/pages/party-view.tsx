@@ -39,6 +39,7 @@ import { billImageSrc, prefetchImagesForPdf } from '@/lib/billImageStorage';
 import { toast } from 'sonner';
 import { format, isToday } from 'date-fns';
 import { bn as bnLocale } from 'date-fns/locale';
+import { formatTimeInUtc } from '@/lib/date-time';
 import { useAppAuth } from '@/App';
 import { useBusinessContext } from '@/lib/businessContext';
 import { ENTRY_OUTBOX_CHANGED, listEntries, type QueuedEntry } from '@/lib/entryOutbox';
@@ -487,7 +488,7 @@ export function PartyView() {
                       >
                         <div className="min-w-0 py-3 pl-4">
                           <p className="text-[12px] font-bold text-slate-700 flex items-center gap-1.5 flex-wrap">
-                            {format(new Date(`${entryDateKey(entry)}T00:00:00`), 'd MMM yy', { locale: bnLocale })} • {format(new Date(entry.createdAt as string), 'HH:mm')}
+                            {format(new Date(`${entryDateKey(entry)}T00:00:00`), 'd MMM yy', { locale: bnLocale })} • {formatTimeInUtc(entry.createdAt)}
                             {entry.isTransfer && (
                               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 text-[9px] font-bold">
                                 <ArrowLeftRight className="w-2.5 h-2.5" />ট্রান্সফার
