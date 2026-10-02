@@ -17,4 +17,5 @@
 - [Expo SecureStore on web](securestore-web-auth.md) — keep native-only SecureStore calls off web; use the server's HttpOnly session cookie for Expo web login.
 - [React Query context singleton](react-query-context-singleton.md) — shared generated hooks must use the app's single `@tanstack/react-query` instance across pnpm workspace links.
 - [Ledger timestamp timezone](ledger-timestamp-timezone.md) — display transaction creation times in the viewer's local timezone while preserving date-only due dates.
+- [PDF statement order](ledger-statement-order.md) — group by business date and show statements newest-first while retaining chronological running balances.
 - [Large transaction amounts](large-transaction-amounts.md) — keep complete formatted values inside party-history cards at narrow phone widths.
