@@ -24,6 +24,7 @@ import { BillImageLightbox } from '@/components/modals/bill-image-lightbox';
 import { billImageSrc } from '@/lib/billImageStorage';
 import { loadShopProfile } from '@/components/modals/settings-drawer';
 import { buildGlobalLedgerReportCsv } from '@/lib/global-ledger-report-csv';
+import { sortGlobalLedgerEntriesNewestFirst } from '@/lib/global-ledger-report-order';
 
 const PERIOD_LABELS: Record<ReportPeriod, string> = {
   ALL: 'সব',
@@ -65,11 +66,15 @@ export function ReportView() {
     () => buildGlobalLedgerReportQuery(period, startDate, endDate, search),
     [period, startDate, endDate, search],
   );
-  const { data: entries = [], isLoading } = useListGlobalLedgerEntries(params, {
+  const { data: unsortedEntries = [], isLoading } = useListGlobalLedgerEntries(params, {
     query: {
       queryKey: getListGlobalLedgerEntriesQueryKey(params),
     }
   });
+  const entries = useMemo(
+    () => sortGlobalLedgerEntriesNewestFirst(unsortedEntries),
+    [unsortedEntries],
+  );
 
   const { totalDebit, totalCredit, netBalance } = useMemo(
     () => calculateGlobalLedgerReportTotals(entries),
@@ -389,7 +394,7 @@ export function ReportView() {
               return (
                 <div
                   key={entry.id}
-                  className="bg-white border border-slate-100 rounded-xl shadow-sm grid grid-cols-[1fr_auto_auto] gap-3 items-center overflow-hidden"
+                  className="bg-white border border-slate-100 rounded-xl shadow-sm grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2 items-center overflow-hidden"
                 >
                   <div className="min-w-0 py-3 pl-4">
                     <p className="text-[13px] font-bold text-slate-800 truncate">{entry.partyName}</p>
@@ -410,11 +415,19 @@ export function ReportView() {
                       </button>
                     )}
                   </div>
-                  <div className={cn('w-20 h-full flex items-center justify-center py-3', isGave ? 'bg-[#FFF5F5]' : 'bg-white')}>
-                    {isGave && <span className="text-sm font-extrabold text-red-700">{formatCurrency(entry.amount)}</span>}
+                  <div className={cn('min-w-0 h-full flex items-center justify-center px-2 py-3', isGave ? 'bg-[#FFF5F5]' : 'bg-white')}>
+                    {isGave && (
+                      <span className="shrink-0 whitespace-nowrap text-[clamp(0.625rem,2.8vw,0.875rem)] font-extrabold leading-none text-red-700">
+                        {formatCurrency(entry.amount)}
+                      </span>
+                    )}
                   </div>
-                  <div className="w-20 h-full flex items-center justify-end py-3 pr-4 bg-white">
-                    {!isGave && <span className="text-sm font-extrabold text-emerald-600">{formatCurrency(entry.amount)}</span>}
+                  <div className="min-w-0 h-full flex items-center justify-end bg-white py-3 pl-2 pr-4">
+                    {!isGave && (
+                      <span className="shrink-0 whitespace-nowrap text-[clamp(0.625rem,2.8vw,0.875rem)] font-extrabold leading-none text-emerald-600">
+                        {formatCurrency(entry.amount)}
+                      </span>
+                    )}
                   </div>
                 </div>
               );

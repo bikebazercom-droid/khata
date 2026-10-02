@@ -73,7 +73,7 @@ router.get("/ledger-entries", async (req, res): Promise<void> => {
     .from(ledgerEntriesTable)
     .innerJoin(partiesTable, eq(ledgerEntriesTable.partyId, partiesTable.id))
     .where(and(...conditions))
-    .orderBy(desc(ledgerEntriesTable.createdAt));
+    .orderBy(desc(ledgerEntriesTable.createdAt), desc(ledgerEntriesTable.id));
 
   res.json(
     ListGlobalLedgerEntriesResponse.parse(
