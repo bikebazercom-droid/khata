@@ -1,11 +1,13 @@
 import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
+import { formatLedgerEntryDateTime, getLedgerEntryDateKey } from './date-time';
 
 export interface PartyStatementEntry {
   id: string;
   type: 'YOU_GAVE' | 'YOU_GOT';
   amount: number;
   createdAt: string | Date;
+  dueDate?: string | null;
   description?: string | null;
   billReference?: string | null;
 }
@@ -21,7 +23,7 @@ export interface PartyStatementRow {
   id: string;
   dayKey: string;
   dayLabel: string;
-  shortDate: string;
+  dateTime: string;
   details: string;
   debit: number | null;
   credit: number | null;
@@ -84,7 +86,8 @@ export function buildPartyStatementRows(
   return sorted.map((entry) => {
     const isDebit = entry.type === 'YOU_GAVE';
     balance += signedDelta(entry);
-    const date = new Date(entry.createdAt);
+    const dayKey = getLedgerEntryDateKey(entry.dueDate, entry.createdAt);
+    const date = new Date(`${dayKey}T00:00:00`);
     const description = entry.description?.trim() || (isDebit ? 'নগদ প্রদান' : 'নগদ গ্রহণ');
     const details = entry.billReference
       ? `${description} (বিল: ${entry.billReference})`
@@ -92,9 +95,9 @@ export function buildPartyStatementRows(
 
     return {
       id: entry.id,
-      dayKey: format(date, 'yyyy-MM-dd'),
+      dayKey,
       dayLabel: format(date, 'd MMMM yyyy', { locale: bn }),
-      shortDate: format(date, 'dd/MM'),
+      dateTime: formatLedgerEntryDateTime(entry.dueDate, entry.createdAt),
       details,
       debit: isDebit ? entry.amount : null,
       credit: isDebit ? null : entry.amount,

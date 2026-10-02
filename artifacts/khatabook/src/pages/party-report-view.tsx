@@ -452,7 +452,7 @@ export function PartyReportView() {
         : '<td style="padding:7px 10px;border:1px solid #e2e8f0;background:#f0fdf4;"></td>';
 
       tableRows += `<tr>
-        <td style="padding:7px 10px;border:1px solid #e2e8f0;font-size:12px;white-space:nowrap;">${row.shortDate}</td>
+        <td style="padding:7px 10px;border:1px solid #e2e8f0;font-size:11px;white-space:nowrap;">${row.dateTime}</td>
         <td style="padding:7px 10px;border:1px solid #e2e8f0;font-size:11px;word-break:break-word;">${details}</td>
         ${debitCell}
         ${creditCell}
@@ -546,11 +546,11 @@ export function PartyReportView() {
     <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;">
       <thead>
         <tr style="background:#f8fafc;">
-          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:left;font-size:12px;color:#374151;font-weight:700;width:13%;">তারিখ</th>
-          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:left;font-size:12px;color:#374151;font-weight:700;width:34%;">ডিটেইলস</th>
-          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:#374151;font-weight:700;background:#fef2f2;width:17%;">ডেবিট / খরচ (-)</th>
-          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:#374151;font-weight:700;background:#f0fdf4;width:17%;">ক্রেডিট / জমা (+)</th>
-          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:#374151;font-weight:700;width:19%;">ব্যালেন্স (Dr/Cr)</th>
+          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:left;font-size:12px;color:#374151;font-weight:700;width:24%;">তারিখ</th>
+          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:left;font-size:12px;color:#374151;font-weight:700;width:26%;">ডিটেইলস</th>
+          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:#374151;font-weight:700;background:#fef2f2;width:16%;">ডেবিট / খরচ (-)</th>
+          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:#374151;font-weight:700;background:#f0fdf4;width:16%;">ক্রেডিট / জমা (+)</th>
+          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:#374151;font-weight:700;width:18%;">ব্যালেন্স (Dr/Cr)</th>
         </tr>
       </thead>
       <tbody>${tableRows}</tbody>

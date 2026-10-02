@@ -38,8 +38,7 @@ import {
 import { billImageSrc, prefetchImagesForPdf } from '@/lib/billImageStorage';
 import { toast } from 'sonner';
 import { format, isToday } from 'date-fns';
-import { bn as bnLocale } from 'date-fns/locale';
-import { formatLocalTime } from '@/lib/date-time';
+import { formatLedgerEntryDateTime, getLedgerEntryDateKey } from '@/lib/date-time';
 import { useAppAuth } from '@/App';
 import { useBusinessContext } from '@/lib/businessContext';
 import { ENTRY_OUTBOX_CHANGED, listEntries, type QueuedEntry } from '@/lib/entryOutbox';
@@ -50,10 +49,7 @@ import { ENTRY_OUTBOX_CHANGED, listEntries, type QueuedEntry } from '@/lib/entry
  * `dueDate`); fall back to the entry's insertion date only when unset.
  */
 function entryDateKey(entry: { dueDate: string | null; createdAt: string | Date }) {
-  // `dueDate` may arrive as a plain "yyyy-MM-dd" or as a full ISO timestamp
-  // (e.g. "2026-07-01T00:00:00.000Z") depending on the serializer; normalize
-  // either shape (or the createdAt fallback) to a bare calendar-day key.
-  return format(new Date(entry.dueDate || entry.createdAt), 'yyyy-MM-dd');
+  return getLedgerEntryDateKey(entry.dueDate, entry.createdAt);
 }
 
 /** Groups already-sorted entries by calendar day, preserving the given order. */
@@ -488,7 +484,7 @@ export function PartyView() {
                       >
                         <div className="min-w-0 py-3 pl-4">
                           <p className="text-[12px] font-bold text-slate-700 flex items-center gap-1.5 flex-wrap">
-                            {format(new Date(`${entryDateKey(entry)}T00:00:00`), 'd MMM yy', { locale: bnLocale })} • {formatLocalTime(entry.createdAt)}
+                            {formatLedgerEntryDateTime(entry.dueDate, entry.createdAt)}
                             {entry.isTransfer && (
                               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 text-[9px] font-bold">
                                 <ArrowLeftRight className="w-2.5 h-2.5" />ট্রান্সফার

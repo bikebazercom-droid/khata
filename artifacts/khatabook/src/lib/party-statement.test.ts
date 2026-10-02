@@ -4,6 +4,7 @@ import {
   calculatePartyStatementSummary,
   type PartyStatementEntry,
 } from './party-statement';
+import { formatLocalTime, getLedgerEntryDateKey } from './date-time';
 
 const allEntries: PartyStatementEntry[] = [
   { id: 'opening-movement', type: 'YOU_GAVE', amount: 100, createdAt: '2026-04-30T12:00:00.000Z' },
@@ -68,5 +69,28 @@ describe('party statement calculations', () => {
         balanceAfter: 90,
       },
     ]);
+  });
+
+  it('uses the entered business date and local creation time for each statement row', () => {
+    const createdAt = '2025-05-01T10:55:00.000Z';
+    const [row] = buildPartyStatementRows([{
+      id: 'backdated',
+      type: 'YOU_GAVE',
+      amount: 10,
+      createdAt,
+      dueDate: '2025-04-30',
+    }], 0);
+
+    expect(row.dayKey).toBe('2025-04-30');
+    expect(row.dayLabel).toContain('30');
+    expect(row.dateTime).toMatch(/^30 .+ 25 • /);
+    expect(row.dateTime).toBe(`${row.dateTime.split(' • ')[0]} • ${formatLocalTime(createdAt)}`);
+  });
+
+  it('keeps ISO-serialized date-only values on their original calendar day', () => {
+    expect(getLedgerEntryDateKey(
+      '2025-04-30T00:00:00.000Z',
+      '2025-05-01T10:55:00.000Z',
+    )).toBe('2025-04-30');
   });
 });
