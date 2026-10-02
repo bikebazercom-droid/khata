@@ -144,19 +144,12 @@ describe('party statement calculations', () => {
     });
   });
 
-  it('uses each entry note and amount column in newest-first order with chronological balances', () => {
+  it('uses chronological order with chronological balances', () => {
     const rows = buildPartyStatementRows(allEntries.slice(1), 110);
 
     expect(rows.map(({ id, details, debit, credit, balanceAfter }) => ({
       id, details, debit, credit, balanceAfter,
     }))).toEqual([
-      {
-        id: 'debit',
-        details: 'নগদ প্রদান (বিল: B-17)',
-        debit: 20,
-        credit: null,
-        balanceAfter: 90,
-      },
       {
         id: 'credit',
         details: 'পুরোনো বাকি পরিশোধ',
@@ -164,10 +157,17 @@ describe('party statement calculations', () => {
         credit: 40,
         balanceAfter: 70,
       },
+      {
+        id: 'debit',
+        details: 'নগদ প্রদান (বিল: B-17)',
+        debit: 20,
+        credit: null,
+        balanceAfter: 90,
+      },
     ]);
   });
 
-  it('keeps backdated day groups contiguous and presents them newest first', () => {
+  it('keeps backdated day groups contiguous and presents them oldest first', () => {
     const entries: PartyStatementEntry[] = [
       {
         id: 'october-first-created',
@@ -202,12 +202,12 @@ describe('party statement calculations', () => {
     const rows = buildPartyStatementRows(entries, 0);
 
     expect(rows.map(({ id, dayKey }) => [id, dayKey])).toEqual([
-      ['october-second-created', '2026-10-02'],
-      ['october-first-created', '2026-10-02'],
-      ['january-2025', '2025-01-02'],
       ['january-2024', '2024-01-01'],
+      ['january-2025', '2025-01-02'],
+      ['october-first-created', '2026-10-02'],
+      ['october-second-created', '2026-10-02'],
     ]);
-    expect(rows.map(({ balanceAfter }) => balanceAfter)).toEqual([-5331, -220, 280, 80]);
+    expect(rows.map(({ balanceAfter }) => balanceAfter)).toEqual([80, 280, -220, -5331]);
   });
 
   it('uses the entered business date and local creation time for each statement row', () => {

@@ -128,7 +128,6 @@ export function buildPartyStatementRows(
     };
   });
 
-  // Balances are accumulated oldest-to-newest, then the finished statement
-  // rows are presented newest-to-oldest.
-  return chronologicalRows.reverse();
+  // Keep the statement oldest-to-newest so dates and balances read forward.
+  return chronologicalRows;
 }
