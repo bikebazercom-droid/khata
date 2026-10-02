@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
 import { billImageSrc } from '@/lib/billImageStorage';
+import { getLedgerEntryDateKey } from './date-time';
 
 export interface ReportEntry {
   id: string;
@@ -30,8 +31,13 @@ interface LedgerReportDocumentProps {
 }
 
 /** The entry's real transaction date, normalized to a Date object. */
+function entryDateKey(entry: ReportEntry) {
+  return getLedgerEntryDateKey(entry.dueDate, entry.createdAt);
+}
+
 function entryDate(entry: ReportEntry) {
-  return new Date(entry.dueDate || entry.createdAt);
+  const [year, month, day] = entryDateKey(entry).split('-').map(Number);
+  return new Date(year, month - 1, day);
 }
 
 /** Human-readable details cell: description, falling back to a generic label, plus bill reference if present. */
@@ -48,12 +54,25 @@ interface MonthGroup {
   totalCredit: number;
 }
 
-/** Groups already chronologically-sorted (oldest -> newest) entries into calendar-month sections. */
+/** Groups entries into month sections in the same newest-first order as party history. */
 function groupByMonth(entries: ReportEntry[]): MonthGroup[] {
   const groups: MonthGroup[] = [];
-  for (const entry of entries) {
+  const newestFirst = entries
+    .map((entry, index) => ({
+      entry,
+      index,
+      dayKey: entryDateKey(entry),
+      createdAt: new Date(entry.createdAt).getTime(),
+    }))
+    .sort((a, b) =>
+      b.dayKey.localeCompare(a.dayKey) ||
+      b.createdAt - a.createdAt ||
+      a.index - b.index,
+    );
+
+  for (const { entry, dayKey } of newestFirst) {
     const date = entryDate(entry);
-    const key = format(date, 'yyyy-MM');
+    const key = dayKey.slice(0, 7);
     let group = groups[groups.length - 1];
     if (!group || group.key !== key) {
       group = { key, label: format(date, 'MMMM yyyy', { locale: bn }), entries: [], totalDebit: 0, totalCredit: 0 };
@@ -168,7 +187,7 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                   {/* Month divider: a plain section title (no grid border) that visually
                       separates each month's bordered block, matching the reference layout
                       where every month renders as its own boxed mini-table. */}
-                  <tr key={`${group.key}-header`}>
+                  <tr key={`${group.key}-header`} data-month-key={group.key}>
                     <td
                       colSpan={5}
                       style={{

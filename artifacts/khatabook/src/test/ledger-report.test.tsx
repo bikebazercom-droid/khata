@@ -137,3 +137,64 @@ describe('LedgerReportDocument — bill image thumbnails', () => {
     expect(container.querySelectorAll('img[alt="বিল"]')).toHaveLength(0);
   });
 });
+
+describe('LedgerReportDocument — statement ordering', () => {
+  it('renders month groups and entries newest-first like the live party history', () => {
+    const entries: ReportEntry[] = [
+      makeEntry({
+        id: 'may',
+        description: 'May entry',
+        dueDate: '2021-05-09',
+        createdAt: '2021-05-09T11:00:00.000Z',
+      }),
+      makeEntry({
+        id: 'october-earlier',
+        description: 'October earlier',
+        dueDate: '2026-10-01',
+        createdAt: '2026-10-01T02:49:00.000Z',
+      }),
+      makeEntry({
+        id: 'january',
+        description: 'January entry',
+        dueDate: '2024-01-01',
+        createdAt: '2024-01-01T11:00:00.000Z',
+      }),
+      makeEntry({
+        id: 'october-later',
+        description: 'October later',
+        dueDate: '2026-10-01',
+        createdAt: '2026-10-01T02:50:00.000Z',
+      }),
+      makeEntry({
+        id: 'october-next-day',
+        description: 'October next day',
+        dueDate: '2026-10-02',
+        createdAt: '2026-10-02T02:00:00.000Z',
+      }),
+    ];
+
+    const { container } = render(
+      <LedgerReportDocument storeName="টেস্ট স্টোর" party={PARTY} entries={entries} />,
+    );
+
+    const monthKeys = Array.from(
+      container.querySelectorAll<HTMLTableRowElement>('tbody tr[data-month-key]'),
+      (row) => row.dataset.monthKey,
+    );
+    expect(monthKeys).toEqual(['2026-10', '2024-01', '2021-05']);
+
+    const entryDescriptions = Array.from(container.querySelectorAll<HTMLTableRowElement>('tbody tr'))
+      .filter((row) =>
+        row.cells.length === 5 &&
+        /^\d{2}\/\d{2}$/.test(row.cells[0].textContent?.trim() ?? ''),
+      )
+      .map((row) => row.cells[1].textContent?.trim());
+    expect(entryDescriptions).toEqual([
+      'October next day',
+      'October later',
+      'October earlier',
+      'January entry',
+      'May entry',
+    ]);
+  });
+});
