@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   LedgerEntryType,
+  PartyRole,
   getGetDashboardSummaryQueryKey,
   getGetPartyQueryKey,
   getListLedgerEntriesQueryKey,
@@ -64,7 +65,7 @@ function setBrowserOnline(value: boolean) {
   Object.defineProperty(navigator, 'onLine', { configurable: true, value });
 }
 
-function renderEntry() {
+function renderEntry(partyRole: PartyRole = PartyRole.CUSTOMER) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -78,6 +79,7 @@ function renderEntry() {
       <TransactionEntryScreen
         partyId={PARTY_ID}
         partyName="রহিম"
+        partyRole={partyRole}
         type={LedgerEntryType.YOU_GAVE}
         onClose={onClose}
       />
@@ -112,7 +114,7 @@ describe('browser ledger entry submission', () => {
     mocks.createLedgerEntry.mockReset();
     mocks.useListAdjustmentTargets.mockReset();
     mocks.useListAdjustmentTargets.mockReturnValue({
-      data: [{ id: 'target-party', name: 'করিম' }],
+      data: [{ id: 'target-party', name: 'করিম', role: PartyRole.CUSTOMER }],
     });
     mocks.uploadBillImage.mockReset();
     mocks.uploadBillImage.mockResolvedValue({ ok: true, objectPath: '/objects/uploads/bill-1' });
@@ -219,6 +221,34 @@ describe('browser ledger entry submission', () => {
       queryKey: getGetDashboardSummaryQueryKey(),
     });
     expect(invalidateQueries).toHaveBeenCalledTimes(4);
+  });
+
+  it('keeps supplier context in the target query and excludes customer destinations', async () => {
+    mocks.useListAdjustmentTargets.mockReturnValue({
+      data: [
+        { id: 'customer-target', name: 'গ্রাহক', role: PartyRole.CUSTOMER },
+        { id: 'supplier-target', name: 'সরবরাহকারী', role: PartyRole.SUPPLIER },
+      ],
+    });
+    const { onClose } = renderEntry(PartyRole.SUPPLIER);
+    expect(mocks.useListAdjustmentTargets).toHaveBeenCalledWith(
+      { partyRole: PartyRole.SUPPLIER },
+      expect.anything(),
+    );
+
+    enterAmount();
+    fireEvent.click(screen.getByTestId('button-toggle-adjustment'));
+    expect(screen.getByPlaceholderText('সরবরাহকারীর নাম লিখুন…')).toBeInTheDocument();
+    expect(screen.queryByTestId('button-adjustment-party-customer-target')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('button-adjustment-party-supplier-target'));
+    saveEntry();
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    expect(mocks.createLedgerEntry).toHaveBeenCalledWith(
+      PARTY_ID,
+      expect.objectContaining({ isTransfer: true, transferPartyId: 'supplier-target' }),
+      expect.anything(),
+    );
   });
 
   it('keeps the form open on API failure and reuses the same request ID for an unchanged retry', async () => {

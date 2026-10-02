@@ -610,6 +610,7 @@ export function PartyView() {
         <TransactionEntryScreen
           partyId={id}
           partyName={party.name}
+          partyRole={party.role}
           type={transactionType}
           onClose={() => setTransactionType(null)}
         />

@@ -49,7 +49,6 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry }: Props)
   const patchEntry = usePatchLedgerEntry();
   const requestUploadUrl = useRequestUploadUrl();
   const partyList = useListParties(undefined, { query: { enabled: mode === 'create', queryKey: getListPartiesQueryKey() } });
-  const adjustmentTargets = useListAdjustmentTargets({ query: { enabled: mode === 'create' && identity?.role === 'staff', queryKey: getListAdjustmentTargetsQueryKey() } });
   const [selectedPartyId, setSelectedPartyId] = useState(initialPartyId ?? '');
   const [partySearch, setPartySearch] = useState('');
   const [type, setType] = useState<EntryType>(entry?.type ?? 'YOU_GAVE');
@@ -70,10 +69,19 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry }: Props)
 
   const parties = (partyList.data ?? []) as PartyRecord[];
   const selectedParty = parties.find((item) => item.id === selectedPartyId);
-  const canTransfer = identity?.role === 'owner' || !!identity?.adjustmentPartyIds.includes(selectedPartyId);
-  const transferTargets = identity?.role === 'staff'
-    ? (adjustmentTargets.data ?? []).filter((target) => target.id !== selectedPartyId)
-    : parties.filter((item) => item.id !== selectedPartyId);
+  const selectedPartyRole = selectedParty?.role;
+  const adjustmentTargetParams = selectedPartyRole ? { partyRole: selectedPartyRole } : undefined;
+  const adjustmentTargets = useListAdjustmentTargets(adjustmentTargetParams, {
+    query: {
+      enabled: mode === 'create' && identity?.role === 'staff' && !!selectedParty,
+      queryKey: getListAdjustmentTargetsQueryKey(adjustmentTargetParams),
+    },
+  });
+  const canTransfer = !!selectedParty &&
+    (identity?.role === 'owner' || !!identity?.adjustmentPartyIds.includes(selectedParty.id));
+  const transferTargets = !selectedPartyRole ? [] : identity?.role === 'staff'
+    ? (adjustmentTargets.data ?? []).filter((target) => target.id !== selectedPartyId && target.role === selectedPartyRole)
+    : parties.filter((item) => item.id !== selectedPartyId && item.role === selectedPartyRole);
 
   const chooseImage = async (source: 'camera' | 'library') => {
     try {
@@ -190,8 +198,14 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry }: Props)
       setError('বাকি পাওয়ার তারিখ YYYY-MM-DD আকারে লিখুন।');
       return;
     }
-    if (isTransfer && (!transferPartyId || transferPartyId === targetPartyId)) {
-      setError('ট্রান্সফারের অন্য হিসাবটি বেছে নিন।');
+    const selectedTransferTarget = transferTargets.find((target) => target.id === transferPartyId);
+    if (isTransfer && (
+      !transferPartyId ||
+      transferPartyId === targetPartyId ||
+      !selectedPartyRole ||
+      selectedTransferTarget?.role !== selectedPartyRole
+    )) {
+      setError(`একজন ${selectedParty?.role === 'SUPPLIER' ? 'সরবরাহকারী' : 'কাস্টমার'} বেছে নিন।`);
       return;
     }
 
@@ -271,9 +285,9 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry }: Props)
               <Field label="কোন হিসাব?" value={partySearch} onChangeText={setPartySearch} placeholder="নাম বা ফোন দিয়ে খুঁজুন" testID="entry-party-search" />
               {partyList.isLoading ? <LoadingState label="হিসাব লোড হচ্ছে…" /> : null}
               {partyList.isError ? <Notice message={errorMessage(partyList.error, 'হিসাব লোড করা যায়নি।')} onRetry={() => { void partyList.refetch(); }} /> : null}
-              {selectedParty ? <PartyCard party={selectedParty} onPress={() => setSelectedPartyId('')} /> : null}
+              {selectedParty ? <PartyCard party={selectedParty} onPress={() => { setSelectedPartyId(''); setTransferPartyId(''); }} /> : null}
               {!selectedParty ? visibleParties.slice(0, 6).map((party) => (
-                <PartyCard key={party.id} party={party} onPress={() => { setSelectedPartyId(party.id); setPartySearch(''); }} />
+                <PartyCard key={party.id} party={party} onPress={() => { setSelectedPartyId(party.id); setTransferPartyId(''); setPartySearch(''); }} />
               )) : null}
               {partyList.isSuccess && visibleParties.length === 0 ? <Text style={{ color: colors.mutedForeground }}>কোনো হিসাব পাওয়া যায়নি। আগে নতুন হিসাব তৈরি করুন।</Text> : null}
             </View>
@@ -307,7 +321,9 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry }: Props)
               </Pressable>
               {isTransfer ? (
                 <View style={{ gap: 8 }}>
-                  <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: '700' }}>অন্য হিসাব বেছে নিন</Text>
+                  <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: '700' }}>
+                    অন্য {selectedParty?.role === 'SUPPLIER' ? 'সরবরাহকারী' : 'কাস্টমার'} বেছে নিন
+                  </Text>
                   {transferTargets.map((target) => (
                     <Pressable key={target.id} onPress={() => setTransferPartyId(target.id)} accessibilityRole="radio" accessibilityState={{ selected: transferPartyId === target.id }} style={{ padding: 12, borderRadius: 10, borderWidth: 1, borderColor: transferPartyId === target.id ? colors.primary : colors.border, backgroundColor: transferPartyId === target.id ? colors.secondary : colors.card }}>
                       <Text style={{ color: colors.foreground, fontWeight: '700' }}>{target.name}</Text>

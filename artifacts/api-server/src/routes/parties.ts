@@ -192,6 +192,13 @@ const isUuid = (value: string) =>
 // Grants authorize choosing a counterparty, never reading its ledger or balance.
 router.get("/adjustment-targets", async (req, res): Promise<void> => {
   const { businessId, role, userId } = req as unknown as AuthenticatedRequest;
+  const partyRoleRaw = typeof req.query.partyRole === "string" ? req.query.partyRole : undefined;
+  if (req.query.partyRole !== undefined &&
+      partyRoleRaw !== "CUSTOMER" && partyRoleRaw !== "SUPPLIER") {
+    res.status(400).json({ error: "partyRole must be CUSTOMER or SUPPLIER" });
+    return;
+  }
+  const partyRole = partyRoleRaw as "CUSTOMER" | "SUPPLIER" | undefined;
   const [user] = role === "staff"
     ? await db.select({ adjustmentPartyIds: appUsersTable.adjustmentPartyIds }).from(appUsersTable)
       .where(and(eq(appUsersTable.id, userId), eq(appUsersTable.businessId, businessId))).limit(1)
@@ -202,6 +209,7 @@ router.get("/adjustment-targets", async (req, res): Promise<void> => {
   }
   const rows = await db.select({ id: partiesTable.id, name: partiesTable.name, role: partiesTable.role })
     .from(partiesTable).where(and(eq(partiesTable.businessId, businessId),
+      partyRole ? eq(partiesTable.role, partyRole) : undefined,
       role === "staff" ? inArray(partiesTable.id, user!.adjustmentPartyIds) : undefined));
   res.json(rows);
 });
@@ -480,6 +488,7 @@ router.post(
         const source = locked.find((p) => p.id === party.id);
         const destination = locked.find((p) => p.id === transferPartyId);
         if (!source || !destination) return { status: "denied" } as const;
+        if (source.role !== destination.role) return { status: "role_mismatch" } as const;
         // Insert both entries first (without linkedEntryId — we don't know the
         // counter ID yet when inserting the primary entry).
         [primaryEntry] = await tx
@@ -546,6 +555,10 @@ router.post(
         return { status: "created" } as const;
       });
       if (result.status === "denied") { res.status(403).json({ error: "Adjustment is not permitted" }); return; }
+      if (result.status === "role_mismatch") {
+        res.status(400).json({ error: "Adjustment parties must have the same role" });
+        return;
+      }
       if (result.status === "conflict") { res.status(409).json({ error: "Request ID was already used for different entry data" }); return; }
       if (result.status === "deleted") {
         res.status(409).json({ error: "This transaction was deleted and cannot be restored by an offline retry" });

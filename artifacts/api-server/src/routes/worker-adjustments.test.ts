@@ -12,6 +12,7 @@ import { enforceRoleAccess } from "../middlewares/roleAccess";
 import ownerRouter from "./owner";
 import authRouter from "./auth";
 import partiesRouter from "./parties";
+import ledgerRouter from "./ledger";
 
 const clerk = vi.hoisted(() => ({ id: "" }));
 vi.mock("@clerk/express", () => ({
@@ -22,7 +23,7 @@ vi.mock("../services/sms", () => ({ ensureSmsReady: vi.fn(), sendOtpSms: vi.fn()
 
 describe("staff deletion, explicit re-invitation and scoped adjustments", () => {
   let businessId: string, foreignBusinessId: string, staffId: string, ownerId: string;
-  let a: string, b: string, c: string, foreign: string;
+  let a: string, b: string, c: string, supplier: string, foreign: string;
   const email = `adjustments-${crypto.randomUUID()}@example.test`;
   const phone = `+88017${Math.floor(Math.random() * 100_000_000).toString().padStart(8, "0")}`;
   let token: string;
@@ -46,7 +47,7 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
       next();
     } else { void requireAuth(req, res, next); }
   });
-  app.use(enforceRoleAccess, ownerRouter, partiesRouter);
+  app.use(enforceRoleAccess, ownerRouter, partiesRouter, ledgerRouter);
 
   beforeAll(async () => {
     vi.stubEnv("DEV_AUTH_BYPASS", "false");
@@ -56,9 +57,10 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
       { businessId, name: "A", role: "CUSTOMER", phone: "" },
       { businessId, name: "B", role: "CUSTOMER", phone: "" },
       { businessId, name: "C", role: "CUSTOMER", phone: "" },
+      { businessId, name: "Supplier S", role: "SUPPLIER", phone: "" },
       { businessId: foreignBusinessId, name: "Foreign", role: "CUSTOMER", phone: "" },
     ]).returning();
-    [a, b, c, foreign] = parties.map((p) => p.id) as [string, string, string, string];
+    [a, b, c, supplier, foreign] = parties.map((p) => p.id) as [string, string, string, string, string];
     const [staff] = await db.insert(appUsersTable).values({ businessId, role: "staff", phone }).returning();
     staffId = staff!.id;
     const [owner] = await db.insert(appUsersTable).values({
@@ -73,14 +75,14 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
   afterAll(async () => {
     vi.restoreAllMocks(); vi.unstubAllEnvs();
     if (!businessId) return;
-    await db.delete(ledgerEntriesTable).where(inArray(ledgerEntriesTable.partyId, [a, b, c, foreign]));
+    await db.delete(ledgerEntriesTable).where(inArray(ledgerEntriesTable.partyId, [a, b, c, supplier, foreign]));
     await db.delete(workerInvitesTable).where(inArray(workerInvitesTable.businessId, [businessId, foreignBusinessId]));
     const users = await db.select({ id: appUsersTable.id }).from(appUsersTable).where(eq(appUsersTable.businessId, businessId));
     for (const { id } of users) {
       await db.delete(userBusinessesTable).where(eq(userBusinessesTable.userId, id));
       await db.delete(appUsersTable).where(eq(appUsersTable.id, id));
     }
-    await db.delete(partiesTable).where(inArray(partiesTable.id, [a, b, c, foreign]));
+    await db.delete(partiesTable).where(inArray(partiesTable.id, [a, b, c, supplier, foreign]));
     await db.delete(businessesTable).where(inArray(businessesTable.id, [businessId, foreignBusinessId]));
   });
   const patch = (body: object) => request(app).patch(`/owner/workers/${staffId}`).set("Authorization", "Bearer owner").send(body);
@@ -163,16 +165,26 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
   });
 
   it("offers adjustment-only counterparties without granting any balance or ledger visibility", async () => {
-    expect((await patch({ partyIds: [a], adjustmentPartyIds: [a, b] })).status).toBe(200);
+    expect((await patch({ partyIds: [a], adjustmentPartyIds: [a, b, supplier] })).status).toBe(200);
     const authorization = `Bearer ${token}`;
     const targets = await request(app).get("/adjustment-targets").set("Authorization", authorization);
     expect(targets.status).toBe(200);
     expect((await request(app).get("/auth/me").set("Authorization", authorization)).body.adjustmentPartyIds)
-      .toEqual(expect.arrayContaining([a, b]));
+      .toEqual(expect.arrayContaining([a, b, supplier]));
     expect(targets.body).toEqual(expect.arrayContaining([
       { id: a, name: "A", role: "CUSTOMER" }, { id: b, name: "B", role: "CUSTOMER" },
+      { id: supplier, name: "Supplier S", role: "SUPPLIER" },
     ]));
-    expect(targets.body).toHaveLength(2);
+    expect(targets.body).toHaveLength(3);
+    const supplierTargets = await request(app)
+      .get("/adjustment-targets?partyRole=SUPPLIER").set("Authorization", authorization);
+    expect(supplierTargets.body).toEqual([{ id: supplier, name: "Supplier S", role: "SUPPLIER" }]);
+    const customerTargets = await request(app)
+      .get("/adjustment-targets?partyRole=CUSTOMER").set("Authorization", authorization);
+    expect(customerTargets.body.map((party: { role: string }) => party.role))
+      .toEqual(["CUSTOMER", "CUSTOMER"]);
+    expect((await request(app).get("/adjustment-targets?partyRole=UNKNOWN")
+      .set("Authorization", authorization)).status).toBe(400);
     const list = await request(app).get("/parties").set("Authorization", authorization);
     expect(list.body.map((p: { id: string }) => p.id)).toEqual([a]);
     expect((await request(app).get("/parties?search=B").set("Authorization", authorization)).body).toEqual([]);
@@ -181,6 +193,7 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
     expect((await request(app).get("/dashboard/summary").set("Authorization", authorization)).status).toBe(403);
     expect((await transfer(c, b)).status).toBe(404);
     expect((await transfer(a, c)).status).toBe(403);
+    expect((await transfer(a, supplier)).status).toBe(400);
     const result = await transfer(a, b);
     expect(result.status).toBe(201);
     expect(result.body.transferPartyId).toBe(b);
@@ -204,6 +217,32 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
     expect((await request(app).patch(`/parties/${b}/ledger-entries/${result.body.id}`).set("Authorization", authorization)
       .send({ amount: 99 })).status).toBe(404);
     expect((await request(app).delete(`/parties/${b}/entries/${result.body.id}`).set("Authorization", authorization)).status).toBe(403);
+  });
+
+  it("filters global ledger report data by customer or supplier role", async () => {
+    const customerEntry = await request(app).post(`/parties/${a}/ledger-entries`)
+      .set("Authorization", "Bearer owner")
+      .send({ type: "YOU_GOT", amount: 4 });
+    const supplierEntry = await request(app).post(`/parties/${supplier}/ledger-entries`)
+      .set("Authorization", "Bearer owner")
+      .send({ type: "YOU_GAVE", amount: 7 });
+    expect(customerEntry.status).toBe(201);
+    expect(supplierEntry.status).toBe(201);
+
+    const [supplierReport, customerReport] = await Promise.all([
+      request(app).get("/ledger-entries?partyRole=SUPPLIER").set("Authorization", "Bearer owner"),
+      request(app).get("/ledger-entries?partyRole=CUSTOMER").set("Authorization", "Bearer owner"),
+    ]);
+
+    expect(supplierReport.status).toBe(200);
+    expect(supplierReport.body.some((entry: { id: string }) => entry.id === supplierEntry.body.id)).toBe(true);
+    expect(supplierReport.body.every((entry: { partyRole: string }) => entry.partyRole === "SUPPLIER")).toBe(true);
+    expect(supplierReport.body.some((entry: { id: string }) => entry.id === customerEntry.body.id)).toBe(false);
+    expect(customerReport.status).toBe(200);
+    expect(customerReport.body.every((entry: { partyRole: string }) => entry.partyRole === "CUSTOMER")).toBe(true);
+    expect(customerReport.body.some((entry: { id: string }) => entry.id === supplierEntry.body.id)).toBe(false);
+    expect((await request(app).get("/ledger-entries?partyRole=UNKNOWN")
+      .set("Authorization", "Bearer owner")).status).toBe(400);
   });
 
   it("keeps both sides and balances synchronized when an owner edits or deletes a transfer", async () => {

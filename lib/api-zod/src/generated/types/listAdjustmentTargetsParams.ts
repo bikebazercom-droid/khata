@@ -7,9 +7,6 @@
  */
 import type { PartyRole } from './partyRole';
 
-export type ListGlobalLedgerEntriesParams = {
-startDate?: Date;
-endDate?: Date;
-search?: string;
+export type ListAdjustmentTargetsParams = {
 partyRole?: PartyRole;
 };

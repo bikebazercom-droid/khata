@@ -12,8 +12,13 @@ function parseQuery(query: Record<string, unknown>) {
   const startDate = typeof query["startDate"] === "string" ? query["startDate"] : undefined;
   const endDate = typeof query["endDate"] === "string" ? query["endDate"] : undefined;
   const search = typeof query["search"] === "string" ? query["search"] : undefined;
-  const partyRoleRaw = typeof query["partyRole"] === "string" ? query["partyRole"] : undefined;
-  const partyRole = partyRoleRaw === "CUSTOMER" || partyRoleRaw === "SUPPLIER" ? partyRoleRaw : undefined;
+  const partyRoleValue = query["partyRole"];
+  const partyRoleRaw = typeof partyRoleValue === "string" ? partyRoleValue : undefined;
+  if (partyRoleValue !== undefined &&
+      (partyRoleRaw === undefined || (partyRoleRaw !== "CUSTOMER" && partyRoleRaw !== "SUPPLIER"))) {
+    return { error: "partyRole must be CUSTOMER or SUPPLIER" } as const;
+  }
+  const partyRole = partyRoleRaw as "CUSTOMER" | "SUPPLIER" | undefined;
 
   if (startDate !== undefined && !DATE_ONLY_PATTERN.test(startDate)) {
     return { error: "startDate must be a yyyy-MM-dd date string" } as const;
@@ -62,6 +67,7 @@ router.get("/ledger-entries", async (req, res): Promise<void> => {
       partyId: ledgerEntriesTable.partyId,
       partyName: partiesTable.name,
       partyPhone: partiesTable.phone,
+      partyRole: partiesTable.role,
       type: ledgerEntriesTable.type,
       amount: ledgerEntriesTable.amount,
       description: ledgerEntriesTable.description,

@@ -171,6 +171,10 @@ export const UpdateBusinessSettingsResponse = zod.object({
 /**
  * @summary List authorized adjustment counterparties (identity only; no ledger access)
  */
+export const ListAdjustmentTargetsQueryParams = zod.object({
+  "partyRole": zod.enum(['CUSTOMER', 'SUPPLIER']).optional()
+})
+
 export const ListAdjustmentTargetsResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string(),
@@ -386,7 +390,8 @@ export const DeleteLedgerEntryResponse = zod.unknown()
 export const ListGlobalLedgerEntriesQueryParams = zod.object({
   "startDate": zod.date().optional(),
   "endDate": zod.date().optional(),
-  "search": zod.coerce.string().optional()
+  "search": zod.coerce.string().optional(),
+  "partyRole": zod.enum(['CUSTOMER', 'SUPPLIER']).optional()
 })
 
 export const ListGlobalLedgerEntriesResponseItem = zod.object({
@@ -394,6 +399,7 @@ export const ListGlobalLedgerEntriesResponseItem = zod.object({
   "partyId": zod.string(),
   "partyName": zod.string(),
   "partyPhone": zod.string(),
+  "partyRole": zod.enum(['CUSTOMER', 'SUPPLIER']),
   "type": zod.enum(['YOU_GAVE', 'YOU_GOT']),
   "amount": zod.number(),
   "description": zod.string(),

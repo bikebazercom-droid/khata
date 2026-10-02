@@ -254,6 +254,11 @@ paths:
       operationId: listAdjustmentTargets
       tags: [parties]
       summary: List authorized adjustment counterparties (identity only; no ledger access)
+      parameters:
+        - name: partyRole
+          in: query
+          schema:
+            $ref: "#/components/schemas/PartyRole"
       responses:
         "200":
           description: Minimal counterparty identities
@@ -454,6 +459,10 @@ paths:
           in: query
           schema:
             type: string
+        - name: partyRole
+          in: query
+          schema:
+            $ref: "#/components/schemas/PartyRole"
       responses:
         "200":
           description: List of ledger entries across all parties, newest first
@@ -1133,6 +1142,7 @@ components:
         - partyId
         - partyName
         - partyPhone
+        - partyRole
         - type
         - amount
         - description
@@ -1149,6 +1159,8 @@ components:
           type: string
         partyPhone:
           type: string
+        partyRole:
+          $ref: "#/components/schemas/PartyRole"
         type:
           $ref: "#/components/schemas/LedgerEntryType"
         amount:

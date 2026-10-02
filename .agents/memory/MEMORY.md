@@ -19,3 +19,4 @@
 - [Ledger timestamp timezone](ledger-timestamp-timezone.md) — display transaction creation times in the viewer's local timezone while preserving date-only due dates.
 - [PDF statement order](ledger-statement-order.md) — group by business date and show statements newest-first while retaining chronological running balances.
 - [Large transaction amounts](large-transaction-amounts.md) — keep complete formatted values inside party-history cards at narrow phone widths.
+- [Party-role report and transfer scope](party-role-scope.md) — supplier/customer reports and transfers must never cross roles; retain existing business isolation.

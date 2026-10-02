@@ -281,6 +281,7 @@ export interface GlobalLedgerEntry {
   partyId: string;
   partyName: string;
   partyPhone: string;
+  partyRole: PartyRole;
   type: LedgerEntryType;
   amount: number;
   description: string;
@@ -491,6 +492,10 @@ export interface BlockedIpsPage {
   policy: ClientIpPolicy;
 }
 
+export type ListAdjustmentTargetsParams = {
+partyRole?: PartyRole;
+};
+
 export type ListPartiesParams = {
 role?: PartyRole;
 search?: string;
@@ -501,6 +506,7 @@ export type ListGlobalLedgerEntriesParams = {
 startDate?: string;
 endDate?: string;
 search?: string;
+partyRole?: PartyRole;
 };
 
 export type ListAdminUsersParams = {

@@ -52,6 +52,7 @@ export * from './ledgerEntry';
 export * from './ledgerEntryInput';
 export * from './ledgerEntryPatch';
 export * from './ledgerEntryType';
+export * from './listAdjustmentTargetsParams';
 export * from './listAdminUsersParams';
 export * from './listGlobalLedgerEntriesParams';
 export * from './listPartiesParams';

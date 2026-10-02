@@ -476,6 +476,7 @@ export function TransactionDetailPage() {
         <TransactionEntryScreen
           partyId={partyId}
           partyName={party.name}
+          partyRole={party.role}
           type={entry.type as LedgerEntryType}
           initialEntry={entry}
           onClose={() => setIsEditOpen(false)}

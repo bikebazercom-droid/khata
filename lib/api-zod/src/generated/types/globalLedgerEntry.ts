@@ -6,12 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { LedgerEntryType } from './ledgerEntryType';
+import type { PartyRole } from './partyRole';
 
 export interface GlobalLedgerEntry {
   id: string;
   partyId: string;
   partyName: string;
   partyPhone: string;
+  partyRole: PartyRole;
   type: LedgerEntryType;
   amount: number;
   description: string;

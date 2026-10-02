@@ -48,6 +48,7 @@ import type {
   LedgerEntry,
   LedgerEntryInput,
   LedgerEntryPatch,
+  ListAdjustmentTargetsParams,
   ListAdminUsersParams,
   ListGlobalLedgerEntriesParams,
   ListPartiesParams,
@@ -969,20 +970,27 @@ export const useUpdateBusinessSettings = <TError = ErrorType<unknown>,
       return useMutation(getUpdateBusinessSettingsMutationOptions(options));
     }
 
-export const getListAdjustmentTargetsUrl = () => {
+export const getListAdjustmentTargetsUrl = (params?: ListAdjustmentTargetsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/adjustment-targets`
+  return stringifiedParams.length > 0 ? `/api/adjustment-targets?${stringifiedParams}` : `/api/adjustment-targets`
 }
 
 /**
  * @summary List authorized adjustment counterparties (identity only; no ledger access)
  */
-export const listAdjustmentTargets = async ( options?: RequestInit): Promise<AdjustmentTarget[]> => {
+export const listAdjustmentTargets = async (params?: ListAdjustmentTargetsParams, options?: RequestInit): Promise<AdjustmentTarget[]> => {
 
-  return customFetch<AdjustmentTarget[]>(getListAdjustmentTargetsUrl(),
+  return customFetch<AdjustmentTarget[]>(getListAdjustmentTargetsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -995,23 +1003,23 @@ export const listAdjustmentTargets = async ( options?: RequestInit): Promise<Adj
 
 
 
-export const getListAdjustmentTargetsQueryKey = () => {
+export const getListAdjustmentTargetsQueryKey = (params?: ListAdjustmentTargetsParams,) => {
     return [
-    `/api/adjustment-targets`
+    `/api/adjustment-targets`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListAdjustmentTargetsQueryOptions = <TData = Awaited<ReturnType<typeof listAdjustmentTargets>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdjustmentTargets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListAdjustmentTargetsQueryOptions = <TData = Awaited<ReturnType<typeof listAdjustmentTargets>>, TError = ErrorType<unknown>>(params?: ListAdjustmentTargetsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdjustmentTargets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListAdjustmentTargetsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListAdjustmentTargetsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdjustmentTargets>>> = ({ signal }) => listAdjustmentTargets({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdjustmentTargets>>> = ({ signal }) => listAdjustmentTargets(params, { signal, ...requestOptions });
 
 
 
@@ -1029,11 +1037,11 @@ export type ListAdjustmentTargetsQueryError = ErrorType<unknown>
  */
 
 export function useListAdjustmentTargets<TData = Awaited<ReturnType<typeof listAdjustmentTargets>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdjustmentTargets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListAdjustmentTargetsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdjustmentTargets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListAdjustmentTargetsQueryOptions(options)
+  const queryOptions = getListAdjustmentTargetsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

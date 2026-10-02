@@ -128,12 +128,14 @@ const Key = memo(function Key({ def, onPress }: { def: KeyDef; onPress: (value: 
 export function TransactionEntryScreen({
   partyId,
   partyName,
+  partyRole,
   type,
   onClose,
   initialEntry,
 }: {
   partyId: string;
   partyName: string;
+  partyRole: Party['role'];
   type: LedgerEntryType;
   onClose: () => void;
   /** When provided the screen opens in edit mode, pre-populated with the
@@ -145,6 +147,8 @@ export function TransactionEntryScreen({
   const { selectedBusinessId } = useBusinessContext();
   const { isOnline } = useConnectionState();
   const canAdjustSource = userRole === 'owner' || adjustmentPartyIds.includes(partyId);
+  const partyRoleLabel = partyRole === 'SUPPLIER' ? 'সরবরাহকারী' : 'কাস্টমার';
+  const partyRoleSearchLabel = partyRole === 'SUPPLIER' ? 'সরবরাহকারীর' : 'কাস্টমারের';
   const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
   /** Stores the cloud-storage path of the bill image already on the entry so
    *  handleUpdate can keep it unchanged when the user hasn't replaced it. */
@@ -285,10 +289,21 @@ export function TransactionEntryScreen({
   const [transferSearch, setTransferSearch] = useState('');
 
   // Fetch party list for the transfer dropdown (only when toggle is on).
+  const adjustmentTargetParams = { partyRole };
   const { data: transferPartyList = [] } = useListAdjustmentTargets(
-    { query: { enabled: canAdjustSource && isTransferMode && !isEditMode, queryKey: businessScopedQueryKey(getListAdjustmentTargetsQueryKey(), selectedBusinessId) } },
+    adjustmentTargetParams,
+    {
+      query: {
+        enabled: canAdjustSource && isTransferMode && !isEditMode,
+        queryKey: businessScopedQueryKey(
+          getListAdjustmentTargetsQueryKey(adjustmentTargetParams),
+          selectedBusinessId,
+        ),
+      },
+    },
   );
   const transferPartyOptions = transferPartyList.filter((p) => p.id !== partyId &&
+    p.role === partyRole &&
     p.name.toLocaleLowerCase().includes(transferSearch.trim().toLocaleLowerCase()));
 
   // Controls the "unsaved changes" confirmation dialog shown when the user
@@ -701,9 +716,15 @@ export function TransactionEntryScreen({
     }
 
     // Validate transfer selection before doing anything else.
-    if (isTransferMode && (!canAdjustSource || !transferPartyId || (userRole !== 'owner' && !adjustmentPartyIds.includes(transferPartyId)))) {
-      toast.warning('কাস্টমার বেছে নিন', {
-        description: 'অ্যাডজাস্টমেন্টের জন্য একটি কাস্টমার নির্বাচন করুন।',
+    const selectedTransferParty = transferPartyList.find((party) => party.id === transferPartyId);
+    if (isTransferMode && (
+      !canAdjustSource ||
+      !transferPartyId ||
+      selectedTransferParty?.role !== partyRole ||
+      (userRole !== 'owner' && !adjustmentPartyIds.includes(transferPartyId))
+    )) {
+      toast.warning(`${partyRoleLabel} বেছে নিন`, {
+        description: `অ্যাডজাস্টমেন্টের জন্য একজন ${partyRoleLabel} নির্বাচন করুন।`,
         duration: 3000,
       });
       return;
@@ -780,7 +801,7 @@ export function TransactionEntryScreen({
     } finally {
       savingRef.current = false;
     }
-  }, [memoryHistory.length, memoryValue, expression, partyId, type, description, dueDate, clearMemory, onClose, isTransferMode, transferPartyId, canAdjustSource, userRole, adjustmentPartyIds, userId, selectedBusinessId, queryClient]);
+  }, [memoryHistory.length, memoryValue, expression, partyId, partyRole, partyRoleLabel, transferPartyList, type, description, dueDate, clearMemory, onClose, isTransferMode, transferPartyId, canAdjustSource, userRole, adjustmentPartyIds, userId, selectedBusinessId, queryClient]);
 
   return (
     <div className="absolute inset-0 z-50 bg-[#f8fafc] flex flex-col">
@@ -977,20 +998,20 @@ export function TransactionEntryScreen({
               </div>
             </button>
 
-            {/* Customer list — only when toggle is ON */}
+            {/* Counterparties of the source party's role — only when toggle is ON */}
             {isTransferMode && (
               <div className="border-t border-slate-100 px-3 pb-3">
                 <input
                   value={transferSearch}
                   data-testid="input-adjustment-party-search"
                   onChange={(e) => setTransferSearch(e.target.value)}
-                  placeholder="কাস্টমারের নাম লিখুন…"
+                  placeholder={`${partyRoleSearchLabel} নাম লিখুন…`}
                   autoFocus
                   className="w-full h-9 px-3 mt-2.5 mb-2 rounded-lg bg-slate-50 border border-slate-200 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400/30"
                 />
                 <div className="max-h-[120px] overflow-y-auto space-y-1">
                   {transferPartyOptions.length === 0 && (
-                    <p className="text-xs text-slate-400 text-center py-2">কোনো কাস্টমার পাওয়া যায়নি</p>
+                    <p className="text-xs text-slate-400 text-center py-2">কোনো {partyRoleLabel} পাওয়া যায়নি</p>
                   )}
                   {transferPartyOptions.map((p) => (
                     <button

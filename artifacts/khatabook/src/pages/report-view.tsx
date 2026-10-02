@@ -7,6 +7,7 @@ import {
   getListGlobalLedgerEntriesQueryKey,
   useGetBusinessSettings,
   getGetBusinessSettingsQueryKey,
+  PartyRole,
 } from '@workspace/api-client-react';
 import {
   buildGlobalLedgerReportQuery,
@@ -28,6 +29,7 @@ import { billImageSrc } from '@/lib/billImageStorage';
 import { loadShopProfile } from '@/components/modals/settings-drawer';
 import { buildGlobalLedgerReportCsv } from '@/lib/global-ledger-report-csv';
 import { sortGlobalLedgerEntriesNewestFirst } from '@/lib/global-ledger-report-order';
+import { filterGlobalLedgerEntriesByRole } from '@/lib/global-ledger-report-role';
 
 const PERIOD_LABELS: Record<ReportPeriod, string> = {
   ALL: 'সব',
@@ -51,7 +53,7 @@ export function ReportView() {
   const [_currentPath] = useLocation(); // reactive trigger — value intentionally unused
   const roleParam = new URLSearchParams(window.location.search).get('role') ?? 'customer';
   const isSupplier = roleParam === 'supplier';
-  const partyRole = isSupplier ? 'SUPPLIER' : 'CUSTOMER';
+  const partyRole = isSupplier ? PartyRole.SUPPLIER : PartyRole.CUSTOMER;
   const roleLabel = isSupplier ? 'সরবরাহকারী' : 'গ্রাহক';
 
   const { data: settings } = useGetBusinessSettings({
@@ -69,8 +71,11 @@ export function ReportView() {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const params = useMemo(
-    () => buildGlobalLedgerReportQuery(period, startDate, endDate, search),
-    [period, startDate, endDate, search],
+    () => ({
+      ...buildGlobalLedgerReportQuery(period, startDate, endDate, search),
+      partyRole,
+    }),
+    [period, startDate, endDate, search, partyRole],
   );
   const { data: unsortedEntries = [], isLoading } = useListGlobalLedgerEntries(params, {
     query: {
@@ -78,8 +83,10 @@ export function ReportView() {
     }
   });
   const entries = useMemo(
-    () => sortGlobalLedgerEntriesNewestFirst(unsortedEntries),
-    [unsortedEntries],
+    () => sortGlobalLedgerEntriesNewestFirst(
+      filterGlobalLedgerEntriesByRole(unsortedEntries, partyRole),
+    ),
+    [unsortedEntries, partyRole],
   );
 
   const { totalDebit, totalCredit, netBalance } = useMemo(
