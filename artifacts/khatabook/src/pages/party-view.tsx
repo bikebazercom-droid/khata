@@ -52,6 +52,18 @@ function entryDateKey(entry: { dueDate: string | null; createdAt: string | Date 
   return getLedgerEntryDateKey(entry.dueDate, entry.createdAt);
 }
 
+function currencyAmountFontSize(value: string): string {
+  const estimatedWidthInEm = Array.from(value).reduce((width, character) => {
+    if (character === '৳') return width + 0.9;
+    if (character === ',' || character === '.') return width + 0.35;
+    return width + 0.68;
+  }, 0);
+
+  // The amount tracks are 6rem wide with 8px horizontal padding, leaving
+  // 88px of text space. Keep a small safety margin for font metric variance.
+  return `${Math.min(14, 84 / (estimatedWidthInEm * 1.12))}px`;
+}
+
 /** Groups already-sorted entries by calendar day, preserving the given order. */
 function groupByDay<T extends { dueDate: string | null; createdAt: string | Date }>(entries: T[]) {
   const groups: { dayKey: string; date: Date; items: T[] }[] = [];
@@ -446,10 +458,10 @@ export function PartyView() {
         ) : (
           <>
             {/* Column headers */}
-            <div className="sticky top-0 z-[5] bg-[#f8fafc] grid grid-cols-[minmax(0,1fr)_minmax(0,5rem)_minmax(0,5rem)] gap-3 px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            <div className="sticky top-0 z-[5] bg-[#f8fafc] grid grid-cols-[minmax(0,1fr)_minmax(0,6rem)_minmax(0,6rem)] gap-3 px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
               <span>এন্ট্রি</span>
-              <span className="w-20 min-w-0 text-center leading-tight">আপনি দিয়েছেন</span>
-              <span className="w-20 min-w-0 text-right leading-tight">আপনি পেয়েছেন</span>
+              <span className="w-24 min-w-0 text-center leading-tight">আপনি দিয়েছেন</span>
+              <span className="w-24 min-w-0 text-right leading-tight">আপনি পেয়েছেন</span>
             </div>
 
             {groupedEntries.map((group) => (
@@ -464,6 +476,8 @@ export function PartyView() {
                   {group.items.map((entry, i) => {
                     const isGave = entry.type === 'YOU_GAVE';
                     const imgSrc = billImageSrc(entry.billImage);
+                    const formattedAmount = formatCurrency(entry.amount);
+                    const amountFontSize = currencyAmountFontSize(formattedAmount);
                     return (
                       <div
                         key={entry.id}
@@ -477,7 +491,7 @@ export function PartyView() {
                           if (userRole === 'owner' && e.key === 'Enter') navigate(`/party/${id}/entry/${entry.id}`);
                         }}
                         className={cn(
-                          "bg-white rounded-xl shadow-sm grid grid-cols-[minmax(0,1fr)_minmax(0,5rem)_minmax(0,5rem)] gap-3 items-center overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both transition-colors",
+                          "bg-white rounded-xl shadow-sm grid grid-cols-[minmax(0,1fr)_minmax(0,6rem)_minmax(0,6rem)] gap-3 items-center overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both transition-colors",
                           userRole === 'owner' ? "cursor-pointer active:bg-slate-50" : ""
                         )}
                         style={{ animationDelay: `${i * 30}ms` }}
@@ -541,10 +555,10 @@ export function PartyView() {
                         <div className="min-w-0 h-full flex items-center justify-center px-1 py-3 bg-[#FFF5F5]">
                           {isGave && (
                             <span
-                              className="block w-full min-w-0 text-center font-extrabold text-red-700 text-[clamp(10px,2.5vw,14px)] leading-tight"
-                              style={{ overflowWrap: 'anywhere' }}
+                              className="block w-full min-w-0 whitespace-nowrap text-center font-extrabold text-red-700 leading-tight"
+                              style={{ fontSize: amountFontSize }}
                             >
-                              {formatCurrency(entry.amount)}
+                              {formattedAmount}
                             </span>
                           )}
                         </div>
@@ -552,10 +566,10 @@ export function PartyView() {
                         <div className="min-w-0 h-full flex items-center justify-end px-1 py-3 bg-white">
                           {!isGave && (
                             <span
-                              className="block w-full min-w-0 text-right font-extrabold text-emerald-600 text-[clamp(10px,2.5vw,14px)] leading-tight"
-                              style={{ overflowWrap: 'anywhere' }}
+                              className="block w-full min-w-0 whitespace-nowrap text-right font-extrabold text-emerald-600 leading-tight"
+                              style={{ fontSize: amountFontSize }}
                             >
-                              {formatCurrency(entry.amount)}
+                              {formattedAmount}
                             </span>
                           )}
                         </div>
