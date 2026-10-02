@@ -6,6 +6,8 @@
  */
 import { useMemo, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
+import { useBusinessContext } from '@/lib/businessContext';
+import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import {
   useGetParty,
   useListLedgerEntries,
@@ -161,12 +163,13 @@ export function PartyReportView() {
   const [, params]    = useRoute('/party/:id/report');
   const id            = params?.id ?? '';
   const [, navigate]  = useLocation();
+  const { selectedBusinessId } = useBusinessContext();
 
   const { data: party,      isLoading: partyLoading   } = useGetParty(id, {
-    query: { enabled: !!id, queryKey: getGetPartyQueryKey(id) },
+    query: { enabled: !!id, queryKey: businessScopedQueryKey(getGetPartyQueryKey(id), selectedBusinessId) },
   });
   const { data: allEntries = [], isLoading: entriesLoading } = useListLedgerEntries(id, {
-    query: { enabled: !!id, queryKey: getListLedgerEntriesQueryKey(id) },
+    query: { enabled: !!id, queryKey: businessScopedQueryKey(getListLedgerEntriesQueryKey(id), selectedBusinessId) },
   });
 
   // ── UI state ──

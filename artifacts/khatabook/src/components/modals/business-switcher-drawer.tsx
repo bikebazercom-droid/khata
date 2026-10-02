@@ -3,7 +3,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import { useBusinessContext, type BusinessInfo } from '@/lib/businessContext';
-import { setExtraHeaders } from '@workspace/api-client-react';
 import { useLanguage } from '@/lib/i18n';
 import { allowOfflineBusinesses, readOfflineIdentity } from '@/lib/authCache';
 
@@ -69,8 +68,6 @@ export function BusinessSwitcherDrawer() {
   async function handleSwitch(id: string) {
     if (id === selectedBusinessId) { closeSwitcher(); return; }
     setSelectedBusiness(id);
-    localStorage.setItem('selected_business_id', id);
-    setExtraHeaders({ 'x-business-id': id });
     queryClient.clear();
     await queryClient.invalidateQueries();
     closeSwitcher();
@@ -118,11 +115,9 @@ export function BusinessSwitcherDrawer() {
       if (targetId === selectedBusinessId) {
         const remaining = businesses.filter((b) => b.id !== targetId);
         if (remaining.length > 0) {
-          localStorage.setItem('selected_business_id', remaining[0]!.id);
-          setExtraHeaders({ 'x-business-id': remaining[0]!.id });
+          setSelectedBusiness(remaining[0]!.id);
         } else {
           localStorage.removeItem('selected_business_id');
-          setExtraHeaders({});
         }
       }
 

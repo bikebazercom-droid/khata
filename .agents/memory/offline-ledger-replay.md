@@ -14,3 +14,9 @@ Pending drafts do not contribute to confirmed balances.
 **Why:** An offline write can be rejected after permission revocation. Showing it as confirmed would misrepresent the ledger before the server has accepted it.
 
 **How to apply:** Keep pending/rejected drafts visible separately and leave them recoverable on failed synchronization.
+
+When evicting persisted query data, clear matching entries from both the saved snapshot and the debounced dirty-write buffer; compare generated query-key prefixes so appended business scopes are included.
+
+**Why:** A pending persistence timer can restore stale ledger data after an entry is deleted or its cache is invalidated.
+
+**How to apply:** Any targeted cache eviction must prevent already-queued writes from flushing the evicted data back to storage.

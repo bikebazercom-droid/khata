@@ -3,6 +3,8 @@ import { toast } from 'sonner';
 import { useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { useClerk, useAuth } from '@clerk/react';
+import { useBusinessContext } from '@/lib/businessContext';
+import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import {
   useGetBusinessSettings,
   useUpdateBusinessSettings,
@@ -76,8 +78,9 @@ export function SettingsDrawer({
   const { signOut } = useClerk();
   const { isSignedIn } = useAuth();
   const { isAuthenticated, role } = useAppAuth();
+  const { selectedBusinessId } = useBusinessContext();
   const { data: settings } = useGetBusinessSettings({
-    query: { enabled: role === 'owner', queryKey: getGetBusinessSettingsQueryKey() },
+    query: { enabled: role === 'owner', queryKey: businessScopedQueryKey(getGetBusinessSettingsQueryKey(), selectedBusinessId) },
   });
   const [, navigate] = useLocation();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -106,7 +109,7 @@ export function SettingsDrawer({
   const updateSettings = useUpdateBusinessSettings({
     mutation: {
       onMutate: async ({ data }) => {
-        const settingsKey = getGetBusinessSettingsQueryKey();
+        const settingsKey = businessScopedQueryKey(getGetBusinessSettingsQueryKey(), selectedBusinessId);
         const previousSettings = queryClient.getQueryData<BusinessSettings>(settingsKey);
         if (previousSettings) {
           queryClient.setQueryData<BusinessSettings>(settingsKey, { ...previousSettings, ...data });

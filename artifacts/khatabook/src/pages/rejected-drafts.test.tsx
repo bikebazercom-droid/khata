@@ -33,6 +33,7 @@ vi.mock('@/lib/entryOutbox', () => ({
 
 vi.mock('@workspace/api-client-react', () => ({
   useListParties: () => ({ data: [{ id: 'party-A', name: 'রহিম স্টোর' }] }),
+  getListPartiesQueryKey: () => ['/api/parties'],
 }));
 
 vi.mock('sonner', () => ({

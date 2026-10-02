@@ -1,8 +1,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useBusinessContext } from '@/lib/businessContext';
+import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import {
   useListParties,
+  getListPartiesQueryKey,
   useGetBusinessSettings,
   getGetBusinessSettingsQueryKey,
   PartyRole,
@@ -80,9 +82,15 @@ export function HomeView() {
     ? rejectedDraftSummary.count
     : 0;
 
-  const { data: settings } = useGetBusinessSettings({ query: { enabled: userRole === 'owner', queryKey: getGetBusinessSettingsQueryKey() } });
-  const { data: summaryParties = [] } = useListParties({ role });
-  const { data: rawParties = [] } = useListParties({ role, search, dueFilter: apiDueFilter });
+  const { data: settings } = useGetBusinessSettings({ query: { enabled: userRole === 'owner', queryKey: businessScopedQueryKey(getGetBusinessSettingsQueryKey(), selectedBusinessId) } });
+  const summaryParams = { role };
+  const partyParams = { role, search, dueFilter: apiDueFilter };
+  const { data: summaryParties = [] } = useListParties(summaryParams, {
+    query: { queryKey: businessScopedQueryKey(getListPartiesQueryKey(summaryParams), selectedBusinessId) },
+  });
+  const { data: rawParties = [] } = useListParties(partyParams, {
+    query: { queryKey: businessScopedQueryKey(getListPartiesQueryKey(partyParams), selectedBusinessId) },
+  });
 
   useEffect(() => {
     if (userRole !== 'owner' || !userId || !selectedBusinessId) return;

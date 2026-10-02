@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useBusinessContext } from '@/lib/businessContext';
 import {
   ChevronLeft,
   UserPlus2,
@@ -160,6 +161,12 @@ function destinationTally(logs: DeploymentLog[]): Record<string, number> {
 export function StaffDeploymentPage() {
   const [, navigate] = useLocation();
   const qc = useQueryClient();
+  const { selectedBusinessId } = useBusinessContext();
+  const businessFetch = (input: RequestInfo | URL, init: RequestInit = {}) => {
+    const headers = new Headers(init.headers);
+    if (selectedBusinessId) headers.set('X-Business-Id', selectedBusinessId);
+    return fetch(input, { ...init, headers });
+  };
 
   // ── keyboard clearance (for Add Staff bottom sheet) ───────────────────────
   const keyboardHeight = useKeyboardHeight();
@@ -198,27 +205,27 @@ export function StaffDeploymentPage() {
   // ── queries ────────────────────────────────────────────────────────────────
 
   const { data: personnel = [], isLoading: personnelLoading } = useQuery<StaffMember[]>({
-    queryKey: ['staff-personnel'],
+    queryKey: ['staff-personnel', selectedBusinessId],
     queryFn: async () => {
-      const r = await fetch(`${BASE}/api/staff/personnel`, { credentials: 'include' });
+      const r = await businessFetch(`${BASE}/api/staff/personnel`, { credentials: 'include' });
       if (!r.ok) throw new Error('Failed to fetch personnel');
       return r.json();
     },
   });
 
   const { data: logs = [], isLoading: logsLoading } = useQuery<DeploymentLog[]>({
-    queryKey: ['staff-logs'],
+    queryKey: ['staff-logs', selectedBusinessId],
     queryFn: async () => {
-      const r = await fetch(`${BASE}/api/staff/logs`, { credentials: 'include' });
+      const r = await businessFetch(`${BASE}/api/staff/logs`, { credentials: 'include' });
       if (!r.ok) throw new Error('Failed to fetch logs');
       return r.json();
     },
   });
 
   const { data: destinations = [], isLoading: destinationsLoading } = useQuery<StaffDestination[]>({
-    queryKey: ['staff-destinations'],
+    queryKey: ['staff-destinations', selectedBusinessId],
     queryFn: async () => {
-      const r = await fetch(`${BASE}/api/staff/destinations`, { credentials: 'include' });
+      const r = await businessFetch(`${BASE}/api/staff/destinations`, { credentials: 'include' });
       if (!r.ok) throw new Error('Failed to fetch destinations');
       return r.json();
     },
@@ -228,7 +235,7 @@ export function StaffDeploymentPage() {
 
   const addMutation = useMutation({
     mutationFn: async (name: string) => {
-      const r = await fetch(`${BASE}/api/staff/personnel`, {
+      const r = await businessFetch(`${BASE}/api/staff/personnel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -248,7 +255,7 @@ export function StaffDeploymentPage() {
 
   const deployMutation = useMutation({
     mutationFn: async ({ id, destination }: { id: string; destination: string }) => {
-      const r = await fetch(`${BASE}/api/staff/personnel/${id}/deploy`, {
+      const r = await businessFetch(`${BASE}/api/staff/personnel/${id}/deploy`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -268,7 +275,7 @@ export function StaffDeploymentPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const r = await fetch(`${BASE}/api/staff/personnel/${id}`, {
+      const r = await businessFetch(`${BASE}/api/staff/personnel/${id}`, {
         method: 'DELETE',
         credentials: 'include',
       });
@@ -284,7 +291,7 @@ export function StaffDeploymentPage() {
 
   const editLogMutation = useMutation({
     mutationFn: async ({ id, destination }: { id: string; destination: string }) => {
-      const r = await fetch(`${BASE}/api/staff/logs/${id}`, {
+      const r = await businessFetch(`${BASE}/api/staff/logs/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -304,7 +311,7 @@ export function StaffDeploymentPage() {
 
   const addDestMutation = useMutation({
     mutationFn: async (name: string) => {
-      const r = await fetch(`${BASE}/api/staff/destinations`, {
+      const r = await businessFetch(`${BASE}/api/staff/destinations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -324,7 +331,7 @@ export function StaffDeploymentPage() {
 
   const deleteDestMutation = useMutation({
     mutationFn: async (id: string) => {
-      const r = await fetch(`${BASE}/api/staff/destinations/${id}`, {
+      const r = await businessFetch(`${BASE}/api/staff/destinations/${id}`, {
         method: 'DELETE',
         credentials: 'include',
       });
@@ -381,7 +388,7 @@ export function StaffDeploymentPage() {
       const monthLabel  = format(new Date(year, mon - 1, 1), 'MMMM yyyy', { locale: bn });
 
       // ── Step 1: fetch month logs ─────────────────────────────────────────
-      const r = await fetch(`${BASE}/api/staff/logs?month=${pdfMonth}`, { credentials: 'include' });
+      const r = await businessFetch(`${BASE}/api/staff/logs?month=${pdfMonth}`, { credentials: 'include' });
       if (!r.ok) throw new Error(`Server error ${r.status}`);
       const monthLogs: DeploymentLog[] = await r.json();
 

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
+import { useBusinessContext } from '@/lib/businessContext';
+import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import {
   useGetParty,
   useDeleteParty,
@@ -41,9 +43,10 @@ export function PartyProfileView() {
   const id = params?.id;
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
+  const { selectedBusinessId } = useBusinessContext();
 
   const { data: party, isLoading } = useGetParty(id || '', {
-    query: { enabled: !!id, queryKey: getGetPartyQueryKey(id || '') },
+    query: { enabled: !!id, queryKey: businessScopedQueryKey(getGetPartyQueryKey(id || ''), selectedBusinessId) },
   });
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -70,8 +73,8 @@ export function PartyProfileView() {
   const deleteParty = useDeleteParty({
     mutation: {
       onMutate: async ({ partyId }) => {
-        const partiesKey = getListPartiesQueryKey();
-        const summaryKey = getGetDashboardSummaryQueryKey();
+        const partiesKey = businessScopedQueryKey(getListPartiesQueryKey(), selectedBusinessId);
+        const summaryKey = businessScopedQueryKey(getGetDashboardSummaryQueryKey(), selectedBusinessId);
         const previousParties = queryClient.getQueryData<Party[]>(partiesKey);
         const previousSummary = queryClient.getQueryData<DashboardSummary>(summaryKey);
         const removedParty = previousParties?.find((p) => p.id === partyId);

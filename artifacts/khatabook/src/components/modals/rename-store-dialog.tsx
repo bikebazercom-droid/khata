@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Pencil } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useBusinessContext } from '@/lib/businessContext';
+import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import {
   useGetBusinessSettings,
   useUpdateBusinessSettings,
@@ -13,7 +15,10 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 export function RenameStoreDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const { data: settings } = useGetBusinessSettings();
+  const { selectedBusinessId } = useBusinessContext();
+  const { data: settings } = useGetBusinessSettings({
+    query: { queryKey: businessScopedQueryKey(getGetBusinessSettingsQueryKey(), selectedBusinessId) },
+  });
   const queryClient = useQueryClient();
   // Optimistic update: onMutate writes the new name into the settings
   // cache synchronously (every screen showing the store name updates in
@@ -22,7 +27,7 @@ export function RenameStoreDialog({ open, onOpenChange }: { open: boolean; onOpe
   const updateSettings = useUpdateBusinessSettings({
     mutation: {
       onMutate: async ({ data }) => {
-        const settingsKey = getGetBusinessSettingsQueryKey();
+        const settingsKey = businessScopedQueryKey(getGetBusinessSettingsQueryKey(), selectedBusinessId);
         const previousSettings = queryClient.getQueryData<BusinessSettings>(settingsKey);
         if (previousSettings) {
           queryClient.setQueryData<BusinessSettings>(settingsKey, { ...previousSettings, ...data });

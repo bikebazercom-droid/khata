@@ -11,9 +11,12 @@ import {
   useScanBengaliLedger,
   useBulkSaveBengaliLedger,
   useListParties,
+  getListPartiesQueryKey,
   type BengaliLedgerItem,
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useBusinessContext } from '@/lib/businessContext';
+import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import { toast } from 'sonner';
 
 // ── types ──────────────────────────────────────────────────────────────────────
@@ -43,6 +46,7 @@ const confidenceLabel = (c: string) =>
 
 // ── component ─────────────────────────────────────────────────────────────────
 export function BengaliLedgerScanner({ onClose, onSuccess }: Props) {
+  const { selectedBusinessId } = useBusinessContext();
   const [step, setStep] = useState<Step>('pick');
   const [items, setItems] = useState<ReviewItem[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -56,7 +60,10 @@ export function BengaliLedgerScanner({ onClose, onSuccess }: Props) {
   const qc = useQueryClient();
 
   // Load all parties so we can offer a re-assign dropdown for unmatched items
-  const { data: allParties = [] } = useListParties({});
+  const partiesParams = {};
+  const { data: allParties = [] } = useListParties(partiesParams, {
+    query: { queryKey: businessScopedQueryKey(getListPartiesQueryKey(partiesParams), selectedBusinessId) },
+  });
 
   // ── image processing ──────────────────────────────────────────────────────
   async function processFile(file: File) {

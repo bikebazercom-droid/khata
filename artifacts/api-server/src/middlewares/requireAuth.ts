@@ -249,21 +249,22 @@ export async function getOrCreatePhoneUser(
 // ─── Business-id resolution ───────────────────────────────────────────────────
 
 /**
- * If the request carries an `X-Business-Id` header and the user owns that
- * business (has a row in user_businesses), use it; otherwise fall back to the
- * user's default businessId.
+ * Resolve the business requested by the client. Owners may select any business
+ * in their user_businesses membership list. Staff remain in their assigned
+ * business. An unrecognized selection is denied rather than silently serving
+ * the owner's default business under the wrong client-side account label.
  */
 async function resolveBusinessId(
   user: AppUser,
   req: Request,
-): Promise<string> {
+): Promise<string | null> {
   const [ownMembership] = await db.select().from(userBusinessesTable).where(and(
     eq(userBusinessesTable.userId, user.id),
     eq(userBusinessesTable.businessId, user.businessId),
   )).limit(1);
-  if (!ownMembership) throw new Error("Business membership required");
+  if (!ownMembership) return null;
   if (user.role === "staff") return user.businessId;
-  const requested = req.headers["x-business-id"] as string | undefined;
+  const requested = req.get("x-business-id")?.trim();
   if (!requested || requested === user.businessId) return user.businessId;
 
   const [membership] = await db
@@ -277,7 +278,7 @@ async function resolveBusinessId(
     )
     .limit(1);
 
-  return membership ? membership.businessId : user.businessId;
+  return membership ? membership.businessId : null;
 }
 
 // One end-to-end budget per provider lookup, covering headers and JSON decoding.
@@ -405,15 +406,20 @@ export async function requireAuth(
         .insert(userBusinessesTable)
         .values({ userId: DEV_USER_ID, businessId: SEED_BUSINESS_ID })
         .onConflictDoNothing();
-      const [devUser] = await db.select({ status: appUsersTable.status }).from(appUsersTable)
+      const [devUser] = await db.select().from(appUsersTable)
         .where(eq(appUsersTable.id, DEV_USER_ID)).limit(1);
-      if (devUser?.status !== "active") {
+      if (!devUser || devUser.status !== "active") {
         res.status(403).json({ error: "Account suspended" });
         return;
       }
+      const businessId = await resolveBusinessId(devUser, req);
+      if (!businessId) {
+        res.status(403).json({ error: "Business access denied" });
+        return;
+      }
       (req as AuthenticatedRequest).userId = DEV_USER_ID;
-      (req as AuthenticatedRequest).businessId = SEED_BUSINESS_ID;
-      (req as AuthenticatedRequest).role = "owner";
+      (req as AuthenticatedRequest).businessId = businessId;
+      (req as AuthenticatedRequest).role = devUser.role;
       (req as AuthenticatedRequest).status = "active";
       (req as AuthenticatedRequest).authMethod = "dev";
       return next();
@@ -492,8 +498,13 @@ export async function requireAuth(
         res.status(401).json({ error: "Session signed out" });
         return;
       }
+      const businessId = await resolveBusinessId(user, req);
+      if (!businessId) {
+        res.status(403).json({ error: "Business access denied" });
+        return;
+      }
       (req as AuthenticatedRequest).userId = user.id;
-      (req as AuthenticatedRequest).businessId = await resolveBusinessId(user, req);
+      (req as AuthenticatedRequest).businessId = businessId;
       (req as AuthenticatedRequest).role = user.role;
       (req as AuthenticatedRequest).status = user.status;
       (req as AuthenticatedRequest).authMethod = "clerk";
@@ -521,17 +532,14 @@ export async function requireAuth(
         res.status(401).json({ error: "Invalid or revoked session" });
         return;
       }
-      const [membership] = await db.select().from(userBusinessesTable).where(and(
-        eq(userBusinessesTable.userId, user.id),
-        eq(userBusinessesTable.businessId, user.businessId),
-      )).limit(1);
-      if (!membership) {
-        res.status(403).json({ error: "Business membership required" });
+      const businessId = await resolveBusinessId(user, req);
+      if (!businessId) {
+        res.status(403).json({ error: "Business access denied" });
         return;
       }
       if (cookieToken) issuePhoneSession(res, payload);
       (req as AuthenticatedRequest).userId = user.id;
-      (req as AuthenticatedRequest).businessId = user.businessId;
+      (req as AuthenticatedRequest).businessId = businessId;
       (req as AuthenticatedRequest).role = user.role;
       (req as AuthenticatedRequest).status = user.status;
       (req as AuthenticatedRequest).authMethod = "phone";

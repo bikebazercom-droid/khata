@@ -3,6 +3,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useQueryClient } from '@tanstack/react-query';
+import { useBusinessContext } from '@/lib/businessContext';
+import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import {
   useCreateParty,
   PartyRole,
@@ -289,6 +291,7 @@ function AddPartyForm({
   onDone: () => void;
 }) {
   const queryClient = useQueryClient();
+  const { selectedBusinessId } = useBusinessContext();
   // Optimistic create: onMutate inserts a temp party into the list/summary
   // caches synchronously so the UI (list, counts, totals) reflects the new
   // party instantly; onError rolls the snapshot back silently if the
@@ -297,8 +300,8 @@ function AddPartyForm({
   const createParty = useCreateParty({
     mutation: {
       onMutate: async ({ data }) => {
-        const partiesKey = getListPartiesQueryKey();
-        const summaryKey = getGetDashboardSummaryQueryKey();
+        const partiesKey = businessScopedQueryKey(getListPartiesQueryKey(), selectedBusinessId);
+        const summaryKey = businessScopedQueryKey(getGetDashboardSummaryQueryKey(), selectedBusinessId);
         const previousParties = queryClient.getQueryData<Party[]>(partiesKey);
         const previousSummary = queryClient.getQueryData<DashboardSummary>(summaryKey);
 

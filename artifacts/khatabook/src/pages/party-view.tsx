@@ -7,6 +7,7 @@ import {
   useGetBusinessSettings,
   getGetBusinessSettingsQueryKey,
   getGetPartyQueryKey,
+  getListPartiesQueryKey,
   getListLedgerEntriesQueryKey,
   LedgerEntryType,
 } from '@workspace/api-client-react';
@@ -41,6 +42,7 @@ import { format, isToday } from 'date-fns';
 import { formatLedgerEntryDateTime, getLedgerEntryDateKey } from '@/lib/date-time';
 import { useAppAuth } from '@/App';
 import { useBusinessContext } from '@/lib/businessContext';
+import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import { ENTRY_OUTBOX_CHANGED, listEntries, type QueuedEntry } from '@/lib/entryOutbox';
 
 /**
@@ -108,10 +110,13 @@ export function PartyView() {
     };
   }, [userId, selectedBusinessId, id]);
 
-  const { data: party, isLoading: partyLoading } = useGetParty(id || '', { query: { enabled: !!id, queryKey: getGetPartyQueryKey(id || '') } });
-  const { data: entries = [], isLoading: entriesLoading } = useListLedgerEntries(id || '', { query: { enabled: !!id, queryKey: getListLedgerEntriesQueryKey(id || '') } });
-  const { data: settings } = useGetBusinessSettings({ query: { enabled: userRole === 'owner', queryKey: getGetBusinessSettingsQueryKey() } });
-  const { data: allParties = [] } = useListParties({});
+  const { data: party, isLoading: partyLoading } = useGetParty(id || '', { query: { enabled: !!id, queryKey: businessScopedQueryKey(getGetPartyQueryKey(id || ''), selectedBusinessId) } });
+  const { data: entries = [], isLoading: entriesLoading } = useListLedgerEntries(id || '', { query: { enabled: !!id, queryKey: businessScopedQueryKey(getListLedgerEntriesQueryKey(id || ''), selectedBusinessId) } });
+  const { data: settings } = useGetBusinessSettings({ query: { enabled: userRole === 'owner', queryKey: businessScopedQueryKey(getGetBusinessSettingsQueryKey(), selectedBusinessId) } });
+  const partiesParams = {};
+  const { data: allParties = [] } = useListParties(partiesParams, {
+    query: { queryKey: businessScopedQueryKey(getListPartiesQueryKey(partiesParams), selectedBusinessId) },
+  });
   const partyNameMap = useMemo(() => Object.fromEntries(allParties.map(p => [p.id, p.name])), [allParties]);
 
   const [transactionType, setTransactionType] = useState<LedgerEntryType | null>(null);

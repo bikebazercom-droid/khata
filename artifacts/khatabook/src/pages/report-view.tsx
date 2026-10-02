@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useLocation } from 'wouter';
+import { useBusinessContext } from '@/lib/businessContext';
+import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import {
   useListGlobalLedgerEntries,
   getListGlobalLedgerEntriesQueryKey,
   useGetBusinessSettings,
+  getGetBusinessSettingsQueryKey,
 } from '@workspace/api-client-react';
 import {
   buildGlobalLedgerReportQuery,
@@ -37,6 +40,7 @@ const PERIOD_LABELS: Record<ReportPeriod, string> = {
 
 export function ReportView() {
   const [, navigate] = useLocation();
+  const { selectedBusinessId } = useBusinessContext();
 
   // useSearch() uses useSyncExternalStore and can produce a stale snapshot in
   // React 18 concurrent mode before the pushState event is committed.
@@ -50,7 +54,9 @@ export function ReportView() {
   const partyRole = isSupplier ? 'SUPPLIER' : 'CUSTOMER';
   const roleLabel = isSupplier ? 'সরবরাহকারী' : 'গ্রাহক';
 
-  const { data: settings } = useGetBusinessSettings();
+  const { data: settings } = useGetBusinessSettings({
+    query: { queryKey: businessScopedQueryKey(getGetBusinessSettingsQueryKey(), selectedBusinessId) },
+  });
 
   const [period, setPeriod] = useState<ReportPeriod>('ALL');
   const [isPeriodOpen, setIsPeriodOpen] = useState(false);
@@ -68,7 +74,7 @@ export function ReportView() {
   );
   const { data: unsortedEntries = [], isLoading } = useListGlobalLedgerEntries(params, {
     query: {
-      queryKey: getListGlobalLedgerEntriesQueryKey(params),
+      queryKey: businessScopedQueryKey(getListGlobalLedgerEntriesQueryKey(params), selectedBusinessId),
     }
   });
   const entries = useMemo(

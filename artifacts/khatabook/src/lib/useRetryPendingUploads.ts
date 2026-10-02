@@ -24,6 +24,7 @@ import {
   getListLedgerEntriesQueryKey,
 } from '@workspace/api-client-react';
 import { toast } from 'sonner';
+import { businessScopedQueryKey } from './businessQueryKey';
 import { getPendingUploads, removePendingUpload } from './pendingUploads';
 import { uploadBillImage } from './billImageStorage';
 import { isNetworkWriteAuthorized } from './useAuthConnectivity';
@@ -36,12 +37,20 @@ const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
  * codegen was last run — a raw fetch is simpler than re-running the full
  * code-gen pipeline.
  */
-async function patchEntryBillImage(partyId: string, entryId: string, objectPath: string): Promise<boolean> {
+async function patchEntryBillImage(
+  partyId: string,
+  entryId: string,
+  objectPath: string,
+  businessId: string | null,
+): Promise<boolean> {
   try {
     const res = await fetch(`${BASE}/api/parties/${partyId}/ledger-entries/${entryId}`, {
       method: 'PATCH',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(businessId ? { 'X-Business-Id': businessId } : {}),
+      },
       body: JSON.stringify({ billImage: objectPath }),
     });
     return res.ok;
@@ -75,7 +84,12 @@ export function useRetryPendingUploads(enabled: boolean): void {
 
         // Patch the entry on the server.
         if (!isNetworkWriteAuthorized()) break;
-        const patched = await patchEntryBillImage(record.partyId, record.entryId, uploadResult.objectPath);
+        const patched = await patchEntryBillImage(
+          record.partyId,
+          record.entryId,
+          uploadResult.objectPath,
+          record.businessId,
+        );
         if (!patched) {
           // Server-side error — leave record, try again next time.
           break;
@@ -84,7 +98,10 @@ export function useRetryPendingUploads(enabled: boolean): void {
         // Success: clean up and refresh the ledger cache for this party.
         removePendingUpload(record.entryId);
         queryClient.invalidateQueries({
-          queryKey: getListLedgerEntriesQueryKey(record.partyId),
+          queryKey: businessScopedQueryKey(
+            getListLedgerEntriesQueryKey(record.partyId),
+            record.businessId,
+          ),
         });
         successCount++;
       }

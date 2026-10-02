@@ -79,10 +79,24 @@ export function persistCache(qc: QueryClient): () => void {
 export function evictPersistedCacheEntries(keys: ReadonlyArray<readonly unknown[]>): void {
   if (!scope) return;
   const snapshot = read(scope);
+  const cachedKeys = new Set([...Object.keys(snapshot.entries), ...dirty.keys()]);
   for (const key of keys) {
     const serialized = JSON.stringify(key);
-    dirty.delete(serialized);
-    delete snapshot.entries[serialized];
+    for (const cachedKey of cachedKeys) {
+      let cachedParts: unknown[];
+      try {
+        cachedParts = JSON.parse(cachedKey) as unknown[];
+      } catch {
+        continue;
+      }
+      // Persisted API query keys may include an active-business suffix. Evict
+      // by the generated key prefix so pending/deleted ledger entries are
+      // removed from every scoped form of that query.
+      if (!Array.isArray(cachedParts) || cachedParts.length < key.length) continue;
+      if (JSON.stringify(cachedParts.slice(0, key.length)) !== serialized) continue;
+      dirty.delete(cachedKey);
+      delete snapshot.entries[cachedKey];
+    }
   }
   try { localStorage.setItem(scope, JSON.stringify(snapshot)); } catch { /* ignore */ }
 }

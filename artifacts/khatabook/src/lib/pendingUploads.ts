@@ -25,6 +25,7 @@
 export interface PendingUpload {
   entryId: string;
   partyId: string;
+  businessId: string | null;
   base64: string;
   enqueuedAt: number; // Date.now() at enqueue time — used only for debugging
 }

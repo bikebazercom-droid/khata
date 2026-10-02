@@ -5,10 +5,18 @@
  * - Exports `setExtraHeader` from the API client so every fetch automatically
  *   carries `X-Business-Id` when a non-default business is active.
  */
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useState } from 'react';
 import { setExtraHeaders } from '@workspace/api-client-react';
 
 const STORAGE_KEY = 'selected_business_id';
+const initialSelectedBusinessId =
+  typeof window === 'undefined' ? null : window.localStorage.getItem(STORAGE_KEY);
+
+// Set the header before child query hooks can make their first request. A
+// React effect is too late: queries start during the initial render.
+setExtraHeaders(initialSelectedBusinessId
+  ? { 'x-business-id': initialSelectedBusinessId }
+  : {});
 
 export interface BusinessInfo {
   id: string;
@@ -31,23 +39,16 @@ const BusinessContext = createContext<BusinessContextValue | null>(null);
 
 export function BusinessContextProvider({ children }: { children: React.ReactNode }) {
   const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(
-    () => localStorage.getItem(STORAGE_KEY),
+    () => initialSelectedBusinessId,
   );
   const [businesses, setBusinesses] = useState<BusinessInfo[]>([]);
   const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
 
-  // Whenever the selected business changes, inject it as a request header
-  useEffect(() => {
-    if (selectedBusinessId) {
-      setExtraHeaders({ 'x-business-id': selectedBusinessId });
-      localStorage.setItem(STORAGE_KEY, selectedBusinessId);
-    } else {
-      setExtraHeaders({});
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  }, [selectedBusinessId]);
-
   const setSelectedBusiness = useCallback((id: string) => {
+    // Update the request scope synchronously so a query triggered by the next
+    // render cannot run with the previous account's header.
+    setExtraHeaders({ 'x-business-id': id });
+    localStorage.setItem(STORAGE_KEY, id);
     setSelectedBusinessId(id);
   }, []);
 

@@ -34,6 +34,7 @@ import { useAppAuth } from '@/App';
 import { uploadBillImage, billImageSrc, type BillImageUploadResult } from '@/lib/billImageStorage';
 import { savePendingUpload } from '@/lib/pendingUploads';
 import { useBusinessContext } from '@/lib/businessContext';
+import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import { useConnectionState } from '@/context/connection-state';
 import { notifyEntrySaved } from '@/components/ui/entry-saved-feedback';
 
@@ -285,7 +286,7 @@ export function TransactionEntryScreen({
 
   // Fetch party list for the transfer dropdown (only when toggle is on).
   const { data: transferPartyList = [] } = useListAdjustmentTargets(
-    { query: { enabled: canAdjustSource && isTransferMode && !isEditMode, queryKey: getListAdjustmentTargetsQueryKey() } },
+    { query: { enabled: canAdjustSource && isTransferMode && !isEditMode, queryKey: businessScopedQueryKey(getListAdjustmentTargetsQueryKey(), selectedBusinessId) } },
   );
   const transferPartyOptions = transferPartyList.filter((p) => p.id !== partyId &&
     p.name.toLocaleLowerCase().includes(transferSearch.trim().toLocaleLowerCase()));
@@ -539,10 +540,10 @@ export function TransactionEntryScreen({
       return;
     }
 
-    const entriesKey = getListLedgerEntriesQueryKey(partyId);
-    const partyKey   = getGetPartyQueryKey(partyId);
-    const partiesKey = getListPartiesQueryKey();
-    const summaryKey = getGetDashboardSummaryQueryKey();
+    const entriesKey = businessScopedQueryKey(getListLedgerEntriesQueryKey(partyId), selectedBusinessId);
+    const partyKey   = businessScopedQueryKey(getGetPartyQueryKey(partyId), selectedBusinessId);
+    const partiesKey = businessScopedQueryKey(getListPartiesQueryKey(), selectedBusinessId);
+    const summaryKey = businessScopedQueryKey(getGetDashboardSummaryQueryKey(), selectedBusinessId);
 
     // ── 1. Snapshot ──────────────────────────────────────────────────────
     const previousEntries = queryClient.getQueryData<LedgerEntry[]>(entriesKey);
@@ -626,7 +627,12 @@ export function TransactionEntryScreen({
             duration: 5000,
           });
           if (capturedBase64 && initialEntry.id) {
-            savePendingUpload({ entryId: initialEntry.id, partyId, base64: capturedBase64 });
+            savePendingUpload({
+              entryId: initialEntry.id,
+              partyId,
+              businessId: selectedBusinessId,
+              base64: capturedBase64,
+            });
           }
         }
       }
@@ -637,7 +643,10 @@ export function TransactionEntryScreen({
           {
             method: 'PATCH',
             credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              ...(selectedBusinessId ? { 'X-Business-Id': selectedBusinessId } : {}),
+            },
             body: JSON.stringify({
               amount:      finalAmount,
               type,

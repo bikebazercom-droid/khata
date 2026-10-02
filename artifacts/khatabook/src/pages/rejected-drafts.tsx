@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'wouter';
 import { ArrowLeft, RefreshCw, Trash2 } from 'lucide-react';
-import { useListParties } from '@workspace/api-client-react';
+import { useListParties, getListPartiesQueryKey } from '@workspace/api-client-react';
 import { toast } from 'sonner';
 import { useAppAuth } from '@/App';
 import { useBusinessContext } from '@/lib/businessContext';
+import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import { readOfflineIdentity } from '@/lib/authCache';
 import {
   discardRejectedEntry,
@@ -29,7 +30,10 @@ export function RejectedDraftsPage() {
   const { userId } = useAppAuth();
   const { selectedBusinessId } = useBusinessContext();
   const [, navigate] = useLocation();
-  const { data: parties = [] } = useListParties({});
+  const partiesParams = {};
+  const { data: parties = [] } = useListParties(partiesParams, {
+    query: { queryKey: businessScopedQueryKey(getListPartiesQueryKey(partiesParams), selectedBusinessId) },
+  });
   const partyNames = useMemo(() => new Map(parties.map((party) => [party.id, party.name])), [parties]);
   const scope = userId && selectedBusinessId
     ? JSON.stringify([userId, selectedBusinessId])

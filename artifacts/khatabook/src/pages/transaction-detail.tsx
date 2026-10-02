@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
+import { useBusinessContext } from '@/lib/businessContext';
+import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import {
   useGetParty,
   useListLedgerEntries,
@@ -8,6 +10,7 @@ import {
   getGetPartyQueryKey,
   getListLedgerEntriesQueryKey,
   getListPartiesQueryKey,
+  getGetBusinessSettingsQueryKey,
   getGetDashboardSummaryQueryKey,
   LedgerEntryType,
   type LedgerEntry,
@@ -48,15 +51,18 @@ export function TransactionDetailPage() {
   const entryId = params?.entryId ?? '';
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
+  const { selectedBusinessId } = useBusinessContext();
   const { isOnline } = useConnectionState();
 
   const { data: party, isLoading: partyLoading } = useGetParty(partyId, {
-    query: { enabled: !!partyId, queryKey: getGetPartyQueryKey(partyId) },
+    query: { enabled: !!partyId, queryKey: businessScopedQueryKey(getGetPartyQueryKey(partyId), selectedBusinessId) },
   });
   const { data: entries = [], isLoading: entriesLoading } = useListLedgerEntries(partyId, {
-    query: { enabled: !!partyId, queryKey: getListLedgerEntriesQueryKey(partyId) },
+    query: { enabled: !!partyId, queryKey: businessScopedQueryKey(getListLedgerEntriesQueryKey(partyId), selectedBusinessId) },
   });
-  const { data: settings } = useGetBusinessSettings();
+  const { data: settings } = useGetBusinessSettings({
+    query: { queryKey: businessScopedQueryKey(getGetBusinessSettingsQueryKey(), selectedBusinessId) },
+  });
 
   const entry = entries.find((e) => e.id === entryId);
 
@@ -65,7 +71,7 @@ export function TransactionDetailPage() {
   const { data: transferParty } = useGetParty(transferPartyId, {
     query: {
       enabled: !!(entry?.isTransfer && transferPartyId),
-      queryKey: getGetPartyQueryKey(transferPartyId),
+      queryKey: businessScopedQueryKey(getGetPartyQueryKey(transferPartyId), selectedBusinessId),
     },
   });
 
@@ -134,10 +140,10 @@ export function TransactionDetailPage() {
       return;
     }
 
-    const entriesKey = getListLedgerEntriesQueryKey(partyId);
-    const partyKey   = getGetPartyQueryKey(partyId);
-    const partiesKey = getListPartiesQueryKey();
-    const summaryKey = getGetDashboardSummaryQueryKey();
+    const entriesKey = businessScopedQueryKey(getListLedgerEntriesQueryKey(partyId), selectedBusinessId);
+    const partyKey   = businessScopedQueryKey(getGetPartyQueryKey(partyId), selectedBusinessId);
+    const partiesKey = businessScopedQueryKey(getListPartiesQueryKey(), selectedBusinessId);
+    const summaryKey = businessScopedQueryKey(getGetDashboardSummaryQueryKey(), selectedBusinessId);
 
     const previousEntries = queryClient.getQueryData<LedgerEntry[]>(entriesKey);
     const previousParty   = queryClient.getQueryData<Party>(partyKey);
@@ -170,6 +176,7 @@ export function TransactionDetailPage() {
         const res = await fetch(`${BASE}/api/parties/${partyId}/entries/${entryId}`, {
           method: 'DELETE',
           credentials: 'include',
+          headers: selectedBusinessId ? { 'X-Business-Id': selectedBusinessId } : {},
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         queryClient.invalidateQueries({ queryKey: entriesKey });
