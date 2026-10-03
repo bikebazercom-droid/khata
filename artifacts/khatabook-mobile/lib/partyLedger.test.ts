@@ -18,6 +18,10 @@ describe('party ledger timeline', () => {
     expect(getLedgerEntryDateKey('2026-10-01T00:00:00.000Z', '2026-10-03T06:00:00.000Z')).toBe('2026-10-01');
   });
 
+  it('rejects impossible calendar dates instead of silently accepting them', () => {
+    expect(() => getLedgerEntryDateKey('2026-02-31', '2026-10-03T06:00:00.000Z')).toThrow(RangeError);
+  });
+
   it('reconstructs running balances in chronological order for backdated entries', () => {
     const timeline = buildPartyLedgerTimeline(entries, partyBalance);
     expect(timeline.map((entry) => entry.id)).toEqual(['backdated', 'today']);

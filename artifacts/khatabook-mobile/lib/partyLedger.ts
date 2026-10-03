@@ -1,26 +1,16 @@
 import type { LedgerRecord, PartyRecord } from '@/lib/domain';
+import {
+  formatLocalTime,
+  getLedgerEntryDateKey,
+  getLocalDateKey,
+} from '@workspace/api-client-react/ledger-domain';
+
+export { getLedgerEntryDateKey };
 
 export type PartyLedgerBalance = Pick<PartyRecord, 'currentBalance' | 'balanceType'>;
 export type PartyLedgerEntry = LedgerRecord & { businessDate: string; balanceAfter: number };
 export type PartyLedgerDayGroup<T> = { dayKey: string; entries: T[] };
 type PartyLedgerSource = Pick<LedgerRecord, 'id' | 'type' | 'amount' | 'createdAt' | 'dueDate'>;
-
-function padDatePart(value: number): string {
-  return String(value).padStart(2, '0');
-}
-
-function localDateKey(value: string | Date): string {
-  const date = value instanceof Date ? value : new Date(value);
-  if (!Number.isFinite(date.getTime())) return '';
-  return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
-}
-
-export function getLedgerEntryDateKey(dueDate: string | null | undefined, createdAt: string | Date): string {
-  const dateOnly = dueDate?.slice(0, 10);
-  return dateOnly && /^\d{4}-\d{2}-\d{2}$/.test(dateOnly)
-    ? dateOnly
-    : localDateKey(createdAt);
-}
 
 export function buildPartyLedgerTimeline<T extends PartyLedgerSource>(
   entries: readonly T[],
@@ -73,12 +63,9 @@ export function formatPartyLedgerDay(dayKey: string): string {
 }
 
 export function formatPartyLedgerEntryTime(createdAt: string | Date): string {
-  const date = createdAt instanceof Date ? createdAt : new Date(createdAt);
-  return Number.isFinite(date.getTime())
-    ? date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-    : '';
+  return formatLocalTime(createdAt);
 }
 
 export function getLocalTodayDateKey(now = new Date()): string {
-  return localDateKey(now);
+  return getLocalDateKey(now);
 }

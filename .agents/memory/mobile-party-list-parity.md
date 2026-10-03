@@ -1,10 +1,12 @@
 ---
 name: Mobile party-list parity
-description: Product decision for the Expo app's initial customer/supplier ledger screen.
+description: Keep Expo/native while using the website as the BanglaKhata mobile parity reference.
 ---
 
-For the Khatabook Expo app, the website customer/supplier party-list screen is the reference for the mobile initial screen. Keep customer/supplier tabs, role-specific balance summary, search/filter/report controls, party rows, add-party action, and Customers/Settings bottom navigation together. Do not restore a separate dashboard as the mobile landing page.
+For BanglaKhata, preserve the Expo/native app architecture and use the website as the reference for mobile features, flows, and styling. Mirror website behavior in Expo instead of replacing the website or migrating both apps to a shared cross-platform UI. Use native equivalents for device-specific controls such as camera, sharing, and date pickers. Check existing mobile entry points before treating an absent route as a missing feature.
 
-**Why:** The user selected the first reference image—the customer/supplier list—as the shared source of truth and asked the mobile app to match it.
+For the mobile initial screen, keep the website's customer/supplier party-list structure: customer/supplier tabs, role-specific balance summary, search/filter/report controls, party rows, add-party action, and Customers/Settings bottom navigation. Do not restore a separate dashboard as the mobile landing page.
 
-**How to apply:** When changing the mobile landing/list layout, mirror the website structure while keeping native routing and platform UI. Leave the website as the source unless the user asks otherwise.
+**Why:** The user chose to keep Expo and bring mobile to website feature and design parity.
+
+**How to apply:** For each feature change, compare the website's behavior and styling with all mobile entry points, then adapt it using native routing and platform UI. Keep the website as the reference; do not start a broad shared-UI migration.

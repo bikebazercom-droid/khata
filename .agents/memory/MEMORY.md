@@ -21,4 +21,4 @@
 - [PDF statement order](ledger-statement-order.md) — group by business date and show statements newest-first while retaining chronological running balances.
 - [Large transaction amounts](large-transaction-amounts.md) — keep complete formatted values inside party-history cards at narrow phone widths.
 - [Party-role report and transfer scope](party-role-scope.md) — supplier/customer reports and transfers must never cross roles; retain existing business isolation.
-- [Mobile party-list parity](mobile-party-list-parity.md) — use the website's customer/supplier list as the mobile landing-screen source of truth.
+- [Mobile website parity](mobile-party-list-parity.md) — keep Expo/native and use the website as the reference for mobile features, flows, and styling.

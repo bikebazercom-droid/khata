@@ -3,6 +3,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { billImageUrl, formatDate, formatMoney, type GlobalLedgerRecord, type LedgerRecord, type PartyRecord } from '@/lib/domain';
 import { calculateGlobalLedgerReportTotals } from '@workspace/api-client-react/global-ledger-report';
+import { getLedgerEntryDateKey } from '@workspace/api-client-react/ledger-domain';
 
 export type StatementPeriod = 'all' | 'month' | '30days' | 'custom';
 
@@ -31,22 +32,7 @@ function localDateKey(date: Date): string {
 }
 
 function ledgerEntryDateKey(entry: Pick<LedgerRecord, 'dueDate' | 'createdAt'>): string {
-  if (entry.dueDate) {
-    const match = /^(\d{4})-(\d{2})-(\d{2})(?:$|T)/.exec(entry.dueDate);
-    if (!match) throw new RangeError(`Invalid ledger entry date: ${entry.dueDate}`);
-    const [, year, month, day] = match;
-    const date = new Date(Number(year), Number(month) - 1, Number(day));
-    if (
-      date.getFullYear() !== Number(year) ||
-      date.getMonth() !== Number(month) - 1 ||
-      date.getDate() !== Number(day)
-    ) {
-      throw new RangeError(`Invalid ledger entry date: ${entry.dueDate}`);
-    }
-    return `${year}-${month}-${day}`;
-  }
-
-  return localDateKey(new Date(entry.createdAt));
+  return getLedgerEntryDateKey(entry.dueDate, entry.createdAt);
 }
 
 function compareLedgerEntriesChronologically(
