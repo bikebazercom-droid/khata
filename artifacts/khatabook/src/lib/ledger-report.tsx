@@ -54,10 +54,10 @@ interface MonthGroup {
   totalCredit: number;
 }
 
-/** Groups entries into month sections in the same newest-first order as party history. */
+/** Groups statement entries by business date, oldest first, with earlier-created rows first within a day. */
 function groupByMonth(entries: ReportEntry[]): MonthGroup[] {
   const groups: MonthGroup[] = [];
-  const newestFirst = entries
+  const chronological = entries
     .map((entry, index) => ({
       entry,
       index,
@@ -65,12 +65,12 @@ function groupByMonth(entries: ReportEntry[]): MonthGroup[] {
       createdAt: new Date(entry.createdAt).getTime(),
     }))
     .sort((a, b) =>
-      b.dayKey.localeCompare(a.dayKey) ||
-      b.createdAt - a.createdAt ||
+      a.dayKey.localeCompare(b.dayKey) ||
+      a.createdAt - b.createdAt ||
       a.index - b.index,
     );
 
-  for (const { entry, dayKey } of newestFirst) {
+  for (const { entry, dayKey } of chronological) {
     const date = entryDate(entry);
     const key = dayKey.slice(0, 7);
     let group = groups[groups.length - 1];

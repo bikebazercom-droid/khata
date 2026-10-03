@@ -22,6 +22,49 @@ export type PartyStatement = {
   runningBalances: Map<string, number>;
 };
 
+function localDateKey(date: Date): string {
+  if (!Number.isFinite(date.getTime())) throw new RangeError('Invalid ledger entry date');
+  const year = String(date.getFullYear()).padStart(4, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function ledgerEntryDateKey(entry: Pick<LedgerRecord, 'dueDate' | 'createdAt'>): string {
+  if (entry.dueDate) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})(?:$|T)/.exec(entry.dueDate);
+    if (!match) throw new RangeError(`Invalid ledger entry date: ${entry.dueDate}`);
+    const [, year, month, day] = match;
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+    if (
+      date.getFullYear() !== Number(year) ||
+      date.getMonth() !== Number(month) - 1 ||
+      date.getDate() !== Number(day)
+    ) {
+      throw new RangeError(`Invalid ledger entry date: ${entry.dueDate}`);
+    }
+    return `${year}-${month}-${day}`;
+  }
+
+  return localDateKey(new Date(entry.createdAt));
+}
+
+function compareLedgerEntriesChronologically(
+  left: Pick<LedgerRecord, 'id' | 'dueDate' | 'createdAt'>,
+  right: Pick<LedgerRecord, 'id' | 'dueDate' | 'createdAt'>,
+): number {
+  const dayOrder = ledgerEntryDateKey(left).localeCompare(ledgerEntryDateKey(right));
+  if (dayOrder) return dayOrder;
+  const timeOrder = new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
+  return timeOrder || left.id.localeCompare(right.id);
+}
+
+function sortLedgerEntriesChronologically<T extends Pick<LedgerRecord, 'id' | 'dueDate' | 'createdAt'>>(
+  entries: readonly T[],
+): T[] {
+  return [...entries].sort(compareLedgerEntriesChronologically);
+}
+
 function entryDelta(entry: LedgerRecord): number {
   return entry.type === 'YOU_GAVE' ? entry.amount : -entry.amount;
 }
@@ -36,29 +79,26 @@ export function calculatePartyStatement(
   if (period === 'month') start = new Date(now.getFullYear(), now.getMonth(), 1);
   if (period === '30days') start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
   if (period === 'custom') start = options.startDate ?? null;
-  const end = period === 'custom' && options.endDate
-    ? new Date(options.endDate.getFullYear(), options.endDate.getMonth(), options.endDate.getDate(), 23, 59, 59, 999)
-    : new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  const startKey = start ? localDateKey(start) : null;
+  const endDate = period === 'custom' && options.endDate ? options.endDate : now;
+  const endKey = localDateKey(endDate);
 
   const inRange = (entry: LedgerRecord) => {
-    const time = new Date(entry.createdAt).getTime();
-    return Number.isFinite(time)
-      && (!start || time >= start.getTime())
-      && (period === 'all' || time <= end.getTime());
+    const dayKey = ledgerEntryDateKey(entry);
+    return (!startKey || dayKey >= startKey)
+      && (period === 'all' || dayKey <= endKey);
   };
   const dateFiltered = entries.filter(inRange);
   const normalizedSearch = options.search?.trim().toLocaleLowerCase();
   const filtered = normalizedSearch
     ? dateFiltered.filter((entry) => (entry.description ?? '').toLocaleLowerCase().includes(normalizedSearch))
     : dateFiltered;
-  const openingBalance = start
+  const openingBalance = startKey
     ? entries
-      .filter((entry) => new Date(entry.createdAt).getTime() < start!.getTime())
+      .filter((entry) => ledgerEntryDateKey(entry) < startKey)
       .reduce((balance, entry) => balance + entryDelta(entry), 0)
     : 0;
-  const entriesAscending = [...dateFiltered].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-  );
+  const entriesAscending = sortLedgerEntriesChronologically(dateFiltered);
   let runningBalance = openingBalance;
   const runningBalances = new Map<string, number>();
   for (const entry of entriesAscending) {
@@ -69,7 +109,7 @@ export function calculatePartyStatement(
   const received = dateFiltered.reduce((total, entry) => total + (entry.type === 'YOU_GOT' ? entry.amount : 0), 0);
 
   return {
-    entries: [...filtered].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    entries: sortLedgerEntriesChronologically(filtered).reverse(),
     entriesAscending: entriesAscending.filter((entry) => !normalizedSearch || (entry.description ?? '').toLocaleLowerCase().includes(normalizedSearch)),
     openingBalance,
     gave,
@@ -154,13 +194,13 @@ export function buildPartyStatementHtml({
   statement: PartyStatement;
   billImages?: Map<string, string>;
 }): string {
-  const rows = statement.entriesAscending.map((entry) => {
+  const rows = sortLedgerEntriesChronologically(statement.entriesAscending).map((entry) => {
     const isGave = entry.type === 'YOU_GAVE';
     const amount = money(entry.amount);
     const runningBalance = statement.runningBalances.get(entry.id) ?? 0;
     const description = entry.description || (entry.isTransfer ? 'ট্রান্সফার' : isGave ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন');
     return `<tr>
-      <td>${escapeHtml(formatDate(entry.createdAt))}</td>
+      <td>${escapeHtml(formatDate(ledgerEntryDateKey(entry)))}</td>
       <td>${escapeHtml(description)}${entry.billReference ? `<br><span style="color:#64748b">রেফ: ${escapeHtml(entry.billReference)}</span>` : ''}${billImages.has(entry.id) ? `<br><img src="${escapeHtml(billImages.get(entry.id) ?? '')}" alt="বিলের ছবি" style="width:64px;height:48px;object-fit:cover;margin-top:4px;border-radius:4px" />` : ''}</td>
       <td class="right ${isGave ? 'red' : ''}">${isGave ? amount : '—'}</td>
       <td class="right ${!isGave ? 'green' : ''}">${isGave ? '—' : amount}</td>
@@ -193,10 +233,10 @@ export function buildGlobalLedgerReportHtml({
   periodLabel: string;
 }): string {
   const totals = calculateGlobalLedgerReportTotals(entries);
-  const rows = [...entries].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()).map((entry) => {
+  const rows = sortLedgerEntriesChronologically(entries).map((entry) => {
     const debit = entry.type === 'YOU_GAVE';
     return `<tr>
-      <td>${escapeHtml(formatDate(entry.createdAt))}</td>
+      <td>${escapeHtml(formatDate(ledgerEntryDateKey(entry)))}</td>
       <td>${escapeHtml(entry.partyName)}${entry.partyPhone ? `<br><span style="color:#64748b">${escapeHtml(entry.partyPhone)}</span>` : ''}</td>
       <td>${escapeHtml(entry.description || (entry.isTransfer ? 'ট্রান্সফার' : '—'))}${entry.billReference ? `<br><span style="color:#64748b">রেফ: ${escapeHtml(entry.billReference)}</span>` : ''}</td>
       <td class="right ${debit ? 'red' : ''}">${debit ? money(entry.amount) : '—'}</td>

@@ -128,8 +128,8 @@ export function PartyView() {
   const reportRef = useRef<HTMLDivElement>(null);
   const storeName = settings?.storeName || 'Banglakhata';
 
-  // Reconstruct balances chronologically, then use one newest-first sequence
-  // for both the live history and its PDF export.
+  // Reconstruct balances chronologically. Keep the live history newest-first,
+  // but pass the ascending sequence to every statement PDF export.
   //
   // The backend applies each entry's delta to the party's running total in
   // insertion order, not transaction-date order, so `currentBalance` cannot
@@ -620,7 +620,7 @@ export function PartyView() {
 
       {/* Off-screen printable ledger report used to render the actual PDF via html2pdf */}
       <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -1 }} aria-hidden="true">
-        <LedgerReportDocument ref={reportRef} storeName={storeName} party={party} entries={descendingEntries} />
+        <LedgerReportDocument ref={reportRef} storeName={storeName} party={party} entries={ascendingEntries} />
       </div>
 
       {/* SMS dialog (distinct simulated flow) */}

@@ -139,7 +139,7 @@ describe('LedgerReportDocument — bill image thumbnails', () => {
 });
 
 describe('LedgerReportDocument — statement ordering', () => {
-  it('renders month groups and entries newest-first like the live party history', () => {
+  it('renders month groups and entries oldest-first by business date', () => {
     const entries: ReportEntry[] = [
       makeEntry({
         id: 'may',
@@ -157,7 +157,7 @@ describe('LedgerReportDocument — statement ordering', () => {
         id: 'january',
         description: 'January entry',
         dueDate: '2024-01-01',
-        createdAt: '2024-01-01T11:00:00.000Z',
+        createdAt: '2026-10-04T11:00:00.000Z',
       }),
       makeEntry({
         id: 'october-later',
@@ -169,7 +169,7 @@ describe('LedgerReportDocument — statement ordering', () => {
         id: 'october-next-day',
         description: 'October next day',
         dueDate: '2026-10-02',
-        createdAt: '2026-10-02T02:00:00.000Z',
+        createdAt: '2020-10-02T02:00:00.000Z',
       }),
     ];
 
@@ -181,7 +181,7 @@ describe('LedgerReportDocument — statement ordering', () => {
       container.querySelectorAll<HTMLTableRowElement>('tbody tr[data-month-key]'),
       (row) => row.dataset.monthKey,
     );
-    expect(monthKeys).toEqual(['2026-10', '2024-01', '2021-05']);
+    expect(monthKeys).toEqual(['2021-05', '2024-01', '2026-10']);
 
     const entryDescriptions = Array.from(container.querySelectorAll<HTMLTableRowElement>('tbody tr'))
       .filter((row) =>
@@ -190,11 +190,11 @@ describe('LedgerReportDocument — statement ordering', () => {
       )
       .map((row) => row.cells[1].textContent?.trim());
     expect(entryDescriptions).toEqual([
-      'October next day',
-      'October later',
-      'October earlier',
-      'January entry',
       'May entry',
+      'January entry',
+      'October earlier',
+      'October later',
+      'October next day',
     ]);
   });
 });

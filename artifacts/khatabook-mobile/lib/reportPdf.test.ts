@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { LedgerRecord, PartyRecord } from '@/lib/domain';
+import type { GlobalLedgerRecord, LedgerRecord, PartyRecord } from '@/lib/domain';
 
 vi.mock('expo-print', () => ({ printAsync: vi.fn(), printToFileAsync: vi.fn() }));
 vi.mock('expo-sharing', () => ({ isAvailableAsync: vi.fn(), shareAsync: vi.fn() }));
 
 import {
   buildPartyStatementHtml,
+  buildGlobalLedgerReportHtml,
   calculatePartyStatement,
   embedPartyStatementBillImages,
 } from '@/lib/reportPdf';
@@ -50,9 +51,9 @@ describe('party statement PDF helpers', () => {
 
   it('filters statement rows by date and search while retaining the real opening and running balance', () => {
     const records: LedgerRecord[] = [
-      { ...ledgerEntry, id: 'before', amount: 30, createdAt: '2025-06-01T10:00:00.000Z' },
-      { ...ledgerEntry, id: 'match', type: 'YOU_GOT', amount: 8, description: 'matched note', createdAt: '2025-06-12T10:00:00.000Z' },
-      { ...ledgerEntry, id: 'hidden', amount: 2, description: 'other note', createdAt: '2025-06-13T10:00:00.000Z' },
+      { ...ledgerEntry, id: 'before', amount: 30, dueDate: '2025-06-01', createdAt: '2025-06-12T10:00:00.000Z' },
+      { ...ledgerEntry, id: 'match', type: 'YOU_GOT', amount: 8, description: 'matched note', dueDate: '2025-06-12', createdAt: '2025-06-01T10:00:00.000Z' },
+      { ...ledgerEntry, id: 'hidden', amount: 2, description: 'other note', dueDate: '2025-06-13', createdAt: '2025-06-02T10:00:00.000Z' },
     ];
     const statement = calculatePartyStatement(records, 'custom', new Date(2025, 5, 20), {
       startDate: new Date(2025, 5, 10),
@@ -65,6 +66,52 @@ describe('party statement PDF helpers', () => {
     expect(statement.received).toBe(8);
     expect(statement.closingBalance).toBe(24);
     expect(statement.runningBalances.get('match')).toBe(22);
+  });
+
+  it('builds a party statement oldest-first by transaction date, not insertion date', () => {
+    const records: LedgerRecord[] = [
+      { ...ledgerEntry, id: 'latest', description: 'Latest business date', dueDate: '2025-06-20', createdAt: '2025-06-01T10:00:00.000Z' },
+      { ...ledgerEntry, id: 'same-day-later', description: 'Later same day', dueDate: '2025-06-10', createdAt: '2025-06-04T10:00:00.000Z' },
+      { ...ledgerEntry, id: 'oldest', description: 'Oldest business date', dueDate: '2025-06-01', createdAt: '2025-06-30T10:00:00.000Z' },
+      { ...ledgerEntry, id: 'same-day-earlier', description: 'Earlier same day', dueDate: '2025-06-10', createdAt: '2025-06-03T10:00:00.000Z' },
+    ];
+    const statement = calculatePartyStatement(records, 'all');
+    const html = buildPartyStatementHtml({
+      businessName: 'Shop',
+      party,
+      periodLabel: 'সব সময়',
+      statement,
+    });
+
+    expect(statement.entriesAscending.map((item) => item.id)).toEqual([
+      'oldest',
+      'same-day-earlier',
+      'same-day-later',
+      'latest',
+    ]);
+    expect(statement.entries.map((item) => item.id)).toEqual([
+      'latest',
+      'same-day-later',
+      'same-day-earlier',
+      'oldest',
+    ]);
+    expect(html.indexOf('Oldest business date')).toBeLessThan(html.indexOf('Earlier same day'));
+    expect(html.indexOf('Earlier same day')).toBeLessThan(html.indexOf('Later same day'));
+    expect(html.indexOf('Later same day')).toBeLessThan(html.indexOf('Latest business date'));
+  });
+
+  it('builds global statement rows oldest-first by transaction date', () => {
+    const records: GlobalLedgerRecord[] = [
+      { ...ledgerEntry, id: 'latest', partyName: 'Latest party', partyPhone: '', dueDate: '2025-06-20', createdAt: '2025-06-01T10:00:00.000Z' },
+      { ...ledgerEntry, id: 'oldest', partyName: 'Oldest party', partyPhone: '', dueDate: '2025-06-01', createdAt: '2025-06-30T10:00:00.000Z' },
+    ];
+    const html = buildGlobalLedgerReportHtml({
+      businessName: 'Shop',
+      entries: records,
+      periodLabel: 'সব সময়',
+    });
+
+    expect(html.indexOf('Oldest party')).toBeLessThan(html.indexOf('Latest party'));
   });
 
   it('embeds authenticated images within size limits and reports failures without throwing', async () => {

@@ -3,6 +3,8 @@ import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
 import { billImageSrc } from '@/lib/billImageStorage';
+import { getLedgerEntryDateKey } from './date-time';
+import { sortGlobalLedgerEntriesChronologically } from './global-ledger-report-order';
 
 export interface GlobalReportEntry {
   id: string;
@@ -21,12 +23,13 @@ export interface GlobalReportEntry {
 interface GlobalReportDocumentProps {
   storeName: string;
   periodLabel: string;
-  /** Entries must already be sorted oldest -> newest for correct monthly grouping. */
+  /** Entries are sorted by business date before monthly grouping and rendering. */
   entries: GlobalReportEntry[];
 }
 
 function entryDate(entry: GlobalReportEntry) {
-  return new Date(entry.dueDate || entry.createdAt);
+  const [year, month, day] = getLedgerEntryDateKey(entry.dueDate, entry.createdAt).split('-').map(Number);
+  return new Date(year, month - 1, day);
 }
 
 function entryDetails(entry: GlobalReportEntry) {
@@ -42,10 +45,10 @@ interface MonthGroup {
   totalCredit: number;
 }
 
-/** Groups already chronologically-sorted (oldest -> newest) entries into calendar-month sections. */
+/** Groups entries into calendar-month sections in chronological business-date order. */
 function groupByMonth(entries: GlobalReportEntry[]): MonthGroup[] {
   const groups: MonthGroup[] = [];
-  for (const entry of entries) {
+  for (const entry of sortGlobalLedgerEntriesChronologically(entries)) {
     const date = entryDate(entry);
     const key = format(date, 'yyyy-MM');
     let group = groups[groups.length - 1];

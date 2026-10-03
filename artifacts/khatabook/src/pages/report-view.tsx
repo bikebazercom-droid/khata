@@ -28,8 +28,12 @@ import { BillImageLightbox } from '@/components/modals/bill-image-lightbox';
 import { billImageSrc } from '@/lib/billImageStorage';
 import { loadShopProfile } from '@/components/modals/settings-drawer';
 import { buildGlobalLedgerReportCsv } from '@/lib/global-ledger-report-csv';
-import { sortGlobalLedgerEntriesNewestFirst } from '@/lib/global-ledger-report-order';
+import {
+  sortGlobalLedgerEntriesChronologically,
+  sortGlobalLedgerEntriesNewestFirst,
+} from '@/lib/global-ledger-report-order';
 import { filterGlobalLedgerEntriesByRole } from '@/lib/global-ledger-report-role';
+import { formatLedgerEntryDateTime } from '@/lib/date-time';
 
 const PERIOD_LABELS: Record<ReportPeriod, string> = {
   ALL: 'সব',
@@ -112,9 +116,10 @@ export function ReportView() {
     const footerAddress = shopProfile.address || '';
     const footerPhone   = shopProfile.phone   || '';
 
-    const rowsHtml = entries.map(e => {
+    const pdfEntries = sortGlobalLedgerEntriesChronologically(entries);
+    const rowsHtml = pdfEntries.map(e => {
       const isGave   = e.type === 'YOU_GAVE';
-      const dateCell = format(new Date(e.createdAt), 'd MMM yy • hh:mm a');
+      const dateCell = formatLedgerEntryDateTime(e.dueDate, e.createdAt);
       const debitCell  = isGave
         ? `<td style="padding:10px;border:1px solid #000;text-align:right;background:#FEF2F2;color:#000;font-weight:500;">৳${e.amount.toFixed(2)}</td>`
         : `<td style="padding:10px;border:1px solid #000;background:#FEF2F2;"></td>`;
@@ -174,7 +179,7 @@ export function ReportView() {
 
         <!-- Count label -->
         <div style="font-size:15px;font-weight:bold;color:#000;margin-bottom:12px;">
-          এন্ট্রির সংখ্যা: ${entries.length} (সব)
+          এন্ট্রির সংখ্যা: ${pdfEntries.length} (সব)
         </div>
 
         <!-- 4. Transaction Table -->
