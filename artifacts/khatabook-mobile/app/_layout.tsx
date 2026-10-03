@@ -9,6 +9,8 @@ import { tokenCache } from '@clerk/expo/token-cache';
 import { setBaseUrl, setExtraHeaders } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { BusinessScopeProvider } from '@/contexts/BusinessScopeContext';
+import { BusinessSwitcherModal } from '@/components/BusinessSwitcherModal';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -38,17 +40,20 @@ const queryClient = new QueryClient({
 
 function RootLayoutNav() {
   return (
-    <Stack screenOptions={{ headerShown: false, headerBackTitle: 'Back' }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="sign-in" options={{ gestureEnabled: false }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="party/new" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="party/[partyId]" />
-      <Stack.Screen name="party/[partyId]/report" />
-      <Stack.Screen name="reports" />
-      <Stack.Screen name="entry/new" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="entry/[entryId]" options={{ presentation: 'modal' }} />
-    </Stack>
+    <>
+      <Stack screenOptions={{ headerShown: false, headerBackTitle: 'Back' }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="sign-in" options={{ gestureEnabled: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="party/new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="party/[partyId]" />
+        <Stack.Screen name="party/[partyId]/report" />
+        <Stack.Screen name="reports" />
+        <Stack.Screen name="entry/new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="entry/[entryId]" options={{ presentation: 'modal' }} />
+      </Stack>
+      <BusinessSwitcherModal />
+    </>
   );
 }
 
@@ -78,12 +83,14 @@ export default function RootLayout() {
         >
           <QueryClientProvider client={queryClient}>
             <AuthProvider>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <KeyboardProvider>
-                  <StatusBar style="auto" />
-                  <RootLayoutNav />
-                </KeyboardProvider>
-              </GestureHandlerRootView>
+              <BusinessScopeProvider>
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                  <KeyboardProvider>
+                    <StatusBar style="auto" />
+                    <RootLayoutNav />
+                  </KeyboardProvider>
+                </GestureHandlerRootView>
+              </BusinessScopeProvider>
             </AuthProvider>
           </QueryClientProvider>
         </ClerkProvider>

@@ -8,7 +8,13 @@ import {
   calculateGlobalLedgerReportTotals,
   type GlobalLedgerReportPeriod,
 } from '@workspace/api-client-react/global-ledger-report';
-import { getListGlobalLedgerEntriesQueryKey, useListGlobalLedgerEntries, useListParties } from '@workspace/api-client-react';
+import {
+  getGetBusinessSettingsQueryKey,
+  getListGlobalLedgerEntriesQueryKey,
+  useGetBusinessSettings,
+  useListGlobalLedgerEntries,
+  useListParties,
+} from '@workspace/api-client-react';
 import { AppButton, Card, EmptyState, LoadingState, Notice, Page, PageHeader, StatCard } from '@/components/Kit';
 import { useAuth } from '@/contexts/AuthContext';
 import { errorMessage, formatMoney, type GlobalLedgerRecord, type PartyRecord } from '@/lib/domain';
@@ -37,6 +43,9 @@ function periodTitle(period: GlobalLedgerReportPeriod, start: string, end: strin
 export default function TransactionReportScreen() {
   const colors = useColors();
   const { identity } = useAuth();
+  const settingsQuery = useGetBusinessSettings({
+    query: { enabled: identity?.role === 'owner', queryKey: getGetBusinessSettingsQueryKey() },
+  });
   const todayText = formatReportDateInput(new Date());
   const [period, setPeriod] = useState<GlobalLedgerReportPeriod>('ALL');
   const [role, setRole] = useState<GlobalLedgerRole>('ALL');
@@ -77,7 +86,7 @@ export default function TransactionReportScreen() {
     setBusy('pdf');
     try {
       const html = buildGlobalLedgerReportHtml({
-        businessName: identity?.businessName || 'বাংলাখাতা',
+        businessName: settingsQuery.data?.storeName || identity?.businessName || 'বাংলাখাতা',
         entries,
         periodLabel: periodTitle(period, startText, endText),
       });
@@ -143,8 +152,14 @@ export default function TransactionReportScreen() {
 
   return (
     <Page
-      onRefresh={() => { void Promise.all([entriesQuery.refetch(), partiesQuery.refetch()]); }}
-      refreshing={entriesQuery.isRefetching || partiesQuery.isRefetching}
+      onRefresh={() => {
+        void Promise.all([
+          entriesQuery.refetch(),
+          partiesQuery.refetch(),
+          ...(identity?.role === 'owner' ? [settingsQuery.refetch()] : []),
+        ]);
+      }}
+      refreshing={entriesQuery.isRefetching || partiesQuery.isRefetching || settingsQuery.isRefetching}
     >
       <PageHeader title="লেনদেন রিপোর্ট" subtitle="লেনদেন খুঁজুন, ফিল্টার করুন ও এক্সপোর্ট করুন" onBack={() => router.back()} />
 

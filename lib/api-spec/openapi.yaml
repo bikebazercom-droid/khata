@@ -24,6 +24,8 @@ tags:
     description: Admin console operations
   - name: auth
     description: Phone OTP authentication and signed-in identity
+  - name: businesses
+    description: Business khata selection and isolation
 paths:
   /scan/bengali-ledger:
     post:
@@ -208,6 +210,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+  /businesses:
+    get:
+      operationId: listBusinesses
+      tags: [businesses]
+      summary: List business khatas accessible to the authenticated user
+      responses:
+        "200":
+          description: Accessible business khatas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BusinessSummary"
   /dashboard/summary:
     get:
       operationId: getDashboardSummary
@@ -937,6 +953,19 @@ components:
           type: string
         role:
           $ref: "#/components/schemas/PartyRole"
+    BusinessSummary:
+      type: object
+      required: [id, name, createdAt, partyCount]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        partyCount:
+          type: integer
     Party:
       type: object
       required:

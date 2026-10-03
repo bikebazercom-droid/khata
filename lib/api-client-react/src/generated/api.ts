@@ -38,6 +38,7 @@ import type {
   BlockedIpsPage,
   BusinessSettings,
   BusinessSettingsUpdate,
+  BusinessSummary,
   DashboardSummary,
   DeletePartyResult,
   ErrorEnvelope,
@@ -744,6 +745,83 @@ export const useDeleteUserAccount = <TError = ErrorType<ErrorEnvelope>,
       > => {
       return useMutation(getDeleteUserAccountMutationOptions(options));
     }
+
+export const getListBusinessesUrl = () => {
+
+
+
+
+  return `/api/businesses`
+}
+
+/**
+ * @summary List business khatas accessible to the authenticated user
+ */
+export const listBusinesses = async ( options?: RequestInit): Promise<BusinessSummary[]> => {
+
+  return customFetch<BusinessSummary[]>(getListBusinessesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListBusinessesQueryKey = () => {
+    return [
+    `/api/businesses`
+    ] as const;
+    }
+
+
+export const getListBusinessesQueryOptions = <TData = Awaited<ReturnType<typeof listBusinesses>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBusinesses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListBusinessesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listBusinesses>>> = ({ signal }) => listBusinesses({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listBusinesses>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListBusinessesQueryResult = NonNullable<Awaited<ReturnType<typeof listBusinesses>>>
+export type ListBusinessesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List business khatas accessible to the authenticated user
+ */
+
+export function useListBusinesses<TData = Awaited<ReturnType<typeof listBusinesses>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listBusinesses>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListBusinessesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetDashboardSummaryUrl = () => {
 

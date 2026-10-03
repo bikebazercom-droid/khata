@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useGetParty, useListLedgerEntries } from '@workspace/api-client-react';
+import { getGetBusinessSettingsQueryKey, useGetBusinessSettings, useGetParty, useListLedgerEntries } from '@workspace/api-client-react';
 import { AppButton, Card, EmptyState, EntryRow, LoadingState, Notice, Page, PageHeader, StatCard } from '@/components/Kit';
 import { useAuth } from '@/contexts/AuthContext';
 import { errorMessage, formatMoney, type LedgerRecord, type PartyRecord } from '@/lib/domain';
@@ -39,6 +39,9 @@ export default function PartyStatementScreen() {
   const [error, setError] = useState('');
   const partyQuery = useGetParty(partyId);
   const entriesQuery = useListLedgerEntries(partyId);
+  const settingsQuery = useGetBusinessSettings({
+    query: { enabled: identity?.role === 'owner', queryKey: getGetBusinessSettingsQueryKey() },
+  });
   const party = partyQuery.data as PartyRecord | undefined;
   const entries = (entriesQuery.data ?? []) as LedgerRecord[];
   const startDate = parseReportDate(startText);
@@ -63,7 +66,7 @@ export default function PartyStatementScreen() {
       const token = await getApiToken().catch(() => null);
       const { images, failedCount } = await embedPartyStatementBillImages(statement.entries, token);
       const html = buildPartyStatementHtml({
-        businessName: identity?.businessName || 'বাংলাখাতা',
+        businessName: settingsQuery.data?.storeName || identity?.businessName || 'বাংলাখাতা',
         party,
         periodLabel: periodLabel(period, startText, endText),
         statement,
@@ -84,8 +87,14 @@ export default function PartyStatementScreen() {
 
   return (
     <Page
-      onRefresh={() => { void Promise.all([partyQuery.refetch(), entriesQuery.refetch()]); }}
-      refreshing={partyQuery.isRefetching || entriesQuery.isRefetching}
+      onRefresh={() => {
+        void Promise.all([
+          partyQuery.refetch(),
+          entriesQuery.refetch(),
+          ...(identity?.role === 'owner' ? [settingsQuery.refetch()] : []),
+        ]);
+      }}
+      refreshing={partyQuery.isRefetching || entriesQuery.isRefetching || settingsQuery.isRefetching}
     >
       <PageHeader
         title="স্টেটমেন্ট"

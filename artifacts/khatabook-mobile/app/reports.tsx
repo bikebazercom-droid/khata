@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { useListParties } from '@workspace/api-client-react';
+import { getGetBusinessSettingsQueryKey, useGetBusinessSettings, useListParties } from '@workspace/api-client-react';
 import { AppButton, Card, EmptyState, LoadingState, Notice, Page, PageHeader, PartyCard, StatCard } from '@/components/Kit';
 import { useAuth } from '@/contexts/AuthContext';
 import { errorMessage, type PartyRecord } from '@/lib/domain';
@@ -19,6 +19,9 @@ const FILTERS: { value: RoleFilter; label: string }[] = [
 export default function ReportsScreen() {
   const colors = useColors();
   const { identity } = useAuth();
+  const settingsQuery = useGetBusinessSettings({
+    query: { enabled: identity?.role === 'owner', queryKey: getGetBusinessSettingsQueryKey() },
+  });
   const [role, setRole] = useState<RoleFilter>('ALL');
   const [sharing, setSharing] = useState(false);
   const [notice, setNotice] = useState('');
@@ -38,7 +41,7 @@ export default function ReportsScreen() {
     setSharing(true);
     try {
       const html = buildPartyBalancesHtml({
-        businessName: identity?.businessName || 'বাংলাখাতা',
+        businessName: settingsQuery.data?.storeName || identity?.businessName || 'বাংলাখাতা',
         parties,
         role,
       });
@@ -52,7 +55,15 @@ export default function ReportsScreen() {
   };
 
   return (
-    <Page onRefresh={() => { void partiesQuery.refetch(); }} refreshing={partiesQuery.isRefetching}>
+    <Page
+      onRefresh={() => {
+        void Promise.all([
+          partiesQuery.refetch(),
+          ...(identity?.role === 'owner' ? [settingsQuery.refetch()] : []),
+        ]);
+      }}
+      refreshing={partiesQuery.isRefetching || settingsQuery.isRefetching}
+    >
       <PageHeader title="PDF রিপোর্ট" subtitle="হিসাবের সারাংশ ও পার্টির ব্যালেন্স" onBack={() => router.back()} />
       <AppButton
         title="লেনদেন রিপোর্ট খুলুন"

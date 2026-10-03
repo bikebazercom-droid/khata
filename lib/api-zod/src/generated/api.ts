@@ -125,6 +125,18 @@ export const DeleteUserAccountResponse = zod.object({
 
 
 /**
+ * @summary List business khatas accessible to the authenticated user
+ */
+export const ListBusinessesResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "partyCount": zod.number()
+})
+export const ListBusinessesResponse = zod.array(ListBusinessesResponseItem)
+
+
+/**
  * @summary Get aggregated dashboard totals
  */
 export const GetDashboardSummaryResponse = zod.object({

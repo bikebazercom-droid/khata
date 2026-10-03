@@ -19,6 +19,7 @@ import { router } from 'expo-router';
 import { DueFilter, PartyRole, useListParties } from '@workspace/api-client-react';
 import { EmptyState, LoadingState, Notice } from '@/components/Kit';
 import { useAuth } from '@/contexts/AuthContext';
+import { useBusinessScope } from '@/contexts/BusinessScopeContext';
 import { errorMessage, formatMoney, toBengaliDigits, type PartyRecord } from '@/lib/domain';
 import { useColors } from '@/hooks/useColors';
 
@@ -307,6 +308,7 @@ export default function PartiesScreen() {
     [summaryParties],
   );
 
+  const { selectedBusinessName, canSwitchBusiness, openBusinessSwitcher } = useBusinessScope();
   const roleLabel = role === PartyRole.CUSTOMER ? 'গ্রাহক' : 'সরবরাহকারী';
   const isFiltered = appliedFilter !== 'all' || appliedSort !== 'recent';
   const filterSummary = FILTER_OPTIONS.find((filter) => filter.id === appliedFilter)?.label ?? 'সব';
@@ -331,9 +333,19 @@ export default function PartiesScreen() {
             <View style={styles.brandRow}>
               <Image source={require('../../assets/images/brand-icon.png')} style={styles.logo} />
               <View style={styles.brandNameWrap}>
-                <Text style={[styles.brandName, { color: colors.primaryForeground }]} numberOfLines={1}>
-                  {identity?.businessName || 'আমার খাতা'}
-                </Text>
+                <Pressable
+                  onPress={canSwitchBusiness ? openBusinessSwitcher : undefined}
+                  disabled={!canSwitchBusiness}
+                  accessibilityRole={canSwitchBusiness ? 'button' : undefined}
+                  accessibilityLabel={canSwitchBusiness ? 'খাতা বদলান' : undefined}
+                  testID="parties-business-switcher"
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}
+                >
+                  <Text style={[styles.brandName, { color: colors.primaryForeground, flexShrink: 1 }]} numberOfLines={1}>
+                    {selectedBusinessName || identity?.businessName || 'আমার খাতা'}
+                  </Text>
+                  {canSwitchBusiness ? <Feather name="chevron-down" size={16} color={colors.primaryForeground} /> : null}
+                </Pressable>
               </View>
               <Pressable
                 onPress={() => router.push('/(tabs)/settings')}

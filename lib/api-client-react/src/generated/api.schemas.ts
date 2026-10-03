@@ -153,6 +153,13 @@ export interface AdjustmentTarget {
   role: PartyRole;
 }
 
+export interface BusinessSummary {
+  id: string;
+  name: string;
+  createdAt: string;
+  partyCount: number;
+}
+
 export interface Party {
   id: string;
   name: string;

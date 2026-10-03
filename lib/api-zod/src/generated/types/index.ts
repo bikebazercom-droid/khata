@@ -38,6 +38,7 @@ export * from './blockedIp';
 export * from './blockedIpsPage';
 export * from './businessSettings';
 export * from './businessSettingsUpdate';
+export * from './businessSummary';
 export * from './clientIpPolicy';
 export * from './clientIpPolicyMode';
 export * from './dashboardSummary';
