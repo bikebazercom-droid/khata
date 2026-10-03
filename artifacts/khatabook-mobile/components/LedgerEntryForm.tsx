@@ -21,26 +21,30 @@ import {
 } from '@workspace/api-client-react';
 import { AppButton, BillPhoto, Card, Field, FormPage, LoadingState, Notice, PageHeader, PartyCard } from '@/components/Kit';
 import { Calculator } from '@/components/Calculator';
+import { DatePickerField } from '@/components/DatePickerField';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import {
   apiBaseUrl,
   errorMessage,
+  formatMoney,
   isIsoDate,
   makeClientRequestId,
   todayIsoDate,
   type LedgerRecord,
   type PartyRecord,
 } from '@/lib/domain';
+import { getLedgerEntryDateKey } from '@/lib/partyLedger';
 
 type Props = {
   mode: 'create' | 'edit';
   partyId?: string;
   entry?: LedgerRecord;
+  initialType?: EntryType;
 };
 type EntryType = 'YOU_GAVE' | 'YOU_GOT';
 
-export function LedgerEntryForm({ mode, partyId: initialPartyId, entry }: Props) {
+export function LedgerEntryForm({ mode, partyId: initialPartyId, entry, initialType }: Props) {
   const colors = useColors();
   const { identity, token } = useAuth();
   const queryClient = useQueryClient();
@@ -51,12 +55,13 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry }: Props)
   const partyList = useListParties(undefined, { query: { enabled: mode === 'create', queryKey: getListPartiesQueryKey() } });
   const [selectedPartyId, setSelectedPartyId] = useState(initialPartyId ?? '');
   const [partySearch, setPartySearch] = useState('');
-  const [type, setType] = useState<EntryType>(entry?.type ?? 'YOU_GAVE');
+  const [type, setType] = useState<EntryType>(entry?.type ?? initialType ?? 'YOU_GAVE');
   const [amount, setAmount] = useState<number | null>(entry?.amount ?? null);
   const [description, setDescription] = useState(entry?.description ?? '');
   const [billReference, setBillReference] = useState(entry?.billReference ?? '');
-  const [entryDate, setEntryDate] = useState(entry?.createdAt.slice(0, 10) ?? todayIsoDate());
-  const [dueDate, setDueDate] = useState(entry?.dueDate ?? '');
+  const [dueDate, setDueDate] = useState(() => mode === 'edit' && entry
+    ? getLedgerEntryDateKey(entry.dueDate, entry.createdAt)
+    : todayIsoDate());
   const [isTransfer, setIsTransfer] = useState(false);
   const [transferPartyId, setTransferPartyId] = useState('');
   const [pickedImage, setPickedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
@@ -190,12 +195,8 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry }: Props)
       setError('সঠিক টাকার অঙ্ক লিখুন।');
       return;
     }
-    if (entryDate && !isIsoDate(entryDate)) {
-      setError('লেনদেনের তারিখ YYYY-MM-DD আকারে লিখুন।');
-      return;
-    }
     if (dueDate && !isIsoDate(dueDate)) {
-      setError('বাকি পাওয়ার তারিখ YYYY-MM-DD আকারে লিখুন।');
+      setError('লেনদেনের তারিখটি সঠিক নয়।');
       return;
     }
     const selectedTransferTarget = transferTargets.find((target) => target.id === transferPartyId);
@@ -219,7 +220,6 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry }: Props)
           description: description.trim(),
           billReference: billReference.trim() || null,
           billImage,
-          entryDate: entryDate || null,
           dueDate: dueDate || null,
           isTransfer,
           transferPartyId: isTransfer ? transferPartyId : null,
@@ -244,7 +244,6 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry }: Props)
             description: description.trim(),
             billReference: billReference.trim() || null,
             billImage,
-            entryDate: entryDate || null,
             dueDate: dueDate || null,
           },
         });
@@ -265,10 +264,17 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry }: Props)
   });
   const imageUri = pickedImage?.uri ?? (removeImage ? null : existingImage);
   const isBusy = uploading || createEntry.isPending || patchEntry.isPending || requestUploadUrl.isPending;
+  const directionLabel = type === 'YOU_GOT' ? 'আপনি পেয়েছেন' : 'আপনি দিয়েছেন';
+  const formTitle = mode === 'create' && initialType
+    ? `${directionLabel}${amount !== null ? ` ${formatMoney(amount)}` : ''}`
+    : mode === 'create' ? 'নতুন লেনদেন' : 'লেনদেন পরিবর্তন';
+  const formSubtitle = mode === 'create' && selectedParty
+    ? `${selectedParty.name}${type === 'YOU_GOT' ? ' থেকে' : ' কে'}`
+    : mode === 'create' ? 'খাতায় একটি এন্ট্রি লিখুন' : 'লেনদেনের তথ্য আপডেট করুন';
 
   return (
     <FormPage>
-      <PageHeader title={mode === 'create' ? 'নতুন লেনদেন' : 'লেনদেন পরিবর্তন'} subtitle={mode === 'create' ? 'খাতায় একটি এন্ট্রি লিখুন' : 'লেনদেনের তথ্য আপডেট করুন'} onBack={() => router.back()} />
+      <PageHeader title={formTitle} subtitle={formSubtitle} onBack={() => router.back()} />
 
       {mode === 'edit' && entry?.isTransfer ? (
         <>
@@ -293,17 +299,21 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry }: Props)
             </View>
           ) : selectedParty ? <PartyCard party={selectedParty} onPress={() => undefined} /> : null}
 
-          <Text style={{ color: colors.foreground, fontSize: 15, fontWeight: '800' }}>লেনদেনের ধরন</Text>
-          <View style={{ flexDirection: 'row', gap: 9 }}>
-            {(['YOU_GAVE', 'YOU_GOT'] as const).map((value) => {
-              const active = type === value;
-              return (
-                <Pressable key={value} onPress={() => setType(value)} accessibilityRole="button" testID={`entry-type-${value}`} style={{ flex: 1, minHeight: 48, borderRadius: 11, borderWidth: 1, borderColor: active ? colors.primary : colors.border, backgroundColor: active ? colors.secondary : colors.card, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: active ? colors.primary : colors.foreground, fontWeight: '700' }}>{value === 'YOU_GAVE' ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন'}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          {!initialType ? (
+            <>
+              <Text style={{ color: colors.foreground, fontSize: 15, fontWeight: '800' }}>লেনদেনের ধরন</Text>
+              <View style={{ flexDirection: 'row', gap: 9 }}>
+                {(['YOU_GAVE', 'YOU_GOT'] as const).map((value) => {
+                  const active = type === value;
+                  return (
+                    <Pressable key={value} onPress={() => setType(value)} accessibilityRole="button" testID={`entry-type-${value}`} style={{ flex: 1, minHeight: 48, borderRadius: 11, borderWidth: 1, borderColor: active ? colors.primary : colors.border, backgroundColor: active ? colors.secondary : colors.card, alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ color: active ? colors.primary : colors.foreground, fontWeight: '700' }}>{value === 'YOU_GAVE' ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন'}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          ) : null}
 
           <View style={{ gap: 8 }}>
             <Text style={{ color: colors.foreground, fontSize: 15, fontWeight: '800' }}>টাকার অঙ্ক</Text>
@@ -314,8 +324,8 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry }: Props)
             <Card>
               <Pressable onPress={() => { setIsTransfer((value) => !value); setTransferPartyId(''); }} accessibilityRole="switch" accessibilityState={{ checked: isTransfer }} testID="entry-transfer-toggle" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <View style={{ flex: 1, gap: 3 }}>
-                  <Text style={{ color: colors.foreground, fontWeight: '800' }}>হিসাবের মধ্যে ট্রান্সফার</Text>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>দুই খাতায় একসঙ্গে মিলিয়ে লিখুন</Text>
+                  <Text style={{ color: colors.foreground, fontWeight: '800' }}>অ্যাডজাস্টমেন্ট</Text>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>অন্য একই ধরনের খাতার সঙ্গে মিলিয়ে নিন</Text>
                 </View>
                 <Text style={{ color: isTransfer ? colors.primary : colors.mutedForeground, fontWeight: '800' }}>{isTransfer ? 'চালু' : 'বন্ধ'}</Text>
               </Pressable>
@@ -338,8 +348,7 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry }: Props)
 
           <Field label="বিবরণ" value={description} onChangeText={setDescription} placeholder="যেমন: চালের বস্তা" testID="entry-description" />
           <Field label="বিল/রেফারেন্স নম্বর" value={billReference} onChangeText={setBillReference} placeholder="ঐচ্ছিক" testID="entry-bill-reference" />
-          <Field label="লেনদেনের তারিখ" value={entryDate} onChangeText={setEntryDate} placeholder="YYYY-MM-DD" testID="entry-date" />
-          <Field label="বাকি পাওয়ার তারিখ" value={dueDate} onChangeText={setDueDate} placeholder="ঐচ্ছিক · YYYY-MM-DD" testID="entry-due-date" />
+          <DatePickerField label="লেনদেনের তারিখ" value={dueDate} onChange={setDueDate} testID="entry-date" />
 
           <Card>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
