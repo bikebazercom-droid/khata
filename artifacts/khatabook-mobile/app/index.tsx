@@ -13,14 +13,14 @@ export default function IndexScreen() {
     if (!ready) return;
     if (isWeb) {
       if (accountDeleted) router.replace('/sign-in');
-      else if (identity) router.replace('/(tabs)/home');
+      else if (identity) router.replace('/(tabs)/parties');
       else if (!identityLoading && identityError && isUnauthorized(identityError)) router.replace('/sign-in');
       return;
     }
     if (!hasSession) {
       router.replace('/sign-in');
     } else if (identity) {
-      router.replace('/(tabs)/home');
+      router.replace('/(tabs)/parties');
     }
   }, [ready, isWeb, hasSession, accountDeleted, identity, identityLoading, identityError]);
 

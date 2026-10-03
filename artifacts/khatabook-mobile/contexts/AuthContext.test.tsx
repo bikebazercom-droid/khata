@@ -176,7 +176,7 @@ function MockRouteTree() {
   }, []);
 
   if (route === '/') return <IndexScreen />;
-  if (route === '/(tabs)/home') return <AuthenticatedQueries />;
+  if (route === '/(tabs)/parties') return <AuthenticatedQueries />;
   return null;
 }
 
@@ -322,7 +322,7 @@ describe('mobile phone-session restoration', () => {
     );
 
     await waitFor(() => expect(currentState?.identity?.userId).toBe('test-owner'));
-    await waitFor(() => expect(routerMock.replace).toHaveBeenCalledWith('/(tabs)/home'));
+    await waitFor(() => expect(routerMock.replace).toHaveBeenCalledWith('/(tabs)/parties'));
     expect(flow.events).not.toContain('secure-read-start');
 
     await act(async () => {

@@ -12,17 +12,9 @@ import { useColors } from '@/hooks/useColors';
 function LiquidTabs() {
   return (
     <NativeTabs>
-      <NativeTabs.Trigger name="home">
-        <NativeTabs.Trigger.Icon sf={{ default: 'house', selected: 'house.fill' }} />
-        <NativeTabs.Trigger.Label>হোম</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="parties">
         <NativeTabs.Trigger.Icon sf={{ default: 'person.2', selected: 'person.2.fill' }} />
-        <NativeTabs.Trigger.Label>হিসাব</NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="activity">
-        <NativeTabs.Trigger.Icon sf={{ default: 'arrow.left.arrow.right', selected: 'arrow.left.arrow.right' }} />
-        <NativeTabs.Trigger.Label>লেনদেন</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>গ্রাহক</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="settings">
         <NativeTabs.Trigger.Icon sf={{ default: 'gearshape', selected: 'gearshape.fill' }} />
@@ -65,10 +57,11 @@ function ClassicTabs() {
           ) : null,
       }}
     >
-      <Tabs.Screen name="home" options={{ title: 'হোম', tabBarIcon: ({ color }) => renderIcon('home', String(color)) }} />
-      <Tabs.Screen name="parties" options={{ title: 'হিসাব', tabBarIcon: ({ color }) => renderIcon('users', String(color)) }} />
-      <Tabs.Screen name="activity" options={{ title: 'লেনদেন', tabBarIcon: ({ color }) => renderIcon('repeat', String(color)) }} />
+      <Tabs.Screen name="parties" options={{ title: 'গ্রাহক', tabBarIcon: ({ color }) => renderIcon('users', String(color)) }} />
       <Tabs.Screen name="settings" options={{ title: 'সেটিংস', tabBarIcon: ({ color }) => renderIcon('settings', String(color)) }} />
+      <Tabs.Screen name="home" options={{ href: null }} />
+      <Tabs.Screen name="activity" options={{ href: null }} />
+      <Tabs.Screen name="index" options={{ href: null }} />
     </Tabs>
   );
 }
