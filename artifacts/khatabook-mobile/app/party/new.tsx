@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { getGetDashboardSummaryQueryKey, getListPartiesQueryKey, useCreateParty } from '@workspace/api-client-react';
 import { AppButton, Field, FormPage, PageHeader } from '@/components/Kit';
@@ -14,9 +14,10 @@ export default function NewPartyScreen() {
   const colors = useColors();
   const queryClient = useQueryClient();
   const createParty = useCreateParty();
+  const params = useLocalSearchParams<{ role?: string }>();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [role, setRole] = useState<PartyRole>('CUSTOMER');
+  const [role, setRole] = useState<PartyRole>(() => params.role === 'SUPPLIER' ? 'SUPPLIER' : 'CUSTOMER');
   const [openingBalance, setOpeningBalance] = useState('');
   const [openingBalanceType, setOpeningBalanceType] = useState<BalanceType>('YOU_WILL_GET');
   const [dueDate, setDueDate] = useState('');

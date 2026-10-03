@@ -4,6 +4,7 @@
 - [Khatabook auth & multi-tenancy](khatabook-auth-multitenancy.md) — seed-business rules, session revocation, Expo Clerk SSO, and DB setup gotchas.
 - [Worker invitation identity](worker-invite-identity.md) — one pending invite per verified identity across businesses avoids arbitrary first-sign-in claims.
 - [Android export validation](android-export-validation.md) — Gradle task discovery is not source compilation; API-only compiler checks are not APK builds.
+- [Expo export port conflicts](expo-export-port.md) — set `RCT_METRO_PORT` when another workflow occupies 8081; Expo export can bundle all platforms without stopping it.
 - [Offline ledger replay](offline-ledger-replay.md) — keep replay protection after deletion and pending drafts separate from confirmed balances.
 - [Browser legacy outbox transition](browser-legacy-outbox.md) — new browser entries go online; keep prior drafts recoverable during the transition.
 - [Offline shell validation](offline-shell-validation.md) — service-worker checks need compiled assets and a browser-reachable secure origin.
@@ -20,3 +21,4 @@
 - [PDF statement order](ledger-statement-order.md) — group by business date and show statements newest-first while retaining chronological running balances.
 - [Large transaction amounts](large-transaction-amounts.md) — keep complete formatted values inside party-history cards at narrow phone widths.
 - [Party-role report and transfer scope](party-role-scope.md) — supplier/customer reports and transfers must never cross roles; retain existing business isolation.
+- [Mobile party-list parity](mobile-party-list-parity.md) — use the website's customer/supplier list as the mobile landing-screen source of truth.
