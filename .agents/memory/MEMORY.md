@@ -22,4 +22,4 @@
 - [Web party PDF ordering](ledger-statement-order.md) — show the single-party web ledger PDF newest-first while retaining chronologically computed running balances.
 - [Large transaction amounts](large-transaction-amounts.md) — keep complete formatted values inside party-history cards at narrow phone widths.
 - [Party-role report and transfer scope](party-role-scope.md) — supplier/customer reports and transfers must never cross roles; retain existing business isolation.
-- [Mobile website parity](mobile-party-list-parity.md) — keep Expo/native and use the website as the reference for mobile features, flows, and styling.
+- [Website source of truth for mobile](mobile-party-list-parity.md) — the user requires shared UI and behavior, not a separately implemented mobile product.

@@ -1,12 +1,10 @@
 ---
-name: Mobile party-list parity
-description: Keep Expo/native while using the website as the BanglaKhata mobile parity reference.
+name: Website source of truth for mobile
+description: The user's required architecture and behavior parity between BanglaKhata web and mobile.
 ---
 
-For BanglaKhata, preserve the Expo/native app architecture and use the website as the reference for mobile features, flows, and styling. Mirror website behavior in Expo instead of replacing the website or migrating both apps to a shared cross-platform UI. Use native equivalents for device-specific controls such as camera, sharing, and date pickers. Check existing mobile entry points before treating an absent route as a missing feature.
+The website is BanglaKhata's single source of truth. Mobile must match its components, UI layout, entry flows, calculator modals, routes, styling, calculations, and multi-khata data isolation without separate mobile templates or custom product behavior. This supersedes the earlier direction to keep an independently implemented Expo UI.
 
-For the mobile initial screen, keep the website's customer/supplier party-list structure: customer/supplier tabs, role-specific balance summary, search/filter/report controls, party rows, add-party action, and Customers/Settings bottom navigation. Do not restore a separate dashboard as the mobile landing page.
+**Why:** The user explicitly directed that mobile and web have no feature or behavior discrepancies and that the website remain the source of truth.
 
-**Why:** The user chose to keep Expo and bring mobile to website feature and design parity.
-
-**How to apply:** For each feature change, compare the website's behavior and styling with all mobile entry points, then adapt it using native routing and platform UI. Keep the website as the reference; do not start a broad shared-UI migration.
+**How to apply:** Prefer one shared implementation over copied web/mobile behavior. Before replacing the current mobile UI architecture, confirm the chosen approach when it changes whether screens run natively or inside a web container.
