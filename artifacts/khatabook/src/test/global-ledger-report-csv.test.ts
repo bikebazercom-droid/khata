@@ -29,7 +29,7 @@ describe('buildGlobalLedgerReportCsv', () => {
     ]);
 
     expect(csv).toBe(
-      '\uFEFFতারিখ,পার্টির নাম,বিবরণ,ডেবিট (-),ক্রেডিট (+)\r\n' +
+      '\uFEFFতারিখ,পার্টির নাম,বিবরণ,আপনি দিয়েছেন (৳),আপনি পেয়েছেন (৳)\r\n' +
       '2026-09-15 05:30:00 PM,"রহিম, ""মিয়া""","প্রথম লাইন\r\nদ্বিতীয় লাইন",125.50,\r\n' +
       '2026-09-16 09:05:00 AM,করিম,পেমেন্ট,,80.00\r\n',
     );
@@ -45,7 +45,7 @@ describe('buildGlobalLedgerReportCsv', () => {
 
   it('returns a valid header-only CSV when no filtered entries match', () => {
     expect(buildGlobalLedgerReportCsv([])).toBe(
-      '\uFEFFতারিখ,পার্টির নাম,বিবরণ,ডেবিট (-),ক্রেডিট (+)\r\n',
+      '\uFEFFতারিখ,পার্টির নাম,বিবরণ,আপনি দিয়েছেন (৳),আপনি পেয়েছেন (৳)\r\n',
     );
   });
 });

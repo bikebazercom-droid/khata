@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 
 type CsvEntry = Pick<GlobalLedgerEntry, 'createdAt' | 'partyName' | 'description' | 'type' | 'amount'>;
 
-const HEADERS = ['তারিখ', 'পার্টির নাম', 'বিবরণ', 'ডেবিট (-)', 'ক্রেডিট (+)'] as const;
+const HEADERS = ['তারিখ', 'পার্টির নাম', 'বিবরণ', 'আপনি দিয়েছেন (৳)', 'আপনি পেয়েছেন (৳)'] as const;
 
 function protectSpreadsheetFormula(value: string): string {
   return /^[\u0000-\u0020]*[=+\-@]/.test(value) ? `'${value}` : value;

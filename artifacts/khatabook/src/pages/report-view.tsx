@@ -19,7 +19,7 @@ import { ChevronLeft, Calendar as CalendarIcon, Search, ChevronDown, FileDown, F
 import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency, cn, toBengaliDigits } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { BengaliCalendarModal } from '@/components/modals/bengali-calendar-modal';
 import { formatBengaliDateInput } from '@/lib/bengali-date';
@@ -33,7 +33,7 @@ import {
   sortGlobalLedgerEntriesNewestFirst,
 } from '@/lib/global-ledger-report-order';
 import { filterGlobalLedgerEntriesByRole } from '@/lib/global-ledger-report-role';
-import { formatLedgerEntryDateTime } from '@/lib/date-time';
+import { getLedgerEntryDateKey } from '@/lib/date-time';
 
 const PERIOD_LABELS: Record<ReportPeriod, string> = {
   ALL: 'সব',
@@ -52,6 +52,39 @@ function reportAmountFontSize(value: string, availableWidth: number): string {
   }, 0);
 
   return `${Math.min(14, availableWidth / (estimatedWidthInEm * 1.12))}px`;
+}
+
+function reportAmountColumnWidth(viewportWidth: number): number {
+  return Math.max(32, ((viewportWidth - 32) * 2) / 7 - 16);
+}
+
+const reportTimeFormatter = new Intl.DateTimeFormat('bn-BD', {
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+function formatReportDate(date: Date): string {
+  return toBengaliDigits(format(date, 'd MMM yy', { locale: bn }));
+}
+
+function formatReportTime(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  return toBengaliDigits(reportTimeFormatter.format(date));
+}
+
+function formatReportTimestamp(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  return `${formatReportDate(date)} • ${formatReportTime(date)}`;
+}
+
+function formatReportEntryTimestamp(
+  dueDate: string | null | undefined,
+  createdAt: string | Date,
+): string {
+  const [year, month, day] = getLedgerEntryDateKey(dueDate, createdAt).split('-').map(Number);
+  const businessDate = new Date(year, month - 1, day);
+  return `${formatReportDate(businessDate)} • ${formatReportTime(createdAt)}`;
 }
 
 export function ReportView() {
@@ -110,9 +143,11 @@ export function ReportView() {
 
   const periodLabel = useMemo(() => {
     if (period === 'CUSTOM_RANGE' && startDate && endDate)
-      return `${format(startDate, 'd MMM yyyy', { locale: bn })} - ${format(endDate, 'd MMM yyyy', { locale: bn })}`;
+      return toBengaliDigits(
+        `${format(startDate, 'd MMM yyyy', { locale: bn })} - ${format(endDate, 'd MMM yyyy', { locale: bn })}`,
+      );
     if (period === 'SINGLE_DAY' && startDate)
-      return format(startDate, 'd MMMM yyyy', { locale: bn });
+      return toBengaliDigits(format(startDate, 'd MMMM yyyy', { locale: bn }));
     return PERIOD_LABELS[period];
   }, [period, startDate, endDate]);
 
@@ -120,21 +155,23 @@ export function ReportView() {
   const handleDownload = async () => {
     setIsGenerating(true);
     const shopProfile = loadShopProfile();
-    const storeName  = shopProfile.businessName || settings?.storeName || 'Banglakhata';
-    const dateStr    = new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' });
-    const timeStr    = new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit', hour12: true });
-    const footerAddress = shopProfile.address || '';
+    const storeName  = shopProfile.businessName || settings?.storeName || 'বাংলাখাতা';
+    const dateStr    = toBengaliDigits(new Date().toLocaleDateString('bn-BD', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }));
     const footerPhone   = shopProfile.phone   || '';
 
     const pdfEntries = sortGlobalLedgerEntriesChronologically(entries);
     const rowsHtml = pdfEntries.map(e => {
       const isGave   = e.type === 'YOU_GAVE';
-      const dateCell = formatLedgerEntryDateTime(e.dueDate, e.createdAt);
+      const dateCell = formatReportEntryTimestamp(e.dueDate, e.createdAt);
       const debitCell  = isGave
-        ? `<td style="padding:10px;border:1px solid #000;text-align:right;background:#FEF2F2;color:#000;font-weight:500;">৳${e.amount.toFixed(2)}</td>`
+        ? `<td style="padding:10px;border:1px solid #000;text-align:right;background:#FEF2F2;color:#000;font-weight:500;">${formatCurrency(e.amount)}</td>`
         : `<td style="padding:10px;border:1px solid #000;background:#FEF2F2;"></td>`;
       const creditCell = !isGave
-        ? `<td style="padding:10px;border:1px solid #000;text-align:right;background:#F0FDF4;color:#000;font-weight:500;">৳${e.amount.toFixed(2)}</td>`
+        ? `<td style="padding:10px;border:1px solid #000;text-align:right;background:#F0FDF4;color:#000;font-weight:500;">${formatCurrency(e.amount)}</td>`
         : `<td style="padding:10px;border:1px solid #000;background:#F0FDF4;"></td>`;
       return `
         <tr style="vertical-align:top;">
@@ -157,13 +194,13 @@ export function ReportView() {
       <!-- 1. Top Navy Header -->
       <div style="background:#003366;display:flex;justify-content:space-between;align-items:center;padding:16px 24px;color:#fff;font-size:20px;font-weight:bold;box-sizing:border-box;">
         <span>${storeName}</span>
-        <span style="letter-spacing:0.5px;">📘 Banglakhata</span>
+        <span style="letter-spacing:0.5px;">📘 বাংলা খাতা</span>
       </div>
 
       <div style="padding:30px;box-sizing:border-box;">
         <!-- 2. Title -->
         <div style="text-align:center;margin-bottom:25px;">
-          <div style="font-size:24px;font-weight:bold;color:#000;letter-spacing:0.5px;">অ্যাকাউন্টের স্টেটমেন্ট</div>
+          <div style="font-size:24px;font-weight:bold;color:#000;letter-spacing:0.5px;">লেনদেনের বিবরণী</div>
           <div style="font-size:15px;color:#555;font-weight:500;margin-top:6px;">${periodLabel} | ${dateStr}</div>
         </div>
 
@@ -171,17 +208,17 @@ export function ReportView() {
         <table style="width:100%;border-collapse:collapse;margin-bottom:25px;text-align:center;border:1px solid #E5E7EB;">
           <tr>
             <td style="width:33.33%;padding:16px;border-right:1px solid #E5E7EB;">
-              <div style="font-size:14px;color:#666;margin-bottom:6px;">মোট খরচ(-)</div>
-              <div style="font-size:18px;font-weight:bold;color:#DC2626;">৳${totalDebit.toFixed(2)}</div>
+              <div style="font-size:14px;color:#666;margin-bottom:6px;">আপনি দিয়েছেন</div>
+              <div style="font-size:18px;font-weight:bold;color:#DC2626;">${formatCurrency(totalDebit)}</div>
             </td>
             <td style="width:33.33%;padding:16px;border-right:1px solid #E5E7EB;">
-              <div style="font-size:14px;color:#666;margin-bottom:6px;">মোট জমা(+)</div>
-              <div style="font-size:18px;font-weight:bold;color:#16A34A;">৳${totalCredit.toFixed(2)}</div>
+              <div style="font-size:14px;color:#666;margin-bottom:6px;">আপনি পেয়েছেন</div>
+              <div style="font-size:18px;font-weight:bold;color:#16A34A;">${formatCurrency(totalCredit)}</div>
             </td>
             <td style="width:33.33%;padding:16px;">
               <div style="font-size:14px;color:#666;margin-bottom:6px;">মোট ব্যালেন্স</div>
               <div style="font-size:18px;font-weight:bold;color:${netBalance >= 0 ? '#16A34A' : '#DC2626'};">
-                ৳${Math.abs(netBalance).toFixed(2)} ${netBalance >= 0 ? 'Cr' : 'Dr'}
+                ${formatCurrency(Math.abs(netBalance))} ${netBalance >= 0 ? 'পাওনা' : 'দেনা'}
               </div>
             </td>
           </tr>
@@ -189,7 +226,7 @@ export function ReportView() {
 
         <!-- Count label -->
         <div style="font-size:15px;font-weight:bold;color:#000;margin-bottom:12px;">
-          এন্ট্রির সংখ্যা: ${pdfEntries.length} (সব)
+          মোট লেনদেন: ${toBengaliDigits(String(pdfEntries.length))} (${PERIOD_LABELS.ALL})
         </div>
 
         <!-- 4. Transaction Table -->
@@ -198,9 +235,9 @@ export function ReportView() {
             <tr style="background:#F8FAFC;font-weight:bold;">
               <th style="padding:10px;border:1px solid #000;width:18%;text-align:left;">তারিখ</th>
               <th style="padding:10px;border:1px solid #000;width:26%;text-align:left;">${isSupplier ? 'সরবরাহকারীর নাম' : 'গ্রাহকের নাম'}</th>
-              <th style="padding:10px;border:1px solid #000;text-align:left;">ডিটেলস</th>
-              <th style="padding:10px;border:1px solid #000;width:15%;text-align:right;background:#FEF2F2;">ডেবিট (-)</th>
-              <th style="padding:10px;border:1px solid #000;width:15%;text-align:right;background:#F0FDF4;">ক্রেডিট (+)</th>
+              <th style="padding:10px;border:1px solid #000;text-align:left;">বিবরণ</th>
+              <th style="padding:10px;border:1px solid #000;width:15%;text-align:right;background:#FEF2F2;">আপনি দিয়েছেন</th>
+              <th style="padding:10px;border:1px solid #000;width:15%;text-align:right;background:#F0FDF4;">আপনি পেয়েছেন</th>
             </tr>
           </thead>
           <tbody>
@@ -212,11 +249,11 @@ export function ReportView() {
       <!-- 5. Deep Navy Footer Strip -->
       <div style="background:#003366;color:#fff;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:40px;font-size:13px;box-sizing:border-box;">
         <div style="display:flex;align-items:center;gap:10px;">
-          <span>এখনই Banglakhata ব্যবহার শুরু করুন</span>
+          <span>এখনই বাংলা খাতা ব্যবহার শুরু করুন</span>
           <span style="background:#fff;color:#003366;padding:4px 10px;font-weight:bold;border-radius:4px;">ইনস্টল করুন</span>
         </div>
         <div>
-          ${footerPhone ? `📞 ${footerPhone}` : 'সাহায্য: support@banglakhata.com'} | নিয়ম ও শর্তাবলী প্রযোজ্য
+          ${footerPhone ? `📞 ${footerPhone}` : 'সাহায্যের জন্য যোগাযোগ করুন'} | নিয়ম ও শর্তাবলী প্রযোজ্য
         </div>
       </div>
     `;
@@ -242,8 +279,9 @@ export function ReportView() {
         first = false;
       }
 
-      const tag      = isSupplier ? 'Supplier' : 'Customer';
-      const filename = `Banglakhata_${tag}_Ledger_${new Date().toISOString().split('T')[0]}.pdf`;
+      const tag      = isSupplier ? 'সরবরাহকারী' : 'গ্রাহক';
+      const fileDate = toBengaliDigits(new Date().toISOString().split('T')[0]);
+      const filename = `বাংলাখাতা_${tag}_হিসাব_${fileDate}.pdf`;
       const pdfBlob  = pdf.output('blob');
       const pdfFile  = new File([pdfBlob], filename, { type: 'application/pdf' });
 
@@ -270,7 +308,9 @@ export function ReportView() {
     setIsExportingCsv(true);
     try {
       const csv = buildGlobalLedgerReportCsv(entries);
-      const filename = `Banglakhata_${isSupplier ? 'Supplier' : 'Customer'}_Ledger_${new Date().toISOString().slice(0, 10)}.csv`;
+      const tag = isSupplier ? 'সরবরাহকারী' : 'গ্রাহক';
+      const fileDate = toBengaliDigits(new Date().toISOString().slice(0, 10));
+      const filename = `বাংলাখাতা_${tag}_হিসাব_${fileDate}.csv`;
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
       const file = new File([blob], filename, { type: 'text/csv' });
       let shared = false;
@@ -284,7 +324,7 @@ export function ReportView() {
 
       if (canShareFile) {
         try {
-          await navigator.share({ files: [file], title: `${roleLabel} লেনদেনের CSV রিপোর্ট` });
+          await navigator.share({ files: [file], title: `${roleLabel} লেনদেনের সিএসভি রিপোর্ট` });
           shared = true;
         } catch (error) {
           if ((error as DOMException).name === 'AbortError') return;
@@ -303,17 +343,20 @@ export function ReportView() {
         window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       }
 
-      toast.success(shared ? 'CSV রিপোর্ট শেয়ার করা হয়েছে' : 'CSV রিপোর্ট ডাউনলোড হয়েছে');
+      toast.success(shared ? 'সিএসভি রিপোর্ট শেয়ার করা হয়েছে' : 'সিএসভি রিপোর্ট ডাউনলোড হয়েছে');
     } catch (error) {
       console.error('Report CSV export failed:', error);
-      toast.error('CSV রিপোর্ট তৈরি করতে সমস্যা হয়েছে।');
+      toast.error('সিএসভি রিপোর্ট তৈরি করতে সমস্যা হয়েছে।');
     } finally {
       setIsExportingCsv(false);
     }
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-white relative">
+    <div
+      className="flex h-full w-full flex-col relative bg-white"
+      style={{ fontFamily: "'Noto Sans Bengali', Inter, sans-serif" }}
+    >
       {/* Deep blue header */}
       <div className="shrink-0 bg-[#0b57d0] px-4 pb-4 pt-[calc(1rem+var(--safe-top))] flex items-center gap-3 z-10">
         <button onClick={() => navigate('/')} aria-label="ফিরে যান" className="text-white active:opacity-70 transition-opacity">
@@ -365,7 +408,7 @@ export function ReportView() {
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <Input
-              placeholder="এন্ট্রি অনুসন্ধান করুন"
+              placeholder="লেনদেন খুঁজুন"
               className="pl-10 h-11 bg-slate-50 border-slate-200 rounded-xl font-medium"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -389,18 +432,30 @@ export function ReportView() {
               {formatCurrency(Math.abs(netBalance))}
             </p>
           </div>
-          <div className="grid grid-cols-3 bg-slate-50 border border-slate-200 rounded-xl p-3 gap-2">
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">মোট</p>
-              <p className="text-[13px] font-extrabold text-slate-800 mt-0.5">{entries.length} এন্ট্রি</p>
+          <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+            <div className="min-w-0 p-3">
+              <p className="text-[10px] font-bold text-slate-500">লেনদেন</p>
+              <p className="mt-0.5 text-[13px] font-extrabold text-slate-800">
+                {toBengaliDigits(String(entries.length))}টি
+              </p>
             </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">দিয়েছেন</p>
-              <p className="text-[13px] font-extrabold text-red-600 mt-0.5">{formatCurrency(totalDebit)}</p>
+            <div className="min-w-0 border-l border-slate-200 bg-[#FFF8F8] px-2 py-3">
+              <p className="text-[9px] font-bold leading-tight text-red-700">আপনি দিয়েছেন</p>
+              <p
+                className="mt-1 whitespace-nowrap text-right font-extrabold leading-none text-red-600"
+                style={{ fontSize: reportAmountFontSize(formatCurrency(totalDebit), reportAmountColumnWidth(window.innerWidth)) }}
+              >
+                {formatCurrency(totalDebit)}
+              </p>
             </div>
-            <div className="text-right">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">পেয়েছেন</p>
-              <p className="text-[13px] font-extrabold text-emerald-600 mt-0.5">{formatCurrency(totalCredit)}</p>
+            <div className="min-w-0 border-l border-slate-200 bg-[#F3FCF5] px-2 py-3 text-right">
+              <p className="text-[9px] font-bold leading-tight text-emerald-700">আপনি পেয়েছেন</p>
+              <p
+                className="mt-1 whitespace-nowrap text-right font-extrabold leading-none text-emerald-600"
+                style={{ fontSize: reportAmountFontSize(formatCurrency(totalCredit), reportAmountColumnWidth(window.innerWidth)) }}
+              >
+                {formatCurrency(totalCredit)}
+              </p>
             </div>
           </div>
         </div>
@@ -412,31 +467,27 @@ export function ReportView() {
           </div>
         ) : entries.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-slate-400 px-8 text-center">
-            <p className="text-sm font-medium">এই সময়কালে কোনো লেনদেন পাওয়া যায়নি</p>
+            <p className="text-sm font-medium">এই সময়ে কোনো লেনদেন পাওয়া যায়নি</p>
           </div>
         ) : (
           <div className="px-4 space-y-2">
-            <div className="grid grid-cols-2 px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider">
-              <span className="text-red-600">আপনি দিয়েছেন</span>
-              <span className="text-right text-emerald-600">আপনি পেয়েছেন</span>
-            </div>
             {entries.map((entry) => {
               const isGave = entry.type === 'YOU_GAVE';
               const imgSrc = billImageSrc(entry.billImage);
               const formattedAmount = formatCurrency(entry.amount);
               const amountFontSize = reportAmountFontSize(
                 formattedAmount,
-                Math.max(40, (window.innerWidth - 32) / 2 - 24),
+                reportAmountColumnWidth(window.innerWidth),
               );
               return (
                 <div
                   key={entry.id}
-                  className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm"
+                  className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
                 >
-                  <div className="min-w-0 px-4 py-3">
+                  <div className="min-w-0 px-3 py-2.5">
                     <p className="text-[13px] font-bold text-slate-800 truncate">{entry.partyName}</p>
                     <p className="text-[11px] font-medium text-slate-400 mt-0.5">
-                      {format(new Date(entry.createdAt), 'd MMM yy')} • {format(new Date(entry.createdAt), 'hh:mm a')}
+                      {formatReportTimestamp(entry.createdAt)}
                     </p>
                     {entry.description && (
                       <p className="text-[11px] text-slate-500 mt-0.5 truncate">{entry.description}</p>
@@ -454,29 +505,31 @@ export function ReportView() {
                   </div>
                   <div
                     role="group"
-                    aria-label="লেনদেনের পরিমাণ"
-                    className="grid grid-cols-2 divide-x divide-slate-100 border-t border-slate-100"
+                    aria-label="আপনি দিয়েছেন"
+                    className="flex min-w-0 items-center justify-end border-l border-slate-100 bg-[#FFF5F5] px-1.5 py-2.5"
                   >
-                    <div className="flex min-w-0 items-center justify-end bg-[#FFF5F5] px-3 py-2.5">
-                      {isGave && (
-                        <span
-                          className="whitespace-nowrap text-right font-extrabold leading-none text-red-700"
-                          style={{ fontSize: amountFontSize }}
-                        >
-                          {formattedAmount}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex min-w-0 items-center justify-end bg-[#F0FDF4] px-3 py-2.5">
-                      {!isGave && (
-                        <span
-                          className="whitespace-nowrap text-right font-extrabold leading-none text-emerald-600"
-                          style={{ fontSize: amountFontSize }}
-                        >
-                          {formattedAmount}
-                        </span>
-                      )}
-                    </div>
+                    {isGave && (
+                      <span
+                        className="whitespace-nowrap text-right font-extrabold leading-none text-red-700"
+                        style={{ fontSize: amountFontSize }}
+                      >
+                        {formattedAmount}
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    role="group"
+                    aria-label="আপনি পেয়েছেন"
+                    className="flex min-w-0 items-center justify-end border-l border-slate-100 bg-[#F0FDF4] px-1.5 py-2.5"
+                  >
+                    {!isGave && (
+                      <span
+                        className="whitespace-nowrap text-right font-extrabold leading-none text-emerald-600"
+                        style={{ fontSize: amountFontSize }}
+                      >
+                        {formattedAmount}
+                      </span>
+                    )}
                   </div>
                 </div>
               );
@@ -502,10 +555,10 @@ export function ReportView() {
           onClick={handleCsvExport}
           disabled={isLoading || isExportingCsv}
           className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl border border-[#0b57d0] bg-white text-[#0b57d0] font-extrabold text-sm active:scale-[0.98] transition-all disabled:opacity-60"
-          aria-label="CSV রিপোর্ট ডাউনলোড বা শেয়ার করুন"
+          aria-label="সিএসভি রিপোর্ট ডাউনলোড বা শেয়ার করুন"
         >
           {isExportingCsv ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileSpreadsheet className="w-5 h-5" />}
-          {isExportingCsv ? 'তৈরি হচ্ছে…' : 'CSV ডাউনলোড'}
+          {isExportingCsv ? 'তৈরি হচ্ছে…' : 'সিএসভি ডাউনলোড'}
         </button>
         </div>
       </div>
