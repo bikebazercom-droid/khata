@@ -292,10 +292,26 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry, initialT
       initialAmount={entry?.amount ?? 0}
       onAmountChange={setAmount}
       onInteraction={() => setHasStartedCalculator(true)}
+      currencyColor={type === 'YOU_GOT' ? colors.success : colors.destructive}
       disabled={isBusy}
     >
       {({ display, keypad }) => (
-    <FormPage footer={mode === 'edit' && entry?.isTransfer ? undefined : keypad}>
+    <FormPage footer={mode === 'edit' && entry?.isTransfer ? undefined : (
+      <>
+        <View style={{ paddingHorizontal: 14, paddingTop: 8, paddingBottom: 8 }}>
+          <AppButton
+            title={mode === 'create' ? 'এন্ট্রি নিশ্চিত করুন' : 'সংরক্ষণ করুন'}
+            icon="check"
+            variant={type === 'YOU_GOT' ? 'success' : 'danger'}
+            onPress={() => { void save(); }}
+            loading={isBusy}
+            disabled={(!selectedPartyId && !initialPartyId) || amount === null || amount <= 0}
+            testID="entry-save"
+          />
+        </View>
+        {keypad}
+      </>
+    )}>
       <PageHeader title={formTitle} subtitle={formSubtitle} onBack={() => router.back()} />
 
       {mode === 'edit' && entry?.isTransfer ? (
@@ -319,7 +335,7 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry, initialT
               )) : null}
               {partyList.isSuccess && visibleParties.length === 0 ? <Text style={{ color: colors.mutedForeground }}>কোনো হিসাব পাওয়া যায়নি। আগে নতুন হিসাব তৈরি করুন।</Text> : null}
             </View>
-          ) : selectedParty ? <PartyCard party={selectedParty} onPress={() => undefined} /> : null}
+          ) : selectedParty && !initialType ? <PartyCard party={selectedParty} onPress={() => undefined} /> : null}
 
           {!initialType ? (
             <>
@@ -337,10 +353,7 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry, initialT
             </>
           ) : null}
 
-          <View style={{ gap: 8 }}>
-            <Text style={{ color: colors.foreground, fontSize: 15, fontWeight: '800' }}>টাকার অঙ্ক</Text>
-            {display}
-          </View>
+          {display}
 
           <Animated.View
             accessibilityElementsHidden={!showMetadata}
@@ -353,6 +366,28 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry, initialT
             }}
           >
             <View onLayout={(event) => setMetadataHeight(event.nativeEvent.layout.height)} style={{ gap: 16 }}>
+              <Field label="বিস্তারিত লিখুন" value={description} onChangeText={setDescription} placeholder="পণ্য, বিল নং, পরিমাণ ইত্যাদি" testID="entry-description" />
+              <Field label="বিল/রেফারেন্স নম্বর" value={billReference} onChangeText={setBillReference} placeholder="ঐচ্ছিক" testID="entry-bill-reference" />
+              <DatePickerField label="তারিখ" value={dueDate} onChange={setDueDate} testID="entry-date" />
+
+              <Card>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Text style={{ color: colors.foreground, fontWeight: '800' }}>বিল সংযুক্ত করুন</Text>
+                    <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>ঐচ্ছিক · সেভ করার সময় নিরাপদে আপলোড হবে</Text>
+                  </View>
+                  <AppButton title={imageUri ? 'ছবি বদলান' : 'বিল সংযুক্ত করুন'} icon="camera" compact variant="secondary" onPress={promptForImage} testID="entry-add-photo" />
+                </View>
+                {imageUri ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    {pickedImage ? <Image source={{ uri: pickedImage.uri }} style={{ width: 84, height: 84, borderRadius: 12 }} /> : <BillPhoto path={existingImage} token={token} />}
+                    <Pressable onPress={() => { setPickedImage(null); setUploadedImagePath(null); setExistingImage(null); setRemoveImage(true); }} accessibilityRole="button" testID="entry-remove-photo">
+                      <Text style={{ color: colors.destructive, fontWeight: '700' }}>ছবি সরান</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </Card>
+
               {mode === 'create' && canTransfer ? (
                 <Card>
                   <Pressable onPress={() => { setIsTransfer((value) => !value); setTransferPartyId(''); }} accessibilityRole="switch" accessibilityState={{ checked: isTransfer }} testID="entry-transfer-toggle" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -379,29 +414,6 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry, initialT
                 </Card>
               ) : null}
 
-              <Field label="বিবরণ" value={description} onChangeText={setDescription} placeholder="যেমন: চালের বস্তা" testID="entry-description" />
-              <Field label="বিল/রেফারেন্স নম্বর" value={billReference} onChangeText={setBillReference} placeholder="ঐচ্ছিক" testID="entry-bill-reference" />
-              <DatePickerField label="লেনদেনের তারিখ" value={dueDate} onChange={setDueDate} testID="entry-date" />
-
-              <Card>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <Text style={{ color: colors.foreground, fontWeight: '800' }}>বিলের ছবি</Text>
-                    <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>ঐচ্ছিক · সেভ করার সময় নিরাপদে আপলোড হবে</Text>
-                  </View>
-                  <AppButton title={imageUri ? 'ছবি বদলান' : 'ছবি যোগ করুন'} icon="camera" compact variant="secondary" onPress={promptForImage} testID="entry-add-photo" />
-                </View>
-                {imageUri ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    {pickedImage ? <Image source={{ uri: pickedImage.uri }} style={{ width: 84, height: 84, borderRadius: 12 }} /> : <BillPhoto path={existingImage} token={token} />}
-                    <Pressable onPress={() => { setPickedImage(null); setUploadedImagePath(null); setExistingImage(null); setRemoveImage(true); }} accessibilityRole="button" testID="entry-remove-photo">
-                      <Text style={{ color: colors.destructive, fontWeight: '700' }}>ছবি সরান</Text>
-                    </Pressable>
-                  </View>
-                ) : null}
-              </Card>
-
-              <AppButton title={mode === 'create' ? 'লেনদেন সংরক্ষণ করুন' : 'পরিবর্তন সেভ করুন'} icon="check" onPress={() => { void save(); }} loading={isBusy} disabled={!selectedPartyId && !initialPartyId} testID="entry-save" />
               {mode === 'edit' ? <AppButton title="লেনদেন স্থায়ীভাবে মুছুন" icon="trash-2" variant="danger" onPress={confirmDelete} loading={deleteEntry.isPending} testID="entry-delete" /> : null}
             </View>
           </Animated.View>

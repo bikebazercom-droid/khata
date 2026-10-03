@@ -43,4 +43,14 @@ describe('Calculator', () => {
     expect(onInteraction).toHaveBeenCalled();
     expect(onAmountChange).toHaveBeenLastCalledWith(125);
   });
+
+  it('keeps percent and equals in the reference keypad grid', () => {
+    render(<Calculator onAmountChange={vi.fn()} />);
+
+    const equalsKey = screen.getByTestId('calculator-key-equals');
+    const plusKey = screen.getByTestId('calculator-key-+');
+
+    expect(screen.getByTestId('calculator-key-%')).toBeTruthy();
+    expect(equalsKey.parentElement).toBe(plusKey.parentElement);
+  });
 });

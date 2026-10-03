@@ -125,7 +125,7 @@ export function AppButton({
 }: {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'accent';
+  variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'accent' | 'success';
   disabled?: boolean;
   loading?: boolean;
   icon?: keyof typeof Feather.glyphMap;
@@ -135,10 +135,12 @@ export function AppButton({
   const colors = useColors();
   const background = variant === 'primary' ? colors.primary
     : variant === 'danger' ? colors.destructive
+      : variant === 'success' ? colors.success
       : variant === 'accent' ? colors.accent
         : variant === 'secondary' ? colors.secondary : 'transparent';
   const foreground = variant === 'primary' ? colors.primaryForeground
     : variant === 'danger' ? colors.destructiveForeground
+      : variant === 'success' ? colors.successForeground
       : variant === 'accent' ? colors.accentForeground
         : colors.foreground;
   return (

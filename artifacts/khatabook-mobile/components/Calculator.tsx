@@ -3,15 +3,15 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { evaluateCalculatorExpression, formatExpression, formatMoney, trimNumberForExpression } from '@/lib/domain';
 
-type Key = { label: string; value: string; tone?: 'muted' | 'operator' | 'accent' };
+type Key = { label: string; value: string; tone?: 'muted' | 'operator'; span?: number };
 type TextSelection = { start: number; end: number };
 
-const KEYS: Key[][] = [
-  [{ label: 'C', value: 'C', tone: 'muted' }, { label: 'M+', value: 'M+', tone: 'muted' }, { label: 'M−', value: 'M-', tone: 'muted' }, { label: '⌫', value: 'DEL', tone: 'muted' }],
-  [{ label: '7', value: '7' }, { label: '8', value: '8' }, { label: '9', value: '9' }, { label: '÷', value: '/', tone: 'operator' }],
-  [{ label: '4', value: '4' }, { label: '5', value: '5' }, { label: '6', value: '6' }, { label: '×', value: '*', tone: 'operator' }],
-  [{ label: '1', value: '1' }, { label: '2', value: '2' }, { label: '3', value: '3' }, { label: '−', value: '-', tone: 'operator' }],
-  [{ label: '0', value: '0' }, { label: '.', value: '.' }, { label: '%', value: '%' }, { label: '+', value: '+', tone: 'operator' }],
+const KEYS: { columns: number; keys: Key[] }[] = [
+  { columns: 4, keys: [{ label: 'C', value: 'C', tone: 'muted' }, { label: 'M+', value: 'M+', tone: 'muted' }, { label: 'M−', value: 'M-', tone: 'muted' }, { label: '⌫', value: 'DEL' }] },
+  { columns: 5, keys: [{ label: '7', value: '7' }, { label: '8', value: '8' }, { label: '9', value: '9' }, { label: '÷', value: '/', tone: 'muted' }, { label: '%', value: '%', tone: 'muted' }] },
+  { columns: 5, keys: [{ label: '4', value: '4' }, { label: '5', value: '5' }, { label: '6', value: '6' }, { label: '×', value: '*', tone: 'muted', span: 2 }] },
+  { columns: 5, keys: [{ label: '1', value: '1' }, { label: '2', value: '2' }, { label: '3', value: '3' }, { label: '−', value: '-', tone: 'operator', span: 2 }] },
+  { columns: 5, keys: [{ label: '0', value: '0' }, { label: '.', value: '.' }, { label: '=', value: '=', tone: 'muted' }, { label: '+', value: '+', tone: 'operator', span: 2 }] },
 ];
 
 export function Calculator({
@@ -19,12 +19,14 @@ export function Calculator({
   onAmountChange,
   disabled = false,
   onInteraction,
+  currencyColor,
   children,
 }: {
   initialAmount?: number;
   onAmountChange: (amount: number | null) => void;
   disabled?: boolean;
   onInteraction?: () => void;
+  currencyColor?: string;
   children?: (parts: { display: React.ReactNode; keypad: React.ReactNode }) => React.ReactNode;
 }) {
   const colors = useColors();
@@ -37,7 +39,6 @@ export function Calculator({
   const [memoryHistory, setMemoryHistory] = useState<string[]>([]);
   const [justRecalled, setJustRecalled] = useState(false);
   const result = evaluateCalculatorExpression(expression);
-  const displayAmount = memoryHistory.length ? memoryValue : result ?? 0;
 
   const updateExpression = (next: string, nextSelection?: TextSelection) => {
     setExpression(next);
@@ -113,13 +114,17 @@ export function Calculator({
     onAmountChange(memoryValue);
   };
 
-  const formula = expression ? formatExpression(expression) : '0';
-  const currentResult = memoryHistory.length ? memoryValue : result;
+  const partialResult = result ?? (expression
+    ? evaluateCalculatorExpression(expression.replace(/[+\-*/]+$/, ''))
+    : null);
+  const formulaPreview = expression
+    ? `${formatExpression(expression)}${partialResult === null ? '' : ` = ${trimNumberForExpression(partialResult)}`}`
+    : '';
 
   const display = (
-    <View style={[styles.displayCard, { backgroundColor: colors.secondary }]}>
+    <View style={[styles.displayCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.display}>
-        <Text style={[styles.formula, { color: colors.mutedForeground }]} numberOfLines={1}>{formula}</Text>
+        <Text style={[styles.currency, { color: currencyColor ?? colors.primary }]}>৳</Text>
         <TextInput
           value={expression}
           onChangeText={updateExpression}
@@ -128,14 +133,18 @@ export function Calculator({
           keyboardType="numbers-and-punctuation"
           showSoftInputOnFocus={false}
           editable={!disabled}
-          accessibilityLabel="হিসাবের অঙ্ক"
+          accessibilityLabel="পরিমাণ লিখুন"
           testID="calculator-expression"
-          style={[styles.expressionInput, { color: colors.foreground }]}
-          placeholder="0"
+          style={[styles.expressionInput, { color: currencyColor ?? colors.primary }]}
+          placeholder="পরিমাণ লিখুন"
           placeholderTextColor={colors.mutedForeground}
         />
-        <Text style={[styles.amount, { color: currentResult === null ? colors.destructive : colors.primary }]}>{formatMoney(displayAmount)}</Text>
       </View>
+      {formulaPreview ? (
+        <View style={[styles.formulaPreview, { borderTopColor: colors.border }]}>
+          <Text style={[styles.formula, { color: colors.mutedForeground }]} numberOfLines={1}>{formulaPreview}</Text>
+        </View>
+      ) : null}
       {memoryHistory.length > 0 ? (
         <View style={[styles.history, { borderTopColor: colors.border }]}>
           {memoryHistory.slice(-4).map((line, index) => <Text key={`${index}-${line}`} style={[styles.historyLine, { color: colors.mutedForeground }]} numberOfLines={1}>{line}</Text>)}
@@ -152,10 +161,13 @@ export function Calculator({
       <View style={styles.keypad}>
         {KEYS.map((row, rowIndex) => (
           <View key={rowIndex} style={styles.keyRow}>
-            {row.map((key) => {
-              const isAccent = key.tone === 'operator';
-              const backgroundColor = key.tone === 'muted' ? colors.card : isAccent ? colors.accent : colors.background;
-              const textColor = key.tone === 'operator' ? colors.accentForeground : colors.foreground;
+            {row.keys.map((key) => {
+              const backgroundColor = key.tone === 'muted'
+                ? colors.secondary
+                : key.tone === 'operator' ? colors.primary : colors.card;
+              const textColor = key.tone === 'operator'
+                ? colors.primaryForeground
+                : key.tone === 'muted' ? colors.primary : colors.foreground;
               return (
                 <Pressable
                   key={key.value}
@@ -163,10 +175,10 @@ export function Calculator({
                   disabled={disabled}
                   accessibilityRole="button"
                   accessibilityLabel={key.label}
-                  testID={`calculator-key-${key.value.replace('-', 'minus')}`}
+                  testID={`calculator-key-${key.value === '=' ? 'equals' : key.value.replace('-', 'minus')}`}
                   style={({ pressed }) => [
                     styles.key,
-                    { backgroundColor, opacity: disabled ? 0.45 : pressed ? 0.7 : 1 },
+                    { flex: (key.span ?? 1) * (5 / row.columns), backgroundColor, opacity: disabled ? 0.45 : pressed ? 0.7 : 1 },
                   ]}
                 >
                   <Text style={[styles.keyLabel, { color: textColor }]}>{key.label}</Text>
@@ -175,9 +187,6 @@ export function Calculator({
             })}
           </View>
         ))}
-        <Pressable onPress={() => handleKey({ label: '=', value: '=' })} disabled={disabled} accessibilityRole="button" testID="calculator-key-equals" style={[styles.equals, { backgroundColor: colors.primary, opacity: disabled ? 0.45 : 1 }]}>
-          <Text style={[styles.equalsText, { color: colors.primaryForeground }]}>=</Text>
-        </Pressable>
       </View>
     </View>
   );
@@ -194,11 +203,12 @@ export function Calculator({
 
 const styles = StyleSheet.create({
   container: { borderRadius: 18, padding: 12, gap: 10 },
-  displayCard: { borderRadius: 18, padding: 12, gap: 10 },
-  display: { minHeight: 118, justifyContent: 'flex-end', alignItems: 'flex-end', padding: 8, gap: 3 },
-  formula: { width: '100%', textAlign: 'right', fontSize: 13 },
-  expressionInput: { width: '100%', minHeight: 42, textAlign: 'right', padding: 0, fontSize: 26, fontWeight: '700' },
-  amount: { fontSize: 18, fontWeight: '800' },
+  displayCard: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8 },
+  display: { minHeight: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, gap: 10 },
+  currency: { fontSize: 28, fontWeight: '800' },
+  expressionInput: { flex: 1, minWidth: 0, height: 48, textAlign: 'left', padding: 0, fontSize: 24, fontWeight: '700' },
+  formulaPreview: { borderTopWidth: StyleSheet.hairlineWidth, marginTop: 2, paddingHorizontal: 8, paddingTop: 7 },
+  formula: { width: '100%', textAlign: 'left', fontSize: 13 },
   history: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 8, gap: 4 },
   historyLine: { fontSize: 12, fontVariant: ['tabular-nums'] },
   mrcButton: { minHeight: 42, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 5 },
@@ -206,8 +216,6 @@ const styles = StyleSheet.create({
   dockedKeypad: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 8 },
   keypad: { gap: 7 },
   keyRow: { flexDirection: 'row', gap: 7 },
-  key: { flex: 1, minHeight: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  key: { minHeight: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   keyLabel: { fontSize: 18, fontWeight: '700' },
-  equals: { minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  equalsText: { fontSize: 20, fontWeight: '800' },
 });
