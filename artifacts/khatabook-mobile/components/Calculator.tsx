@@ -18,10 +18,14 @@ export function Calculator({
   initialAmount = 0,
   onAmountChange,
   disabled = false,
+  onInteraction,
+  children,
 }: {
   initialAmount?: number;
   onAmountChange: (amount: number | null) => void;
   disabled?: boolean;
+  onInteraction?: () => void;
+  children?: (parts: { display: React.ReactNode; keypad: React.ReactNode }) => React.ReactNode;
 }) {
   const colors = useColors();
   const [expression, setExpression] = useState(initialAmount > 0 ? trimNumberForExpression(initialAmount) : '');
@@ -40,6 +44,7 @@ export function Calculator({
     if (nextSelection) setSelection(nextSelection);
     setJustRecalled(false);
     onAmountChange(memoryHistory.length ? memoryValue : evaluateCalculatorExpression(next));
+    if (next.trim()) onInteraction?.();
   };
 
   const handleKey = (key: Key) => {
@@ -60,6 +65,7 @@ export function Calculator({
       return;
     }
     if (key.value === 'M+' || key.value === 'M-') {
+      onInteraction?.();
       const safeValue = result !== null && Number.isFinite(result) ? result : 0;
       const nextMemory = key.value === 'M+' ? memoryValue + safeValue : memoryValue - safeValue;
       setMemoryValue(nextMemory);
@@ -72,6 +78,7 @@ export function Calculator({
     }
     if (key.value === '=') {
       if (result !== null) {
+        onInteraction?.();
         const next = trimNumberForExpression(result);
         updateExpression(next, { start: next.length, end: next.length });
       }
@@ -84,6 +91,7 @@ export function Calculator({
       replaceStart -= 1;
     }
     if (isOperator && replaceStart === 0) return;
+    onInteraction?.();
     const next = `${expression.slice(0, replaceStart)}${key.value}${expression.slice(replaceEnd)}`;
     const caret = replaceStart + key.value.length;
     updateExpression(next, { start: caret, end: caret });
@@ -98,6 +106,7 @@ export function Calculator({
       return;
     }
     const recalled = trimNumberForExpression(memoryValue);
+    onInteraction?.();
     setExpression(recalled);
     setSelection({ start: recalled.length, end: recalled.length });
     setJustRecalled(true);
@@ -107,8 +116,8 @@ export function Calculator({
   const formula = expression ? formatExpression(expression) : '0';
   const currentResult = memoryHistory.length ? memoryValue : result;
 
-  return (
-    <View style={[styles.container, { backgroundColor: colors.secondary }]}>
+  const display = (
+    <View style={[styles.displayCard, { backgroundColor: colors.secondary }]}>
       <View style={styles.display}>
         <Text style={[styles.formula, { color: colors.mutedForeground }]} numberOfLines={1}>{formula}</Text>
         <TextInput
@@ -117,6 +126,7 @@ export function Calculator({
           selection={selection}
           onSelectionChange={(event) => setSelection(event.nativeEvent.selection)}
           keyboardType="numbers-and-punctuation"
+          showSoftInputOnFocus={false}
           editable={!disabled}
           accessibilityLabel="হিসাবের অঙ্ক"
           testID="calculator-expression"
@@ -134,6 +144,11 @@ export function Calculator({
           </Pressable>
         </View>
       ) : null}
+    </View>
+  );
+
+  const keypad = (
+    <View style={[styles.dockedKeypad, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
       <View style={styles.keypad}>
         {KEYS.map((row, rowIndex) => (
           <View key={rowIndex} style={styles.keyRow}>
@@ -166,10 +181,20 @@ export function Calculator({
       </View>
     </View>
   );
+
+  if (children) return <>{children({ display, keypad })}</>;
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.secondary }]}>
+      {display}
+      {keypad}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
   container: { borderRadius: 18, padding: 12, gap: 10 },
+  displayCard: { borderRadius: 18, padding: 12, gap: 10 },
   display: { minHeight: 118, justifyContent: 'flex-end', alignItems: 'flex-end', padding: 8, gap: 3 },
   formula: { width: '100%', textAlign: 'right', fontSize: 13 },
   expressionInput: { width: '100%', minHeight: 42, textAlign: 'right', padding: 0, fontSize: 26, fontWeight: '700' },
@@ -178,6 +203,7 @@ const styles = StyleSheet.create({
   historyLine: { fontSize: 12, fontVariant: ['tabular-nums'] },
   mrcButton: { minHeight: 42, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 5 },
   mrcText: { fontSize: 14, fontWeight: '800' },
+  dockedKeypad: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 8 },
   keypad: { gap: 7 },
   keyRow: { flexDirection: 'row', gap: 7 },
   key: { flex: 1, minHeight: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },

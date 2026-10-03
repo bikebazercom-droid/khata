@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { Alert, Image, Linking, Platform, Pressable, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, Animated, Image, Linking, Platform, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
@@ -71,6 +71,20 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry, initialT
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const requestRef = useRef<{ fingerprint: string; id: string } | null>(null);
+  const [hasStartedCalculator, setHasStartedCalculator] = useState(mode === 'edit');
+  const [metadataHeight, setMetadataHeight] = useState(0);
+  const metadataProgress = useRef(new Animated.Value(mode === 'edit' ? 1 : 0)).current;
+  const showMetadata = mode === 'edit' || hasStartedCalculator;
+
+  useEffect(() => {
+    const animation = Animated.timing(metadataProgress, {
+      toValue: showMetadata ? 1 : 0,
+      duration: 260,
+      useNativeDriver: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [metadataHeight, metadataProgress, showMetadata]);
 
   const parties = (partyList.data ?? []) as PartyRecord[];
   const selectedParty = parties.find((item) => item.id === selectedPartyId);
@@ -273,7 +287,15 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry, initialT
     : mode === 'create' ? 'খাতায় একটি এন্ট্রি লিখুন' : 'লেনদেনের তথ্য আপডেট করুন';
 
   return (
-    <FormPage>
+    <Calculator
+      key={entry?.id ?? 'new-entry'}
+      initialAmount={entry?.amount ?? 0}
+      onAmountChange={setAmount}
+      onInteraction={() => setHasStartedCalculator(true)}
+      disabled={isBusy}
+    >
+      {({ display, keypad }) => (
+    <FormPage footer={mode === 'edit' && entry?.isTransfer ? undefined : keypad}>
       <PageHeader title={formTitle} subtitle={formSubtitle} onBack={() => router.back()} />
 
       {mode === 'edit' && entry?.isTransfer ? (
@@ -317,61 +339,76 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry, initialT
 
           <View style={{ gap: 8 }}>
             <Text style={{ color: colors.foreground, fontSize: 15, fontWeight: '800' }}>টাকার অঙ্ক</Text>
-            <Calculator key={entry?.id ?? 'new-entry'} initialAmount={entry?.amount ?? 0} onAmountChange={setAmount} disabled={isBusy} />
+            {display}
           </View>
 
-          {mode === 'create' && canTransfer ? (
-            <Card>
-              <Pressable onPress={() => { setIsTransfer((value) => !value); setTransferPartyId(''); }} accessibilityRole="switch" accessibilityState={{ checked: isTransfer }} testID="entry-transfer-toggle" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View style={{ flex: 1, gap: 3 }}>
-                  <Text style={{ color: colors.foreground, fontWeight: '800' }}>অ্যাডজাস্টমেন্ট</Text>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>অন্য একই ধরনের খাতার সঙ্গে মিলিয়ে নিন</Text>
-                </View>
-                <Text style={{ color: isTransfer ? colors.primary : colors.mutedForeground, fontWeight: '800' }}>{isTransfer ? 'চালু' : 'বন্ধ'}</Text>
-              </Pressable>
-              {isTransfer ? (
-                <View style={{ gap: 8 }}>
-                  <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: '700' }}>
-                    অন্য {selectedParty?.role === 'SUPPLIER' ? 'সরবরাহকারী' : 'কাস্টমার'} বেছে নিন
-                  </Text>
-                  {transferTargets.map((target) => (
-                    <Pressable key={target.id} onPress={() => setTransferPartyId(target.id)} accessibilityRole="radio" accessibilityState={{ selected: transferPartyId === target.id }} style={{ padding: 12, borderRadius: 10, borderWidth: 1, borderColor: transferPartyId === target.id ? colors.primary : colors.border, backgroundColor: transferPartyId === target.id ? colors.secondary : colors.card }}>
-                      <Text style={{ color: colors.foreground, fontWeight: '700' }}>{target.name}</Text>
-                    </Pressable>
-                  ))}
-                  {adjustmentTargets.isLoading && identity?.role === 'staff' ? <LoadingState label="অনুমোদিত হিসাব লোড হচ্ছে…" /> : null}
-                  {transferTargets.length === 0 ? <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>ট্রান্সফারের জন্য অন্য কোনো অনুমোদিত হিসাব নেই।</Text> : null}
-                </View>
+          <Animated.View
+            accessibilityElementsHidden={!showMetadata}
+            importantForAccessibility={showMetadata ? 'auto' : 'no-hide-descendants'}
+            testID="entry-metadata-panel"
+            style={{
+              height: metadataProgress.interpolate({ inputRange: [0, 1], outputRange: [0, metadataHeight] }),
+              opacity: metadataProgress,
+              overflow: 'hidden',
+            }}
+          >
+            <View onLayout={(event) => setMetadataHeight(event.nativeEvent.layout.height)} style={{ gap: 16 }}>
+              {mode === 'create' && canTransfer ? (
+                <Card>
+                  <Pressable onPress={() => { setIsTransfer((value) => !value); setTransferPartyId(''); }} accessibilityRole="switch" accessibilityState={{ checked: isTransfer }} testID="entry-transfer-toggle" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flex: 1, gap: 3 }}>
+                      <Text style={{ color: colors.foreground, fontWeight: '800' }}>অ্যাডজাস্টমেন্ট</Text>
+                      <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>অন্য একই ধরনের খাতার সঙ্গে মিলিয়ে নিন</Text>
+                    </View>
+                    <Text style={{ color: isTransfer ? colors.primary : colors.mutedForeground, fontWeight: '800' }}>{isTransfer ? 'চালু' : 'বন্ধ'}</Text>
+                  </Pressable>
+                  {isTransfer ? (
+                    <View style={{ gap: 8 }}>
+                      <Text style={{ color: colors.foreground, fontSize: 13, fontWeight: '700' }}>
+                        অন্য {selectedParty?.role === 'SUPPLIER' ? 'সরবরাহকারী' : 'কাস্টমার'} বেছে নিন
+                      </Text>
+                      {transferTargets.map((target) => (
+                        <Pressable key={target.id} onPress={() => setTransferPartyId(target.id)} accessibilityRole="radio" accessibilityState={{ selected: transferPartyId === target.id }} style={{ padding: 12, borderRadius: 10, borderWidth: 1, borderColor: transferPartyId === target.id ? colors.primary : colors.border, backgroundColor: transferPartyId === target.id ? colors.secondary : colors.card }}>
+                          <Text style={{ color: colors.foreground, fontWeight: '700' }}>{target.name}</Text>
+                        </Pressable>
+                      ))}
+                      {adjustmentTargets.isLoading && identity?.role === 'staff' ? <LoadingState label="অনুমোদিত হিসাব লোড হচ্ছে…" /> : null}
+                      {transferTargets.length === 0 ? <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>ট্রান্সফারের জন্য অন্য কোনো অনুমোদিত হিসাব নেই।</Text> : null}
+                    </View>
+                  ) : null}
+                </Card>
               ) : null}
-            </Card>
-          ) : null}
 
-          <Field label="বিবরণ" value={description} onChangeText={setDescription} placeholder="যেমন: চালের বস্তা" testID="entry-description" />
-          <Field label="বিল/রেফারেন্স নম্বর" value={billReference} onChangeText={setBillReference} placeholder="ঐচ্ছিক" testID="entry-bill-reference" />
-          <DatePickerField label="লেনদেনের তারিখ" value={dueDate} onChange={setDueDate} testID="entry-date" />
+              <Field label="বিবরণ" value={description} onChangeText={setDescription} placeholder="যেমন: চালের বস্তা" testID="entry-description" />
+              <Field label="বিল/রেফারেন্স নম্বর" value={billReference} onChangeText={setBillReference} placeholder="ঐচ্ছিক" testID="entry-bill-reference" />
+              <DatePickerField label="লেনদেনের তারিখ" value={dueDate} onChange={setDueDate} testID="entry-date" />
 
-          <Card>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-              <View style={{ flex: 1, gap: 4 }}>
-                <Text style={{ color: colors.foreground, fontWeight: '800' }}>বিলের ছবি</Text>
-                <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>ঐচ্ছিক · সেভ করার সময় নিরাপদে আপলোড হবে</Text>
-              </View>
-              <AppButton title={imageUri ? 'ছবি বদলান' : 'ছবি যোগ করুন'} icon="camera" compact variant="secondary" onPress={promptForImage} testID="entry-add-photo" />
+              <Card>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Text style={{ color: colors.foreground, fontWeight: '800' }}>বিলের ছবি</Text>
+                    <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>ঐচ্ছিক · সেভ করার সময় নিরাপদে আপলোড হবে</Text>
+                  </View>
+                  <AppButton title={imageUri ? 'ছবি বদলান' : 'ছবি যোগ করুন'} icon="camera" compact variant="secondary" onPress={promptForImage} testID="entry-add-photo" />
+                </View>
+                {imageUri ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    {pickedImage ? <Image source={{ uri: pickedImage.uri }} style={{ width: 84, height: 84, borderRadius: 12 }} /> : <BillPhoto path={existingImage} token={token} />}
+                    <Pressable onPress={() => { setPickedImage(null); setUploadedImagePath(null); setExistingImage(null); setRemoveImage(true); }} accessibilityRole="button" testID="entry-remove-photo">
+                      <Text style={{ color: colors.destructive, fontWeight: '700' }}>ছবি সরান</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </Card>
+
+              <AppButton title={mode === 'create' ? 'লেনদেন সংরক্ষণ করুন' : 'পরিবর্তন সেভ করুন'} icon="check" onPress={() => { void save(); }} loading={isBusy} disabled={!selectedPartyId && !initialPartyId} testID="entry-save" />
+              {mode === 'edit' ? <AppButton title="লেনদেন স্থায়ীভাবে মুছুন" icon="trash-2" variant="danger" onPress={confirmDelete} loading={deleteEntry.isPending} testID="entry-delete" /> : null}
             </View>
-            {imageUri ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                {pickedImage ? <Image source={{ uri: pickedImage.uri }} style={{ width: 84, height: 84, borderRadius: 12 }} /> : <BillPhoto path={existingImage} token={token} />}
-                <Pressable onPress={() => { setPickedImage(null); setUploadedImagePath(null); setExistingImage(null); setRemoveImage(true); }} accessibilityRole="button" testID="entry-remove-photo">
-                  <Text style={{ color: colors.destructive, fontWeight: '700' }}>ছবি সরান</Text>
-                </Pressable>
-              </View>
-            ) : null}
-          </Card>
-
-          <AppButton title={mode === 'create' ? 'লেনদেন সংরক্ষণ করুন' : 'পরিবর্তন সেভ করুন'} icon="check" onPress={() => { void save(); }} loading={isBusy} disabled={!selectedPartyId && !initialPartyId} testID="entry-save" />
-          {mode === 'edit' ? <AppButton title="লেনদেন স্থায়ীভাবে মুছুন" icon="trash-2" variant="danger" onPress={confirmDelete} loading={deleteEntry.isPending} testID="entry-delete" /> : null}
+          </Animated.View>
         </>
       )}
     </FormPage>
+      )}
+    </Calculator>
   );
 }

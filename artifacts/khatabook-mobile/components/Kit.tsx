@@ -12,7 +12,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { billImageUrl, formatDate, formatMoney, type LedgerRecord, type PartyRecord } from '@/lib/domain';
@@ -44,21 +45,40 @@ export function Page({ children, onRefresh, refreshing = false, contentStyle }: 
   );
 }
 
-export function FormPage({ children }: React.PropsWithChildren) {
+export function FormPage({ children, footer }: React.PropsWithChildren<{ footer?: React.ReactNode }>) {
   const colors = useColors();
-  return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.fill, { backgroundColor: colors.background }]}>
+  const insets = useSafeAreaInsets();
+  const pageContent = (
+    <>
       <KeyboardAwareScrollViewCompat
         style={styles.fill}
         contentContainerStyle={[
           styles.formContent,
-          Platform.OS === 'web' ? styles.webPageContent : null,
+          footer ? styles.formContentWithFooter : null,
+          Platform.OS === 'web' ? (footer ? styles.webFormContentWithFooter : styles.webPageContent) : null,
         ]}
-        bottomOffset={88}
+        bottomOffset={footer ? 8 : 88}
         keyboardShouldPersistTaps="handled"
       >
         {children}
       </KeyboardAwareScrollViewCompat>
+      {footer ? (
+        <View style={[styles.formFooter, { paddingBottom: Math.max(insets.bottom, Platform.OS === 'web' ? 34 : 8) }]}>
+          {footer}
+        </View>
+      ) : null}
+    </>
+  );
+
+  return (
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.fill, { backgroundColor: colors.background }]}>
+      {footer && Platform.OS !== 'web' ? (
+        <KeyboardAvoidingView style={styles.fill} behavior="padding" keyboardVerticalOffset={0}>
+          {pageContent}
+        </KeyboardAvoidingView>
+      ) : (
+        <View style={styles.fill}>{pageContent}</View>
+      )}
     </SafeAreaView>
   );
 }
@@ -348,7 +368,10 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   pageContent: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 112, gap: 16 },
   formContent: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 30, gap: 16 },
+  formContentWithFooter: { paddingBottom: 16 },
   webPageContent: { paddingTop: 67, paddingBottom: 120 },
+  webFormContentWithFooter: { paddingTop: 67, paddingBottom: 16 },
+  formFooter: { flexShrink: 0 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 6 },
   headerTitleRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   pageTitle: { fontSize: 25, fontWeight: '800', letterSpacing: -0.5 },

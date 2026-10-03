@@ -7,4 +7,4 @@ When Expo export cannot use port 8081 because another workflow already owns it, 
 
 **Why:** In this workspace, the mockup preview server occupies port 8081, while a normal Expo export can otherwise prompt to use another port and fail in a non-interactive build.
 
-**How to apply:** Prefer `RCT_METRO_PORT=<available-port> expo export --platform all` for bundle verification before interrupting a running preview workflow.
+**How to apply:** Prefer `RCT_METRO_PORT=<available-port> expo export --platform all` for bundle verification before interrupting a running preview workflow. The mobile package's static-build wrapper probes and fetches `localhost:8081` directly, so changing `RCT_METRO_PORT` does not redirect that wrapper; use direct `expo export` for an alternate-port verification.
