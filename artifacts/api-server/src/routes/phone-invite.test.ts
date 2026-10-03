@@ -23,10 +23,14 @@ import authRouter from "./auth";
 import ownerRouter from "./owner";
 
 vi.mock("@clerk/express", () => ({ getAuth: () => ({ userId: null }) }));
-vi.mock("../services/sms", () => ({
-  ensureSmsReady: vi.fn(),
-  sendOtpSms: vi.fn(),
-}));
+vi.mock("../services/sms", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../services/sms")>();
+  return {
+    ...actual,
+    ensureSmsReady: vi.fn(),
+    sendOtpSms: vi.fn(),
+  };
+});
 
 describe("phone worker invitation and verified first sign-in", () => {
   let businessId: string;
@@ -36,6 +40,17 @@ describe("phone worker invitation and verified first sign-in", () => {
 
   const app = express();
   app.use(express.json());
+  app.use((req, _res, next) => {
+    Object.assign(req, {
+      log: {
+        error: vi.fn(),
+        warn: vi.fn(),
+        info: vi.fn(),
+        debug: vi.fn(),
+      },
+    });
+    next();
+  });
   app.use((req: Request, _res: Response, next: NextFunction) => {
     if (req.path.startsWith("/owner")) {
       const auth = req as AuthenticatedRequest;
@@ -78,7 +93,7 @@ describe("phone worker invitation and verified first sign-in", () => {
   it("rejects provider failure without saving a usable code", async () => {
     vi.mocked(sendOtpSms).mockRejectedValueOnce(new Error("SMS rejected"));
     const response = await request(app).post("/auth/phone/send-otp").send({ phone });
-    expect(response.status).toBe(503);
+    expect(response.status, response.text).toBe(503);
     expect(response.body).toEqual({ error: "Could not send the SMS code. Please try again later." });
     expect(await db.select().from(otpCodesTable).where(eq(otpCodesTable.phone, normalized))).toHaveLength(0);
   });

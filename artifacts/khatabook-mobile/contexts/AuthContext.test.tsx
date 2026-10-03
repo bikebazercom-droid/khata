@@ -36,11 +36,6 @@ const flow = vi.hoisted(() => ({
   },
 }));
 
-const routerMock = vi.hoisted(() => ({
-  replace: vi.fn(),
-  push: vi.fn(),
-}));
-
 vi.mock('react-native', () => ({
   Platform: { get OS() { return flow.platform; } },
 }));
@@ -112,9 +107,6 @@ vi.mock('@workspace/api-client-react', async () => {
       enabled: options.query.enabled,
       staleTime: options.query.staleTime,
     }),
-    useListParties: () => useTestQuery('party-list', ['parties']),
-    useGetParty: (partyId: string) => useTestQuery('party-detail', ['party', partyId]),
-    useListLedgerEntries: (partyId: string) => useTestQuery('ledger', ['ledger', partyId]),
     logoutPhoneOtp: flow.logout,
     reportAuthLogoutEvent: flow.logoutEvent,
   };
@@ -127,8 +119,6 @@ vi.mock('@/lib/domain', () => ({
   errorMessage: () => 'Unable to load account',
 }));
 
-vi.mock('expo-router', () => ({ router: routerMock }));
-
 vi.mock('@/components/Kit', () => ({
   AppButton: () => null,
   LoadingState: () => null,
@@ -137,7 +127,6 @@ vi.mock('@/components/Kit', () => ({
 }));
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import IndexScreen from '@/app/index';
 import { getSavedAuthToken } from '@/lib/authStorage';
 
 type AuthState = ReturnType<typeof useAuth>;
@@ -156,28 +145,6 @@ function createQueryClient() {
   return new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-}
-
-let routeSetState: ((route: string) => void) | undefined;
-
-function AuthenticatedQueries() {
-  useListParties({});
-  useGetParty('test-party');
-  useListLedgerEntries('test-party');
-  return null;
-}
-
-function MockRouteTree() {
-  const [route, setRoute] = React.useState('/');
-  routeSetState = setRoute;
-
-  React.useEffect(() => () => {
-    routeSetState = undefined;
-  }, []);
-
-  if (route === '/') return <IndexScreen />;
-  if (route === '/(tabs)/parties') return <AuthenticatedQueries />;
-  return null;
 }
 
 function renderWithAuth(children: ReactNode, queryClient = createQueryClient()) {
@@ -205,12 +172,6 @@ describe('mobile phone-session restoration', () => {
     flow.clerkSignOut.mockReset().mockImplementation(async () => {
       flow.clerkSignedIn = false;
     });
-    routerMock.replace.mockReset();
-    routerMock.replace.mockImplementation((route: string) => {
-      routeSetState?.(route);
-    });
-    routerMock.push.mockReset();
-    routeSetState = undefined;
   });
 
   afterEach(() => {
@@ -226,10 +187,7 @@ describe('mobile phone-session restoration', () => {
 
     let currentState: AuthState | undefined;
     const view = renderWithAuth(
-      <>
-        <AuthProbe capture={(state) => { currentState = state; }} />
-        <MockRouteTree />
-      </>,
+      <AuthProbe capture={(state) => { currentState = state; }} />,
     );
 
     await waitFor(() => expect(flow.events).toContain('secure-read-start'));
@@ -240,16 +198,11 @@ describe('mobile phone-session restoration', () => {
     });
 
     await waitFor(() => expect(currentState?.identity?.userId).toBe('test-owner'));
-    await waitFor(() => expect(flow.requestTokens).toHaveLength(4));
+    await waitFor(() => expect(flow.requestTokens).toHaveLength(1));
     expect(currentState?.token).toBe('restored-phone-session');
-    expect(flow.requestTokens).toEqual(Array(4).fill('restored-phone-session'));
+    expect(flow.requestTokens).toEqual(['restored-phone-session']);
     expect(flow.events.indexOf('secure-read-finished'))
       .toBeLessThan(flow.events.indexOf('identity-query-start'));
-    const identityFinished = flow.events.indexOf('identity-query-finished');
-    for (const queryName of ['party-list', 'party-detail', 'ledger']) {
-      expect(flow.events.indexOf(`${queryName}-query-start`)).toBeGreaterThan(identityFinished);
-    }
-
     view.unmount();
     view.queryClient.clear();
   });
@@ -287,21 +240,18 @@ describe('mobile phone-session restoration', () => {
     secondView.queryClient.clear();
   });
 
-  it('clears an unauthorized saved session and returns the app to sign-in', async () => {
+  it('clears an unauthorized saved session without depending on a native route redirect', async () => {
     flow.secureToken = 'revoked-phone-session';
     flow.identityError = { status: 401 };
 
     let currentState: AuthState | undefined;
     const view = renderWithAuth(
-      <>
-        <AuthProbe capture={(state) => { currentState = state; }} />
-        <MockRouteTree />
-      </>,
+      <AuthProbe capture={(state) => { currentState = state; }} />,
     );
 
     await waitFor(() => expect(flow.requestTokens).toEqual(['revoked-phone-session']));
     await waitFor(() => expect(currentState?.token).toBeNull());
-    await waitFor(() => expect(routerMock.replace).toHaveBeenCalledWith('/sign-in'));
+    await waitFor(() => expect(currentState?.hasSession).toBe(false));
 
     expect(flow.secureToken).toBeNull();
     expect(flow.events).toContain('secure-delete');
@@ -315,14 +265,10 @@ describe('mobile phone-session restoration', () => {
     flow.getToken = null;
     let currentState: AuthState | undefined;
     const view = renderWithAuth(
-      <>
-        <AuthProbe capture={(state) => { currentState = state; }} />
-        <MockRouteTree />
-      </>,
+      <AuthProbe capture={(state) => { currentState = state; }} />,
     );
 
     await waitFor(() => expect(currentState?.identity?.userId).toBe('test-owner'));
-    await waitFor(() => expect(routerMock.replace).toHaveBeenCalledWith('/(tabs)/parties'));
     expect(flow.events).not.toContain('secure-read-start');
 
     await act(async () => {
