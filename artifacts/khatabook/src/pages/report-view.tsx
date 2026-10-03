@@ -44,6 +44,16 @@ const PERIOD_LABELS: Record<ReportPeriod, string> = {
   CUSTOM_RANGE: 'তারিখের পরিসর',
 };
 
+function reportAmountFontSize(value: string, availableWidth: number): string {
+  const estimatedWidthInEm = Array.from(value).reduce((width, character) => {
+    if (character === '৳') return width + 0.9;
+    if (character === ',' || character === '.') return width + 0.35;
+    return width + 0.68;
+  }, 0);
+
+  return `${Math.min(14, availableWidth / (estimatedWidthInEm * 1.12))}px`;
+}
+
 export function ReportView() {
   const [, navigate] = useLocation();
   const { selectedBusinessId } = useBusinessContext();
@@ -406,15 +416,24 @@ export function ReportView() {
           </div>
         ) : (
           <div className="px-4 space-y-2">
+            <div className="grid grid-cols-2 px-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider">
+              <span className="text-red-600">আপনি দিয়েছেন</span>
+              <span className="text-right text-emerald-600">আপনি পেয়েছেন</span>
+            </div>
             {entries.map((entry) => {
               const isGave = entry.type === 'YOU_GAVE';
               const imgSrc = billImageSrc(entry.billImage);
+              const formattedAmount = formatCurrency(entry.amount);
+              const amountFontSize = reportAmountFontSize(
+                formattedAmount,
+                Math.max(40, (window.innerWidth - 32) / 2 - 24),
+              );
               return (
                 <div
                   key={entry.id}
-                  className="bg-white border border-slate-100 rounded-xl shadow-sm grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2 items-center overflow-hidden"
+                  className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm"
                 >
-                  <div className="min-w-0 py-3 pl-4">
+                  <div className="min-w-0 px-4 py-3">
                     <p className="text-[13px] font-bold text-slate-800 truncate">{entry.partyName}</p>
                     <p className="text-[11px] font-medium text-slate-400 mt-0.5">
                       {format(new Date(entry.createdAt), 'd MMM yy')} • {format(new Date(entry.createdAt), 'hh:mm a')}
@@ -433,19 +452,31 @@ export function ReportView() {
                       </button>
                     )}
                   </div>
-                  <div className={cn('min-w-0 h-full flex items-center justify-center px-2 py-3', isGave ? 'bg-[#FFF5F5]' : 'bg-white')}>
-                    {isGave && (
-                      <span className="shrink-0 whitespace-nowrap text-[clamp(0.625rem,2.8vw,0.875rem)] font-extrabold leading-none text-red-700">
-                        {formatCurrency(entry.amount)}
-                      </span>
-                    )}
-                  </div>
-                  <div className="min-w-0 h-full flex items-center justify-end bg-white py-3 pl-2 pr-4">
-                    {!isGave && (
-                      <span className="shrink-0 whitespace-nowrap text-[clamp(0.625rem,2.8vw,0.875rem)] font-extrabold leading-none text-emerald-600">
-                        {formatCurrency(entry.amount)}
-                      </span>
-                    )}
+                  <div
+                    role="group"
+                    aria-label="লেনদেনের পরিমাণ"
+                    className="grid grid-cols-2 divide-x divide-slate-100 border-t border-slate-100"
+                  >
+                    <div className="flex min-w-0 items-center justify-end bg-[#FFF5F5] px-3 py-2.5">
+                      {isGave && (
+                        <span
+                          className="whitespace-nowrap text-right font-extrabold leading-none text-red-700"
+                          style={{ fontSize: amountFontSize }}
+                        >
+                          {formattedAmount}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex min-w-0 items-center justify-end bg-[#F0FDF4] px-3 py-2.5">
+                      {!isGave && (
+                        <span
+                          className="whitespace-nowrap text-right font-extrabold leading-none text-emerald-600"
+                          style={{ fontSize: amountFontSize }}
+                        >
+                          {formattedAmount}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
