@@ -53,6 +53,12 @@ import type {
   ListAdminUsersParams,
   ListGlobalLedgerEntriesParams,
   ListPartiesParams,
+  OwnerActivityResponse,
+  OwnerParty,
+  OwnerWorkerInput,
+  OwnerWorkerList,
+  OwnerWorkerMutationResult,
+  OwnerWorkerUpdate,
   Party,
   PartyInput,
   PhoneOtpLogoutResult,
@@ -822,6 +828,451 @@ export function useListBusinesses<TData = Awaited<ReturnType<typeof listBusiness
 
 
 
+
+export const getGetOwnerPartiesUrl = () => {
+
+
+
+
+  return `/api/owner/parties`
+}
+
+/**
+ * @summary List parties in the selected business for staff access management
+ */
+export const getOwnerParties = async ( options?: RequestInit): Promise<OwnerParty[]> => {
+
+  return customFetch<OwnerParty[]>(getGetOwnerPartiesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOwnerPartiesQueryKey = () => {
+    return [
+    `/api/owner/parties`
+    ] as const;
+    }
+
+
+export const getGetOwnerPartiesQueryOptions = <TData = Awaited<ReturnType<typeof getOwnerParties>>, TError = ErrorType<ErrorEnvelope>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOwnerParties>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOwnerPartiesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOwnerParties>>> = ({ signal }) => getOwnerParties({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOwnerParties>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOwnerPartiesQueryResult = NonNullable<Awaited<ReturnType<typeof getOwnerParties>>>
+export type GetOwnerPartiesQueryError = ErrorType<ErrorEnvelope>
+
+
+/**
+ * @summary List parties in the selected business for staff access management
+ */
+
+export function useGetOwnerParties<TData = Awaited<ReturnType<typeof getOwnerParties>>, TError = ErrorType<ErrorEnvelope>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOwnerParties>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOwnerPartiesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetOwnerWorkersUrl = () => {
+
+
+
+
+  return `/api/owner/workers`
+}
+
+/**
+ * @summary List staff and pending invitations in the selected business
+ */
+export const getOwnerWorkers = async ( options?: RequestInit): Promise<OwnerWorkerList> => {
+
+  return customFetch<OwnerWorkerList>(getGetOwnerWorkersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOwnerWorkersQueryKey = () => {
+    return [
+    `/api/owner/workers`
+    ] as const;
+    }
+
+
+export const getGetOwnerWorkersQueryOptions = <TData = Awaited<ReturnType<typeof getOwnerWorkers>>, TError = ErrorType<ErrorEnvelope>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOwnerWorkers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOwnerWorkersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOwnerWorkers>>> = ({ signal }) => getOwnerWorkers({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOwnerWorkers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOwnerWorkersQueryResult = NonNullable<Awaited<ReturnType<typeof getOwnerWorkers>>>
+export type GetOwnerWorkersQueryError = ErrorType<ErrorEnvelope>
+
+
+/**
+ * @summary List staff and pending invitations in the selected business
+ */
+
+export function useGetOwnerWorkers<TData = Awaited<ReturnType<typeof getOwnerWorkers>>, TError = ErrorType<ErrorEnvelope>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOwnerWorkers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOwnerWorkersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateOwnerWorkerUrl = () => {
+
+
+
+
+  return `/api/owner/workers`
+}
+
+/**
+ * @summary Invite a staff identity to the selected business
+ */
+export const createOwnerWorker = async (ownerWorkerInput: OwnerWorkerInput, options?: RequestInit): Promise<OwnerWorkerMutationResult> => {
+
+  return customFetch<OwnerWorkerMutationResult>(getCreateOwnerWorkerUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(ownerWorkerInput)
+  }
+);}
+
+
+
+
+
+export const getCreateOwnerWorkerMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOwnerWorker>>, TError,{data: BodyType<OwnerWorkerInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createOwnerWorker>>, TError,{data: BodyType<OwnerWorkerInput>}, TContext> => {
+
+const mutationKey = ['createOwnerWorker'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createOwnerWorker>>, {data: BodyType<OwnerWorkerInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createOwnerWorker(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateOwnerWorkerMutationResult = NonNullable<Awaited<ReturnType<typeof createOwnerWorker>>>
+    export type CreateOwnerWorkerMutationBody = BodyType<OwnerWorkerInput>
+    export type CreateOwnerWorkerMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Invite a staff identity to the selected business
+ */
+export const useCreateOwnerWorker = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOwnerWorker>>, TError,{data: BodyType<OwnerWorkerInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createOwnerWorker>>,
+        TError,
+        {data: BodyType<OwnerWorkerInput>},
+        TContext
+      > => {
+      return useMutation(getCreateOwnerWorkerMutationOptions(options));
+    }
+
+export const getGetOwnerActivityUrl = () => {
+
+
+
+
+  return `/api/owner/activity`
+}
+
+/**
+ * @summary List recent staff ledger activity in the selected business
+ */
+export const getOwnerActivity = async ( options?: RequestInit): Promise<OwnerActivityResponse> => {
+
+  return customFetch<OwnerActivityResponse>(getGetOwnerActivityUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOwnerActivityQueryKey = () => {
+    return [
+    `/api/owner/activity`
+    ] as const;
+    }
+
+
+export const getGetOwnerActivityQueryOptions = <TData = Awaited<ReturnType<typeof getOwnerActivity>>, TError = ErrorType<ErrorEnvelope>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOwnerActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOwnerActivityQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOwnerActivity>>> = ({ signal }) => getOwnerActivity({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOwnerActivity>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOwnerActivityQueryResult = NonNullable<Awaited<ReturnType<typeof getOwnerActivity>>>
+export type GetOwnerActivityQueryError = ErrorType<ErrorEnvelope>
+
+
+/**
+ * @summary List recent staff ledger activity in the selected business
+ */
+
+export function useGetOwnerActivity<TData = Awaited<ReturnType<typeof getOwnerActivity>>, TError = ErrorType<ErrorEnvelope>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOwnerActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOwnerActivityQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateOwnerWorkerUrl = (id: string,) => {
+
+
+
+
+  return `/api/owner/workers/${id}`
+}
+
+/**
+ * @summary Update staff status or party permissions
+ */
+export const updateOwnerWorker = async (id: string,
+    ownerWorkerUpdate: OwnerWorkerUpdate, options?: RequestInit): Promise<OwnerWorkerMutationResult> => {
+
+  return customFetch<OwnerWorkerMutationResult>(getUpdateOwnerWorkerUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(ownerWorkerUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateOwnerWorkerMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOwnerWorker>>, TError,{id: string;data: BodyType<OwnerWorkerUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateOwnerWorker>>, TError,{id: string;data: BodyType<OwnerWorkerUpdate>}, TContext> => {
+
+const mutationKey = ['updateOwnerWorker'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateOwnerWorker>>, {id: string;data: BodyType<OwnerWorkerUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateOwnerWorker(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateOwnerWorkerMutationResult = NonNullable<Awaited<ReturnType<typeof updateOwnerWorker>>>
+    export type UpdateOwnerWorkerMutationBody = BodyType<OwnerWorkerUpdate>
+    export type UpdateOwnerWorkerMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Update staff status or party permissions
+ */
+export const useUpdateOwnerWorker = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateOwnerWorker>>, TError,{id: string;data: BodyType<OwnerWorkerUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateOwnerWorker>>,
+        TError,
+        {id: string;data: BodyType<OwnerWorkerUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateOwnerWorkerMutationOptions(options));
+    }
+
+export const getDeleteOwnerWorkerUrl = (id: string,) => {
+
+
+
+
+  return `/api/owner/workers/${id}`
+}
+
+/**
+ * @summary Remove staff access or revoke an invitation
+ */
+export const deleteOwnerWorker = async (id: string, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteOwnerWorkerUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteOwnerWorkerMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteOwnerWorker>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteOwnerWorker>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['deleteOwnerWorker'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteOwnerWorker>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteOwnerWorker(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteOwnerWorkerMutationResult = NonNullable<Awaited<ReturnType<typeof deleteOwnerWorker>>>
+
+    export type DeleteOwnerWorkerMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Remove staff access or revoke an invitation
+ */
+export const useDeleteOwnerWorker = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteOwnerWorker>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteOwnerWorker>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getDeleteOwnerWorkerMutationOptions(options));
+    }
 
 export const getGetDashboardSummaryUrl = () => {
 

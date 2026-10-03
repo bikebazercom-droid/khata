@@ -87,6 +87,21 @@ export default function SettingsScreen() {
           <Text style={{ color: colors.foreground, fontSize: 15 }}>{identity?.role === 'owner' ? 'মালিক' : 'স্টাফ'}</Text>
         </View>
       </Card>
+      {identity?.role === 'owner' ? (
+        <Card>
+          <Text style={{ color: colors.foreground, fontSize: 16, fontWeight: '800' }}>খাতা ও অ্যাক্সেস</Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 13, lineHeight: 19 }}>
+            স্টাফ যোগ করুন, কোন খাতা দেখতে পারবে এবং কোথায় অ্যাডজাস্টমেন্ট করতে পারবে তা ঠিক করুন।
+          </Text>
+          <AppButton
+            title="খাতা ও স্টাফ অ্যাক্সেস"
+            icon="users"
+            variant="outline"
+            onPress={() => router.push('/access')}
+            testID="settings-owner-access"
+          />
+        </Card>
+      ) : null}
       <AppButton title="সাইন আউট" icon="log-out" variant="outline" onPress={confirmSignOut} loading={busy} testID="settings-sign-out" />
       {identity?.role === 'owner' ? (
         <Card>

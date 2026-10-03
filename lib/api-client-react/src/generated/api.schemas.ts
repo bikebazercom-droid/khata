@@ -160,6 +160,97 @@ export interface BusinessSummary {
   partyCount: number;
 }
 
+export interface OwnerParty {
+  id: string;
+  name: string;
+  role: PartyRole;
+}
+
+export type OwnerWorkerStatus = typeof OwnerWorkerStatus[keyof typeof OwnerWorkerStatus];
+
+
+export const OwnerWorkerStatus = {
+  active: 'active',
+  pending: 'pending',
+  suspended: 'suspended',
+} as const;
+
+export interface OwnerWorker {
+  id: string;
+  identity: string;
+  status: OwnerWorkerStatus;
+  partyIds: string[];
+  adjustmentPartyIds: string[];
+  /** @nullable */
+  lastLogin?: string | null;
+  /** @nullable */
+  lastLogout?: string | null;
+  /** @nullable */
+  invitedAt?: string | null;
+}
+
+export interface OwnerWorkerList {
+  workers: OwnerWorker[];
+}
+
+export type OwnerWorkerMutationResultStatus = typeof OwnerWorkerMutationResultStatus[keyof typeof OwnerWorkerMutationResultStatus];
+
+
+export const OwnerWorkerMutationResultStatus = {
+  active: 'active',
+  pending: 'pending',
+  suspended: 'suspended',
+  revoked: 'revoked',
+} as const;
+
+export interface OwnerWorkerMutationResult {
+  id: string;
+  status: OwnerWorkerMutationResultStatus;
+  partyIds: string[];
+  adjustmentPartyIds: string[];
+}
+
+export interface OwnerWorkerInput {
+  email?: string;
+  /** Bangladesh phone number in local or international format */
+  phone?: string;
+  partyIds: string[];
+  adjustmentPartyIds: string[];
+}
+
+export type OwnerWorkerUpdateStatus = typeof OwnerWorkerUpdateStatus[keyof typeof OwnerWorkerUpdateStatus];
+
+
+export const OwnerWorkerUpdateStatus = {
+  active: 'active',
+  suspended: 'suspended',
+} as const;
+
+export interface OwnerWorkerUpdate {
+  partyIds?: string[];
+  adjustmentPartyIds?: string[];
+  status?: OwnerWorkerUpdateStatus;
+}
+
+export interface OwnerActivityEntry {
+  id: string;
+  partyId: string;
+  partyName: string;
+  partyRole: PartyRole;
+  actorId: string;
+  actorIdentity: string;
+  type: LedgerEntryType;
+  /** @nullable */
+  amount: number | null;
+  /** @nullable */
+  description: string | null;
+  createdAt: string;
+}
+
+export interface OwnerActivityResponse {
+  entries: OwnerActivityEntry[];
+}
+
 export interface Party {
   id: string;
   name: string;

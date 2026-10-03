@@ -26,6 +26,8 @@ tags:
     description: Phone OTP authentication and signed-in identity
   - name: businesses
     description: Business khata selection and isolation
+  - name: owner
+    description: Owner-only staff access management
 paths:
   /scan/bengali-ledger:
     post:
@@ -224,6 +226,182 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/BusinessSummary"
+  /owner/parties:
+    get:
+      operationId: getOwnerParties
+      tags: [owner]
+      summary: List parties in the selected business for staff access management
+      responses:
+        "200":
+          description: Business parties
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OwnerParty"
+        "403":
+          description: Owner access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /owner/workers:
+    get:
+      operationId: getOwnerWorkers
+      tags: [owner]
+      summary: List staff and pending invitations in the selected business
+      responses:
+        "200":
+          description: Staff and pending invitations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerWorkerList"
+        "403":
+          description: Owner access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    post:
+      operationId: createOwnerWorker
+      tags: [owner]
+      summary: Invite a staff identity to the selected business
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OwnerWorkerInput"
+      responses:
+        "201":
+          description: Staff invitation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerWorkerMutationResult"
+        "400":
+          description: Invalid identity or business assignment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: Owner access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: This identity already has an active or pending staff invitation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: Phone invitations are unavailable because SMS delivery is not ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /owner/activity:
+    get:
+      operationId: getOwnerActivity
+      tags: [owner]
+      summary: List recent staff ledger activity in the selected business
+      responses:
+        "200":
+          description: Recent staff ledger activity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerActivityResponse"
+        "403":
+          description: Owner access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /owner/workers/{id}:
+    patch:
+      operationId: updateOwnerWorker
+      tags: [owner]
+      summary: Update staff status or party permissions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OwnerWorkerUpdate"
+      responses:
+        "200":
+          description: Staff access updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerWorkerMutationResult"
+        "400":
+          description: Invalid status or business assignment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: Owner access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Staff member or invitation not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Invitation was already claimed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+    delete:
+      operationId: deleteOwnerWorker
+      tags: [owner]
+      summary: Remove staff access or revoke an invitation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Staff access removed or invitation revoked
+        "400":
+          description: Invalid worker id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: Owner access required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Staff member or invitation not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /dashboard/summary:
     get:
       operationId: getDashboardSummary
@@ -966,6 +1144,142 @@ components:
           format: date-time
         partyCount:
           type: integer
+    OwnerParty:
+      type: object
+      required: [id, name, role]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          $ref: "#/components/schemas/PartyRole"
+    OwnerWorker:
+      type: object
+      required: [id, identity, status, partyIds, adjustmentPartyIds]
+      properties:
+        id:
+          type: string
+        identity:
+          type: string
+        status:
+          type: string
+          enum: [active, pending, suspended]
+        partyIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        adjustmentPartyIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        lastLogin:
+          type: ["string", "null"]
+          format: date-time
+        lastLogout:
+          type: ["string", "null"]
+          format: date-time
+        invitedAt:
+          type: ["string", "null"]
+          format: date-time
+    OwnerWorkerList:
+      type: object
+      required: [workers]
+      properties:
+        workers:
+          type: array
+          items:
+            $ref: "#/components/schemas/OwnerWorker"
+    OwnerWorkerMutationResult:
+      type: object
+      required: [id, status, partyIds, adjustmentPartyIds]
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [active, pending, suspended, revoked]
+        partyIds:
+          type: array
+          items:
+            type: string
+        adjustmentPartyIds:
+          type: array
+          items:
+            type: string
+    OwnerWorkerInput:
+      type: object
+      required: [partyIds, adjustmentPartyIds]
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+        phone:
+          type: string
+          description: Bangladesh phone number in local or international format
+        partyIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        adjustmentPartyIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+    OwnerWorkerUpdate:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        partyIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        adjustmentPartyIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+        status:
+          type: string
+          enum: [active, suspended]
+    OwnerActivityEntry:
+      type: object
+      required: [id, partyId, partyName, partyRole, actorId, actorIdentity, type, amount, description, createdAt]
+      properties:
+        id:
+          type: string
+        partyId:
+          type: string
+        partyName:
+          type: string
+        partyRole:
+          $ref: "#/components/schemas/PartyRole"
+        actorId:
+          type: string
+        actorIdentity:
+          type: string
+        type:
+          $ref: "#/components/schemas/LedgerEntryType"
+        amount:
+          type: ["number", "null"]
+        description:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+    OwnerActivityResponse:
+      type: object
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/OwnerActivityEntry"
     Party:
       type: object
       required:

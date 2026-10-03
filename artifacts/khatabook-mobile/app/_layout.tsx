@@ -45,6 +45,7 @@ function RootLayoutNav() {
         <Stack.Screen name="index" />
         <Stack.Screen name="sign-in" options={{ gestureEnabled: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="access" />
         <Stack.Screen name="party/new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="party/[partyId]" />
         <Stack.Screen name="party/[partyId]/report" />

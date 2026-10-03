@@ -137,6 +137,102 @@ export const ListBusinessesResponse = zod.array(ListBusinessesResponseItem)
 
 
 /**
+ * @summary List parties in the selected business for staff access management
+ */
+export const GetOwnerPartiesResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "role": zod.enum(['CUSTOMER', 'SUPPLIER'])
+})
+export const GetOwnerPartiesResponse = zod.array(GetOwnerPartiesResponseItem)
+
+
+/**
+ * @summary List staff and pending invitations in the selected business
+ */
+export const GetOwnerWorkersResponse = zod.object({
+  "workers": zod.array(zod.object({
+  "id": zod.string(),
+  "identity": zod.string(),
+  "status": zod.enum(['active', 'pending', 'suspended']),
+  "partyIds": zod.array(zod.string()),
+  "adjustmentPartyIds": zod.array(zod.string()),
+  "lastLogin": zod.coerce.date().nullish(),
+  "lastLogout": zod.coerce.date().nullish(),
+  "invitedAt": zod.coerce.date().nullish()
+}))
+})
+
+
+/**
+ * @summary Invite a staff identity to the selected business
+ */
+export const CreateOwnerWorkerBody = zod.object({
+  "email": zod.string().optional(),
+  "phone": zod.string().optional().describe('Bangladesh phone number in local or international format'),
+  "partyIds": zod.array(zod.string()),
+  "adjustmentPartyIds": zod.array(zod.string())
+})
+
+export const CreateOwnerWorkerResponse = zod.object({
+  "id": zod.string(),
+  "status": zod.enum(['active', 'pending', 'suspended', 'revoked']),
+  "partyIds": zod.array(zod.string()),
+  "adjustmentPartyIds": zod.array(zod.string())
+})
+
+
+/**
+ * @summary List recent staff ledger activity in the selected business
+ */
+export const GetOwnerActivityResponse = zod.object({
+  "entries": zod.array(zod.object({
+  "id": zod.string(),
+  "partyId": zod.string(),
+  "partyName": zod.string(),
+  "partyRole": zod.enum(['CUSTOMER', 'SUPPLIER']),
+  "actorId": zod.string(),
+  "actorIdentity": zod.string(),
+  "type": zod.enum(['YOU_GAVE', 'YOU_GOT']),
+  "amount": zod.number().nullable(),
+  "description": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Update staff status or party permissions
+ */
+export const UpdateOwnerWorkerParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateOwnerWorkerBody = zod.object({
+  "partyIds": zod.array(zod.string()).optional(),
+  "adjustmentPartyIds": zod.array(zod.string()).optional(),
+  "status": zod.enum(['active', 'suspended']).optional()
+})
+
+export const UpdateOwnerWorkerResponse = zod.object({
+  "id": zod.string(),
+  "status": zod.enum(['active', 'pending', 'suspended', 'revoked']),
+  "partyIds": zod.array(zod.string()),
+  "adjustmentPartyIds": zod.array(zod.string())
+})
+
+
+/**
+ * @summary Remove staff access or revoke an invitation
+ */
+export const DeleteOwnerWorkerParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeleteOwnerWorkerResponse = zod.void()
+
+
+/**
  * @summary Get aggregated dashboard totals
  */
 export const GetDashboardSummaryResponse = zod.object({
