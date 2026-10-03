@@ -128,8 +128,8 @@ export function PartyView() {
   const reportRef = useRef<HTMLDivElement>(null);
   const storeName = settings?.storeName || 'Banglakhata';
 
-  // Reconstruct balances chronologically. Keep the live history newest-first,
-  // but pass the ascending sequence to every statement PDF export.
+  // Reconstruct balances chronologically, then show the live history and PDFs
+  // newest-first. The PDF renderer keeps these per-entry balance snapshots.
   //
   // The backend applies each entry's delta to the party's running total in
   // insertion order, not transaction-date order, so `currentBalance` cannot

@@ -1,10 +1,10 @@
 ---
-name: PDF statement order
-description: Date ordering and balance behavior for party statement PDFs.
+name: Web party PDF ordering
+description: Business-date ordering and balance snapshots for the web single-party ledger PDF.
 ---
 
-Use the transaction business date (`dueDate`, falling back to local `createdAt` date) for statement filtering, opening-balance boundaries, row order, and date groups. Show statement PDF rows oldest-first, earlier-created entries first within a day, and calculate balances in that same chronological order; attach the opening-balance note to the first (earliest) included date group. Keep the live party history's newest-first presentation independent.
+For the web single-party ledger PDF, use the transaction business date (`dueDate`, falling back to local `createdAt` date) for sorting and month groups. Render months and rows newest-first, with later-created entries first within a day. Calculate each entry's balance snapshot in chronological oldest-first order before reversing presentation; never recompute balances in display order. Treat other PDF renderers independently rather than assuming they share this order.
 
-**Why:** Backdated entries were being filtered and grouped by different dates because range calculations used `createdAt` while statements displayed `dueDate`. The user has since explicitly requested chronological oldest-first order in statement PDFs.
+**Why:** Newer ledger periods should be easier to find, and changing PDF display order must not alter the chronological running balance attached to each entry.
 
-**How to apply:** Use `getLedgerEntryDateKey` consistently for period bounds, opening-balance inclusion, sorting, and grouping. Include entries on the selected start/end days, keep equal-day rows contiguous, and render the chronologically accumulated rows without reversing them.
+**How to apply:** Use `getLedgerEntryDateKey` for business-date sorting and grouping. Compute balances oldest-first, then reverse only the rendered order; do not change filtering or balance calculations to achieve newest-first navigation.

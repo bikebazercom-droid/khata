@@ -54,10 +54,10 @@ interface MonthGroup {
   totalCredit: number;
 }
 
-/** Groups statement entries by business date, oldest first, with earlier-created rows first within a day. */
+/** Groups ledger entries newest-first by business date, with later-created rows first within a day. */
 function groupByMonth(entries: ReportEntry[]): MonthGroup[] {
   const groups: MonthGroup[] = [];
-  const chronological = entries
+  const newestFirst = entries
     .map((entry, index) => ({
       entry,
       index,
@@ -65,12 +65,12 @@ function groupByMonth(entries: ReportEntry[]): MonthGroup[] {
       createdAt: new Date(entry.createdAt).getTime(),
     }))
     .sort((a, b) =>
-      a.dayKey.localeCompare(b.dayKey) ||
-      a.createdAt - b.createdAt ||
-      a.index - b.index,
+      b.dayKey.localeCompare(a.dayKey) ||
+      b.createdAt - a.createdAt ||
+      b.index - a.index,
     );
 
-  for (const { entry, dayKey } of chronological) {
+  for (const { entry, dayKey } of newestFirst) {
     const date = entryDate(entry);
     const key = dayKey.slice(0, 7);
     let group = groups[groups.length - 1];
@@ -206,7 +206,7 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                     const isGave = entry.type === 'YOU_GAVE';
                     const imgSrc = billImageSrc(entry.billImage);
                     return (
-                      <tr key={entry.id} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#fafafa' }}>
+                      <tr key={entry.id} data-entry-id={entry.id} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#fafafa' }}>
                         <td style={{ padding: '7px 10px', border: GRID_BORDER, whiteSpace: 'nowrap' }}>
                           {format(entryDate(entry), 'dd/MM')}
                         </td>

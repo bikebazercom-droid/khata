@@ -17,6 +17,7 @@ import React from 'react';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { render } from '@testing-library/react';
 import { LedgerReportDocument, type ReportEntry, type ReportParty } from '../lib/ledger-report';
+import { formatCurrency } from '../lib/utils';
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -110,7 +111,7 @@ describe('LedgerReportDocument — bill image thumbnails', () => {
     expect(container.querySelectorAll('img[alt="বিল"]')).toHaveLength(2);
   });
 
-  it('img elements have the expected thumbnail dimensions (48×48) and objectFit:cover', () => {
+  it('img elements have the expected thumbnail dimensions (48×48) and objectFit:contain', () => {
     const { container } = render(
       <LedgerReportDocument
         storeName="টেস্ট স্টোর"
@@ -122,7 +123,7 @@ describe('LedgerReportDocument — bill image thumbnails', () => {
     const img = container.querySelector('img[alt="বিল"]') as HTMLImageElement;
     expect(img.style.width).toBe('48px');
     expect(img.style.height).toBe('48px');
-    expect(img.style.objectFit).toBe('cover');
+    expect(img.style.objectFit).toBe('contain');
   });
 
   it('renders correctly when there are no entries (empty ledger)', () => {
@@ -139,37 +140,42 @@ describe('LedgerReportDocument — bill image thumbnails', () => {
 });
 
 describe('LedgerReportDocument — statement ordering', () => {
-  it('renders month groups and entries oldest-first by business date', () => {
+  it('renders month groups and entries newest-first by business date while retaining each balance', () => {
     const entries: ReportEntry[] = [
       makeEntry({
         id: 'may',
         description: 'May entry',
         dueDate: '2021-05-09',
         createdAt: '2021-05-09T11:00:00.000Z',
+        balanceAfter: 321,
       }),
       makeEntry({
         id: 'october-earlier',
         description: 'October earlier',
         dueDate: '2026-10-01',
         createdAt: '2026-10-01T02:49:00.000Z',
+        balanceAfter: -121,
       }),
       makeEntry({
         id: 'january',
         description: 'January entry',
         dueDate: '2024-01-01',
         createdAt: '2026-10-04T11:00:00.000Z',
+        balanceAfter: 654,
       }),
       makeEntry({
         id: 'october-later',
         description: 'October later',
         dueDate: '2026-10-01',
         createdAt: '2026-10-01T02:50:00.000Z',
+        balanceAfter: 432,
       }),
       makeEntry({
         id: 'october-next-day',
         description: 'October next day',
         dueDate: '2026-10-02',
         createdAt: '2020-10-02T02:00:00.000Z',
+        balanceAfter: 987,
       }),
     ];
 
@@ -181,20 +187,23 @@ describe('LedgerReportDocument — statement ordering', () => {
       container.querySelectorAll<HTMLTableRowElement>('tbody tr[data-month-key]'),
       (row) => row.dataset.monthKey,
     );
-    expect(monthKeys).toEqual(['2021-05', '2024-01', '2026-10']);
+    expect(monthKeys).toEqual(['2026-10', '2024-01', '2021-05']);
 
-    const entryDescriptions = Array.from(container.querySelectorAll<HTMLTableRowElement>('tbody tr'))
-      .filter((row) =>
-        row.cells.length === 5 &&
-        /^\d{2}\/\d{2}$/.test(row.cells[0].textContent?.trim() ?? ''),
-      )
-      .map((row) => row.cells[1].textContent?.trim());
+    const entryRows = Array.from(container.querySelectorAll<HTMLTableRowElement>('tbody tr[data-entry-id]'));
+    const entryDescriptions = entryRows.map((row) => row.cells[1].textContent?.trim());
     expect(entryDescriptions).toEqual([
-      'May entry',
-      'January entry',
-      'October earlier',
-      'October later',
       'October next day',
+      'October later',
+      'October earlier',
+      'January entry',
+      'May entry',
+    ]);
+    expect(entryRows.map((row) => row.cells[4].textContent?.trim())).toEqual([
+      `${formatCurrency(987)} Dr`,
+      `${formatCurrency(432)} Dr`,
+      `${formatCurrency(121)} Cr`,
+      `${formatCurrency(654)} Dr`,
+      `${formatCurrency(321)} Dr`,
     ]);
   });
 });
