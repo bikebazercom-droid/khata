@@ -8,3 +8,5 @@ The website is BanglaKhata's single source of truth. Mobile must match its compo
 **Why:** The user explicitly directed that mobile and web have no feature or behavior discrepancies and that the website remain the source of truth. Native safe-area or keyboard offsets can duplicate the website's viewport handling and cause layout drift.
 
 **How to apply:** Load the same website in Expo's browser iframe and the iOS/Android WebView. Do not add native safe-area or keyboard offsets around the website; disable automatic WebView content insets and let its CSS control responsive layout. Keep Android `adjustResize` so the site receives keyboard viewport changes. Preserve unused native source files, and add native bridges only for required device features unavailable in the website container.
+
+**User-reported validation (2026-10-04):** The user confirmed that both iOS and Android simulator previews passed checks for safe areas/cutouts, open keyboards, OTP, ledger, and transaction reports. No screenshots or recordings were attached.

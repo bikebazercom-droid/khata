@@ -19,12 +19,14 @@ keyboard opens:
   390×844 and 412×915; the layouts match after both previews finish loading.
   This checks the shared website viewport, not native safe-area or keyboard
   behavior.
-- **Native iOS and Android:** Not verified. This runner has no `adb` or Android
-  emulator, and no `xcrun` or Xcode simulator. Successful iOS/Android bundle
-  exports confirm compilation only, not device rendering.
-- **OTP, ledger-entry keyboard, and authenticated transaction report:** Not
-  visually verified. The preview capture cannot sign in or interact with the
-  app, and no native simulator is available here.
+- **Native iOS and Android:** The user reports that both simulator previews
+  passed the safe-area/cutout and keyboard-open checks. No screenshots or
+  recordings were attached, and this runner has no `adb` or Android emulator,
+  nor `xcrun` or Xcode simulator, so I could not independently inspect those
+  native renders. Bundle exports confirm compilation only.
+- **OTP, ledger, and transaction report:** The user confirms these flows were
+  checked and passed in both platform previews. The browser capture itself
+  cannot sign in or interact with these screens.
 
 ## Relevant implementation
 
