@@ -15,11 +15,16 @@ keyboard opens:
 
 ## Verification status
 
-- **Android:** The keyboard and safe-area wrapper changed to use the website's
-  viewport logic directly; repeat device verification before calling this a
-  pass.
-- **iPhone:** Not tested. No iPhone is available in this preview environment;
-  this result must not be treated as an iOS pass.
+- **Browser and Expo Web preview:** The public landing page was compared at
+  390×844 and 412×915; the layouts match after both previews finish loading.
+  This checks the shared website viewport, not native safe-area or keyboard
+  behavior.
+- **Native iOS and Android:** Not verified. This runner has no `adb` or Android
+  emulator, and no `xcrun` or Xcode simulator. Successful iOS/Android bundle
+  exports confirm compilation only, not device rendering.
+- **OTP, ledger-entry keyboard, and authenticated transaction report:** Not
+  visually verified. The preview capture cannot sign in or interact with the
+  app, and no native simulator is available here.
 
 ## Relevant implementation
 
