@@ -28,6 +28,35 @@ keyboard opens:
   checked and passed in both platform previews. The browser capture itself
   cannot sign in or interact with these screens.
 
+## Automated regression guard
+
+`../lib/mobileViewportContract.test.ts` checks that the active website shell
+does not add a second safe-area or keyboard offset, iOS WebView inset
+adjustments stay disabled, Android continues to resize for the keyboard, and
+the website CSS retains its safe-area and compact sign-in rules. These
+configuration checks do not replace opening the keyboard in a native simulator.
+
+## Manual native simulator checklist
+
+Repeat these steps separately in the iOS and Android simulator previews:
+
+1. Open OTP sign-in and focus the phone/OTP input with the software keyboard
+   open. Check that the field and submit action remain reachable.
+2. Open a party ledger, start an entry, and focus the amount field. Check that
+   the field and save action remain reachable while the keyboard is open.
+3. Check the top and bottom of each screen against the status bar, cutout, and
+   home/navigation area.
+4. Open the transaction report and confirm its layout fits the phone viewport.
+5. Record each platform result and any device/OS details.
+
+## User-reported simulator results (2026-10-04)
+
+- **iOS preview:** Pass — safe areas/cutouts, keyboard-open, OTP, ledger, and
+  transaction report were confirmed by the user. No screenshot or recording
+  was attached.
+- **Android preview:** Pass — the same checks were confirmed by the user. No
+  screenshot or recording was attached.
+
 ## Relevant implementation
 
 - `../components/WebAppScreen.tsx` gives the website the full native WebView
