@@ -12,6 +12,7 @@ import {
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import WebView, { type WebViewNavigation } from 'react-native-webview';
+import { useAudioPlayer } from 'expo-audio';
 import { useColors } from '@/hooks/useColors';
 import { getWebAppUrl } from '@/lib/webAppUrl';
 
@@ -21,6 +22,10 @@ function isBrowserUrl(url: string) {
 
 export function WebAppScreen() {
   const colors = useColors();
+  const calculatorAudioPlayer = useAudioPlayer(
+    require('../assets/audio/calculator-key-tap.mp3'),
+    { downloadFirst: true },
+  );
   const webAppUrl = getWebAppUrl();
   const webViewRef = useRef<WebView>(null);
   const [retryKey, setRetryKey] = useState(0);
@@ -91,6 +96,21 @@ export function WebAppScreen() {
     setCanGoBack(state.canGoBack);
   }, []);
 
+  const handleWebViewMessage = useCallback((event: { nativeEvent: { data: string } }) => {
+    if (event.nativeEvent.data !== 'calculator-key-tap') return;
+
+    try {
+      try {
+        calculatorAudioPlayer.currentTime = 0;
+      } catch {
+        // Playback should still be attempted if the initial seek is unavailable.
+      }
+      calculatorAudioPlayer.play();
+    } catch {
+      // Audio is optional and must not block calculator interactions.
+    }
+  }, [calculatorAudioPlayer]);
+
   if (!webAppUrl) {
     return (
       <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
@@ -144,6 +164,7 @@ export function WebAppScreen() {
         onNavigationStateChange={handleNavigationStateChange}
         onShouldStartLoadWithRequest={handleNavigationRequest}
         onOpenWindow={handleOpenWindow}
+        onMessage={handleWebViewMessage}
       />
     );
 

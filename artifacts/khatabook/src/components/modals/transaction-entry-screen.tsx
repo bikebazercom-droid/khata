@@ -27,6 +27,7 @@ import { ChevronLeft, Camera, X, ArrowLeftRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { cn, evaluateCalculatorExpression, formatCurrency, formatExpressionForDisplay, toBengaliDigits, trimNumberForExpression } from '@/lib/utils';
+import { playCalculatorTapSound } from '@/lib/calculator-sound';
 import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic';
 import { CameraCaptureModal } from '@/components/modals/camera-capture-modal';
 import { scanDocument } from '@/lib/document-scan';
@@ -96,7 +97,10 @@ const Key = memo(function Key({ def, onPress }: { def: KeyDef; onPress: (value: 
     <button
       type="button"
       data-testid={`calculator-key-${def.value}`}
-      onClick={() => onPress(def.value)}
+      onClick={() => {
+        playCalculatorTapSound();
+        onPress(def.value);
+      }}
       style={{
         ...(def.span ? { gridColumn: `span ${def.span}` } : undefined),
         // Hardware-accelerated, GPU-composited layer: the browser can flip
@@ -1064,7 +1068,10 @@ export function TransactionEntryScreen({
         {isMemoryActive && (
           <button
             type="button"
-            onClick={handleMrcTap}
+            onClick={() => {
+              playCalculatorTapSound();
+              handleMrcTap();
+            }}
             className="w-full h-12 rounded-xl bg-[#0b3d91] text-white font-extrabold text-base flex items-center justify-center active:scale-[0.98] active:bg-[#4A3C31] transition-[background-color,transform] duration-[50ms] ease-out"
           >
             MRC = {formatCurrency(memoryValue)}

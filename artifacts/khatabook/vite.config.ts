@@ -39,7 +39,7 @@ function offlineShell() {
           if (entry.isDirectory()) result.push(...await files(relative));
           else if (relative === 'index.html' || relative === 'manifest.webmanifest' ||
             relative === 'logo.svg' || relative === 'logo-icon.svg' || relative === 'icon-192.png' || relative === 'icon-512.png' ||
-            relative.startsWith('assets/') || relative.startsWith('fonts/')) result.push(relative);
+            relative.startsWith('assets/') || relative.startsWith('fonts/') || relative.startsWith('sounds/')) result.push(relative);
         }
         return result;
       }

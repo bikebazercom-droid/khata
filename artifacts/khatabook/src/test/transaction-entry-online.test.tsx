@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   uploadBillImage: vi.fn(),
   scanDocument: vi.fn(),
   queueEntry: vi.fn(),
+  playCalculatorTapSound: vi.fn(),
 }));
 
 vi.mock('@workspace/api-client-react', async (importOriginal) => {
@@ -55,6 +56,10 @@ vi.mock('@/lib/document-scan', () => ({
 
 vi.mock('@/lib/entryOutbox', () => ({
   queueEntry: mocks.queueEntry,
+}));
+
+vi.mock('@/lib/calculator-sound', () => ({
+  playCalculatorTapSound: mocks.playCalculatorTapSound,
 }));
 
 import { TransactionEntryScreen } from '../components/modals/transaction-entry-screen';
@@ -121,6 +126,7 @@ describe('browser ledger entry submission', () => {
     mocks.scanDocument.mockReset();
     mocks.scanDocument.mockResolvedValue('data:image/jpeg;base64,captured-bill');
     mocks.queueEntry.mockReset();
+    mocks.playCalculatorTapSound.mockReset();
     mocks.createLedgerEntry.mockResolvedValue({ id: 'entry-1' });
   });
 
@@ -184,6 +190,16 @@ describe('browser ledger entry submission', () => {
 
     pressCalculatorKey('=');
     expect(amount.value).toBe('২০.২৫');
+  });
+
+  it('plays a tap sound for keypad presses and the MRC control', () => {
+    renderEntry();
+
+    pressCalculatorKey('1');
+    pressCalculatorKey('M+');
+    fireEvent.click(screen.getByRole('button', { name: /MRC =/ }));
+
+    expect(mocks.playCalculatorTapSound).toHaveBeenCalledTimes(3);
   });
 
   it('POSTs the transfer and uploaded bill object path directly, then closes and invalidates ledger views', async () => {
