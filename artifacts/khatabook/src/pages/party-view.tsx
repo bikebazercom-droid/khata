@@ -342,7 +342,7 @@ export function PartyView() {
   const isGive = party.balanceType === 'YOU_WILL_GIVE';
 
   return (
-    <div className="flex flex-col h-full bg-[#f8fafc] w-full relative">
+    <div className="flex flex-col h-full min-h-0 bg-[#f8fafc] w-full relative">
       {/* Sticky blue top header */}
       <div className="bg-[#0b57d0] shadow-sm z-10 shrink-0 sticky top-0">
         <div className="flex items-center gap-3 px-3 pb-6 pt-[calc(0.75rem+var(--safe-top))]">
@@ -431,7 +431,7 @@ export function PartyView() {
       )}
 
       {/* Scrollable ledger area */}
-      <div className="flex-1 overflow-y-auto pb-4">
+      <div className="flex-1 min-h-0 overflow-y-auto pb-4">
         {outboxError && <p role="alert" className="m-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{outboxError}</p>}
         {pendingEntries.length > 0 && (
           <section className="m-3 rounded-xl border border-amber-200 bg-amber-50 p-3" aria-label="অপেক্ষমাণ এন্ট্রি">
@@ -589,7 +589,7 @@ export function PartyView() {
       </div>
 
       {/* Sticky bottom action overlay */}
-      <div className="bg-white border-t border-slate-200 px-3 pt-3 pb-[calc(1.25rem+var(--safe-bottom))] flex gap-3 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.08)] shrink-0 z-20">
+      <div className="party-transaction-actions bg-white border-t border-slate-200 px-3 pt-3 flex gap-3 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.08)] shrink-0 z-20">
         <Button
           variant="destructive"
           className="flex-1 h-12 text-base font-extrabold shadow-[0_4px_14px_0_rgba(239,68,68,0.35)] active:scale-[0.98] transition-all rounded-xl flex items-center justify-center leading-none"

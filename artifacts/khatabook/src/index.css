@@ -173,6 +173,15 @@ textarea {
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/*
+ * Android WebViews can report a zero CSS safe-area inset with gesture
+ * navigation. Keep the party actions clear of that area while preserving
+ * the larger native inset on devices that expose one (for example iPhone).
+ */
+.party-transaction-actions {
+  padding-bottom: calc(1.25rem + max(var(--safe-bottom), 1.5rem));
+}
+
 /* Scrollbar hide */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
