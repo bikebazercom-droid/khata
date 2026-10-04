@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import { useLanguage } from '@/lib/i18n';
 import { useAppAuth } from '@/App';
 import { ENTRY_OUTBOX_CHANGED, listRejectedEntries } from '@/lib/entryOutbox';
+import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
 
 export function HomeView() {
   const { openSwitcher, businesses, selectedBusinessId } = useBusinessContext();
@@ -385,6 +386,13 @@ export function HomeView() {
       const roleTag  = role === PartyRole.CUSTOMER ? 'Customer' : 'Supplier';
       const filename = `Banglakhata_${roleTag}_${new Date().toISOString().split('T')[0]}.pdf`;
       const pdfBlob  = pdf.output('blob');
+      const nativeShare = await shareGeneratedFileWithNative(pdfBlob, {
+        fileName: filename,
+        mimeType: 'application/pdf',
+        title: statementTitle,
+      });
+      if (nativeShare) return;
+
       const pdfFile  = new File([pdfBlob], filename, { type: 'application/pdf' });
 
       if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {

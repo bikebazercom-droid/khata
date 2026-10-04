@@ -44,6 +44,7 @@ import { useAppAuth } from '@/App';
 import { useBusinessContext } from '@/lib/businessContext';
 import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import { ENTRY_OUTBOX_CHANGED, listEntries, type QueuedEntry } from '@/lib/entryOutbox';
+import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
 
 /**
  * The entry's real transaction date. Users can backdate/forward-date an
@@ -210,9 +211,17 @@ export function PartyView() {
       const { default: html2pdf } = await import('html2pdf.js');
       const worker = buildReportPdf(html2pdf);
       if (!worker) throw new Error('report element not ready');
-      await finalizeReportPdf(worker).save();
+      const finalizedWorker = finalizeReportPdf(worker);
+      const blob = await finalizedWorker.outputPdf('blob');
+      const filename = buildReportFilename(party.name);
+      const nativeShare = await shareGeneratedFileWithNative(blob, {
+        fileName: filename,
+        mimeType: 'application/pdf',
+        title: `${party.name} এর হিসাবের রিপোর্ট`,
+      });
+      if (!nativeShare) await finalizedWorker.save(filename);
       // Silent by design: the browser's own download indicator is the
-      // confirmation — no toast needed.
+      // confirmation — on mobile the system share sheet is the confirmation.
     } catch (err) {
       console.error('Report generation failed', err);
     } finally {
@@ -244,8 +253,23 @@ export function PartyView() {
       const blob = await finalizeReportPdf(worker).outputPdf('blob');
       const filename = buildReportFilename(party.name);
       const messageText = buildWhatsAppReminderText(storeName, party);
-      const file = new File([blob], filename, { type: 'application/pdf' });
+      const nativeShare = await shareGeneratedFileWithNative(blob, {
+        fileName: filename,
+        mimeType: 'application/pdf',
+        title: 'হিসাবের রিপোর্ট',
+        shareText: messageText,
+      });
 
+      if (nativeShare) {
+        toast.success(
+          nativeShare.copiedText
+            ? 'রিমাইন্ডারের লেখা কপি হয়েছে—WhatsApp-এ গিয়ে পেস্ট করুন'
+            : 'রিপোর্ট PDF শেয়ার করার জন্য প্রস্তুত',
+        );
+        return;
+      }
+
+      const file = new File([blob], filename, { type: 'application/pdf' });
       const canShareFile =
         typeof navigator.share === 'function' &&
         typeof navigator.canShare === 'function' &&

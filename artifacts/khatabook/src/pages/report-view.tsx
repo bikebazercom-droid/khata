@@ -34,6 +34,7 @@ import {
 } from '@/lib/global-ledger-report-order';
 import { filterGlobalLedgerEntriesByRole } from '@/lib/global-ledger-report-role';
 import { getLedgerEntryDateKey } from '@/lib/date-time';
+import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
 
 const PERIOD_LABELS: Record<ReportPeriod, string> = {
   ALL: 'সব',
@@ -283,18 +284,32 @@ export function ReportView() {
       const fileDate = toBengaliDigits(new Date().toISOString().split('T')[0]);
       const filename = `বাংলাখাতা_${tag}_হিসাব_${fileDate}.pdf`;
       const pdfBlob  = pdf.output('blob');
-      const pdfFile  = new File([pdfBlob], filename, { type: 'application/pdf' });
+      const nativeShare = await shareGeneratedFileWithNative(pdfBlob, {
+        fileName: filename,
+        mimeType: 'application/pdf',
+        title: `${roleLabel} লেনদেনের রিপোর্ট`,
+      });
+      let shared = nativeShare !== null;
+      let downloaded = false;
 
-      if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-        try {
-          await navigator.share({ files: [pdfFile], title: `${roleLabel} লেনদেনের রিপোর্ট` });
-        } catch (err) {
-          if ((err as DOMException).name !== 'AbortError') pdf.save(filename);
+      if (!nativeShare) {
+        const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+        if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+          try {
+            await navigator.share({ files: [pdfFile], title: `${roleLabel} লেনদেনের রিপোর্ট` });
+            shared = true;
+          } catch (err) {
+            if ((err as DOMException).name === 'AbortError') return;
+            pdf.save(filename);
+            downloaded = true;
+          }
+        } else {
+          pdf.save(filename);
+          downloaded = true;
         }
-      } else {
-        pdf.save(filename);
       }
-      toast.success('পিডিএফ রিপোর্ট ডাউনলোড হয়েছে');
+      if (shared) toast.success('পিডিএফ রিপোর্ট শেয়ার করার জন্য প্রস্তুত');
+      else if (downloaded) toast.success('পিডিএফ রিপোর্ট ডাউনলোড হয়েছে');
     } catch (err) {
       if (document.body.contains(container)) document.body.removeChild(container);
       console.error('Report PDF failed:', err);
@@ -312,22 +327,30 @@ export function ReportView() {
       const fileDate = toBengaliDigits(new Date().toISOString().slice(0, 10));
       const filename = `বাংলাখাতা_${tag}_হিসাব_${fileDate}.csv`;
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-      const file = new File([blob], filename, { type: 'text/csv' });
-      let shared = false;
-      let canShareFile = false;
+      const nativeShare = await shareGeneratedFileWithNative(blob, {
+        fileName: filename,
+        mimeType: 'text/csv',
+        title: `${roleLabel} লেনদেনের সিএসভি রিপোর্ট`,
+      });
+      let shared = nativeShare !== null;
 
-      try {
-        canShareFile = Boolean(navigator.canShare?.({ files: [file] }));
-      } catch {
-        // Fall back to a normal download if this browser cannot inspect the file share payload.
-      }
+      if (!nativeShare) {
+        const file = new File([blob], filename, { type: 'text/csv' });
+        let canShareFile = false;
 
-      if (canShareFile) {
         try {
-          await navigator.share({ files: [file], title: `${roleLabel} লেনদেনের সিএসভি রিপোর্ট` });
-          shared = true;
-        } catch (error) {
-          if ((error as DOMException).name === 'AbortError') return;
+          canShareFile = Boolean(navigator.canShare?.({ files: [file] }));
+        } catch {
+          // Fall back to a normal download if this browser cannot inspect the file share payload.
+        }
+
+        if (canShareFile) {
+          try {
+            await navigator.share({ files: [file], title: `${roleLabel} লেনদেনের সিএসভি রিপোর্ট` });
+            shared = true;
+          } catch (error) {
+            if ((error as DOMException).name === 'AbortError') return;
+          }
         }
       }
 

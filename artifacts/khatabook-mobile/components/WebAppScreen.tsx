@@ -16,9 +16,23 @@ import { useColors } from '@/hooks/useColors';
 import { getWebAppUrl } from '@/lib/webAppUrl';
 import { resolveVisualFixtureUrl } from '@/lib/visualFixtureUrl';
 import { useTransactionSuccessSound } from '@/lib/useTransactionSuccessSound';
+import {
+  NATIVE_FILE_EXPORT_RESULT_EVENT,
+  parseNativeFileExportRequest,
+  shareNativeWebViewFile,
+  type NativeFileExportResult,
+} from '@/lib/nativeFileExport';
 
 function isBrowserUrl(url: string) {
   return /^(https?:|about:|blob:|data:)/i.test(url);
+}
+
+function hasSameOrigin(url: string, expectedUrl: string): boolean {
+  try {
+    return new URL(url).origin === new URL(expectedUrl).origin;
+  } catch {
+    return false;
+  }
 }
 
 export function WebAppScreen() {
@@ -103,7 +117,39 @@ export function WebAppScreen() {
     setCanGoBack(state.canGoBack);
   }, []);
 
-  const handleWebViewMessage = useCallback((event: { nativeEvent: { data: string } }) => {
+  const handleWebViewMessage = useCallback((event: {
+    nativeEvent: { data: string; url?: string };
+  }) => {
+    const request = parseNativeFileExportRequest(event.nativeEvent.data);
+    if (request) {
+      const sourceUrl = event.nativeEvent.url;
+      if (!webAppUrl || (sourceUrl && !hasSameOrigin(sourceUrl, webAppUrl))) return;
+
+      const sendResult = (result: NativeFileExportResult) => {
+        const script = `window.dispatchEvent(new CustomEvent(${JSON.stringify(NATIVE_FILE_EXPORT_RESULT_EVENT)}, { detail: ${JSON.stringify(result)} })); true;`;
+        webViewRef.current?.injectJavaScript(script);
+      };
+
+      void shareNativeWebViewFile(request).then(
+        ({ copiedText }) => sendResult({
+          type: request.type,
+          requestId: request.requestId,
+          ok: true,
+          copiedText,
+        }),
+        (error: unknown) => {
+          console.error('WebView file export failed:', error);
+          sendResult({
+            type: request.type,
+            requestId: request.requestId,
+            ok: false,
+            error: 'ফাইল তৈরি বা শেয়ার করা যায়নি। আবার চেষ্টা করুন।',
+          });
+        },
+      );
+      return;
+    }
+
     if (event.nativeEvent.data === 'transaction-success') {
       playSuccessSound();
       return;
@@ -120,7 +166,7 @@ export function WebAppScreen() {
     } catch {
       // Audio is optional and must not block calculator interactions.
     }
-  }, [calculatorAudioPlayer, playSuccessSound]);
+  }, [calculatorAudioPlayer, playSuccessSound, webAppUrl]);
 
   if (!webAppUrl) {
     return (

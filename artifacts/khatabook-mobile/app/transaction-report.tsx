@@ -117,6 +117,7 @@ export default function TransactionReportScreen() {
         setNotice('CSV ফাইল ডাউনলোড হয়েছে।');
       } else {
         const file = new File(Paths.cache, fileName);
+        file.create({ overwrite: true });
         file.write(csv);
         if (!(await Sharing.isAvailableAsync())) throw new Error('এই ডিভাইসে ফাইল শেয়ার করা যাচ্ছে না।');
         await Sharing.shareAsync(file.uri, { mimeType: 'text/csv', dialogTitle: 'লেনদেন CSV শেয়ার করুন' });

@@ -47,6 +47,7 @@ import {
   calculatePartyStatementSummary,
   filterPartyStatementEntriesByRange,
 } from '@/lib/party-statement';
+import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
 
 // ─── Report Options Bottom Sheet ──────────────────────────────────────────────
 
@@ -493,15 +494,25 @@ export function PartyReportView() {
     const a   = document.createElement('a');
     a.href = url; a.download = filename;
     document.body.appendChild(a); a.click();
-    document.body.removeChild(a); URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const executePdf = async () => {
     setIsPdfBusy(true);
     try {
       const blob = await generatePdfBlob();
-      triggerDownload(blob, pdfFilename());
-      toast.success('PDF ডাউনলোড হয়েছে');
+      const filename = pdfFilename();
+      const nativeShare = await shareGeneratedFileWithNative(blob, {
+        fileName: filename,
+        mimeType: 'application/pdf',
+        title: `${party?.name ?? 'পার্টি'} এর রিপোর্ট`,
+      });
+      if (nativeShare) toast.success('রিপোর্ট PDF শেয়ার করার জন্য প্রস্তুত');
+      else {
+        triggerDownload(blob, filename);
+        toast.success('PDF ডাউনলোড হয়েছে');
+      }
     } catch (err) {
       console.error(err);
       toast.error('PDF তৈরি করতে সমস্যা হয়েছে।');
@@ -515,6 +526,16 @@ export function PartyReportView() {
     try {
       const blob     = await generatePdfBlob();
       const filename = pdfFilename();
+      const nativeShare = await shareGeneratedFileWithNative(blob, {
+        fileName: filename,
+        mimeType: 'application/pdf',
+        title: `${party?.name ?? ''} এর রিপোর্ট`,
+      });
+      if (nativeShare) {
+        toast.success('রিপোর্ট PDF শেয়ার করার জন্য প্রস্তুত');
+        return;
+      }
+
       const file     = new File([blob], filename, { type: 'application/pdf' });
       if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file], title: `${party?.name ?? ''} এর রিপোর্ট` });
