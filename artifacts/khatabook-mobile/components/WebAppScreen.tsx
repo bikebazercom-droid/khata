@@ -14,6 +14,7 @@ import WebView, { type WebViewNavigation } from 'react-native-webview';
 import { useAudioPlayer } from 'expo-audio';
 import { useColors } from '@/hooks/useColors';
 import { getWebAppUrl } from '@/lib/webAppUrl';
+import { resolveVisualFixtureUrl } from '@/lib/visualFixtureUrl';
 import { useTransactionSuccessSound } from '@/lib/useTransactionSuccessSound';
 
 function isBrowserUrl(url: string) {
@@ -27,7 +28,12 @@ export function WebAppScreen() {
     require('../assets/audio/calculator-key-tap.mp3'),
     { downloadFirst: true },
   );
-  const webAppUrl = getWebAppUrl();
+  const webAppUrl = resolveVisualFixtureUrl(
+    getWebAppUrl(),
+    Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.search : '',
+    Platform.OS,
+    process.env.NODE_ENV !== 'production',
+  );
   const webViewRef = useRef<WebView>(null);
   const [retryKey, setRetryKey] = useState(0);
   const [loading, setLoading] = useState(true);

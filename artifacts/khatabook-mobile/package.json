@@ -8,6 +8,7 @@
     "build": "node scripts/build.js",
     "serve": "node server/serve.js",
     "test": "vitest run",
+    "test:visual-parity": "node scripts/visual-parity.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
@@ -45,6 +46,7 @@
     "expo-system-ui": "~57.0.1",
     "expo-web-browser": "~57.0.1",
     "jsdom": "^29.1.1",
+    "playwright-core": "^1.63.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",

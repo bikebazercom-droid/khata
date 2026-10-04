@@ -24,4 +24,5 @@
 - [Party-role report and transfer scope](party-role-scope.md) — supplier/customer reports and transfers must never cross roles; retain existing business isolation.
 - [Website source of truth for mobile](mobile-party-list-parity.md) — the user chose a website WebView in Expo and asked to keep legacy native source files for now.
 - [Expo WebView browser preview](expo-webview-preview.md) — use an iframe on web previews; keep react-native-webview for actual iOS and Android.
+- [Expo iframe screenshot readiness](expo-iframe-screenshot-readiness.md) — await the embedded target and wrapper load overlay; frame content can be visible before the full-screen spinner clears.
 - [Expo Audio component tests](expo-audio-component-tests.md) — mock `expo-audio` in mobile Vitest tests; importing its Expo runtime bootstrap fails under the jsdom setup.
