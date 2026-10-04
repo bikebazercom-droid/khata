@@ -9,9 +9,9 @@ const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 export function SignInPage() {
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-b from-[#1B3A6B] to-[#2a5298] flex flex-col items-center justify-center px-4 py-12">
+    <div className="sign-in-page h-[100dvh] overflow-y-auto overscroll-y-contain bg-gradient-to-b from-[#1B3A6B] to-[#2a5298] flex flex-col items-center justify-center px-4 py-12">
       {/* Brand logo */}
-      <div className="mb-8 flex flex-col items-center gap-4">
+      <div className="sign-in-brand mb-8 flex flex-col items-center gap-4">
         <img
           src={`${basePath}/logo-icon.svg`}
           alt="Banglakhata"
@@ -21,7 +21,7 @@ export function SignInPage() {
           <p className="text-white font-extrabold text-3xl tracking-tight leading-tight">Banglakhata</p>
         </div>
       </div>
-      <div className="w-full max-w-[440px] space-y-6">
+      <div className="w-full max-w-[440px]">
         <SignInTabs />
       </div>
     </div>
@@ -34,7 +34,7 @@ function SignInTabs() {
   return (
     <div>
       {/* Tab bar */}
-      <div className="flex rounded-xl bg-white/20 p-1 mb-6">
+      <div className="sign-in-tab-bar flex rounded-xl bg-white/20 p-1 mb-6">
         <button
           onClick={() => setTab('clerk')}
           className={`flex-1 text-sm font-medium py-2 rounded-lg transition-colors ${
@@ -146,7 +146,7 @@ export function PhoneSignIn() {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8">
+    <div className="phone-sign-in-card bg-white rounded-2xl shadow-lg border border-slate-200 p-8">
 
       {step === 'phone' ? (
         <>
@@ -235,7 +235,7 @@ export function PhoneSignIn() {
         </>
       )}
 
-      <p className="text-center text-xs text-slate-400 mt-6">
+      <p className="phone-sign-in-footer text-center text-xs text-slate-400 mt-6">
         Don't have an account?{' '}
         <a href={`${basePath}/sign-up`} className="text-sky-600 hover:underline">
           Sign up

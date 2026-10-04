@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import WebView, { type WebViewNavigation } from 'react-native-webview';
 import { useColors } from '@/hooks/useColors';
@@ -146,9 +147,21 @@ export function WebAppScreen() {
       />
     );
 
+  const keyboardAwareWebsiteView = Platform.OS === 'web'
+    ? websiteView
+    : (
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoiding}
+        behavior="padding"
+        keyboardVerticalOffset={0}
+      >
+        {websiteView}
+      </KeyboardAvoidingView>
+    );
+
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
-      {websiteView}
+      {keyboardAwareWebsiteView}
 
       {loading && !loadFailed && (
         <View
@@ -194,6 +207,9 @@ const styles = StyleSheet.create({
   webView: {
     flex: 1,
     backgroundColor: 'transparent',
+  },
+  keyboardAvoiding: {
+    flex: 1,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFill,

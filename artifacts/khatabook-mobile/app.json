@@ -15,6 +15,7 @@
     "android": {
       "package": "com.banglakhata.mobile",
       "versionCode": 1,
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#F7F9FC"
