@@ -27,6 +27,28 @@ export function WebAppScreen() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
 
+  const handleLoadStart = useCallback(() => {
+    setLoading(true);
+    setLoadFailed(false);
+  }, []);
+
+  const handleLoadComplete = useCallback(() => {
+    setLoading(false);
+    setLoadFailed(false);
+  }, []);
+
+  const handleLoadFailure = useCallback(() => {
+    setLoading(false);
+    setLoadFailed(true);
+  }, []);
+
+  useEffect(() => {
+    if (!loading) return undefined;
+
+    const timeout = setTimeout(handleLoadFailure, 30_000);
+    return () => clearTimeout(timeout);
+  }, [handleLoadFailure, loading, retryKey]);
+
   useEffect(() => {
     if (Platform.OS === 'web') return undefined;
 
@@ -87,11 +109,8 @@ export function WebAppScreen() {
       src: webAppUrl,
       title: 'BanglaKhata',
       allow: 'camera; clipboard-read; clipboard-write',
-      onLoad: () => setLoading(false),
-      onError: () => {
-        setLoading(false);
-        setLoadFailed(true);
-      },
+      onLoad: handleLoadComplete,
+      onError: handleLoadFailure,
       style: {
         border: 0,
         display: 'block',
@@ -113,15 +132,14 @@ export function WebAppScreen() {
         thirdPartyCookiesEnabled
         setSupportMultipleWindows={false}
         allowsBackForwardNavigationGestures
-        onLoadStart={() => {
-          setLoading(true);
-          setLoadFailed(false);
+        onLoadStart={handleLoadStart}
+        onLoad={handleLoadComplete}
+        onLoadProgress={({ nativeEvent }) => {
+          if (nativeEvent.progress >= 1) handleLoadComplete();
         }}
         onLoadEnd={() => setLoading(false)}
-        onError={() => {
-          setLoading(false);
-          setLoadFailed(true);
-        }}
+        onError={handleLoadFailure}
+        onRenderProcessGone={handleLoadFailure}
         onNavigationStateChange={handleNavigationStateChange}
         onShouldStartLoadWithRequest={handleNavigationRequest}
         onOpenWindow={handleOpenWindow}
@@ -138,7 +156,9 @@ export function WebAppScreen() {
           style={[styles.loadingOverlay, { backgroundColor: colors.background }]}
         >
           <ActivityIndicator color={colors.primary} size="large" />
-          <Text style={[styles.body, { color: colors.mutedForeground }]}>বাংলাখাতা খোলা হচ্ছে…</Text>
+          <Text style={[styles.body, { color: colors.mutedForeground }]}>
+            বাংলাখাতা খোলা হচ্ছে… অ্যাপ না খুললে কিছুক্ষণ পর আবার চেষ্টা করুন।
+          </Text>
         </View>
       )}
 
