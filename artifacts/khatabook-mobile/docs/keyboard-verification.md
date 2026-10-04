@@ -2,7 +2,9 @@
 
 ## Expected keyboard-open layout
 
-The Expo app displays the website inside a native WebView. When the software
+The Expo app displays the website inside a full-screen native WebView. The
+website owns its safe-area and keyboard-responsive layout; the native shell
+does not add a second safe-area inset or keyboard offset. When the software
 keyboard opens:
 
 - **Phone OTP sign-in:** The WebView viewport adjusts. On short phone viewports,
@@ -13,16 +15,16 @@ keyboard opens:
 
 ## Verification status
 
-- **Android:** User-reported as tested and verified. The OTP field and ledger
-  amount fields stayed visible above the keyboard with the expected layout
-  adjustment.
+- **Android:** The keyboard and safe-area wrapper changed to use the website's
+  viewport logic directly; repeat device verification before calling this a
+  pass.
 - **iPhone:** Not tested. No iPhone is available in this preview environment;
   this result must not be treated as an iOS pass.
 
 ## Relevant implementation
 
-- `../components/WebAppScreen.tsx` wraps the native WebView in keyboard
-  avoidance.
+- `../components/WebAppScreen.tsx` gives the website the full native WebView
+  viewport and disables automatic native content insets.
 - `../app.json` configures Android to resize for the software keyboard.
 - `../../khatabook/src/pages/sign-in.tsx` and
   `../../khatabook/src/index.css` define

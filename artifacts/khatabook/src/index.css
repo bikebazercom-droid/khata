@@ -193,9 +193,9 @@ textarea {
 
 /*
  * Keep compact sign-in forms visible while mobile keyboards are open.
- * The native WebView is resized by KeyboardAvoidingView/Android adjustResize;
- * this breakpoint removes the non-essential brand block when that reduced
- * viewport is shorter than a typical phone screen.
+ * The website owns responsive viewport handling in the browser and native
+ * WebView; Android uses adjustResize, while WebKit reports its visual viewport.
+ * Hide non-essential branding when that reduced viewport is short.
  */
 .sign-in-page {
   scroll-padding-block: 16px;
