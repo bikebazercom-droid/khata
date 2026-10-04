@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
 import { useBusinessContext, type BusinessInfo } from '@/lib/businessContext';
 import { useLanguage } from '@/lib/i18n';
-import { allowOfflineBusinesses, readOfflineIdentity } from '@/lib/authCache';
 
 function initials(name: string): string {
   return name
@@ -44,8 +43,6 @@ export function BusinessSwitcherDrawer() {
       if (!res.ok) return;
       const data: BusinessInfo[] = await res.json();
       setBusinesses(data);
-      const identity = readOfflineIdentity();
-      if (identity) allowOfflineBusinesses(identity.userId, data.map((business) => business.id));
       if (!selectedBusinessId && data.length > 0) {
         setSelectedBusiness(data[0]!.id);
       }

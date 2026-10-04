@@ -30,8 +30,6 @@ import { phoneLogout } from '@/lib/phoneAuth';
 import { clearAllPendingUploads } from '@/lib/pendingUploads';
 import { useLanguage } from '@/lib/i18n';
 import { useAppAuth } from '@/App';
-import { clearOfflineIdentity, readOfflineIdentity } from '@/lib/authCache';
-import { clearActorViews } from '@/lib/queryPersister';
 import { revokeNetworkWrites } from '@/lib/useAuthConnectivity';
 
 /** Shape stored in localStorage under PROFILE_KEY */
@@ -141,9 +139,6 @@ export function SettingsDrawer({
 
       queryClient.clear();
       revokeNetworkWrites();
-      const actor = readOfflineIdentity()?.userId;
-      if (actor) clearActorViews(actor);
-      clearOfflineIdentity();
       clearAllPendingUploads();
       localStorage.clear();
       setShowDeleteConfirm(false);
@@ -189,9 +184,6 @@ export function SettingsDrawer({
       if (isSignedIn) await signOut();
       queryClient.clear();
       revokeNetworkWrites();
-      const actor = readOfflineIdentity()?.userId;
-      if (actor) clearActorViews(actor);
-      clearOfflineIdentity();
       localStorage.removeItem('selected_business_id');
       clearAllPendingUploads();
       onOpenChange(false);

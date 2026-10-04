@@ -25,11 +25,10 @@ import { toast } from 'sonner';
 import { useLanguage } from '@/lib/i18n';
 import { useAppAuth } from '@/App';
 import { ENTRY_OUTBOX_CHANGED, listRejectedEntries } from '@/lib/entryOutbox';
-import { readOfflineIdentity } from '@/lib/authCache';
 
 export function HomeView() {
   const { openSwitcher, businesses, selectedBusinessId } = useBusinessContext();
-  const { role: userRole, userId } = useAppAuth();
+  const { role: userRole, userId, businessId } = useAppAuth();
   const activeBusiness = businesses.find((b) => b.id === selectedBusinessId);
   const [role, setRole] = useState<PartyRole>(PartyRole.CUSTOMER);
   const [search, setSearch] = useState('');
@@ -96,8 +95,7 @@ export function HomeView() {
     if (userRole !== 'owner' || !userId || !selectedBusinessId) return;
     let active = true;
     const refresh = () => {
-      const identity = readOfflineIdentity();
-      const includeLegacyUnscoped = identity?.userId === userId && identity.businessId === selectedBusinessId;
+      const includeLegacyUnscoped = businessId === selectedBusinessId;
       void listRejectedEntries(userId, selectedBusinessId, includeLegacyUnscoped)
         .then((entries) => {
           if (active) setRejectedDraftSummary({ scope: businessScopeKey, count: entries.length });
@@ -112,7 +110,7 @@ export function HomeView() {
       active = false;
       window.removeEventListener(ENTRY_OUTBOX_CHANGED, refresh);
     };
-  }, [userRole, userId, selectedBusinessId, businessScopeKey]);
+  }, [userRole, userId, businessId, selectedBusinessId, businessScopeKey]);
 
   const parties = useMemo(() => {
     let result = rawParties;

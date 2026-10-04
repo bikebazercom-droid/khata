@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { clearOfflineIdentity, readOfflineIdentity, writeOfflineIdentity } from './authCache';
-import { clearActorViews, pausePersistedCache } from './queryPersister';
 import { fetchMe } from './phoneAuth';
-import { clearAllPendingUploads } from './pendingUploads';
 
 export type AuthConnectivity = 'probing' | 'online' | 'offline';
 export const AUTH_PROBE_TIMEOUT_MS = 6000;
@@ -15,7 +12,7 @@ export function revokeNetworkWrites() { networkWritesAuthorized = false; }
 /**
  * Probe our own server before mounting Clerk or any mutating application UI.
  * navigator.onLine is advisory: captive portals and dead upstream connections
- * still report true. A local identity only authorizes the read-only offline view.
+ * still report true. Without the server, browser ledger routes stay unavailable.
  */
 export function useAuthConnectivity(clearQueries: () => void) {
   const [phase, setPhase] = useState<AuthConnectivity>(() => navigator.onLine ? 'probing' : 'offline');
@@ -31,7 +28,6 @@ export function useAuthConnectivity(clearQueries: () => void) {
     activeProbe.current?.abort();
     activeProbe.current = null;
     settled.current = false;
-    pausePersistedCache();
     clearQueries();
     setPhase('offline');
   }, [clearQueries]);
@@ -48,19 +44,6 @@ export function useAuthConnectivity(clearQueries: () => void) {
       const me = await fetchMe(controller.signal);
       if (id !== attempt.current) return;
       if (!me.userId || !me.businessId || (me.role !== 'owner' && me.role !== 'staff')) throw new Error('Invalid identity response');
-      const previous = readOfflineIdentity();
-      if (previous && previous.userId !== me.userId) {
-        clearQueries();
-        clearAllPendingUploads();
-        clearActorViews(previous.userId);
-        clearOfflineIdentity();
-        localStorage.removeItem('selected_business_id');
-      } else if (previous && (previous.role !== me.role ||
-        JSON.stringify(previous.adjustmentPartyIds) !== JSON.stringify((me as typeof me & { adjustmentPartyIds?: string[] }).adjustmentPartyIds ?? []))) {
-        clearQueries();
-        clearActorViews(me.userId);
-      }
-      writeOfflineIdentity(me);
       settled.current = false;
       setPhase('online');
     } catch (error) {
@@ -68,9 +51,6 @@ export function useAuthConnectivity(clearQueries: () => void) {
       const status = (error as Error & { status?: number }).status;
       if (status === 401 || status === 403) {
         revokeNetworkWrites();
-        const actor = readOfflineIdentity()?.userId;
-        if (actor) clearActorViews(actor);
-        clearOfflineIdentity();
         clearQueries();
         settled.current = false;
         setPhase('online'); // public landing / sign-in; never local offline ledger

@@ -6,7 +6,6 @@ import { toast } from 'sonner';
 import { useAppAuth } from '@/App';
 import { useBusinessContext } from '@/lib/businessContext';
 import { businessScopedQueryKey } from '@/lib/businessQueryKey';
-import { readOfflineIdentity } from '@/lib/authCache';
 import {
   discardRejectedEntry,
   ENTRY_OUTBOX_CHANGED,
@@ -27,7 +26,7 @@ function formatCreatedAt(value: string): string {
 }
 
 export function RejectedDraftsPage() {
-  const { userId } = useAppAuth();
+  const { userId, businessId } = useAppAuth();
   const { selectedBusinessId } = useBusinessContext();
   const [, navigate] = useLocation();
   const partiesParams = {};
@@ -58,9 +57,7 @@ export function RejectedDraftsPage() {
       setLoading(true);
       setLoadError('');
       try {
-        const identity = readOfflineIdentity();
-        const includeLegacyUnscoped = identity?.userId === userId &&
-          identity.businessId === selectedBusinessId;
+        const includeLegacyUnscoped = businessId === selectedBusinessId;
         const rejected = await listRejectedEntries(userId, selectedBusinessId, includeLegacyUnscoped);
         if (active) setSnapshot({ scope: activeScope, entries: rejected });
       } catch {
@@ -76,7 +73,7 @@ export function RejectedDraftsPage() {
       active = false;
       window.removeEventListener(ENTRY_OUTBOX_CHANGED, load);
     };
-  }, [userId, selectedBusinessId, reloadKey]);
+  }, [userId, businessId, selectedBusinessId, reloadKey]);
 
   const discard = async (entry: QueuedEntry) => {
     if (!userId || !selectedBusinessId) return;
@@ -89,9 +86,7 @@ export function RejectedDraftsPage() {
 
     setDiscardingId(entry.id);
     try {
-      const identity = readOfflineIdentity();
-      const includeLegacyUnscoped = identity?.userId === userId &&
-        identity.businessId === selectedBusinessId;
+      const includeLegacyUnscoped = businessId === selectedBusinessId;
       const removed = await discardRejectedEntry(
         entry.id,
         userId,

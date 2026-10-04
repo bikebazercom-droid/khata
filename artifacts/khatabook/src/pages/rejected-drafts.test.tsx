@@ -14,15 +14,11 @@ vi.mock('wouter', () => ({
 }));
 
 vi.mock('@/App', () => ({
-  useAppAuth: () => ({ userId: 'owner-A' }),
+  useAppAuth: () => ({ userId: 'owner-A', businessId: 'business-A' }),
 }));
 
 vi.mock('@/lib/businessContext', () => ({
   useBusinessContext: () => ({ selectedBusinessId: 'business-A' }),
-}));
-
-vi.mock('@/lib/authCache', () => ({
-  readOfflineIdentity: () => null,
 }));
 
 vi.mock('@/lib/entryOutbox', () => ({
@@ -90,7 +86,7 @@ describe('rejected browser drafts', () => {
       'draft-rejected',
       'owner-A',
       'business-A',
-      false,
+      true,
     ));
   });
 });

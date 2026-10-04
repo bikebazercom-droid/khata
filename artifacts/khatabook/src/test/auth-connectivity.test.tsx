@@ -1,24 +1,24 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { isNetworkWriteAuthorized, markServerReauthenticated, revokeNetworkWrites, useAuthConnectivity } from '../lib/useAuthConnectivity';
-import { clearOfflineIdentity, readOfflineIdentity, writeOfflineIdentity } from '../lib/authCache';
-import { getOfflineEntries, pausePersistedCache } from '../lib/queryPersister';
 
 const me = { userId: 'actor', businessId: 'biz', authMethod: 'phone' as const, role: 'owner' as const };
 function online() { Object.defineProperty(navigator, 'onLine', { configurable: true, value: true }); }
 
 describe('cold auth connectivity gate', () => {
   beforeEach(() => {
-    pausePersistedCache();
     revokeNetworkWrites();
     localStorage.clear();
     online();
     vi.useFakeTimers();
-    writeOfflineIdentity(me);
   });
-  afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); clearOfflineIdentity(); });
+  afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
-  it('shows only the scoped read-only offline path when navigator claims online but fetch throws TypeError', async () => {
+  it('requires a live server and leaves old local data untouched when fetch fails', async () => {
+    const oldSnapshot = JSON.stringify({ ts: 1, entries: { '["/api/parties"]': [{ id: 'old-party' }] } });
+    const oldIdentity = JSON.stringify({ userId: 'old-actor', businessId: 'old-business' });
+    localStorage.setItem('dkhata_offline_view_v2:old', oldSnapshot);
+    localStorage.setItem('dkhata_offline_identity_v2', oldIdentity);
     const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
     vi.stubGlobal('fetch', fetchMock);
     const clear = vi.fn();
@@ -31,19 +31,24 @@ describe('cold auth connectivity gate', () => {
       cache: 'no-store',
     }));
     expect(isNetworkWriteAuthorized()).toBe(false);
-    expect(readOfflineIdentity()?.userId).toBe('actor');
     expect(clear).toHaveBeenCalled();
-    expect(getOfflineEntries('another-actor', 'owner', 'biz')).toEqual({});
+    expect(localStorage.getItem('dkhata_offline_view_v2:old')).toBe(oldSnapshot);
+    expect(localStorage.getItem('dkhata_offline_identity_v2')).toBe(oldIdentity);
     unmount();
   });
 
-  it.each([401, 403])('revokes cached identity on definitive HTTP %i, never grants an offline view', async (status) => {
+  it.each([401, 403])('keeps legacy local data untouched after definitive HTTP %i', async (status) => {
+    const oldSnapshot = JSON.stringify({ ts: 1, entries: { '["/api/parties"]': [{ id: 'old-party' }] } });
+    const oldIdentity = JSON.stringify({ userId: 'old-actor', businessId: 'old-business' });
+    localStorage.setItem('dkhata_offline_view_v2:old', oldSnapshot);
+    localStorage.setItem('dkhata_offline_identity_v2', oldIdentity);
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status }));
     const clear = vi.fn();
     const { result, unmount } = renderHook(() => useAuthConnectivity(clear));
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(result.current.phase).toBe('online'); // public Clerk/sign-in only
-    expect(readOfflineIdentity()).toBeNull();
+    expect(localStorage.getItem('dkhata_offline_view_v2:old')).toBe(oldSnapshot);
+    expect(localStorage.getItem('dkhata_offline_identity_v2')).toBe(oldIdentity);
     expect(isNetworkWriteAuthorized()).toBe(false);
     unmount();
   });
@@ -63,6 +68,7 @@ describe('cold auth connectivity gate', () => {
     });
     expect(result.current.phase).toBe('online');
     expect(isNetworkWriteAuthorized()).toBe(false); // /me probe alone cannot replay drafts
+    expect(localStorage.getItem('dkhata_offline_identity_v2')).toBeNull();
     await act(async () => { vi.advanceTimersByTime(8001); });
     expect(result.current.phase).toBe('offline'); // Clerk CDN cannot strand a splash forever
     expect(isNetworkWriteAuthorized()).toBe(false);

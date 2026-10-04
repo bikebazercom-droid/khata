@@ -13,8 +13,6 @@ import { fetchMe } from '@/lib/phoneAuth';
 import { authMeQueryKey } from '@/lib/authQueryKeys';
 import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import { useRetryPendingUploads } from '@/lib/useRetryPendingUploads';
-import { readOfflineIdentity, writeOfflineIdentity, clearOfflineIdentity, allowOfflineBusinesses } from '@/lib/authCache';
-import { setPersistedScope, persistCache, pausePersistedCache, clearActorViews } from '@/lib/queryPersister';
 import { BusinessContextProvider } from '@/lib/businessContext';
 import { BusinessSwitcherDrawer } from '@/components/modals/business-switcher-drawer';
 import { LanguageProvider } from '@/lib/i18n';
@@ -113,15 +111,9 @@ const clerkAppearance = {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // ── Offline-first configuration ──────────────────────────────────────
-      //
-      // networkMode: 'offlineFirst' — queries fire regardless of what the
-      // browser's navigator.onLine reports. When the network is genuinely
-      // unreachable the query will fail as normal, but the persisted cache
-      // (restored synchronously before first render) means the UI shows
-      // real data rather than an empty/loading state. Background refetches
-      // are paused while offline and resume the moment connectivity returns.
-      networkMode: 'offlineFirst',
+      // Browser ledger queries require a live server response. The offline
+      // connection gate prevents ledger routes from mounting without one.
+      networkMode: 'online',
       //
       // staleTime: 5 min — reduces unnecessary background refetches on
       // every tab switch or component mount. SSE-driven invalidateQueries
@@ -129,9 +121,8 @@ const queryClient = new QueryClient({
       // just a ceiling on "how long can data stay fresh without SSE".
       staleTime: 5 * 60 * 1000,
       //
-      // gcTime: 24 h — keeps query results in the in-memory cache overnight.
-      // The queryPersister also writes to localStorage (24 h TTL), so both
-      // layers stay aligned.
+      // Keep successful results in memory only; the browser no longer stores
+      // ledger query snapshots in localStorage.
       gcTime: 24 * 60 * 60 * 1000,
       //
       // refetchOnWindowFocus: false — the SSE connection + visibilitychange
@@ -152,10 +143,6 @@ const queryClient = new QueryClient({
     },
   },
 });
-persistCache(queryClient);
-
-// ── Seed the QueryClient with last-session data before the first render ───────
-// (Removed persisted query restore to prevent cross-account cache leak)
 
 // ─── Real-time sync ───────────────────────────────────────────────────────────
 
@@ -225,6 +212,11 @@ function AuthCacheInvalidator() {
   const qc = useQueryClient();
   const { selectedBusinessId, setSelectedBusiness } = useBusinessContext();
   const { isLoaded, userId: clerkUserId } = useAuth();
+  const previousAuthorization = useRef<{
+    userId: string;
+    role: string | undefined;
+    adjustmentPartyIds: string[];
+  } | null>(null);
   const { data: me, isError, error } = useQuery({
     queryKey: authMeQueryKey(clerkUserId),
     queryFn: () => fetchMe(),
@@ -236,36 +228,24 @@ function AuthCacheInvalidator() {
   useEffect(() => {
     if (isError && [401, 403].includes((error as Error & { status?: number })?.status ?? 0)) {
       qc.clear();
-      const actor = readOfflineIdentity()?.userId;
-      if (actor) clearActorViews(actor);
-      clearOfflineIdentity();
+      previousAuthorization.current = null;
       return;
     }
     if (isError) return; // A stale successful query is not fresh permission.
     if (!me?.userId || !me.businessId) return;
-    const previous = readOfflineIdentity();
-    if (previous && previous.userId === me.userId &&
-      (previous.role !== me.role || JSON.stringify(previous.adjustmentPartyIds) !== JSON.stringify((me as typeof me & { adjustmentPartyIds?: string[] }).adjustmentPartyIds ?? []))) {
-      clearActorViews(me.userId);
-    }
+    const adjustmentPartyIds = (me as typeof me & { adjustmentPartyIds?: string[] }).adjustmentPartyIds ?? [];
+    const previous = previousAuthorization.current;
     if (previous && previous.userId !== me.userId) {
       qc.clear();
       clearAllPendingUploads();
-      clearActorViews(previous.userId);
-      clearOfflineIdentity();
       localStorage.removeItem('selected_business_id');
       setSelectedBusiness(me.businessId);
+    } else if (previous && (previous.role !== me.role ||
+      JSON.stringify(previous.adjustmentPartyIds) !== JSON.stringify(adjustmentPartyIds))) {
+      qc.removeQueries({ predicate: (query) => query.queryKey[0] !== 'auth-me' });
     }
-    writeOfflineIdentity(me);
-    const identity = readOfflineIdentity();
-    const business = previous?.userId !== me.userId ? me.businessId : selectedBusinessId || me.businessId;
-    if (identity?.permittedBusinessIds.includes(business)) {
-      setPersistedScope(qc, me.userId, me.role ?? 'staff', business);
-    } else {
-      qc.clear();
-      pausePersistedCache();
-    }
-  }, [me, selectedBusinessId, isError, error, qc, setSelectedBusiness]);
+    previousAuthorization.current = { userId: me.userId, role: me.role, adjustmentPartyIds };
+  }, [me, isError, error, qc, setSelectedBusiness]);
 
   useEffect(() => {
     if (!me?.userId || isError) return;
@@ -273,14 +253,11 @@ function AuthCacheInvalidator() {
     void fetch('/api/businesses', { credentials: 'include' }).then(async (response) => {
       if (!response.ok) return;
       const businesses = await response.json() as { id: string }[];
-      if (active && readOfflineIdentity()?.userId === me.userId) {
+      if (active) {
         const ids = businesses.map((business) => business.id);
-        allowOfflineBusinesses(me.userId, ids);
         if (selectedBusinessId && !ids.includes(selectedBusinessId)) {
-          clearActorViews(me.userId);
+          qc.removeQueries({ predicate: (query) => query.queryKey[0] !== 'auth-me' });
           setSelectedBusiness(me.businessId);
-        } else if (selectedBusinessId && ids.includes(selectedBusinessId)) {
-          setPersistedScope(qc, me.userId, me.role ?? 'staff', selectedBusinessId);
         }
       }
     }).catch(() => { /* No new local business grants during an outage. */ });
@@ -297,10 +274,8 @@ function AuthCacheInvalidator() {
  * phone-OTP path. Phone auth is confirmed by a successful /api/auth/me fetch
  * (the server reads the httpOnly `phone_session` cookie).
  *
- * Optimistic loading: if a previous session was cached in localStorage we
- * treat the user as authenticated immediately, skipping the spinner entirely.
- * The real check still runs in the background — if it fails (session expired),
- * we clear the cache and redirect to sign-in seamlessly.
+ * Authentication and business permissions come from the live /api/auth/me
+ * response; no browser-cached identity is used to authorize ledger access.
  */
 export function useAppAuth() {
   const { isLoaded, isSignedIn: clerkSignedIn, userId: clerkUserId } = useAuth();
@@ -335,7 +310,7 @@ export function useAppAuth() {
 
   // ── Development bypass — returned AFTER all hooks so hook order is stable ──
   if (devBypass) {
-    return { isAuthenticated: true, isLoading: false, authMethod: 'dev' as const, role: 'owner' as const, userId: 'dev-user', adjustmentPartyIds: [] as string[] };
+    return { isAuthenticated: true, isLoading: false, authMethod: 'dev' as const, role: 'owner' as const, userId: 'dev-user', businessId: null, adjustmentPartyIds: [] as string[] };
   }
 
   return {
@@ -344,6 +319,7 @@ export function useAppAuth() {
     authMethod: clerkSignedIn ? 'clerk' : (authData ? 'phone' : null),
     role,
     userId: authData?.userId,
+    businessId: authData?.businessId ?? null,
     adjustmentPartyIds: (authData as (typeof authData & { adjustmentPartyIds?: string[] }) | undefined)?.adjustmentPartyIds ?? [],
     authError: isError ? (error as Error).message : null,
   };
