@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   scanDocument: vi.fn(),
   queueEntry: vi.fn(),
   playCalculatorTapSound: vi.fn(),
+  playTransactionSuccessSound: vi.fn(),
 }));
 
 vi.mock('@workspace/api-client-react', async (importOriginal) => {
@@ -60,6 +61,10 @@ vi.mock('@/lib/entryOutbox', () => ({
 
 vi.mock('@/lib/calculator-sound', () => ({
   playCalculatorTapSound: mocks.playCalculatorTapSound,
+}));
+
+vi.mock('@/lib/transaction-success-sound', () => ({
+  playTransactionSuccessSound: mocks.playTransactionSuccessSound,
 }));
 
 import { TransactionEntryScreen } from '../components/modals/transaction-entry-screen';
@@ -127,6 +132,7 @@ describe('browser ledger entry submission', () => {
     mocks.scanDocument.mockResolvedValue('data:image/jpeg;base64,captured-bill');
     mocks.queueEntry.mockReset();
     mocks.playCalculatorTapSound.mockReset();
+    mocks.playTransactionSuccessSound.mockReset();
     mocks.createLedgerEntry.mockResolvedValue({ id: 'entry-1' });
   });
 
@@ -212,6 +218,7 @@ describe('browser ledger entry submission', () => {
     saveEntry();
 
     await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    expect(mocks.playTransactionSuccessSound).toHaveBeenCalledOnce();
     expect(mocks.uploadBillImage).toHaveBeenCalledWith('data:image/jpeg;base64,captured-bill');
     expect(mocks.createLedgerEntry).toHaveBeenCalledOnce();
     expect(mocks.createLedgerEntry).toHaveBeenCalledWith(
@@ -277,10 +284,12 @@ describe('browser ledger entry submission', () => {
     saveEntry();
     await waitFor(() => expect(mocks.createLedgerEntry).toHaveBeenCalledOnce());
     expect(onClose).not.toHaveBeenCalled();
+    expect(mocks.playTransactionSuccessSound).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'এন্ট্রি নিশ্চিত করুন' })).toBeInTheDocument();
 
     saveEntry();
     await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    expect(mocks.playTransactionSuccessSound).toHaveBeenCalledOnce();
 
     const firstRequest = mocks.createLedgerEntry.mock.calls[0][1];
     const retryRequest = mocks.createLedgerEntry.mock.calls[1][1];
@@ -299,6 +308,7 @@ describe('browser ledger entry submission', () => {
     await waitFor(() => expect(mocks.uploadBillImage).toHaveBeenCalledOnce());
     expect(mocks.createLedgerEntry).not.toHaveBeenCalled();
     expect(mocks.queueEntry).not.toHaveBeenCalled();
+    expect(mocks.playTransactionSuccessSound).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'এন্ট্রি নিশ্চিত করুন' })).toBeInTheDocument();
   });

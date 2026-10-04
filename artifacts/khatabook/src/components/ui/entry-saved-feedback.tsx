@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check } from 'lucide-react';
+import { playTransactionSuccessSound } from '@/lib/transaction-success-sound';
 
 const ENTRY_SAVED_EVENT = 'banglakhata:entry-saved';
 const FEEDBACK_DURATION_MS = 640;
@@ -8,6 +9,7 @@ const FEEDBACK_DURATION_MS = 640;
 export function notifyEntrySaved() {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event(ENTRY_SAVED_EVENT));
+    playTransactionSuccessSound();
   }
 }
 

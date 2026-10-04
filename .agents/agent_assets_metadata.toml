@@ -126,3 +126,17 @@ mtime_ms = 1790771077334
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/3c827869-977f-40f5-bc4e-38d7a390809b/0b821fd8-a40b-4fb1-8723-42ca5342cee8"
 storage_version_token = "1790771085782852"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "qbuPbwFPEyLs8b4b2zadw"
+uri = "file://artifacts/khatabook/public/sounds/transaction-success.mp3"
+type = "audio"
+title = "Ledger entry success chime"
+description = "A brief, soft two-note chime used after an entry is successfully saved."
+logical_id = "ad84007f-7cf9-43fa-a981-646d9c2f3c05"
+content_hash = "sha256:455b53265f35234b8b1ed552e05de2e46a30a6f09c108ecaa0b1ba872e814a48"
+size = 8195
+mtime_ms = 1791110179486
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:439482f1-6578-43b8-9b74-2a0f15d228cf/ad84007f-7cf9-43fa-a981-646d9c2f3c05/9d74842d-a472-463b-ad41-171c552f17d4"
+storage_version_token = "1791110697491671"
+content_type = "audio/mpeg"

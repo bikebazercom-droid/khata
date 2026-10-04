@@ -15,6 +15,7 @@ import WebView, { type WebViewNavigation } from 'react-native-webview';
 import { useAudioPlayer } from 'expo-audio';
 import { useColors } from '@/hooks/useColors';
 import { getWebAppUrl } from '@/lib/webAppUrl';
+import { useTransactionSuccessSound } from '@/lib/useTransactionSuccessSound';
 
 function isBrowserUrl(url: string) {
   return /^(https?:|about:|blob:|data:)/i.test(url);
@@ -22,6 +23,7 @@ function isBrowserUrl(url: string) {
 
 export function WebAppScreen() {
   const colors = useColors();
+  const playSuccessSound = useTransactionSuccessSound();
   const calculatorAudioPlayer = useAudioPlayer(
     require('../assets/audio/calculator-key-tap.mp3'),
     { downloadFirst: true },
@@ -97,6 +99,10 @@ export function WebAppScreen() {
   }, []);
 
   const handleWebViewMessage = useCallback((event: { nativeEvent: { data: string } }) => {
+    if (event.nativeEvent.data === 'transaction-success') {
+      playSuccessSound();
+      return;
+    }
     if (event.nativeEvent.data !== 'calculator-key-tap') return;
 
     try {
@@ -109,7 +115,7 @@ export function WebAppScreen() {
     } catch {
       // Audio is optional and must not block calculator interactions.
     }
-  }, [calculatorAudioPlayer]);
+  }, [calculatorAudioPlayer, playSuccessSound]);
 
   if (!webAppUrl) {
     return (

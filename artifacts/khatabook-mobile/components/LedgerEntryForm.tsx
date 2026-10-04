@@ -24,6 +24,7 @@ import { Calculator } from '@/components/Calculator';
 import { DatePickerField } from '@/components/DatePickerField';
 import { useAuth } from '@/contexts/AuthContext';
 import { useColors } from '@/hooks/useColors';
+import { useTransactionSuccessSound } from '@/lib/useTransactionSuccessSound';
 import {
   apiBaseUrl,
   errorMessage,
@@ -46,6 +47,7 @@ type EntryType = 'YOU_GAVE' | 'YOU_GOT';
 
 export function LedgerEntryForm({ mode, partyId: initialPartyId, entry, initialType }: Props) {
   const colors = useColors();
+  const playSuccessSound = useTransactionSuccessSound();
   const { identity, token } = useAuth();
   const queryClient = useQueryClient();
   const createEntry = useCreateLedgerEntry();
@@ -246,6 +248,7 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry, initialT
           partyId: targetPartyId,
           data: { ...payload, clientRequestId: requestRef.current.id },
         });
+        playSuccessSound();
         await invalidateLedger(targetPartyId);
         router.replace({ pathname: '/party/[partyId]', params: { partyId: targetPartyId } });
       } else if (entry) {
@@ -261,6 +264,7 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry, initialT
             dueDate: dueDate || null,
           },
         });
+        playSuccessSound();
         await invalidateLedger(targetPartyId);
         router.back();
       }
