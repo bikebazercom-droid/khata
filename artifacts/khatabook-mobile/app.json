@@ -42,7 +42,8 @@
           "backgroundColor": "#F7F9FC"
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true,
