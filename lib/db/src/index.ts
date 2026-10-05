@@ -13,4 +13,16 @@ if (!process.env.DATABASE_URL) {
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 export const db = drizzle(pool, { schema });
 
+// Keep health probes isolated from normal database traffic and bound both
+// connection acquisition and query execution so a stalled probe can't occupy
+// the application pool indefinitely.
+export const readinessPool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 1,
+  connectionTimeoutMillis: 2_000,
+  query_timeout: 2_000,
+  statement_timeout: 2_000,
+});
+export const readinessDb = drizzle(readinessPool, { schema });
+
 export * from "./schema";
