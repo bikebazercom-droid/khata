@@ -36,14 +36,26 @@ configuration alone does not ensure that the platform and build tools exist.
 **How to apply:** Check the generated project's requested SDK versions and make
 them available before attempting release assembly.
 
-A full release attempt under OpenJDK 17 and a retry under OpenJDK 21 crashed
-inside libjvm with SIGBUS during Gradle operations, including after reducing
-Gradle concurrency. The crashes occurred at different JVM frames and produced
-no APK.
+In the shared, memory-limited workspace, cap Metro's Node heap at 1 GiB and keep
+CMake at one compiler, but preserve the Android project's 2 GiB Gradle heap.
+Reducing Gradle to 1 GiB let Metro finish but caused D8's dex merge to fail with
+Java heap exhaustion; the project's configured 2 GiB heap completed release
+assembly.
 
-**Why:** Reproducing across two supported Java versions points to a workspace or
-host-level problem rather than one JDK patch or broken application source.
+**Why:** The 8 GiB container also runs the app workflows. Node's uncapped heap
+was externally killed during Metro bundling, while an over-reduced Gradle heap
+starved D8, which runs in Gradle's no-isolation worker.
 
-**How to apply:** Avoid repeating the same local build setup. Use another
-supported build environment, then require a successful release assemble and
-verify the APK signature before delivery.
+**How to apply:** For local release builds, use `NODE_OPTIONS=--max-old-space-size=1024`,
+`CMAKE_BUILD_PARALLEL_LEVEL=1`, one Gradle worker, and the project's existing
+`-Xmx2048m` setting. Verify package metadata and the signing certificate with
+`aapt` and `apksigner`.
+
+Info-ZIP `unzip -t` reported zero-length extra-field warnings for the verified
+APK even though `aapt` parsed it, `apksigner` accepted it, and Python's ZIP CRC
+test passed.
+
+**Why:** Generic ZIP tooling can misreport Android APK extra fields.
+
+**How to apply:** Treat Android's APK tools and an entry CRC check as stronger
+validation than `unzip -t` alone.
