@@ -20,8 +20,9 @@ export const readinessPool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 1,
   connectionTimeoutMillis: 2_000,
-  query_timeout: 2_000,
-  statement_timeout: 2_000,
+  // Let node-postgres discard timed-out clients before the server-side backstop.
+  query_timeout: 1_500,
+  statement_timeout: 5_000,
 });
 export const readinessDb = drizzle(readinessPool, { schema });
 

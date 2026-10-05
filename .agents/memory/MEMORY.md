@@ -10,6 +10,7 @@
 - [Browser legacy outbox transition](browser-legacy-outbox.md) — new browser entries go online; keep prior drafts recoverable during the transition.
 - [Offline shell validation](offline-shell-validation.md) — service-worker checks need compiled assets and a browser-reachable secure origin.
 - [API integration test concurrency](api-integration-test-concurrency.md) — database-backed suites can fail nondeterministically when Vitest runs test files in parallel.
+- [Readiness probe pool](readiness-probe-pool.md) — keep readiness checks isolated and let the client timeout discard its connection before the server-side fallback.
 - [PostgreSQL pooler compatibility](supabase-postgres-pooler.md) — the event bus needs persistent LISTEN/NOTIFY; Supabase transaction pooling is incompatible.
 - [Hostinger Node entry file](hostinger-node-entry-file.md) — Hostinger's Entry File must point to the compiled server file, not the package command `pnpm start`.
 - [Legacy download-channel compatibility](download-channel-compatibility.md) — retire inactive UI/API routes without dropping stored channel columns; static exports must keep their existing Clerk tenant and path settings.
