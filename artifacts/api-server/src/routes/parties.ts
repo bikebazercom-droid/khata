@@ -12,7 +12,10 @@ import {
   workerPartyAssignmentsTable,
 } from "@workspace/db";
 import { broadcast } from "../lib/eventBus";
-import { createOwnerEntryNotifications, publishOwnerEntryNotifications } from "../lib/ownerNotifications";
+import {
+  createOwnerEntryNotificationsBestEffort,
+  publishOwnerEntryNotifications,
+} from "../lib/ownerNotifications";
 import {
   ListPartiesQueryParams,
   ListPartiesResponse,
@@ -551,16 +554,9 @@ router.post(
           .update(partiesTable)
           .set({ ...partyBBalance, lastTransactionAt: now })
           .where(eq(partiesTable.id, transferPartyId));
-        const notifications = role === "staff"
-          ? await createOwnerEntryNotifications(tx, {
-            businessId,
-            actorUserId: userId,
-            entries: [{ entryId: primaryEntry!.id, partyId: party.id, partyName: party.name }],
-          })
-          : [];
         await saveRequest(tx, businessId, userId, clientRequestId, fingerprint,
           { ...primaryEntry!, linkedEntryId: counterEntry!.id });
-        return { status: "created", notifications } as const;
+        return { status: "created" } as const;
       });
       if (result.status === "denied") { res.status(403).json({ error: "Adjustment is not permitted" }); return; }
       if (result.status === "role_mismatch") {
@@ -585,7 +581,14 @@ router.post(
       // return rows without .returning(), so we patch them manually here).
       const primaryEntryFinal = { ...primaryEntry!, linkedEntryId: counterEntry!.id };
 
-      publishOwnerEntryNotifications(result.notifications);
+      const notifications = role === "staff"
+        ? await createOwnerEntryNotificationsBestEffort({
+          businessId,
+          actorUserId: userId,
+          entries: [{ entryId: primaryEntry!.id, partyId: party.id, partyName: party.name }],
+        })
+        : [];
+      publishOwnerEntryNotifications(notifications);
       broadcast(businessId, { type: "ledger.created", payload: { partyId: party.id, entryId: primaryEntry!.id } });
       broadcast(businessId, { type: "ledger.created", payload: { partyId: transferPartyId, entryId: counterEntry!.id } });
 
@@ -639,15 +642,8 @@ router.post(
         ...(dueDate ? { dueDate: toDateOnlyString(dueDate) } : {}),
       })
       .where(eq(partiesTable.id, party.id));
-    const notifications = role === "staff"
-      ? await createOwnerEntryNotifications(tx, {
-        businessId,
-        actorUserId: userId,
-        entries: [{ entryId: saved!.id, partyId: party.id, partyName: party.name }],
-      })
-      : [];
     await saveRequest(tx, businessId, userId, clientRequestId, fingerprint, saved!);
-    return { status: "created", entry: saved!, notifications } as const;
+    return { status: "created", entry: saved! } as const;
     });
     if (result.status === "denied") { res.status(403).json({ error: "Party access was revoked" }); return; }
     if (result.status === "conflict") { res.status(409).json({ error: "Request ID was already used for different entry data" }); return; }
@@ -664,7 +660,14 @@ router.post(
     }
     const entry = result.entry;
 
-    publishOwnerEntryNotifications(result.notifications);
+    const notifications = role === "staff"
+      ? await createOwnerEntryNotificationsBestEffort({
+        businessId,
+        actorUserId: userId,
+        entries: [{ entryId: entry!.id, partyId: party.id, partyName: party.name }],
+      })
+      : [];
+    publishOwnerEntryNotifications(notifications);
     broadcast(businessId, { type: 'ledger.created', payload: { partyId: party.id, entryId: entry!.id } });
 
     res.status(201).json(

@@ -15,6 +15,7 @@ import authRouter from "./auth";
 import partiesRouter from "./parties";
 import ledgerRouter from "./ledger";
 import notificationsRouter from "./notifications";
+import { createOwnerEntryNotificationsBestEffort } from "../lib/ownerNotifications";
 
 const clerk = vi.hoisted(() => ({ id: "" }));
 vi.mock("@clerk/express", () => ({
@@ -131,6 +132,18 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
       .send({ token: tokenValue, platform: "android" })).status).toBe(204);
     expect(await db.select().from(ownerPushTokensTable)
       .where(eq(ownerPushTokensTable.token, tokenValue))).toHaveLength(0);
+  });
+
+  it("does not propagate owner-notification storage failures", async () => {
+    const notifications = await createOwnerEntryNotificationsBestEffort({
+      businessId,
+      actorUserId: staffId,
+      entries: [{ entryId: crypto.randomUUID(), partyId: a, partyName: "A" }],
+    }, async () => {
+      throw Object.assign(new Error("notification table unavailable"), { code: "42P01" });
+    });
+
+    expect(notifications).toEqual([]);
   });
 
   it("defaults to no adjustment rights while normal assigned entries still work", async () => {

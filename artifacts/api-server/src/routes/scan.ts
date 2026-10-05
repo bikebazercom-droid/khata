@@ -4,7 +4,10 @@ import { openai } from "@workspace/integrations-openai-ai-server";
 import { db, ledgerEntriesTable, partiesTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { broadcast } from "../lib/eventBus";
-import { createOwnerEntryNotifications, publishOwnerEntryNotifications } from "../lib/ownerNotifications";
+import {
+  createOwnerEntryNotificationsBestEffort,
+  publishOwnerEntryNotifications,
+} from "../lib/ownerNotifications";
 import {
   fromSignedBalance,
   toSignedBalance,
@@ -231,7 +234,7 @@ router.post("/scan/bulk-save", async (req, res): Promise<void> => {
   const now = new Date();
   const createdEntries: (typeof ledgerEntriesTable.$inferSelect)[] = [];
 
-  const notifications = await db.transaction(async (tx) => {
+  await db.transaction(async (tx) => {
     for (const item of entries) {
       const party = partyMap.get(item.partyId)!;
       const currentSigned = toSignedBalance(party);
@@ -265,19 +268,19 @@ router.post("/scan/bulk-save", async (req, res): Promise<void> => {
 
       createdEntries.push(entry!);
     }
-    return role === "staff"
-      ? createOwnerEntryNotifications(tx, {
-        businessId,
-        actorUserId: userId,
-        entries: createdEntries.map((entry) => ({
-          entryId: entry.id,
-          partyId: entry.partyId,
-          partyName: partyMap.get(entry.partyId)!.name,
-        })),
-      })
-      : [];
   });
 
+  const notifications = role === "staff"
+    ? await createOwnerEntryNotificationsBestEffort({
+      businessId,
+      actorUserId: userId,
+      entries: createdEntries.map((entry) => ({
+        entryId: entry.id,
+        partyId: entry.partyId,
+        partyName: partyMap.get(entry.partyId)!.name,
+      })),
+    })
+    : [];
   publishOwnerEntryNotifications(notifications);
   // Broadcast live-update events for each affected party
   for (const entry of createdEntries) {

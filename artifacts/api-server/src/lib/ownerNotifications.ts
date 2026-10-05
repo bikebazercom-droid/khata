@@ -69,6 +69,31 @@ export async function createOwnerEntryNotifications(
     .returning();
 }
 
+/**
+ * Owner alerts are secondary to the ledger write. Persist them in a separate
+ * transaction so an unavailable notification table cannot roll back a saved
+ * entry or balance update.
+ */
+export async function createOwnerEntryNotificationsBestEffort(
+  input: {
+    businessId: string;
+    actorUserId: string;
+    entries: StaffLedgerEntryReference[];
+  },
+  createNotifications: typeof createOwnerEntryNotifications = createOwnerEntryNotifications,
+): Promise<Notification[]> {
+  if (input.entries.length === 0) return [];
+  try {
+    return await db.transaction((tx) => createNotifications(tx, input));
+  } catch (error) {
+    logger.warn(
+      { businessId: input.businessId, error },
+      "Staff ledger entry was saved, but owner notification persistence failed",
+    );
+    return [];
+  }
+}
+
 export function publishOwnerEntryNotifications(notifications: Notification[]): void {
   if (notifications.length === 0) return;
 
