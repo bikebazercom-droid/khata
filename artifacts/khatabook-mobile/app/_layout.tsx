@@ -11,6 +11,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { BusinessScopeProvider } from '@/contexts/BusinessScopeContext';
 import { BusinessSwitcherModal } from '@/components/BusinessSwitcherModal';
+import { resolveMobileStartupConfig } from '@/lib/startupConfig';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -24,12 +25,12 @@ import { StatusBar } from 'expo-status-bar';
 
 SplashScreen.preventAutoHideAsync();
 
-const apiDomain = process.env.EXPO_PUBLIC_DOMAIN;
-if (!apiDomain) throw new Error('EXPO_PUBLIC_DOMAIN is required to connect BanglaKhata Mobile to the API.');
-setBaseUrl(`https://${apiDomain}`);
+const { apiBaseUrl, clerkPublishableKey } = resolveMobileStartupConfig({
+  apiDomain: process.env.EXPO_PUBLIC_DOMAIN,
+  clerkPublishableKey: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY,
+});
+setBaseUrl(apiBaseUrl);
 setExtraHeaders({ 'x-client-platform': Platform.OS === 'web' ? 'web' : 'mobile' });
-const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
-if (!clerkPublishableKey) throw new Error('EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is required for Email and Google sign-in.');
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,22 +39,28 @@ const queryClient = new QueryClient({
   },
 });
 
-function RootLayoutNav() {
+function RootLayoutNav({ nativeRuntimeReady }: { nativeRuntimeReady: boolean }) {
+  const nativeScreens = nativeRuntimeReady
+    ? [
+        <Stack.Screen key="sign-in" name="sign-in" options={{ gestureEnabled: false }} />,
+        <Stack.Screen key="tabs" name="(tabs)" options={{ headerShown: false }} />,
+        <Stack.Screen key="access" name="access" />,
+        <Stack.Screen key="party-new" name="party/new" options={{ presentation: 'modal' }} />,
+        <Stack.Screen key="party-detail" name="party/[partyId]" />,
+        <Stack.Screen key="party-report" name="party/[partyId]/report" />,
+        <Stack.Screen key="reports" name="reports" />,
+        <Stack.Screen key="entry-new" name="entry/new" options={{ presentation: 'modal' }} />,
+        <Stack.Screen key="entry-detail" name="entry/[entryId]" options={{ presentation: 'modal' }} />,
+      ]
+    : [];
+
   return (
     <>
       <Stack screenOptions={{ headerShown: false, headerBackTitle: 'Back' }}>
         <Stack.Screen name="index" />
-        <Stack.Screen name="sign-in" options={{ gestureEnabled: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="access" />
-        <Stack.Screen name="party/new" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="party/[partyId]" />
-        <Stack.Screen name="party/[partyId]/report" />
-        <Stack.Screen name="reports" />
-        <Stack.Screen name="entry/new" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="entry/[entryId]" options={{ presentation: 'modal' }} />
+        {nativeScreens}
       </Stack>
-      <BusinessSwitcherModal />
+      {nativeRuntimeReady ? <BusinessSwitcherModal /> : null}
     </>
   );
 }
@@ -74,27 +81,34 @@ export default function RootLayout() {
 
   if (!fontsLoaded && !fontError) return null;
 
+  const nativeRuntimeReady = Boolean(apiBaseUrl && clerkPublishableKey);
+  const app = nativeRuntimeReady && clerkPublishableKey ? (
+    <ClerkProvider
+      publishableKey={clerkPublishableKey}
+      tokenCache={tokenCache}
+      proxyUrl={process.env.EXPO_PUBLIC_CLERK_PROXY_URL}
+    >
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <BusinessScopeProvider>
+            <RootLayoutNav nativeRuntimeReady />
+          </BusinessScopeProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ClerkProvider>
+  ) : (
+    <RootLayoutNav nativeRuntimeReady={false} />
+  );
+
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
-        <ClerkProvider
-          publishableKey={clerkPublishableKey}
-          tokenCache={tokenCache}
-          proxyUrl={process.env.EXPO_PUBLIC_CLERK_PROXY_URL}
-        >
-          <QueryClientProvider client={queryClient}>
-            <AuthProvider>
-              <BusinessScopeProvider>
-                <GestureHandlerRootView style={{ flex: 1 }}>
-                  <KeyboardProvider>
-                    <StatusBar style="auto" />
-                    <RootLayoutNav />
-                  </KeyboardProvider>
-                </GestureHandlerRootView>
-              </BusinessScopeProvider>
-            </AuthProvider>
-          </QueryClientProvider>
-        </ClerkProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <KeyboardProvider>
+            <StatusBar style="auto" />
+            {app}
+          </KeyboardProvider>
+        </GestureHandlerRootView>
       </ErrorBoundary>
     </SafeAreaProvider>
   );
