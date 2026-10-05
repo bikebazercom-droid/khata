@@ -21,6 +21,8 @@ export type EventType =
   | "ledger.created"
   | "ledger.deleted"
   | "ledger.updated"
+  | "notification.created"
+  | "notification.updated"
   | "settings.updated";
 
 export interface BusinessEvent {

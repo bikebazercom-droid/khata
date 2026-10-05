@@ -1,5 +1,6 @@
 import React, { createElement, useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   ActivityIndicator,
   BackHandler,
   Linking,
@@ -12,6 +13,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import WebView, { type WebViewNavigation } from 'react-native-webview';
 import { useAudioPlayer } from 'expo-audio';
+import Constants from 'expo-constants';
+import * as Notifications from 'expo-notifications';
 import { useColors } from '@/hooks/useColors';
 import { getWebAppUrl } from '@/lib/webAppUrl';
 import { resolveVisualFixtureUrl } from '@/lib/visualFixtureUrl';
@@ -22,6 +25,16 @@ import {
   shareNativeWebViewFile,
   type NativeFileExportResult,
 } from '@/lib/nativeFileExport';
+
+const NATIVE_PUSH_TOKEN_EVENT = 'banglakhata-native-push-token';
+const NATIVE_PUSH_STATUS_EVENT = 'banglakhata-native-push-status';
+const OPEN_NOTIFICATION_EVENT = 'banglakhata-open-notification';
+
+type PushNavigationData = {
+  notificationId: string;
+  businessId: string;
+  partyId: string | null;
+};
 
 function isBrowserUrl(url: string) {
   return /^(https?:|about:|blob:|data:)/i.test(url);
@@ -49,15 +62,127 @@ export function WebAppScreen() {
     process.env.NODE_ENV !== 'production',
   );
   const webViewRef = useRef<WebView>(null);
+  const pendingPushNavigation = useRef<PushNavigationData | null>(null);
+  const handledNotificationResponses = useRef(new Set<string>());
+  const webPageReady = useRef(false);
   const [retryKey, setRetryKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
 
   const handleLoadStart = useCallback(() => {
+    webPageReady.current = false;
     setLoading(true);
     setLoadFailed(false);
   }, []);
+
+  const sendPushStatusToWeb = useCallback((status: string) => {
+    const script = `window.dispatchEvent(new CustomEvent(${JSON.stringify(NATIVE_PUSH_STATUS_EVENT)}, { detail: ${JSON.stringify({ status })} })); true;`;
+    webViewRef.current?.injectJavaScript(script);
+  }, []);
+
+  const sendPendingPushNavigation = useCallback(() => {
+    const payload = pendingPushNavigation.current;
+    if (!payload || !webPageReady.current || !webViewRef.current) return;
+
+    const script = `window.dispatchEvent(new CustomEvent(${JSON.stringify(OPEN_NOTIFICATION_EVENT)}, { detail: ${JSON.stringify(payload)} })); true;`;
+    webViewRef.current.injectJavaScript(script);
+    pendingPushNavigation.current = null;
+    void Notifications.clearLastNotificationResponseAsync().catch(() => {});
+  }, []);
+
+  const requestOwnerPushToken = useCallback(async (allowPrompt: boolean) => {
+    if (Platform.OS !== 'android' && Platform.OS !== 'ios') {
+      if (allowPrompt) sendPushStatusToWeb('unavailable');
+      return;
+    }
+
+    try {
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('ledger-alerts', {
+          name: 'Ledger alerts',
+          importance: Notifications.AndroidImportance.MAX,
+          sound: 'default',
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#1B3A6B',
+        });
+      }
+
+      let permission = await Notifications.getPermissionsAsync();
+      if (!permission.granted && allowPrompt) {
+        permission = await Notifications.requestPermissionsAsync();
+      }
+      if (!permission.granted) {
+        sendPushStatusToWeb(allowPrompt ? 'permission-denied' : 'not-enabled');
+        if (allowPrompt && !permission.canAskAgain) {
+          Alert.alert(
+            'বিজ্ঞপ্তি বন্ধ আছে',
+            'ফোনের সেটিংস থেকে BanglaKhata বিজ্ঞপ্তির অনুমতি চালু করুন।',
+            [
+              { text: 'এখন নয়', style: 'cancel' },
+              { text: 'সেটিংস খুলুন', onPress: () => { void Linking.openSettings(); } },
+            ],
+          );
+        }
+        return;
+      }
+
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+      if (!projectId) {
+        sendPushStatusToWeb(allowPrompt ? 'unavailable' : 'not-enabled');
+        return;
+      }
+
+      const token = await Notifications.getExpoPushTokenAsync({ projectId });
+      const platform = Platform.OS === 'ios' ? 'ios' : 'android';
+      const script = `window.dispatchEvent(new CustomEvent(${JSON.stringify(NATIVE_PUSH_TOKEN_EVENT)}, { detail: ${JSON.stringify({ token: token.data, platform })} })); true;`;
+      webViewRef.current?.injectJavaScript(script);
+      sendPushStatusToWeb('granted');
+    } catch (error) {
+      console.warn('Could not register owner push notifications:', error);
+      sendPushStatusToWeb(allowPrompt ? 'unavailable' : 'not-enabled');
+    }
+  }, [sendPushStatusToWeb]);
+
+  useEffect(() => {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
+
+    const handleNotificationResponse = (response: Notifications.NotificationResponse) => {
+      const requestId = response.notification.request.identifier;
+      if (handledNotificationResponses.current.has(requestId)) return;
+      handledNotificationResponses.current.add(requestId);
+
+      const data = response.notification.request.content.data as Record<string, unknown>;
+      if (
+        data.type !== 'staff-ledger-entry' ||
+        typeof data.notificationId !== 'string' ||
+        typeof data.businessId !== 'string'
+      ) {
+        void Notifications.clearLastNotificationResponseAsync().catch(() => {});
+        return;
+      }
+
+      pendingPushNavigation.current = {
+        notificationId: data.notificationId,
+        businessId: data.businessId,
+        partyId: typeof data.partyId === 'string' ? data.partyId : null,
+      };
+      sendPendingPushNavigation();
+    };
+
+    const subscription = Notifications.addNotificationResponseReceivedListener(handleNotificationResponse);
+    void Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) handleNotificationResponse(response);
+    });
+    return () => subscription.remove();
+  }, [sendPendingPushNavigation]);
 
   const handleLoadComplete = useCallback(() => {
     setLoading(false);
@@ -150,6 +275,25 @@ export function WebAppScreen() {
       return;
     }
 
+    let pushMessage: { type?: string } | null = null;
+    try {
+      pushMessage = JSON.parse(event.nativeEvent.data) as { type?: string };
+    } catch {
+      // Existing sound messages are plain strings rather than JSON.
+    }
+    if (pushMessage?.type === 'banglakhata-web-ready' || pushMessage?.type === 'banglakhata-enable-push') {
+      const sourceUrl = event.nativeEvent.url;
+      if (!webAppUrl || (sourceUrl && !hasSameOrigin(sourceUrl, webAppUrl))) return;
+      if (pushMessage.type === 'banglakhata-web-ready') {
+        webPageReady.current = true;
+        sendPendingPushNavigation();
+        void requestOwnerPushToken(false);
+      } else {
+        void requestOwnerPushToken(true);
+      }
+      return;
+    }
+
     if (event.nativeEvent.data === 'transaction-success') {
       playSuccessSound();
       return;
@@ -166,7 +310,7 @@ export function WebAppScreen() {
     } catch {
       // Audio is optional and must not block calculator interactions.
     }
-  }, [calculatorAudioPlayer, playSuccessSound, webAppUrl]);
+  }, [calculatorAudioPlayer, playSuccessSound, requestOwnerPushToken, sendPendingPushNavigation, webAppUrl]);
 
   if (!webAppUrl) {
     return (
@@ -211,6 +355,8 @@ export function WebAppScreen() {
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         setSupportMultipleWindows={false}
+        mediaPlaybackRequiresUserAction={false}
+        allowsInlineMediaPlayback
         allowsBackForwardNavigationGestures
         onLoadStart={handleLoadStart}
         onLoad={handleLoadComplete}

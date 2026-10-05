@@ -51,6 +51,7 @@ import {
   getListLedgerEntriesQueryKey,
   getGetBusinessSettingsQueryKey,
   getListGlobalLedgerEntriesQueryKey,
+  getListNotificationsQueryKey,
 } from '@workspace/api-client-react';
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -186,6 +187,15 @@ export function useRealtimeSync(
       } catch {
         void qc.invalidateQueries();
       }
+    });
+
+    // ─── notification.created ────────────────────────────────────────────
+    // The server sends this event only to the owner who received the alert.
+    es.addEventListener('notification.created', () => {
+      void qc.invalidateQueries({ queryKey: getListNotificationsQueryKey() });
+    });
+    es.addEventListener('notification.updated', () => {
+      void qc.invalidateQueries({ queryKey: getListNotificationsQueryKey() });
     });
 
     // ─── ledger.updated ───────────────────────────────────────────────────

@@ -4,6 +4,7 @@ import { openai } from "@workspace/integrations-openai-ai-server";
 import { db, ledgerEntriesTable, partiesTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { broadcast } from "../lib/eventBus";
+import { createOwnerEntryNotifications, publishOwnerEntryNotifications } from "../lib/ownerNotifications";
 import {
   fromSignedBalance,
   toSignedBalance,
@@ -158,7 +159,7 @@ If no transactions are found in the image, return {"items":[]}.`,
 // ── POST /api/scan/bulk-save ──────────────────────────────────────────────────
 // Bulk-saves confirmed scan results across multiple parties in one transaction.
 router.post("/scan/bulk-save", async (req, res): Promise<void> => {
-  const { businessId, userId } = req as unknown as AuthenticatedRequest;
+  const { businessId, userId, role } = req as unknown as AuthenticatedRequest;
 
   const body = req.body as unknown;
   if (
@@ -230,7 +231,7 @@ router.post("/scan/bulk-save", async (req, res): Promise<void> => {
   const now = new Date();
   const createdEntries: (typeof ledgerEntriesTable.$inferSelect)[] = [];
 
-  await db.transaction(async (tx) => {
+  const notifications = await db.transaction(async (tx) => {
     for (const item of entries) {
       const party = partyMap.get(item.partyId)!;
       const currentSigned = toSignedBalance(party);
@@ -264,8 +265,20 @@ router.post("/scan/bulk-save", async (req, res): Promise<void> => {
 
       createdEntries.push(entry!);
     }
+    return role === "staff"
+      ? createOwnerEntryNotifications(tx, {
+        businessId,
+        actorUserId: userId,
+        entries: createdEntries.map((entry) => ({
+          entryId: entry.id,
+          partyId: entry.partyId,
+          partyName: partyMap.get(entry.partyId)!.name,
+        })),
+      })
+      : [];
   });
 
+  publishOwnerEntryNotifications(notifications);
   // Broadcast live-update events for each affected party
   for (const entry of createdEntries) {
     broadcast(businessId, {

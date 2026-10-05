@@ -17,6 +17,7 @@ import downloadsRouter from "./downloads";
 import downloadConfigsRouter from "./downloadConfigs";
 import scanRouter from "./scan";
 import ownerRouter from "./owner";
+import notificationsRouter from "./notifications";
 import { enforceRoleAccess } from "../middlewares/roleAccess";
 import { enforceIpBlock } from "../middlewares/ipBlock";
 
@@ -57,5 +58,6 @@ router.use(businessesRouter);
 router.use(userRouter);
 router.use(scanRouter);
 router.use(ownerRouter);
+router.use(notificationsRouter);
 
 export default router;

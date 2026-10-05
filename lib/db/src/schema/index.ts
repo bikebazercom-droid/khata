@@ -14,3 +14,4 @@ export * from "./workerAccess";
 export * from "./adminOtpConfig";
 export * from "./adminTelemetry";
 export * from "./downloadConfigs";
+export * from "./notifications";

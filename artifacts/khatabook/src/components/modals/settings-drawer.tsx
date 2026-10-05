@@ -9,6 +9,7 @@ import {
   useGetBusinessSettings,
   useUpdateBusinessSettings,
   getGetBusinessSettingsQueryKey,
+  useRemoveOwnerPushToken,
   type BusinessSettings,
 } from '@workspace/api-client-react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
@@ -31,6 +32,7 @@ import { clearAllPendingUploads } from '@/lib/pendingUploads';
 import { useLanguage } from '@/lib/i18n';
 import { useAppAuth } from '@/App';
 import { revokeNetworkWrites } from '@/lib/useAuthConnectivity';
+import { STORED_OWNER_PUSH_TOKEN_KEY } from '@/lib/nativePushBridge';
 
 /** Shape stored in localStorage under PROFILE_KEY */
 export interface ShopProfile {
@@ -76,6 +78,7 @@ export function SettingsDrawer({
   const { signOut } = useClerk();
   const { isSignedIn } = useAuth();
   const { isAuthenticated, role } = useAppAuth();
+  const removeOwnerPushToken = useRemoveOwnerPushToken();
   const { selectedBusinessId } = useBusinessContext();
   const { data: settings } = useGetBusinessSettings({
     query: { enabled: role === 'owner', queryKey: businessScopedQueryKey(getGetBusinessSettingsQueryKey(), selectedBusinessId) },
@@ -176,6 +179,31 @@ export function SettingsDrawer({
     if (isLoggingOut) return;
     setIsLoggingOut(true);
     try {
+      const storedPushToken = localStorage.getItem(STORED_OWNER_PUSH_TOKEN_KEY);
+      if (storedPushToken) {
+        try {
+          const tokenInput = JSON.parse(storedPushToken) as {
+            token?: string;
+            platform?: 'android' | 'ios';
+          };
+          if (
+            typeof tokenInput.token === 'string' &&
+            (tokenInput.platform === 'android' || tokenInput.platform === 'ios')
+          ) {
+            await removeOwnerPushToken.mutateAsync({ data: {
+              token: tokenInput.token,
+              platform: tokenInput.platform,
+            } });
+          }
+        } catch (error) {
+          if (error instanceof SyntaxError) {
+            localStorage.removeItem(STORED_OWNER_PUSH_TOKEN_KEY);
+          } else {
+            throw error;
+          }
+        }
+        localStorage.removeItem(STORED_OWNER_PUSH_TOKEN_KEY);
+      }
       const logoutEvent = await fetch('/api/auth/logout-event', { method: 'POST', credentials: 'include' });
       if (!logoutEvent.ok && logoutEvent.status !== 401) {
         throw new Error('The server could not confirm logout');

@@ -20,7 +20,7 @@ const router: IRouter = Router();
 const HEARTBEAT_INTERVAL_MS = 25_000;
 
 router.get("/events", (req, res): void => {
-  const { businessId } = req as unknown as AuthenticatedRequest;
+  const { businessId, userId } = req as unknown as AuthenticatedRequest;
 
   // SSE headers — no buffering, keep-alive, no cache.
   res.setHeader("Content-Type", "text/event-stream");
@@ -41,6 +41,15 @@ router.get("/events", (req, res): void => {
 
   // Fan-out handler: serialise each event as an SSE message.
   function send(event: BusinessEvent): void {
+    const isOwnerNotificationEvent =
+      event.type === "notification.created" || event.type === "notification.updated";
+    if (isOwnerNotificationEvent && event.payload.recipientUserId !== userId) return;
+
+    if (isOwnerNotificationEvent) {
+      const { recipientUserId: _recipientUserId, ...payload } = event.payload;
+      res.write(`event: ${event.type}\ndata: ${JSON.stringify(payload)}\n\n`);
+      return;
+    }
     res.write(`event: ${event.type}\ndata: ${JSON.stringify(event.payload)}\n\n`);
   }
 

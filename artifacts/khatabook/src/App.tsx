@@ -22,6 +22,19 @@ import { useBusinessContext } from '@/lib/businessContext';
 import { isNetworkWriteAuthorized, markServerReauthenticated, revokeNetworkWrites, useAuthConnectivity } from '@/lib/useAuthConnectivity';
 import { EntrySavedFeedbackHost } from '@/components/ui/entry-saved-feedback';
 import { lazyWithChunkRecovery } from '@/lib/lazyWithChunkRecovery';
+import {
+  getListNotificationsQueryKey,
+  useMarkNotificationRead,
+  useRemoveOwnerPushToken,
+  useRegisterOwnerPushToken,
+} from '@workspace/api-client-react';
+import {
+  NATIVE_PUSH_STATUS_EVENT,
+  NATIVE_PUSH_TOKEN_EVENT,
+  OPEN_NOTIFICATION_EVENT,
+  OWNER_PUSH_REGISTRATION_EVENT,
+  STORED_OWNER_PUSH_TOKEN_KEY,
+} from '@/lib/nativePushBridge';
 
 const HomeView = lazyWithChunkRecovery(() => import('@/pages/home').then((module) => ({ default: module.HomeView })));
 const PartyView = lazyWithChunkRecovery(() => import('@/pages/party-view').then((module) => ({ default: module.PartyView })));
@@ -152,11 +165,13 @@ const queryClient = new QueryClient({
  * Must be rendered inside both ClerkProvider and QueryClientProvider.
  */
 function RealtimeSyncManager() {
-  const { isAuthenticated, userId } = useAppAuth();
-  const { selectedBusinessId } = useBusinessContext();
+  const { isAuthenticated, userId, role } = useAppAuth();
+  const { selectedBusinessId, setSelectedBusiness } = useBusinessContext();
   const { setIsOnline } = useConnectionState();
   useRealtimeSync(isAuthenticated, setIsOnline);
   const qc = useQueryClient();
+  const [, navigate] = useLocation();
+  const markNotificationRead = useMarkNotificationRead();
   const activeScope = useRef('');
   const scope = isAuthenticated && userId ? JSON.stringify([userId, selectedBusinessId]) : '';
   activeScope.current = scope;
@@ -200,9 +215,119 @@ function RealtimeSyncManager() {
       document.removeEventListener('visibilitychange', heartbeat);
     };
   }, [isAuthenticated]);
+  useEffect(() => {
+    if (!isAuthenticated || role !== 'owner') return;
+    const handleOpenNotification = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        notificationId?: string;
+        businessId?: string;
+        partyId?: string | null;
+      }>).detail;
+      if (!detail) return;
+      if (detail.businessId && detail.businessId !== selectedBusinessId) {
+        setSelectedBusiness(detail.businessId);
+      }
+      if (detail.notificationId) {
+        markNotificationRead.mutate({ notificationId: detail.notificationId }, {
+          onSuccess: () => {
+            void qc.invalidateQueries({ queryKey: getListNotificationsQueryKey() });
+          },
+        });
+      }
+      navigate(detail.partyId ? `/party/${detail.partyId}` : '/');
+    };
+    window.addEventListener(OPEN_NOTIFICATION_EVENT, handleOpenNotification);
+    return () => window.removeEventListener(OPEN_NOTIFICATION_EVENT, handleOpenNotification);
+  }, [isAuthenticated, role, selectedBusinessId, setSelectedBusiness, markNotificationRead.mutate, navigate, qc]);
   // Retry any bill image uploads that failed while offline, once connectivity
   // is restored. Only active when the user is authenticated (API calls need auth).
   useRetryPendingUploads(isAuthenticated);
+  return null;
+}
+
+function NativePushRegistrationManager() {
+  const { isAuthenticated, role, userId } = useAppAuth();
+  const registerPushToken = useRegisterOwnerPushToken();
+  const removePushToken = useRemoveOwnerPushToken();
+
+  useEffect(() => {
+    if (!isAuthenticated || role !== 'owner') return;
+    const bridge = (window as Window & {
+      ReactNativeWebView?: { postMessage: (message: string) => void };
+    }).ReactNativeWebView;
+    if (!bridge) return;
+
+    const handleToken = (event: Event) => {
+      const detail = (event as CustomEvent<{ token?: string; platform?: 'android' | 'ios' }>).detail;
+      if (
+        !detail ||
+        typeof detail.token !== 'string' ||
+        (detail.platform !== 'android' && detail.platform !== 'ios')
+      ) return;
+
+      registerPushToken.mutate(
+        { data: { token: detail.token, platform: detail.platform } },
+        {
+          onSuccess: () => {
+            localStorage.setItem(STORED_OWNER_PUSH_TOKEN_KEY, JSON.stringify({
+              token: detail.token,
+              platform: detail.platform,
+            }));
+            window.dispatchEvent(new CustomEvent(OWNER_PUSH_REGISTRATION_EVENT, {
+              detail: { status: 'enabled' },
+            }));
+          },
+          onError: () => {
+            window.dispatchEvent(new CustomEvent(OWNER_PUSH_REGISTRATION_EVENT, {
+              detail: { status: 'failed' },
+            }));
+          },
+        },
+      );
+    };
+    const handleNativeStatus = (event: Event) => {
+      const status = (event as CustomEvent<{ status?: string }>).detail?.status;
+      if (status !== 'not-enabled' && status !== 'permission-denied') return;
+
+      const stored = localStorage.getItem(STORED_OWNER_PUSH_TOKEN_KEY);
+      if (!stored) return;
+      try {
+        const tokenInput = JSON.parse(stored) as {
+          token?: string;
+          platform?: 'android' | 'ios';
+        };
+        if (
+          typeof tokenInput.token !== 'string' ||
+          (tokenInput.platform !== 'android' && tokenInput.platform !== 'ios')
+        ) {
+          localStorage.removeItem(STORED_OWNER_PUSH_TOKEN_KEY);
+          return;
+        }
+        removePushToken.mutate(
+          { data: { token: tokenInput.token, platform: tokenInput.platform } },
+          { onSuccess: () => localStorage.removeItem(STORED_OWNER_PUSH_TOKEN_KEY) },
+        );
+      } catch {
+        localStorage.removeItem(STORED_OWNER_PUSH_TOKEN_KEY);
+      }
+    };
+
+    window.addEventListener(NATIVE_PUSH_TOKEN_EVENT, handleToken);
+    window.addEventListener(NATIVE_PUSH_STATUS_EVENT, handleNativeStatus);
+    const readyMessageTimer = window.setTimeout(() => {
+      try {
+        bridge.postMessage(JSON.stringify({ type: 'banglakhata-web-ready' }));
+      } catch {
+        // The dashboard remains usable if the native notification bridge is unavailable.
+      }
+    }, 0);
+    return () => {
+      window.clearTimeout(readyMessageTimer);
+      window.removeEventListener(NATIVE_PUSH_TOKEN_EVENT, handleToken);
+      window.removeEventListener(NATIVE_PUSH_STATUS_EVENT, handleNativeStatus);
+    };
+  }, [isAuthenticated, role, userId, registerPushToken.mutate, removePushToken.mutate]);
+
   return null;
 }
 
@@ -450,6 +575,7 @@ function AppRouter({ onNetworkFailure, onSettled }: { onNetworkFailure: () => vo
         <ConnectionStateProvider>
         <AuthCacheInvalidator />
         <RealtimeSyncManager />
+        <NativePushRegistrationManager />
         <TooltipProvider>
           <Suspense fallback={<AppSplash />}>
             <Switch>

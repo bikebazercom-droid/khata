@@ -50,6 +50,7 @@
       ],
       "expo-sharing",
       "expo-audio",
+      "expo-notifications",
       "expo-asset"
     ],
     "experiments": {

@@ -26,14 +26,19 @@ import { useLanguage } from '@/lib/i18n';
 import { useAppAuth } from '@/App';
 import { ENTRY_OUTBOX_CHANGED, listRejectedEntries } from '@/lib/entryOutbox';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 export function HomeView() {
-  const { openSwitcher, businesses, selectedBusinessId } = useBusinessContext();
+  const { openSwitcher, businesses, selectedBusinessId, setSelectedBusiness } = useBusinessContext();
   const { role: userRole, userId, businessId } = useAppAuth();
   const activeBusiness = businesses.find((b) => b.id === selectedBusinessId);
   const [role, setRole] = useState<PartyRole>(PartyRole.CUSTOMER);
   const [search, setSearch] = useState('');
   const [location, navigate] = useLocation();
+  const openNotifiedParty = useCallback((notificationBusinessId: string, partyId: string) => {
+    if (selectedBusinessId !== notificationBusinessId) setSelectedBusiness(notificationBusinessId);
+    navigate(`/party/${partyId}`);
+  }, [navigate, selectedBusinessId, setSelectedBusiness]);
 
   const { t, formatCurrency } = useLanguage();
 
@@ -449,6 +454,7 @@ export function HomeView() {
           <div className="flex items-center gap-2 shrink-0">
             {userRole === 'owner' ? (
               <>
+                <NotificationBell businessId={selectedBusinessId} onOpenParty={openNotifiedParty} />
                 <button
                   onClick={() => navigate('/access')}
                   className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-2 rounded-xl active:scale-95 transition-all"

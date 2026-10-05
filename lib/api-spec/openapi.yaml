@@ -28,6 +28,8 @@ tags:
     description: Business khata selection and isolation
   - name: owner
     description: Owner-only staff access management
+  - name: notifications
+    description: Owner alerts for staff-created ledger entries and mobile push registration
 paths:
   /scan/bengali-ledger:
     post:
@@ -414,6 +416,84 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DashboardSummary"
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List recent owner notifications for the active business
+      responses:
+        "200":
+          description: Recent notifications, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+        "403":
+          description: Owner access required
+  /notifications/{notificationId}/read:
+    post:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark one owner notification as read
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Updated notification
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+        "404":
+          description: Notification not found for the active owner and business
+  /notifications/read-all:
+    post:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all owner notifications in the active business as read
+      responses:
+        "200":
+          description: Number of notifications updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarkAllNotificationsReadResult"
+  /notifications/push-token:
+    post:
+      operationId: registerOwnerPushToken
+      tags: [notifications]
+      summary: Register this owner's Expo push token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushTokenInput"
+      responses:
+        "204":
+          description: Push token registered
+        "403":
+          description: Owner access required
+    delete:
+      operationId: removeOwnerPushToken
+      tags: [notifications]
+      summary: Remove this owner's Expo push token from this device
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushTokenInput"
+      responses:
+        "204":
+          description: Push token removed
+        "403":
+          description: Owner access required
   /settings:
     get:
       operationId: getBusinessSettings
@@ -1438,6 +1518,44 @@ components:
           type: integer
         supplierCount:
           type: integer
+    Notification:
+      type: object
+      required:
+        - id
+        - businessId
+        - actorName
+        - partyId
+        - partyName
+        - entryId
+        - entryCount
+        - createdAt
+        - readAt
+      properties:
+        id: { type: string }
+        businessId: { type: string }
+        actorName: { type: string }
+        partyId: { type: ["string", "null"] }
+        partyName: { type: ["string", "null"] }
+        entryId: { type: ["string", "null"] }
+        entryCount: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        readAt: { type: ["string", "null"], format: date-time }
+    PushTokenInput:
+      type: object
+      required: [token, platform]
+      properties:
+        token:
+          type: string
+          minLength: 16
+          maxLength: 512
+        platform:
+          type: string
+          enum: [android, ios]
+    MarkAllNotificationsReadResult:
+      type: object
+      required: [updatedCount]
+      properties:
+        updatedCount: { type: integer, minimum: 0 }
     BusinessSettings:
       type: object
       required:

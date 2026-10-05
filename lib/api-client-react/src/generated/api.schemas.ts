@@ -353,6 +353,45 @@ export interface DashboardSummary {
   supplierCount: number;
 }
 
+export interface Notification {
+  id: string;
+  businessId: string;
+  actorName: string;
+  /** @nullable */
+  partyId: string | null;
+  /** @nullable */
+  partyName: string | null;
+  /** @nullable */
+  entryId: string | null;
+  /** @minimum 1 */
+  entryCount: number;
+  createdAt: string;
+  /** @nullable */
+  readAt: string | null;
+}
+
+export type PushTokenInputPlatform = typeof PushTokenInputPlatform[keyof typeof PushTokenInputPlatform];
+
+
+export const PushTokenInputPlatform = {
+  android: 'android',
+  ios: 'ios',
+} as const;
+
+export interface PushTokenInput {
+  /**
+     * @minLength 16
+     * @maxLength 512
+     */
+  token: string;
+  platform: PushTokenInputPlatform;
+}
+
+export interface MarkAllNotificationsReadResult {
+  /** @minimum 0 */
+  updatedCount: number;
+}
+
 export interface BusinessSettings {
   id: string;
   storeName: string;

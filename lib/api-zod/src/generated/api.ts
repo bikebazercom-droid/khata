@@ -245,6 +245,93 @@ export const GetDashboardSummaryResponse = zod.object({
 
 
 /**
+ * @summary List recent owner notifications for the active business
+ */
+
+
+
+export const ListNotificationsResponseItem = zod.object({
+  "id": zod.string(),
+  "businessId": zod.string(),
+  "actorName": zod.string(),
+  "partyId": zod.string().nullable(),
+  "partyName": zod.string().nullable(),
+  "entryId": zod.string().nullable(),
+  "entryCount": zod.number().min(1),
+  "createdAt": zod.coerce.date(),
+  "readAt": zod.coerce.date().nullable()
+})
+export const ListNotificationsResponse = zod.array(ListNotificationsResponseItem)
+
+
+/**
+ * @summary Mark one owner notification as read
+ */
+export const MarkNotificationReadParams = zod.object({
+  "notificationId": zod.coerce.string()
+})
+
+
+
+
+export const MarkNotificationReadResponse = zod.object({
+  "id": zod.string(),
+  "businessId": zod.string(),
+  "actorName": zod.string(),
+  "partyId": zod.string().nullable(),
+  "partyName": zod.string().nullable(),
+  "entryId": zod.string().nullable(),
+  "entryCount": zod.number().min(1),
+  "createdAt": zod.coerce.date(),
+  "readAt": zod.coerce.date().nullable()
+})
+
+
+/**
+ * @summary Mark all owner notifications in the active business as read
+ */
+export const markAllNotificationsReadResponseUpdatedCountMin = 0;
+
+
+
+export const MarkAllNotificationsReadResponse = zod.object({
+  "updatedCount": zod.number().min(markAllNotificationsReadResponseUpdatedCountMin)
+})
+
+
+/**
+ * @summary Register this owner's Expo push token
+ */
+export const registerOwnerPushTokenBodyTokenMin = 16;
+export const registerOwnerPushTokenBodyTokenMax = 512;
+
+
+
+export const RegisterOwnerPushTokenBody = zod.object({
+  "token": zod.string().min(registerOwnerPushTokenBodyTokenMin).max(registerOwnerPushTokenBodyTokenMax),
+  "platform": zod.enum(['android', 'ios'])
+})
+
+export const RegisterOwnerPushTokenResponse = zod.void()
+
+
+/**
+ * @summary Remove this owner's Expo push token from this device
+ */
+export const removeOwnerPushTokenBodyTokenMin = 16;
+export const removeOwnerPushTokenBodyTokenMax = 512;
+
+
+
+export const RemoveOwnerPushTokenBody = zod.object({
+  "token": zod.string().min(removeOwnerPushTokenBodyTokenMin).max(removeOwnerPushTokenBodyTokenMax),
+  "platform": zod.enum(['android', 'ios'])
+})
+
+export const RemoveOwnerPushTokenResponse = zod.void()
+
+
+/**
  * @summary Get business settings
  */
 export const GetBusinessSettingsResponse = zod.object({
