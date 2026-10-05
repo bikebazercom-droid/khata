@@ -21,4 +21,4 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
-packages = ["jdk17"]
+packages = ["jdk17", "jdk24"]
