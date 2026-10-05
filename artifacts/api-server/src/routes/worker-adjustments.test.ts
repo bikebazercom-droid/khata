@@ -5,7 +5,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { and, eq, inArray } from "drizzle-orm";
 import {
   appUsersTable, appUserLoginSessionsTable, businessesTable, db, ledgerEntriesTable,
-  partiesTable, userBusinessesTable, workerInvitesTable, workerPartyAssignmentsTable,
+  notificationsTable, ownerPushTokensTable, partiesTable, userBusinessesTable,
+  workerInvitesTable, workerPartyAssignmentsTable,
 } from "@workspace/db";
 import { getOrCreateClerkUser, getOrCreatePhoneUser, requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import { enforceRoleAccess } from "../middlewares/roleAccess";
@@ -13,6 +14,7 @@ import ownerRouter from "./owner";
 import authRouter from "./auth";
 import partiesRouter from "./parties";
 import ledgerRouter from "./ledger";
+import notificationsRouter from "./notifications";
 
 const clerk = vi.hoisted(() => ({ id: "" }));
 vi.mock("@clerk/express", () => ({
@@ -47,7 +49,7 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
       next();
     } else { void requireAuth(req, res, next); }
   });
-  app.use(enforceRoleAccess, ownerRouter, partiesRouter, ledgerRouter);
+  app.use(enforceRoleAccess, ownerRouter, partiesRouter, ledgerRouter, notificationsRouter);
 
   beforeAll(async () => {
     vi.stubEnv("DEV_AUTH_BYPASS", "false");
@@ -88,6 +90,48 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
   const patch = (body: object) => request(app).patch(`/owner/workers/${staffId}`).set("Authorization", "Bearer owner").send(body);
   const transfer = (source: string, destination: string) => request(app).post(`/parties/${source}/ledger-entries`)
     .set("Authorization", `Bearer ${token}`).send({ type: "YOU_GAVE", amount: 10, isTransfer: true, transferPartyId: destination });
+
+  it("persists staff-entry alerts for owners and supports the owner inbox and push-token controls", async () => {
+    const created = await request(app).post(`/parties/${a}/ledger-entries`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ type: "YOU_GAVE", amount: 7, description: "Staff entry alert" });
+    expect(created.status).toBe(201);
+
+    const [alert] = await db.select().from(notificationsTable)
+      .where(eq(notificationsTable.entryId, created.body.id));
+    expect(alert?.recipientUserId).toBe(ownerId);
+    expect(alert?.businessId).toBe(businessId);
+    expect(alert?.partyId).toBe(a);
+    expect(alert?.entryCount).toBe(1);
+    expect(alert?.readAt).toBeNull();
+
+    const inbox = await request(app).get("/notifications").set("Authorization", "Bearer uuid-owner");
+    expect(inbox.status).toBe(200);
+    expect(inbox.body).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: alert!.id, entryId: created.body.id, partyName: "A", readAt: null }),
+    ]));
+    expect((await request(app).get("/notifications").set("Authorization", `Bearer ${token}`)).status).toBe(403);
+
+    const read = await request(app).post(`/notifications/${alert!.id}/read`)
+      .set("Authorization", "Bearer uuid-owner");
+    expect(read.status).toBe(200);
+    expect(read.body.readAt).toEqual(expect.any(String));
+
+    const tokenValue = "ExpoPushToken[test-notification-device-token]";
+    expect((await request(app).post("/notifications/push-token")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ token: tokenValue, platform: "android" })).status).toBe(403);
+    expect((await request(app).post("/notifications/push-token")
+      .set("Authorization", "Bearer uuid-owner")
+      .send({ token: tokenValue, platform: "android" })).status).toBe(204);
+    expect(await db.select().from(ownerPushTokensTable)
+      .where(eq(ownerPushTokensTable.token, tokenValue))).toHaveLength(1);
+    expect((await request(app).delete("/notifications/push-token")
+      .set("Authorization", "Bearer uuid-owner")
+      .send({ token: tokenValue, platform: "android" })).status).toBe(204);
+    expect(await db.select().from(ownerPushTokensTable)
+      .where(eq(ownerPushTokensTable.token, tokenValue))).toHaveLength(0);
+  });
 
   it("defaults to no adjustment rights while normal assigned entries still work", async () => {
     expect((await request(app).get("/auth/me").set("Authorization", `Bearer ${token}`)).body.adjustmentPartyIds).toEqual([]);
@@ -293,8 +337,8 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
     expect((await request(app).delete(`/parties/${a}/entries/${first.body.id}`)
       .set("Authorization", "Bearer owner")).status).toBe(200);
     const replay = await send("Bearer owner");
-    expect(replay.status).toBe(200);
-    expect(replay.body.id).toBe(first.body.id);
+    expect(replay.status).toBe(409);
+    expect(replay.body.error).toMatch(/deleted/i);
     expect((await db.select().from(ledgerEntriesTable).where(eq(ledgerEntriesTable.id, first.body.id)))).toHaveLength(0);
   });
 

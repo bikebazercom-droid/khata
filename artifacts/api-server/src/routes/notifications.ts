@@ -14,6 +14,18 @@ import { broadcast } from "../lib/eventBus";
 
 const router: IRouter = Router();
 
+function serializeNotification(notification: {
+  createdAt: Date;
+  readAt: Date | null;
+  [key: string]: unknown;
+}) {
+  return {
+    ...notification,
+    createdAt: notification.createdAt.toISOString(),
+    readAt: notification.readAt?.toISOString() ?? null,
+  };
+}
+
 function requireOwner(req: Request, res: Response): AuthenticatedRequest | null {
   const auth = req as unknown as AuthenticatedRequest;
   if (auth.role !== "owner") {
@@ -37,7 +49,7 @@ router.get("/notifications", async (req, res): Promise<void> => {
     .orderBy(desc(notificationsTable.createdAt))
     .limit(40);
 
-  res.json(ListNotificationsResponse.parse(notifications));
+  res.json(ListNotificationsResponse.parse(notifications.map(serializeNotification)));
 });
 
 router.post("/notifications/:notificationId/read", async (req, res): Promise<void> => {
@@ -67,7 +79,7 @@ router.post("/notifications/:notificationId/read", async (req, res): Promise<voi
     type: "notification.updated",
     payload: { recipientUserId: auth.userId },
   });
-  res.json(MarkNotificationReadResponse.parse(notification));
+  res.json(MarkNotificationReadResponse.parse(serializeNotification(notification)));
 });
 
 router.post("/notifications/read-all", async (req, res): Promise<void> => {

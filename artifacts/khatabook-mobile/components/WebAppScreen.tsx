@@ -145,6 +145,8 @@ export function WebAppScreen() {
   }, [sendPushStatusToWeb]);
 
   useEffect(() => {
+    if (Platform.OS === 'web') return undefined;
+
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
         shouldShowBanner: true,
