@@ -4,7 +4,7 @@
 - [Orval and Zod format compatibility](orval-zod-format-compat.md) — OpenAPI UUID/email formats generate Zod 4 methods in this Zod 3 setup; omit them unless codegen is fixed.
 - [Khatabook auth & multi-tenancy](khatabook-auth-multitenancy.md) — seed-business rules, session revocation, Expo Clerk SSO, and DB setup gotchas.
 - [Worker invitation identity](worker-invite-identity.md) — one pending invite per verified identity across businesses avoids arbitrary first-sign-in claims.
-- [Android export validation](android-export-validation.md) — Gradle task discovery is not source compilation; API-only compiler checks are not APK builds.
+- [Android export validation](android-export-validation.md) — verify the actual signed APK; Gradle configuration success alone misses SDK and JVM build failures.
 - [Expo export port conflicts](expo-export-port.md) — set `RCT_METRO_PORT` when another workflow occupies 8081; Expo export can bundle all platforms without stopping it.
 - [Offline ledger replay](offline-ledger-replay.md) — keep replay protection after deletion and pending drafts separate from confirmed balances.
 - [Browser legacy outbox transition](browser-legacy-outbox.md) — new browser entries go online; keep prior drafts recoverable during the transition.
