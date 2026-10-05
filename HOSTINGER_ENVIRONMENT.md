@@ -17,6 +17,14 @@ in Replit does not mean the same variable exists on Hostinger.
   `node --enable-source-maps artifacts/api-server/dist/index.mjs`
 - Do not set the Entry File to `pnpm start`.
 
+## Health checks
+
+- `GET /api/healthz` confirms the API process is responding; it does not query PostgreSQL.
+- `GET /api/readyz` runs a lightweight database query. It returns HTTP 200 with
+  `{"status":"ready"}` when PostgreSQL is reachable, or HTTP 503 with
+  `{"status":"not_ready"}` otherwise. Use this route to check database readiness;
+  it does not expose connection or database details.
+
 ## Required runtime variables
 
 | Variable | Purpose |
