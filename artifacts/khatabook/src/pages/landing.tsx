@@ -1,34 +1,6 @@
-import { useEffect, useState } from "react";
-
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-interface DownloadConfig {
-  windowsUrl: string | null;
-}
-
 export function LandingPage() {
-  const [windowsUrl, setWindowsUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch(`${basePath}/api/public/download-configs`)
-      .then((response) => (response.ok ? response.json() : null))
-      .then((config: DownloadConfig | null) => setWindowsUrl(config?.windowsUrl ?? null))
-      .catch(() => setWindowsUrl(null));
-  }, []);
-
-  function handleWindowsClick(event: React.MouseEvent<HTMLAnchorElement>) {
-    event.preventDefault();
-    if (!windowsUrl) return;
-
-    const link = document.createElement("a");
-    link.href = windowsUrl;
-    link.download = "banglakhata-windows.exe";
-    link.rel = "noopener noreferrer";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-
   return (
     <div className="min-h-[100dvh] w-full bg-gradient-to-b from-[#0f2444] via-[#1B3A6B] to-[#2a5298] flex flex-col items-center">
       <nav className="w-full max-w-5xl flex items-center justify-between px-6 py-5">
@@ -36,12 +8,6 @@ export function LandingPage() {
           <img src={`${basePath}/logo-icon.svg`} alt="BanglaKhata" className="w-8 h-8" />
           <span className="text-white font-bold text-lg tracking-tight">BanglaKhata</span>
         </div>
-        <a
-          href={`${basePath}/sign-in`}
-          className="text-white/70 text-sm hover:text-white transition-colors font-medium"
-        >
-          সাইন ইন করুন →
-        </a>
       </nav>
 
       <main className="flex-1 flex flex-col items-center justify-center text-center px-6 py-16 max-w-2xl">
@@ -60,22 +26,13 @@ export function LandingPage() {
           গ্রাহক, সরবরাহকারী, বকেয়া এবং লেনদেন — সব এক জায়গায়।
         </p>
 
-        {windowsUrl && (
-          <a
-            href={windowsUrl}
-            onClick={handleWindowsClick}
-            className="w-full max-w-sm flex items-center justify-center gap-3 bg-[#0078d4] hover:bg-[#006cbf] border border-[#0078d4]/50 text-white rounded-2xl px-6 py-4 font-bold text-sm shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-          >
-            <svg className="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-13.051-1.949" />
-            </svg>
-            <span>
-              Windows App / কম্পিউটার ভার্সন
-              <br />
-              <span className="font-normal text-xs opacity-80">কম্পিউটারের জন্য ডাউনলোড করুন</span>
-            </span>
-          </a>
-        )}
+        <a
+          href={`${basePath}/sign-in`}
+          data-testid="link-landing-sign-in"
+          className="w-full max-w-sm flex items-center justify-center gap-3 bg-[#0078d4] hover:bg-[#006cbf] border border-[#0078d4]/50 text-white rounded-2xl px-6 py-4 font-bold text-sm shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+        >
+          Sign In / সাইন ইন করুন
+        </a>
 
         <p className="text-white/30 text-xs mt-6">
           বিনামূল্যে · কোনো ক্রেডিট কার্ড লাগবে না
