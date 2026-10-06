@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useAuthGuard, getAdminToken } from "@/lib/auth";
+import { adminFetch, clearAdminAuth, getAdminToken } from "@/lib/auth";
 import { SidebarLayout } from "@/components/layout/sidebar";
 import {
   useGetAdminOtpConfig, useUpdateAdminOtpConfig, getGetAdminOtpConfigQueryKey,
@@ -28,10 +28,9 @@ function useDownloadConfig() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/download-configs", {
-        headers: { Authorization: `Bearer ${getAdminToken()}` },
-      });
-      if (res.ok) setData(await res.json());
+      const res = await adminFetch("/api/admin/download-configs");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setData(await res.json());
     } finally {
       setLoading(false);
     }
@@ -42,12 +41,9 @@ function useDownloadConfig() {
   const save = useCallback(async (payload: Omit<DownloadConfigRow, "updatedAt">) => {
     setSaving(true);
     try {
-      const res = await fetch("/api/admin/download-configs", {
+      const res = await adminFetch("/api/admin/download-configs", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization:  `Bearer ${getAdminToken()}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -82,9 +78,7 @@ function useBinaryInfo() {
   const [info, setInfo] = useState<BinaryInfo | null>(null);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/admin/binary-info", {
-      headers: { Authorization: `Bearer ${getAdminToken()}` },
-    });
+    const res = await adminFetch("/api/admin/binary-info");
     if (res.ok) setInfo(await res.json());
   }, []);
 
@@ -109,6 +103,7 @@ function uploadBinaryFile(
       if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
     });
     xhr.addEventListener("load", () => {
+      if (xhr.status === 401) clearAdminAuth();
       xhr.status >= 200 && xhr.status < 300
         ? resolve()
         : reject(new Error(xhr.responseText || `HTTP ${xhr.status}`));

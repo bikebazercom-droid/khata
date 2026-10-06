@@ -1,5 +1,4 @@
 import { Link } from "wouter";
-import { useAuthGuard } from "@/lib/auth";
 import { SidebarLayout } from "@/components/layout/sidebar";
 import { useGetAdminStats, useListAdminUsers, useGetAdminOtpConfig, getGetAdminStatsQueryKey, getListAdminUsersQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +8,6 @@ import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, X
 const fmt = (date: string | null | undefined) => date ? new Date(date).toLocaleString() : "—";
 
 export default function DashboardPage() {
-  useAuthGuard();
   const { data: stats, isLoading, isError } = useGetAdminStats({
     query: { queryKey: getGetAdminStatsQueryKey(), refetchInterval: 30_000 },
   });

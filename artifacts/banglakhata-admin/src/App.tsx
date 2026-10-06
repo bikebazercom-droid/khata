@@ -1,9 +1,23 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  MutationCache,
+  QueryCache,
+  QueryClient,
+  QueryClientProvider,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { Route, Switch, Router as WouterRouter } from 'wouter';
+import { Redirect, Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
+import { useEffect } from 'react';
 import { setAuthTokenGetter } from '@workspace/api-client-react';
+import {
+  ADMIN_AUTH_CHANGED_EVENT,
+  clearAdminAuth,
+  getAdminToken,
+  getAdminTokenExpires,
+  hasValidAdminSession,
+} from '@/lib/auth';
 
 // App imports
 import LoginPage from '@/pages/login';
@@ -12,12 +26,19 @@ import UsersPage from '@/pages/users';
 import UserDetailPage from '@/pages/user-detail';
 import SettingsPage from '@/pages/settings';
 
-// Wire the admin JWT into every generated API call.
-// customFetch reads this getter before each request and attaches
-// "Authorization: Bearer <token>" when a token is present.
-setAuthTokenGetter(() => localStorage.getItem('admin_token'));
+// Generated admin API calls read the latest JWT before every request.
+setAuthTokenGetter(getAdminToken);
+
+function handleUnauthorized(error: unknown) {
+  const status = error && typeof error === 'object' && 'status' in error
+    ? (error as { status?: unknown }).status
+    : undefined;
+  if (status === 401 && getAdminToken()) clearAdminAuth();
+}
 
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({ onError: handleUnauthorized }),
+  mutationCache: new MutationCache({ onError: handleUnauthorized }),
   defaultOptions: {
     queries: {
       retry: 1,
@@ -26,14 +47,96 @@ const queryClient = new QueryClient({
   },
 });
 
+function AdminSessionController() {
+  const [, setLocation] = useLocation();
+  const client = useQueryClient();
+
+  useEffect(() => {
+    let expiryTimer: number | undefined;
+
+    const clearTimer = () => {
+      if (expiryTimer !== undefined) window.clearTimeout(expiryTimer);
+    };
+
+    const redirectToLogin = () => {
+      client.clear();
+      setLocation('/');
+    };
+
+    const scheduleExpiry = () => {
+      clearTimer();
+      const token = getAdminToken();
+      const expiresAt = getAdminTokenExpires();
+      if (!token && !expiresAt) return;
+
+      const remaining = Date.parse(expiresAt ?? '') - Date.now();
+      if (!hasValidAdminSession()) {
+        clearAdminAuth(false);
+        redirectToLogin();
+        return;
+      }
+
+      expiryTimer = window.setTimeout(() => clearAdminAuth(), remaining);
+    };
+
+    const handleAuthChange = () => {
+      scheduleExpiry();
+      if (!hasValidAdminSession()) redirectToLogin();
+    };
+
+    window.addEventListener(ADMIN_AUTH_CHANGED_EVENT, handleAuthChange);
+    window.addEventListener('storage', handleAuthChange);
+    scheduleExpiry();
+
+    return () => {
+      clearTimer();
+      window.removeEventListener(ADMIN_AUTH_CHANGED_EVENT, handleAuthChange);
+      window.removeEventListener('storage', handleAuthChange);
+    };
+  }, [client, setLocation]);
+
+  return null;
+}
+
+function AdminGuard({ children }: { children: React.ReactNode }) {
+  const [, setLocation] = useLocation();
+  const client = useQueryClient();
+  const isAuthenticated = hasValidAdminSession();
+
+  useEffect(() => {
+    if (isAuthenticated) return;
+    clearAdminAuth(false);
+    client.clear();
+    setLocation('/');
+  }, [client, isAuthenticated, setLocation]);
+
+  return isAuthenticated ? <>{children}</> : <div className="min-h-screen" aria-busy="true" />;
+}
+
+function ProtectedDashboard() {
+  return <AdminGuard><DashboardPage /></AdminGuard>;
+}
+
+function ProtectedUsers() {
+  return <AdminGuard><UsersPage /></AdminGuard>;
+}
+
+function ProtectedUserDetail() {
+  return <AdminGuard><UserDetailPage /></AdminGuard>;
+}
+
+function ProtectedSettings() {
+  return <AdminGuard><SettingsPage /></AdminGuard>;
+}
+
 function Router() {
   return (
     <Switch>
       <Route path="/" component={LoginPage} />
-      <Route path="/dashboard" component={DashboardPage} />
-      <Route path="/users" component={UsersPage} />
-      <Route path="/users/:id" component={UserDetailPage} />
-      <Route path="/settings" component={SettingsPage} />
+      <Route path="/dashboard" component={ProtectedDashboard} />
+      <Route path="/users" component={ProtectedUsers} />
+      <Route path="/users/:id" component={ProtectedUserDetail} />
+      <Route path="/settings" component={ProtectedSettings} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -44,6 +147,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+          <AdminSessionController />
           <Router />
         </WouterRouter>
         <Toaster />

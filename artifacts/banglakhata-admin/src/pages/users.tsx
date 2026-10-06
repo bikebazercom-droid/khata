@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { useAuthGuard } from "@/lib/auth";
 import { SidebarLayout } from "@/components/layout/sidebar";
 import { useListAdminUsers, getListAdminUsersQueryKey } from "@workspace/api-client-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,7 +11,6 @@ import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { useDebounce } from "@/lib/use-debounce";
 
 export default function UsersPage() {
-  useAuthGuard();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);

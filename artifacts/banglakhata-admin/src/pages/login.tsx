@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { Redirect, useLocation } from "wouter";
 import { useAdminLogin } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { setAdminAuth } from "@/lib/auth";
+import { hasValidAdminSession, setAdminAuth } from "@/lib/auth";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -14,6 +14,8 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const loginMutation = useAdminLogin();
+
+  if (hasValidAdminSession()) return <Redirect to="/dashboard" />;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

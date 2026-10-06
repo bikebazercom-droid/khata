@@ -3,16 +3,15 @@ import { useParams, Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetAdminUser, useUpdateAdminUser, getGetAdminUserQueryKey,
+  getGetAdminStatsQueryKey, getListAdminUsersQueryKey,
   useBlockIp, useUnblockIp, useListBlockedIps, getListBlockedIpsQueryKey,
 } from "@workspace/api-client-react";
-import { useAuthGuard } from "@/lib/auth";
 import { SidebarLayout } from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export default function UserDetailPage() {
-  useAuthGuard();
   const { id } = useParams<{ id: string }>();
   const { data: user, isLoading, isError } = useGetAdminUser(id, { query: { queryKey: getGetAdminUserQueryKey(id), enabled: !!id, refetchInterval: 30_000 } });
   const { data: blocked } = useListBlockedIps();
@@ -25,6 +24,8 @@ export default function UserDetailPage() {
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: getGetAdminUserQueryKey(id) });
     void qc.invalidateQueries({ queryKey: getListBlockedIpsQueryKey() });
+    void qc.invalidateQueries({ queryKey: getListAdminUsersQueryKey() });
+    void qc.invalidateQueries({ queryKey: getGetAdminStatsQueryKey() });
   };
   const changeStatus = () => {
     if (!user) return;
