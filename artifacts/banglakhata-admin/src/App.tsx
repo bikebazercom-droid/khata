@@ -9,7 +9,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { Redirect, Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { setAuthTokenGetter } from '@workspace/api-client-react';
 import {
   ADMIN_AUTH_CHANGED_EVENT,
@@ -98,7 +98,7 @@ function AdminSessionController() {
   return null;
 }
 
-function AdminGuard({ children }: { children: React.ReactNode }) {
+function AdminGuard({ children }: { children: ReactNode }) {
   const [, setLocation] = useLocation();
   const client = useQueryClient();
   const isAuthenticated = hasValidAdminSession();

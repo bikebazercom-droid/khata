@@ -15,7 +15,7 @@ export default function UsersPage() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 500);
 
-  const { data, isLoading } = useListAdminUsers({
+  const { data, isLoading, isError, refetch } = useListAdminUsers({
     search: debouncedSearch,
     page,
     pageSize: 20
@@ -46,6 +46,12 @@ export default function UsersPage() {
         </div>
 
         <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+          {isError && (
+            <p role="alert" className="border-b bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center justify-between gap-3">
+              <span>Could not load the user list.</span>
+              <Button type="button" variant="outline" size="sm" onClick={() => void refetch()}>Retry</Button>
+            </p>
+          )}
           <Table>
             <TableHeader className="bg-slate-50">
               <TableRow>
@@ -65,7 +71,13 @@ export default function UsersPage() {
                     Loading users...
                   </TableCell>
                 </TableRow>
-              ) : data?.items.length === 0 ? (
+              ) : !data ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    No user data is available.
+                  </TableCell>
+                </TableRow>
+              ) : data.items.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     No users found

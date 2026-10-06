@@ -24,13 +24,18 @@ function useDownloadConfig() {
   const [data, setData]       = useState<DownloadConfigRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
+  const [error, setError]     = useState<string | null>(null);
   const { toast } = useToast();
 
   const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
       const res = await adminFetch("/api/admin/download-configs");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setData(await res.json());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load download settings.");
     } finally {
       setLoading(false);
     }
@@ -57,7 +62,7 @@ function useDownloadConfig() {
     }
   }, [toast]);
 
-  return { data, loading, saving, save };
+  return { data, loading, saving, error, save, reload: load };
 }
 
 // ── Binary file info types & hook ─────────────────────────────────────────────
@@ -76,15 +81,26 @@ function isPlaceholder(info: BinaryFileInfo) { return info.size <= 1024; }
 
 function useBinaryInfo() {
   const [info, setInfo] = useState<BinaryInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const res = await adminFetch("/api/admin/binary-info");
-    if (res.ok) setInfo(await res.json());
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await adminFetch("/api/admin/binary-info");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setInfo(await res.json());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load uploaded file status.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { void load(); }, [load]);
 
-  return { info, reload: load };
+  return { info, loading, error, reload: load };
 }
 
 /** Upload a binary via XHR so we get upload-progress events. */
@@ -243,12 +259,19 @@ function DownloadTestCard({ binInfo }: { binInfo: BinaryInfo | null }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
-  useAuthGuard();
-
   // ── OTP config ──────────────────────────────────────────────────────────────
-  const { data: config, isLoading: otpLoading } = useGetAdminOtpConfig();
+  const {
+    data: config,
+    isLoading: otpLoading,
+    isError: otpError,
+    refetch: retryOtpConfig,
+  } = useGetAdminOtpConfig();
   const updateMutation = useUpdateAdminOtpConfig();
-  const { data: blockedIps } = useListBlockedIps();
+  const {
+    data: blockedIps,
+    isError: blockedIpsError,
+    refetch: retryBlockedIps,
+  } = useListBlockedIps();
   const blockIp = useBlockIp();
   const unblockIp = useUnblockIp();
   const { toast } = useToast();
@@ -296,7 +319,14 @@ export default function SettingsPage() {
   };
 
   // ── Download config ─────────────────────────────────────────────────────────
-  const { data: dlCfg, loading: dlLoading, saving: dlSaving, save: dlSave } = useDownloadConfig();
+  const {
+    data: dlCfg,
+    loading: dlLoading,
+    saving: dlSaving,
+    error: dlError,
+    save: dlSave,
+    reload: reloadDlConfig,
+  } = useDownloadConfig();
 
   const [windowsExeUrl,   setWindowsExeUrl]   = useState("");
 
@@ -314,7 +344,12 @@ export default function SettingsPage() {
   };
 
   // ── Binary file upload ──────────────────────────────────────────────────────
-  const { info: binInfo, reload: reloadBinInfo } = useBinaryInfo();
+  const {
+    info: binInfo,
+    loading: binLoading,
+    error: binError,
+    reload: reloadBinInfo,
+  } = useBinaryInfo();
   const exeInputRef = useRef<HTMLInputElement>(null);
   const macInputRef = useRef<HTMLInputElement>(null);
   const [exeProgress, setExeProgress] = useState<number | null>(null);
@@ -366,11 +401,20 @@ export default function SettingsPage() {
             <CardDescription>Server-enforced for all sessions and OTP requests when a verified client-IP policy is configured. Shared networks can affect multiple people; blocking an IP is not a permanent device block.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p role="status" className={`rounded p-3 text-sm ${blockedIps?.policy.configured && blockedIps.policy.clientIpAvailable ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
-              {blockedIps?.policy.message ?? "Checking client IP policy…"}
-              {blockedIps?.policy.configured && !blockedIps.policy.clientIpAvailable &&
-                " This request has no verifiable forwarded client IP; blocking is disabled."}
-            </p>
+            {blockedIpsError ? (
+              <div role="alert" className="rounded bg-red-50 text-red-700 p-3 text-sm flex flex-wrap items-center justify-between gap-2">
+                <span>Could not load the IP blocking policy.</span>
+                <Button type="button" variant="outline" size="sm" onClick={() => void retryBlockedIps()}>
+                  Retry
+                </Button>
+              </div>
+            ) : (
+              <p role="status" className={`rounded p-3 text-sm ${blockedIps?.policy.configured && blockedIps.policy.clientIpAvailable ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
+                {blockedIps?.policy.message ?? "Checking client IP policy…"}
+                {blockedIps?.policy.configured && !blockedIps.policy.clientIpAvailable &&
+                  " This request has no verifiable forwarded client IP; blocking is disabled."}
+              </p>
+            )}
             <form onSubmit={saveIp} className="flex flex-wrap gap-2">
               <Input className="flex-1 min-w-40" placeholder="IPv4 or IPv6 address" value={newIp}
                 onChange={e => setNewIp(e.target.value)} disabled={!blockedIps?.policy.clientIpAvailable} required />
@@ -408,6 +452,14 @@ export default function SettingsPage() {
             </CardHeader>
 
             <CardContent className="space-y-7 pt-4 border-t">
+              {dlError && (
+                <div role="alert" className="rounded bg-red-50 text-red-700 p-3 text-sm flex flex-wrap items-center justify-between gap-2">
+                  <span>Could not load download settings. {dlError}</span>
+                  <Button type="button" variant="outline" size="sm" onClick={() => void reloadDlConfig()}>
+                    Retry
+                  </Button>
+                </div>
+              )}
 
               {/* Windows desktop */}
               <div className="space-y-4">
@@ -464,6 +516,14 @@ export default function SettingsPage() {
           </CardHeader>
 
           <CardContent className="space-y-6 pt-4 border-t">
+            {binError && (
+              <div role="alert" className="rounded bg-red-50 text-red-700 p-3 text-sm flex flex-wrap items-center justify-between gap-2">
+                <span>Could not load uploaded file status. {binError}</span>
+                <Button type="button" variant="outline" size="sm" onClick={() => void reloadBinInfo()}>
+                  Retry
+                </Button>
+              </div>
+            )}
 
             {/* Hidden file inputs */}
             <input
@@ -497,7 +557,9 @@ export default function SettingsPage() {
               </div>
 
               {/* Current file status badge */}
-              {binInfo?.exe ? (
+              {binLoading ? (
+                <div className="h-8 w-64 bg-slate-100 animate-pulse rounded-lg" />
+              ) : binInfo?.exe ? (
                 isPlaceholder(binInfo.exe) ? (
                   <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
@@ -516,9 +578,9 @@ export default function SettingsPage() {
                     </span>
                   </div>
                 )
-              ) : (
+              ) : !binError ? (
                 <div className="h-8 w-64 bg-slate-100 animate-pulse rounded-lg" />
-              )}
+              ) : null}
 
               {/* Upload button or progress bar */}
               {exeProgress !== null ? (
@@ -558,7 +620,9 @@ export default function SettingsPage() {
               </div>
 
               {/* Current file status badge */}
-              {binInfo?.mac ? (
+              {binLoading ? (
+                <div className="h-8 w-64 bg-slate-100 animate-pulse rounded-lg" />
+              ) : binInfo?.mac ? (
                 isPlaceholder(binInfo.mac) ? (
                   <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
@@ -577,9 +641,9 @@ export default function SettingsPage() {
                     </span>
                   </div>
                 )
-              ) : (
+              ) : !binError ? (
                 <div className="h-8 w-64 bg-slate-100 animate-pulse rounded-lg" />
-              )}
+              ) : null}
 
               {/* Upload button or progress bar */}
               {macProgress !== null ? (
@@ -637,6 +701,14 @@ export default function SettingsPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-6 pt-4 border-t">
+              {otpError && (
+                <div role="alert" className="rounded bg-red-50 text-red-700 p-3 text-sm flex flex-wrap items-center justify-between gap-2">
+                  <span>Could not load OTP configuration.</span>
+                  <Button type="button" variant="outline" size="sm" onClick={() => void retryOtpConfig()}>
+                    Retry
+                  </Button>
+                </div>
+              )}
               {config?.connectionError && <p role="alert" className="text-sm text-amber-700 bg-amber-50 p-3 rounded">{config.connectionError}</p>}
               <div className="text-sm space-y-2">
                 <p>Provider: <strong>{config?.provider ?? "sms.net.bd"}</strong></p>
@@ -648,7 +720,7 @@ export default function SettingsPage() {
                 </p>
               </div>
               <label className="flex items-center gap-3 text-sm font-medium">
-                <input type="checkbox" checked={otpEnabled} onChange={e => setOtpEnabled(e.target.checked)} />
+                <input type="checkbox" checked={otpEnabled} disabled={!config || otpError} onChange={e => setOtpEnabled(e.target.checked)} />
                 Enable Bangladesh phone OTP sign-in and verification
               </label>
               <p className="text-xs text-muted-foreground">Only Bangladeshi mobile numbers using 01XXXXXXXXX or +8801XXXXXXXXX format can receive an OTP.</p>
@@ -657,7 +729,7 @@ export default function SettingsPage() {
               <div className="text-xs text-muted-foreground">
                 Last updated: {formatDate(config?.updatedAt)}
               </div>
-              <Button type="submit" disabled={updateMutation.isPending}>
+              <Button type="submit" disabled={updateMutation.isPending || !config || otpError}>
                 <Save className="w-4 h-4 mr-2" />
                 {updateMutation.isPending ? "Saving..." : "Save Configuration"}
               </Button>

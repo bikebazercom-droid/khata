@@ -13,8 +13,17 @@ import { Input } from "@/components/ui/input";
 
 export default function UserDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { data: user, isLoading, isError } = useGetAdminUser(id, { query: { queryKey: getGetAdminUserQueryKey(id), enabled: !!id, refetchInterval: 30_000 } });
-  const { data: blocked } = useListBlockedIps();
+  const {
+    data: user,
+    isLoading,
+    isError,
+    refetch: refetchUser,
+  } = useGetAdminUser(id, { query: { queryKey: getGetAdminUserQueryKey(id), enabled: !!id, refetchInterval: 30_000 } });
+  const {
+    data: blocked,
+    isError: blockedError,
+    refetch: refetchBlocked,
+  } = useListBlockedIps();
   const update = useUpdateAdminUser();
   const block = useBlockIp();
   const unblock = useUnblockIp();
@@ -48,7 +57,12 @@ export default function UserDetailPage() {
     <div className="flex items-center gap-4"><Link href="/users" className="text-primary hover:underline">← Users</Link>
       <h1 className="text-2xl font-bold">User details</h1></div>
     {isLoading && <p>Loading user…</p>}
-    {isError && <p role="alert" className="text-red-600">Unable to load user.</p>}
+    {isError && (
+      <p role="alert" className="text-red-600 flex items-center gap-3">
+        Unable to load user.
+        <Button type="button" variant="outline" size="sm" onClick={() => void refetchUser()}>Retry</Button>
+      </p>
+    )}
     {error && <p role="alert" className="text-red-600">{error}</p>}
     {user && <>
       <Card className="border-0 shadow-sm bg-white"><CardHeader><CardTitle>Account</CardTitle></CardHeader>
@@ -68,6 +82,12 @@ export default function UserDetailPage() {
       <Card className="border-0 shadow-sm bg-white">
         <CardHeader><CardTitle>Successful login history (latest 50 · retained 90 days)</CardTitle></CardHeader>
         <CardContent>
+          {blockedError && (
+            <p role="alert" className="text-sm text-red-700 bg-red-50 p-3 rounded mb-4">
+              Could not load network restrictions.{" "}
+              <Button type="button" size="sm" variant="outline" onClick={() => void refetchBlocked()}>Retry</Button>
+            </p>
+          )}
           <p className="text-xs text-muted-foreground mb-4">IP restrictions affect everyone on a shared IP, including existing sessions and OTP routes—not a permanent device ban. IPs recorded before a verified policy was configured may belong to a shared proxy. Review them before blocking.</p>
           <p role="status" className={`text-sm p-3 rounded mb-4 ${blocked?.policy.configured && blocked.policy.clientIpAvailable ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
             {blocked?.policy.message ?? "Checking client IP policy…"}
