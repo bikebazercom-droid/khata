@@ -163,6 +163,18 @@ paths:
       operationId: getAuthMe
       tags: [auth]
       summary: Get the current user's business identity and permissions
+      description: |
+        Expo WebViews may send a native bearer token once with
+        X-Banglakhata-Native-Session: 1. When valid, the server establishes an
+        HttpOnly WebView session cookie; ordinary browser requests continue to use cookies.
+      parameters:
+        - in: header
+          name: X-Banglakhata-Native-Session
+          required: false
+          schema:
+            type: string
+            enum: ["1"]
+          description: Marks the one-time Expo WebView session exchange request.
       responses:
         "200":
           description: Signed-in identity

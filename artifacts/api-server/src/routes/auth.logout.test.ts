@@ -7,7 +7,10 @@ import { eq } from "drizzle-orm";
 import {
   appUserLoginSessionsTable, appUsersTable, businessesTable, db, userBusinessesTable,
 } from "@workspace/db";
-import { PHONE_SESSION_COOKIE_MAX_AGE_MS } from "../middlewares/requireAuth";
+import {
+  CLERK_WEBVIEW_SESSION_COOKIE_MAX_AGE_MS,
+  PHONE_SESSION_COOKIE_MAX_AGE_MS,
+} from "../middlewares/requireAuth";
 import authRouter from "./auth";
 
 const clerkSession = vi.hoisted(() => ({ userId: "", oldSessionId: "", newSessionId: "" }));
@@ -74,6 +77,22 @@ describe("phone session logout", () => {
     const reopened = await request(app).get("/auth/me")
       .set("Cookie", `phone_session=${refreshedToken}`);
     expect(reopened.status, reopened.text).toBe(200);
+  });
+
+  it("exchanges a native phone bearer for the existing persistent WebView cookie", async () => {
+    const response = await request(app).get("/auth/me")
+      .set("Authorization", `Bearer ${token}`)
+      .set("x-banglakhata-native-session", "1");
+    expect(response.status, response.text).toBe(200);
+    const rawCookies = response.headers["set-cookie"];
+    const cookies = Array.isArray(rawCookies) ? rawCookies : rawCookies ? [rawCookies] : [];
+    const cookie = cookies.find((value) => value.startsWith("phone_session="));
+    expect(cookie).toContain(`Max-Age=${PHONE_SESSION_COOKIE_MAX_AGE_MS / 1000}`);
+    expect(cookie).toContain("HttpOnly");
+    const webViewSession = await request(app).get("/auth/me")
+      .set("Cookie", cookie!.split(";")[0]!);
+    expect(webViewSession.status, webViewSession.text).toBe(200);
+    expect(webViewSession.body.authMethod).toBe("phone");
   });
 
   it("revokes a copied mobile bearer token and records the explicit logout", async () => {
@@ -162,10 +181,31 @@ describe("phone session logout", () => {
       }),
     } as Response);
     try {
-      const before = await request(app).get("/auth/me").set("Authorization", "Bearer clerk-old");
+      const before = await request(app).get("/auth/me")
+        .set("Authorization", "Bearer clerk-old")
+        .set("x-banglakhata-native-session", "1");
       expect(before.status, before.text).toBe(200);
-      const logout = await request(app).post("/auth/logout-event").set("Authorization", "Bearer clerk-old");
+      const rawCookies = before.headers["set-cookie"];
+      const cookies = Array.isArray(rawCookies) ? rawCookies : rawCookies ? [rawCookies] : [];
+      const webViewCookie = cookies.find((value) => value.startsWith("clerk_webview_session="));
+      expect(webViewCookie).toContain(`Max-Age=${CLERK_WEBVIEW_SESSION_COOKIE_MAX_AGE_MS / 1000}`);
+      expect(webViewCookie).toContain("HttpOnly");
+
+      const reopened = await request(app).get("/auth/me")
+        .set("Cookie", webViewCookie!.split(";")[0]!);
+      expect(reopened.status, reopened.text).toBe(200);
+      expect(reopened.body.authMethod).toBe("clerk");
+
+      const logout = await request(app).post("/auth/logout-event")
+        .set("Cookie", webViewCookie!.split(";")[0]!);
       expect(logout.status, logout.text).toBe(204);
+      const clearedCookies = logout.headers["set-cookie"];
+      const cleared = Array.isArray(clearedCookies) ? clearedCookies : clearedCookies ? [clearedCookies] : [];
+      expect(cleared.find((value) => value.startsWith("clerk_webview_session="))).toContain("Expires=");
+
+      const copiedWebViewCookie = await request(app).get("/auth/me")
+        .set("Cookie", webViewCookie!.split(";")[0]!);
+      expect(copiedWebViewCookie.status).toBe(401);
       const copiedOldToken = await request(app).get("/auth/me").set("Authorization", "Bearer clerk-old");
       expect(copiedOldToken.status).toBe(401);
 

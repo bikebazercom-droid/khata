@@ -36,6 +36,21 @@ export function resolveWebAppUrl(
   }
 }
 
+export function resolveWebAppStartUrl(
+  webAppUrl: string,
+  hasNativeSession: boolean,
+): string | null {
+  try {
+    const url = new URL(webAppUrl);
+    if (!hasNativeSession) return url.toString();
+    const basePath = url.pathname.replace(/\/+$/, "");
+    url.pathname = `${basePath}/dashboard`;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 export function getWebAppUrl(): string | null {
   return resolveWebAppUrl(
     process.env.EXPO_PUBLIC_WEB_APP_URL,

@@ -546,6 +546,9 @@ export const getGetAuthMeUrl = () => {
 }
 
 /**
+ * Expo WebViews may send a native bearer token once with
+ * X-Banglakhata-Native-Session: 1. When valid, the server establishes an
+ * HttpOnly WebView session cookie; ordinary browser requests continue to use cookies.
  * @summary Get the current user's business identity and permissions
  */
 export const getAuthMe = async ( options?: RequestInit): Promise<AuthMe> => {

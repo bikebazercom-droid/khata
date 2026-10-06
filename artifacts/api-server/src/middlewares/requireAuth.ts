@@ -341,12 +341,60 @@ const COOKIE_NAME = "phone_session";
 // Browsers cap persistent cookies at roughly 400 days. Renew the cookie on
 // authenticated requests so active phone sessions remain signed in until logout.
 export const PHONE_SESSION_COOKIE_MAX_AGE_MS = 400 * 24 * 60 * 60 * 1000;
+export const CLERK_WEBVIEW_SESSION_COOKIE_MAX_AGE_MS = PHONE_SESSION_COOKIE_MAX_AGE_MS;
+const CLERK_WEBVIEW_SESSION_COOKIE_NAME = "clerk_webview_session";
+export const NATIVE_WEBVIEW_SESSION_HEADER = "x-banglakhata-native-session";
 
 interface PhoneSessionPayload {
   userId: string;
   businessId?: string;
   phone: string;
   sessionVersion: number;
+}
+
+interface ClerkWebViewSessionPayload {
+  type: "clerk-webview";
+  userId: string;
+  clerkUserId: string;
+  sessionId: string;
+}
+
+export function issueClerkWebViewSession(
+  res: Response,
+  payload: Omit<ClerkWebViewSessionPayload, "type">,
+): void {
+  const token = jwt.sign({ ...payload, type: "clerk-webview" }, SESSION_SECRET);
+  res.cookie(CLERK_WEBVIEW_SESSION_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: CLERK_WEBVIEW_SESSION_COOKIE_MAX_AGE_MS,
+    path: "/",
+  });
+}
+
+export function clearClerkWebViewSession(res: Response): void {
+  res.clearCookie(CLERK_WEBVIEW_SESSION_COOKIE_NAME, { path: "/" });
+}
+
+export function isNativeWebViewSessionExchange(req: Request): boolean {
+  return req.get(NATIVE_WEBVIEW_SESSION_HEADER) === "1"
+    && Boolean(req.headers.authorization?.startsWith("Bearer "));
+}
+
+function verifyClerkWebViewSession(token: string): ClerkWebViewSessionPayload | null {
+  try {
+    const decoded = jwt.verify(token, SESSION_SECRET) as Partial<ClerkWebViewSessionPayload>;
+    if (
+      decoded.type !== "clerk-webview"
+      || typeof decoded.userId !== "string"
+      || typeof decoded.clerkUserId !== "string"
+      || typeof decoded.sessionId !== "string"
+    ) return null;
+    return decoded as ClerkWebViewSessionPayload;
+  } catch {
+    return null;
+  }
 }
 
 export function issuePhoneSession(
@@ -394,8 +442,19 @@ export async function requireAuth(
   res: Response,
   next: NextFunction,
 ): Promise<void> {
+  const isNativeSessionExchange = isNativeWebViewSessionExchange(req);
+  const hasWebViewSessionCookie = Boolean(
+    (req as any).cookies?.[CLERK_WEBVIEW_SESSION_COOKIE_NAME]
+    || (req as any).cookies?.[COOKIE_NAME],
+  );
+
   // ── 0. Development bypass — NEVER active when NODE_ENV=production ──────────
-  if (process.env.NODE_ENV !== "production" && process.env.DEV_AUTH_BYPASS === "true") {
+  if (
+    process.env.NODE_ENV !== "production"
+    && process.env.DEV_AUTH_BYPASS === "true"
+    && !isNativeSessionExchange
+    && !hasWebViewSessionCookie
+  ) {
     try {
       // Ensure a stable dev user exists (idempotent, uses fixed UUID).
       await db
@@ -424,9 +483,69 @@ export async function requireAuth(
       (req as AuthenticatedRequest).authMethod = "dev";
       return next();
     } catch (err) {
-      console.warn("[requireAuth] dev-bypass setup error — falling through to real auth:", err);
+      req.log?.warn({ err }, "[requireAuth] Dev bypass setup failed; falling through to real auth");
       // Fall through to real auth if the bypass setup fails.
     }
+  }
+
+  // Native Clerk tokens are exchanged for this signed, HttpOnly cookie inside
+  // the WebView. The exchange itself must still authenticate with its bearer
+  // token so a previous cookie cannot select a different native account.
+  const rawWebViewSession = (req as any).cookies?.[CLERK_WEBVIEW_SESSION_COOKIE_NAME];
+  if (typeof rawWebViewSession === "string" && !isNativeSessionExchange) {
+    const webViewSession = verifyClerkWebViewSession(rawWebViewSession);
+    if (webViewSession) {
+      try {
+        const [user] = await db.select().from(appUsersTable)
+          .where(eq(appUsersTable.id, webViewSession.userId)).limit(1);
+        const [session] = await db.select().from(appUserLoginSessionsTable)
+          .where(and(
+            eq(appUserLoginSessionsTable.userId, webViewSession.userId),
+            eq(appUserLoginSessionsTable.sessionId, webViewSession.sessionId),
+          )).limit(1);
+        const [revokedWorkerAccess] = await db.select({
+          revokedAt: appUserLoginSessionsTable.revokedAt,
+        }).from(appUserLoginSessionsTable).where(and(
+          eq(appUserLoginSessionsTable.userId, webViewSession.userId),
+          eq(appUserLoginSessionsTable.sessionId, "worker-access-revoked"),
+        )).limit(1);
+        const workerSessionIsCurrent = !revokedWorkerAccess?.revokedAt
+          || await verifyClerkSessionCreationTime(
+            webViewSession.sessionId,
+            webViewSession.clerkUserId,
+            revokedWorkerAccess.revokedAt,
+          );
+
+        if (
+          user
+          && user.clerkUserId === webViewSession.clerkUserId
+          && user.status === "active"
+          && !user.workerAccessDeletedAt
+          && session
+          && !session.revokedAt
+          && workerSessionIsCurrent
+        ) {
+          const businessId = await resolveBusinessId(user, req);
+          if (businessId) {
+            const authReq = req as AuthenticatedRequest;
+            authReq.userId = user.id;
+            authReq.businessId = businessId;
+            authReq.role = user.role as "owner" | "staff";
+            authReq.status = user.status;
+            authReq.authMethod = "clerk";
+            authReq.clerkSessionId = webViewSession.sessionId;
+            authReq.verifiedEmail = user.verifiedEmail ?? undefined;
+            issueClerkWebViewSession(res, webViewSession);
+            return next();
+          }
+        }
+      } catch (err) {
+        req.log?.error({ err }, "[requireAuth] Native WebView session validation failed");
+        res.status(500).json({ error: "Unable to verify session" });
+        return;
+      }
+    }
+    clearClerkWebViewSession(res);
   }
 
   // ── 1. Try Clerk ──
@@ -512,7 +631,7 @@ export async function requireAuth(
       (req as AuthenticatedRequest).verifiedEmail = verifiedEmail ?? undefined;
       return next();
     } catch (err) {
-      console.error("[requireAuth] Clerk JIT provision error:", err);
+      req.log?.error({ err }, "[requireAuth] Clerk JIT provision failed");
       res.status(500).json({ error: "Auth provisioning failed" });
       return;
     }

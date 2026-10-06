@@ -27,6 +27,9 @@ import {
   getOrCreatePhoneUser,
   issuePhoneSession,
   clearPhoneSession,
+  clearClerkWebViewSession,
+  isNativeWebViewSessionExchange,
+  issueClerkWebViewSession,
   requireAuth,
   type AuthenticatedRequest,
 } from "../middlewares/requireAuth";
@@ -386,6 +389,7 @@ router.post("/auth/logout-event", requireAuth, async (req: Request, res: Respons
       eq(appUsersTable.businessId, auth.businessId),
     ));
   });
+  if (auth.authMethod === "clerk") clearClerkWebViewSession(res);
   res.status(204).end();
 });
 
@@ -425,8 +429,35 @@ router.get(
     const auth = req as AuthenticatedRequest;
     const [business] = await db.select({ name: businessesTable.name }).from(businessesTable)
       .where(eq(businessesTable.id, auth.businessId)).limit(1);
-    const [user] = await db.select({ ids: appUsersTable.adjustmentPartyIds }).from(appUsersTable)
+    const [user] = await db.select({
+      ids: appUsersTable.adjustmentPartyIds,
+      clerkUserId: appUsersTable.clerkUserId,
+      phone: appUsersTable.phone,
+      phoneSessionVersion: appUsersTable.phoneSessionVersion,
+    }).from(appUsersTable)
       .where(eq(appUsersTable.id, auth.userId)).limit(1);
+    if (isNativeWebViewSessionExchange(req)) {
+      if (auth.authMethod === "clerk" && auth.clerkSessionId && user?.clerkUserId) {
+        clearPhoneSession(res);
+        issueClerkWebViewSession(res, {
+          userId: auth.userId,
+          clerkUserId: user.clerkUserId,
+          sessionId: auth.clerkSessionId,
+        });
+      } else if (
+        auth.authMethod === "phone"
+        && user?.phone
+        && Number.isInteger(user.phoneSessionVersion)
+      ) {
+        clearClerkWebViewSession(res);
+        issuePhoneSession(res, {
+          userId: auth.userId,
+          businessId: auth.businessId,
+          phone: user.phone,
+          sessionVersion: user.phoneSessionVersion,
+        });
+      }
+    }
     const targets = auth.role === "staff" && user?.ids.length
       ? await db.select({ id: partiesTable.id }).from(partiesTable)
         .where(and(eq(partiesTable.businessId, auth.businessId), inArray(partiesTable.id, user.ids)))

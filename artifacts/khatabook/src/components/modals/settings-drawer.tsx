@@ -34,7 +34,11 @@ import { clearAllPendingUploads } from '@/lib/pendingUploads';
 import { useLanguage } from '@/lib/i18n';
 import { useAppAuth } from '@/App';
 import { revokeNetworkWrites } from '@/lib/useAuthConnectivity';
-import { STORED_OWNER_PUSH_TOKEN_KEY } from '@/lib/nativePushBridge';
+import {
+  NATIVE_AUTH_LOGOUT_MESSAGE,
+  postNativeAuthMessage,
+  STORED_OWNER_PUSH_TOKEN_KEY,
+} from '@/lib/nativePushBridge';
 
 /** Shape stored in localStorage under PROFILE_KEY */
 export interface ShopProfile {
@@ -143,6 +147,7 @@ export function SettingsDrawer({
         throw new Error(err);
       }
 
+      postNativeAuthMessage(NATIVE_AUTH_LOGOUT_MESSAGE);
       queryClient.clear();
       revokeNetworkWrites();
       clearAllPendingUploads();
@@ -193,6 +198,7 @@ export function SettingsDrawer({
       clearAllPendingUploads();
       localStorage.removeItem(STORED_OWNER_PUSH_TOKEN_KEY);
       localStorage.removeItem('selected_business_id');
+      postNativeAuthMessage(NATIVE_AUTH_LOGOUT_MESSAGE);
       if (isSignedIn) await signOut().catch(() => {});
       onOpenChange(false);
       navigate('/sign-in');
@@ -232,6 +238,7 @@ export function SettingsDrawer({
       }
       await phoneLogout();
       if (isSignedIn) await signOut();
+      postNativeAuthMessage(NATIVE_AUTH_LOGOUT_MESSAGE);
       queryClient.clear();
       revokeNetworkWrites();
       clearOfflineIdentity();

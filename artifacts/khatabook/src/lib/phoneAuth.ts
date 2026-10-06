@@ -6,6 +6,11 @@
  * in-memory flag and a `/api/auth/me` check to know whether a phone session
  * is active.
  */
+import {
+  NATIVE_AUTH_READY_MESSAGE,
+  NATIVE_AUTH_REJECTED_MESSAGE,
+  postNativeAuthMessage,
+} from './nativePushBridge';
 
 export interface MeResponse {
   userId: string;
@@ -16,7 +21,51 @@ export interface MeResponse {
   role?: "owner" | "staff";
 }
 
+interface NativeAuthBootstrapResult {
+  ok: boolean;
+  status: number;
+  data?: MeResponse;
+}
+
+declare global {
+  interface Window {
+    __BKH_NATIVE_AUTH_BOOTSTRAP__?: Promise<NativeAuthBootstrapResult>;
+  }
+}
+
+let nativeAuthBootstrapPromise: Promise<NativeAuthBootstrapResult> | null = null;
+let nativeAuthReadyNotified = false;
+let nativeAuthRejectedNotified = false;
+
 export async function fetchMe(signal?: AbortSignal): Promise<MeResponse> {
+  const injectedBootstrap = typeof window === 'undefined'
+    ? undefined
+    : window.__BKH_NATIVE_AUTH_BOOTSTRAP__;
+  if (injectedBootstrap) {
+    nativeAuthBootstrapPromise ??= injectedBootstrap;
+    const result = await nativeAuthBootstrapPromise;
+    if (result.ok && result.data) {
+      if (typeof window !== 'undefined') delete window.__BKH_NATIVE_AUTH_BOOTSTRAP__;
+      nativeAuthBootstrapPromise = null;
+      if (!nativeAuthReadyNotified) {
+        nativeAuthReadyNotified = true;
+        postNativeAuthMessage(NATIVE_AUTH_READY_MESSAGE);
+      }
+      return result.data;
+    }
+    if (result.status === 401 || result.status === 403) {
+      if (typeof window !== 'undefined') delete window.__BKH_NATIVE_AUTH_BOOTSTRAP__;
+      nativeAuthBootstrapPromise = null;
+      if (!nativeAuthRejectedNotified) {
+        nativeAuthRejectedNotified = true;
+        postNativeAuthMessage(NATIVE_AUTH_REJECTED_MESSAGE);
+      }
+      const error = new Error("Session expired or access denied") as Error & { status: number };
+      error.status = result.status;
+      throw error;
+    }
+  }
+
   const res = await fetch(`/api/auth/me`, { credentials: "include", cache: "no-store", signal });
   if (!res.ok) {
     const error = new Error(res.status === 401 || res.status === 403 ? "Session expired or access denied" : "Authentication server unavailable") as Error & { status: number };

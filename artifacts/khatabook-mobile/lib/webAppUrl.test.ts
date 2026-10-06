@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveWebAppUrl } from './webAppUrl';
+import { resolveWebAppStartUrl, resolveWebAppUrl } from './webAppUrl';
 
 describe('resolveWebAppUrl', () => {
   it('uses an explicit website URL when configured', () => {
@@ -23,5 +23,17 @@ describe('resolveWebAppUrl', () => {
     expect(resolveWebAppUrl('http://ledger.example.com', undefined)).toBeNull();
     expect(resolveWebAppUrl('https://user:password@ledger.example.com', undefined)).toBeNull();
     expect(resolveWebAppUrl('javascript:alert(1)', undefined)).toBeNull();
+  });
+});
+
+describe('resolveWebAppStartUrl', () => {
+  it('opens the protected dashboard when the native shell has a persisted session', () => {
+    expect(resolveWebAppStartUrl('https://ledger.example.com/mobile/', true))
+      .toBe('https://ledger.example.com/mobile/dashboard');
+  });
+
+  it('keeps the public root when the native shell has no session', () => {
+    expect(resolveWebAppStartUrl('https://ledger.example.com/', false))
+      .toBe('https://ledger.example.com/');
   });
 });

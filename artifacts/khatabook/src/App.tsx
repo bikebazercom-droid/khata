@@ -501,7 +501,7 @@ export function useAppAuth() {
   return {
     isAuthenticated,
     isLoading,
-    authMethod: clerkSignedIn ? 'clerk' : (resolvedAuthData ? 'phone' : null),
+    authMethod: resolvedAuthData?.authMethod ?? (clerkSignedIn ? 'clerk' : null),
     role,
     userId: resolvedAuthData?.userId,
     businessId: resolvedAuthData?.businessId ?? null,
@@ -575,11 +575,12 @@ function OwnerLayout({ children }: { children: React.ReactNode }) {
 // ─── Home route (public landing or app) ──────────────────────────────────────
 
 function HomeRoute() {
-  const { isAuthenticated, isLoading } = useAppAuth();
+  const { isAuthenticated, isLoading, role } = useAppAuth();
 
   if (isLoading) return <AppSplash />;
 
   if (isAuthenticated) {
+    if (role !== 'staff') return <Redirect to="/dashboard" />;
     return (
       <MainLayout>
         <HomeView />
@@ -645,6 +646,11 @@ function AppRouter({ onNetworkFailure, onSettled }: { onNetworkFailure: () => vo
               <Route path="/sign-in/*?" component={SignInRoute} />
               <Route path="/sign-up/*?" component={SignUpPage} />
               {/* Protected */}
+              <Route path="/dashboard">
+                <OwnerLayout>
+                  <HomeView />
+                </OwnerLayout>
+              </Route>
               <Route path="/access">
                 <OwnerLayout>
                   <AccessPage />

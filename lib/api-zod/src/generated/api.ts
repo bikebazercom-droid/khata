@@ -97,8 +97,15 @@ export const LogoutPhoneOtpResponse = zod.object({
 
 
 /**
+ * Expo WebViews may send a native bearer token once with
+ * X-Banglakhata-Native-Session: 1. When valid, the server establishes an
+ * HttpOnly WebView session cookie; ordinary browser requests continue to use cookies.
  * @summary Get the current user's business identity and permissions
  */
+export const GetAuthMeHeader = zod.object({
+  "X-Banglakhata-Native-Session": zod.enum(['1']).optional().describe('Marks the one-time Expo WebView session exchange request.')
+})
+
 export const GetAuthMeResponse = zod.object({
   "role": zod.enum(['owner', 'staff']),
   "businessId": zod.string(),

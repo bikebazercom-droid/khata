@@ -34,6 +34,7 @@ type AuthContextValue = {
   acceptClerkSession: () => Promise<void>;
   signOut: () => Promise<unknown | null>;
   clearAfterAccountDeletion: () => Promise<unknown | null>;
+  clearNativeSession: () => Promise<void>;
   refreshIdentity: () => Promise<void>;
 };
 
@@ -247,6 +248,18 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     return requestError;
   }, [clerkAuth.isSignedIn, clerkAuth.signOut, queryClient]);
 
+  const clearNativeSession = useCallback(async () => {
+    await queryClient.cancelQueries();
+    queryClient.clear();
+    if (clerkAuth.isSignedIn) {
+      await clerkAuth.signOut().catch(() => undefined);
+    }
+    await clearSavedAuthToken().catch(() => undefined);
+    setToken(null);
+    setPreferredMethod(null);
+    setStorageError(null);
+  }, [clerkAuth.isSignedIn, clerkAuth.signOut, queryClient]);
+
   const refreshIdentity = useCallback(async () => {
     if (accountDeleted) return;
     await identityQuery.refetch();
@@ -267,11 +280,12 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     acceptClerkSession,
     signOut,
     clearAfterAccountDeletion,
+    clearNativeSession,
     refreshIdentity,
   }), [
     ready, hasSession, accountDeleted, token, authMethod, identityQuery.data,
     identityQuery.isLoading, identityQuery.error, storageError, getApiToken,
-    acceptSession, acceptClerkSession, signOut, clearAfterAccountDeletion, refreshIdentity,
+    acceptSession, acceptClerkSession, signOut, clearAfterAccountDeletion, clearNativeSession, refreshIdentity,
   ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -281,4 +295,8 @@ export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) throw new Error('useAuth must be used inside AuthProvider');
   return context;
+}
+
+export function useOptionalAuth() {
+  return useContext(AuthContext);
 }

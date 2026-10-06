@@ -16,9 +16,10 @@ import { useAudioPlayer } from 'expo-audio';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { useColors } from '@/hooks/useColors';
-import { getWebAppUrl } from '@/lib/webAppUrl';
+import { getWebAppUrl, resolveWebAppStartUrl } from '@/lib/webAppUrl';
 import { resolveVisualFixtureUrl } from '@/lib/visualFixtureUrl';
 import { useTransactionSuccessSound } from '@/lib/useTransactionSuccessSound';
+import { useOptionalAuth } from '@/contexts/AuthContext';
 import {
   NATIVE_FILE_EXPORT_RESULT_EVENT,
   parseNativeFileExportRequest,
@@ -29,6 +30,35 @@ import {
 const NATIVE_PUSH_TOKEN_EVENT = 'banglakhata-native-push-token';
 const NATIVE_PUSH_STATUS_EVENT = 'banglakhata-native-push-status';
 const OPEN_NOTIFICATION_EVENT = 'banglakhata-open-notification';
+const NATIVE_AUTH_READY_MESSAGE = 'banglakhata-native-auth-ready';
+const NATIVE_AUTH_REJECTED_MESSAGE = 'banglakhata-native-auth-rejected';
+const NATIVE_AUTH_LOGOUT_MESSAGE = 'banglakhata-native-auth-logout';
+
+function createNativeAuthBootstrapScript(token: string): string {
+  return `(() => {
+    const nativeToken = ${JSON.stringify(token)};
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const request = fetch('/api/auth/me', {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store',
+      headers: {
+        Authorization: 'Bearer ' + nativeToken,
+        'x-banglakhata-native-session': '1',
+        'x-client-platform': 'mobile'
+      },
+      signal: controller.signal
+    }).then(async (response) => {
+      if (!response.ok) return { ok: false, status: response.status };
+      return { ok: true, status: response.status, data: await response.json() };
+    }).catch(() => ({ ok: false, status: 0 })).finally(() => clearTimeout(timeout));
+    Object.defineProperty(window, '__BKH_NATIVE_AUTH_BOOTSTRAP__', {
+      value: request,
+      configurable: true
+    });
+  })(); true;`;
+}
 
 type PushNavigationData = {
   notificationId: string;
@@ -50,6 +80,8 @@ function hasSameOrigin(url: string, expectedUrl: string): boolean {
 
 export function WebAppScreen() {
   const colors = useColors();
+  const nativeAuth = useOptionalAuth();
+  const initialNativeSessionCaptured = useRef(false);
   const playSuccessSound = useTransactionSuccessSound();
   const calculatorAudioPlayer = useAudioPlayer(
     require('../assets/audio/calculator-key-tap.mp3'),
@@ -61,6 +93,10 @@ export function WebAppScreen() {
     Platform.OS,
     process.env.NODE_ENV !== 'production',
   );
+  const [nativeAuthReady, setNativeAuthReady] = useState(Platform.OS === 'web');
+  const [nativeAuthToken, setNativeAuthToken] = useState<string | null>(null);
+  const [nativeSessionAtStart, setNativeSessionAtStart] = useState(false);
+  const [nativeAuthError, setNativeAuthError] = useState(false);
   const webViewRef = useRef<WebView>(null);
   const pendingPushNavigation = useRef<PushNavigationData | null>(null);
   const handledNotificationResponses = useRef(new Set<string>());
@@ -69,6 +105,55 @@ export function WebAppScreen() {
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === 'web' || initialNativeSessionCaptured.current) return;
+    if (!nativeAuth) {
+      initialNativeSessionCaptured.current = true;
+      setNativeAuthReady(true);
+      return;
+    }
+    if (!nativeAuth.ready) return;
+
+    let active = true;
+    void (async () => {
+      const hasSession = nativeAuth.hasSession;
+      try {
+        const token = hasSession ? await nativeAuth.getApiToken() : null;
+        if (!active) return;
+        initialNativeSessionCaptured.current = true;
+        setNativeAuthToken(token);
+        setNativeSessionAtStart(!!token);
+        setNativeAuthError(hasSession && !token);
+      } catch {
+        if (!active) return;
+        initialNativeSessionCaptured.current = true;
+        setNativeAuthError(hasSession);
+      } finally {
+        if (active) setNativeAuthReady(true);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [nativeAuth?.ready, nativeAuth?.hasSession, nativeAuth?.getApiToken]);
+
+  const retryNativeAuth = useCallback(async () => {
+    setNativeAuthReady(false);
+    setNativeAuthError(false);
+    try {
+      const hasSession = nativeAuth?.hasSession ?? false;
+      const token = hasSession ? await nativeAuth?.getApiToken() ?? null : null;
+      setNativeAuthToken(token);
+      setNativeSessionAtStart(!!token);
+      setNativeAuthError(hasSession && !token);
+    } catch {
+      setNativeAuthError(true);
+    } finally {
+      setNativeAuthReady(true);
+      setRetryKey((key) => key + 1);
+    }
+  }, [nativeAuth]);
 
   const handleLoadStart = useCallback(() => {
     webPageReady.current = false;
@@ -216,19 +301,29 @@ export function WebAppScreen() {
   }, [canGoBack, loadFailed]);
 
   const handleNavigationRequest = useCallback((request: { url: string }) => {
+    if (nativeAuthToken && !hasSameOrigin(request.url, webAppUrl ?? '')) {
+      if (/^https?:/i.test(request.url)) {
+        void Linking.openURL(request.url).catch(() => setLoadFailed(true));
+      }
+      return false;
+    }
     if (isBrowserUrl(request.url)) return true;
 
     void Linking.openURL(request.url).catch(() => {
       setLoadFailed(true);
     });
     return false;
-  }, []);
+  }, [nativeAuthToken, webAppUrl]);
 
   const handleOpenWindow = useCallback((event: { nativeEvent: { targetUrl: string } }) => {
     const targetUrl = event.nativeEvent.targetUrl;
     if (!targetUrl) return;
 
     if (isBrowserUrl(targetUrl)) {
+      if (nativeAuthToken && !hasSameOrigin(targetUrl, webAppUrl ?? '')) {
+        void Linking.openURL(targetUrl).catch(() => setLoadFailed(true));
+        return;
+      }
       webViewRef.current?.injectJavaScript(
         `window.location.href = ${JSON.stringify(targetUrl)}; true;`,
       );
@@ -238,7 +333,7 @@ export function WebAppScreen() {
     void Linking.openURL(targetUrl).catch(() => {
       setLoadFailed(true);
     });
-  }, []);
+  }, [nativeAuthToken, webAppUrl]);
 
   const handleNavigationStateChange = useCallback((state: WebViewNavigation) => {
     setCanGoBack(state.canGoBack);
@@ -283,6 +378,19 @@ export function WebAppScreen() {
     } catch {
       // Existing sound messages are plain strings rather than JSON.
     }
+    if (
+      pushMessage?.type === NATIVE_AUTH_READY_MESSAGE
+      || pushMessage?.type === NATIVE_AUTH_REJECTED_MESSAGE
+      || pushMessage?.type === NATIVE_AUTH_LOGOUT_MESSAGE
+    ) {
+      const sourceUrl = event.nativeEvent.url;
+      if (!webAppUrl || !sourceUrl || !hasSameOrigin(sourceUrl, webAppUrl)) return;
+      setNativeAuthToken(null);
+      if (pushMessage.type !== NATIVE_AUTH_READY_MESSAGE) {
+        void nativeAuth?.clearNativeSession().catch(() => {});
+      }
+      return;
+    }
     if (pushMessage?.type === 'banglakhata-web-ready' || pushMessage?.type === 'banglakhata-enable-push') {
       const sourceUrl = event.nativeEvent.url;
       if (!webAppUrl || (sourceUrl && !hasSameOrigin(sourceUrl, webAppUrl))) return;
@@ -312,7 +420,51 @@ export function WebAppScreen() {
     } catch {
       // Audio is optional and must not block calculator interactions.
     }
-  }, [calculatorAudioPlayer, playSuccessSound, requestOwnerPushToken, sendPendingPushNavigation, webAppUrl]);
+  }, [
+    calculatorAudioPlayer,
+    nativeAuth?.clearNativeSession,
+    playSuccessSound,
+    requestOwnerPushToken,
+    sendPendingPushNavigation,
+    webAppUrl,
+  ]);
+
+  const initialUrl = webAppUrl
+    ? resolveWebAppStartUrl(webAppUrl, nativeSessionAtStart)
+    : null;
+
+  if (!nativeAuthReady) {
+    return (
+      <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+        <View style={styles.message}>
+          <ActivityIndicator color={colors.primary} size="large" />
+          <Text style={[styles.body, { color: colors.mutedForeground }]}>
+            সাইন-ইন যাচাই করে বাংলাখাতা খোলা হচ্ছে…
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (nativeAuthError) {
+    return (
+      <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+        <View style={styles.message}>
+          <Text style={[styles.title, { color: colors.foreground }]}>সাইন-ইন যাচাই করা যায়নি</Text>
+          <Text style={[styles.body, { color: colors.mutedForeground }]}>
+            সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => { void retryNativeAuth(); }}
+            style={[styles.retryButton, { backgroundColor: colors.primary }]}
+          >
+            <Text style={[styles.retryText, { color: colors.primaryForeground }]}>আবার চেষ্টা করুন</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!webAppUrl) {
     return (
@@ -346,7 +498,7 @@ export function WebAppScreen() {
       <WebView
         key={retryKey}
         ref={webViewRef}
-        source={{ uri: webAppUrl }}
+        source={{ uri: initialUrl ?? webAppUrl }}
         style={styles.webView}
         automaticallyAdjustContentInsets={false}
         contentInsetAdjustmentBehavior="never"
@@ -356,6 +508,9 @@ export function WebAppScreen() {
         domStorageEnabled
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
+        injectedJavaScriptBeforeContentLoaded={nativeAuthToken
+          ? createNativeAuthBootstrapScript(nativeAuthToken)
+          : undefined}
         setSupportMultipleWindows={false}
         mediaPlaybackRequiresUserAction={false}
         allowsInlineMediaPlayback
