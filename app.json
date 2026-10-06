@@ -4,6 +4,9 @@
       "eas": {
         "projectId": "85a7f0b5-f6a3-49d6-83bf-e8e2b05773ab"
       }
+    },
+    "android": {
+      "package": "com.shakil112233445566778899.workspace"
     }
   }
 }
