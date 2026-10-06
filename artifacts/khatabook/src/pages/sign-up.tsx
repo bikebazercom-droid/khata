@@ -1,16 +1,23 @@
 import { SignUp } from '@clerk/react';
+import { PageMeta } from '@/components/layout/page-meta';
+import { SiteFooter } from '@/components/layout/site-footer';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 export function SignUpPage() {
   return (
-    <div className="min-h-[100dvh] bg-[#f8fafc] flex flex-col items-center justify-center px-4 py-12">
-      <div className="w-full max-w-[440px]">
-        <SignUp
-          routing="path"
-          path={`${basePath}/sign-up`}
-          signInUrl={`${basePath}/sign-in`}
-          appearance={{
+    <>
+      <PageMeta
+        title="Create an Account | BanglaKhata - Business Ledger"
+        description="Create a BanglaKhata account to manage customer and supplier records, business transactions, and outstanding balances."
+      />
+      <div className="min-h-[100dvh] bg-[#f8fafc] flex flex-col items-center justify-center px-4 py-12">
+        <div className="w-full max-w-[440px]">
+          <SignUp
+            routing="path"
+            path={`${basePath}/sign-up`}
+            signInUrl={`${basePath}/sign-in`}
+            appearance={{
             elements: {
               rootBox: 'w-full',
               cardBox: 'w-full rounded-2xl shadow-lg overflow-hidden border border-slate-200',
@@ -38,9 +45,11 @@ export function SignUpPage() {
               fontFamily: 'Inter, sans-serif',
               borderRadius: '0.5rem',
             },
-          }}
-        />
+            }}
+          />
+        </div>
+        <SiteFooter />
       </div>
-    </div>
+    </>
   );
 }

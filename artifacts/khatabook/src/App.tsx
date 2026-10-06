@@ -9,6 +9,8 @@ import { TooltipProvider } from '@radix-ui/react-tooltip';
 import { MainLayout } from '@/components/layout/main-layout';
 import { ConnectionStateProvider, useConnectionState } from '@/context/connection-state';
 import { LandingPage } from '@/pages/landing';
+import { PrivacyPolicyPage } from '@/pages/privacy-policy';
+import { SupportPage } from '@/pages/support';
 import { fetchMe } from '@/lib/phoneAuth';
 import { authMeQueryKey } from '@/lib/authQueryKeys';
 import { useRealtimeSync } from '@/lib/useRealtimeSync';
@@ -642,6 +644,8 @@ function AppRouter({ onNetworkFailure, onSettled }: { onNetworkFailure: () => vo
             <Switch>
               {/* Public */}
               <Route path="/" component={HomeRoute} />
+              <Route path="/privacy-policy" component={PrivacyPolicyPage} />
+              <Route path="/support" component={SupportPage} />
               {/* REQUIRED — copy "/sign-in/*?" verbatim */}
               <Route path="/sign-in/*?" component={SignInRoute} />
               <Route path="/sign-up/*?" component={SignUpPage} />
@@ -715,14 +719,23 @@ function AppRouter({ onNetworkFailure, onSettled }: { onNetworkFailure: () => vo
 function AppClient() {
   const clearQueries = useCallback(() => queryClient.clear(), []);
   const { phase, goOffline, serverAuthSettled, retry } = useAuthConnectivity(clearQueries);
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const cachedIdentity = isLocalLogoutPending() ? null : readOfflineIdentity();
 
   useEffect(() => {
-    if (!cachedIdentity) return;
+    if (
+      !cachedIdentity ||
+      location === "/privacy-policy" ||
+      location === "/support"
+    ) return;
     setQueryPersistenceScope(cachedIdentity.userId, cachedIdentity.businessId);
     void restorePersistedQueries(queryClient, cachedIdentity.userId, cachedIdentity.businessId).catch(() => {});
-  }, [cachedIdentity?.userId, cachedIdentity?.businessId]);
+  }, [cachedIdentity?.userId, cachedIdentity?.businessId, location]);
+
+  // Legal and support pages must remain reachable without an auth session,
+  // Clerk configuration, or a successful server connectivity probe.
+  if (location === "/privacy-policy") return <PrivacyPolicyPage />;
+  if (location === "/support") return <SupportPage />;
 
   if (!clerkPubKey) {
     return (

@@ -4,27 +4,36 @@ import { sendOtp, verifyOtp } from '@/lib/phoneAuth';
 import { authMeQueryKey } from '@/lib/authQueryKeys';
 import { useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
+import { PageMeta } from '@/components/layout/page-meta';
+import { SiteFooter } from '@/components/layout/site-footer';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 export function SignInPage() {
   return (
-    <div className="sign-in-page h-[100dvh] overflow-y-auto overscroll-y-contain bg-gradient-to-b from-[#1B3A6B] to-[#2a5298] flex flex-col items-center justify-center px-4 py-12">
-      {/* Brand logo */}
-      <div className="sign-in-brand mb-8 flex flex-col items-center gap-4">
-        <img
-          src={`${basePath}/logo-icon.svg`}
-          alt="Banglakhata"
-          className="w-24 h-24 drop-shadow-xl"
-        />
-        <div className="text-center">
-          <p className="text-white font-extrabold text-3xl tracking-tight leading-tight">Banglakhata</p>
+    <>
+      <PageMeta
+        title="Sign In | BanglaKhata - Business Ledger"
+        description="Sign in to BanglaKhata with Email, Google, or a phone verification code to access your business ledger."
+      />
+      <div className="sign-in-page h-[100dvh] overflow-y-auto overscroll-y-contain bg-gradient-to-b from-[#1B3A6B] to-[#2a5298] flex flex-col items-center justify-center px-4 py-12">
+        {/* Brand logo */}
+        <div className="sign-in-brand mb-8 flex flex-col items-center gap-4">
+          <img
+            src={`${basePath}/logo-icon.svg`}
+            alt="Banglakhata"
+            className="w-24 h-24 drop-shadow-xl"
+          />
+          <div className="text-center">
+            <p className="text-white font-extrabold text-3xl tracking-tight leading-tight">Banglakhata</p>
+          </div>
         </div>
+        <div className="w-full max-w-[440px]">
+          <SignInTabs />
+        </div>
+        <SiteFooter tone="dark" />
       </div>
-      <div className="w-full max-w-[440px]">
-        <SignInTabs />
-      </div>
-    </div>
+    </>
   );
 }
 

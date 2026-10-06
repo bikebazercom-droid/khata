@@ -1,3 +1,5 @@
+import { SiteFooter } from "@/components/layout/site-footer";
+
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export function LandingPage() {
@@ -52,9 +54,7 @@ export function LandingPage() {
         ))}
       </div>
 
-      <footer className="w-full border-t border-white/10 py-5 px-6 text-center">
-        <p className="text-white/30 text-xs">© ২০২৬ BanglaKhata · সব অধিকার সংরক্ষিত</p>
-      </footer>
+      <SiteFooter tone="dark" />
     </div>
   );
 }
