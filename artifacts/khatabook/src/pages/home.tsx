@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { useBusinessContext } from '@/lib/businessContext';
 import { businessScopedQueryKey } from '@/lib/businessQueryKey';
+import { isOfflineMode } from '@/lib/useAuthConnectivity';
 import {
   useListParties,
   getListPartiesQueryKey,
@@ -93,9 +94,23 @@ export function HomeView() {
   const { data: summaryParties = [] } = useListParties(summaryParams, {
     query: { queryKey: businessScopedQueryKey(getListPartiesQueryKey(summaryParams), selectedBusinessId) },
   });
-  const { data: rawParties = [] } = useListParties(partyParams, {
+  const { data: queriedParties } = useListParties(partyParams, {
     query: { queryKey: businessScopedQueryKey(getListPartiesQueryKey(partyParams), selectedBusinessId) },
   });
+  const offlineParties = useMemo(() => {
+    const term = search.trim().toLocaleLowerCase();
+    const today = new Date().toISOString().slice(0, 10);
+    return summaryParties.filter((party) => {
+      if (term && !party.name.toLocaleLowerCase().includes(term) && !party.phone.toLocaleLowerCase().includes(term)) {
+        return false;
+      }
+      if (apiDueFilter === DueFilter.DUE_TODAY && party.dueDate !== today) return false;
+      if (apiDueFilter === DueFilter.UPCOMING && (!party.dueDate || party.dueDate <= today)) return false;
+      if (apiDueFilter === DueFilter.NO_DUE_DATE && party.dueDate) return false;
+      return true;
+    });
+  }, [summaryParties, search, apiDueFilter]);
+  const rawParties = isOfflineMode() ? offlineParties : (queriedParties ?? []);
 
   useEffect(() => {
     if (userRole !== 'owner' || !userId || !selectedBusinessId) return;

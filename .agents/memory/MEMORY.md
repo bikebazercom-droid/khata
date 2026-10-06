@@ -7,7 +7,7 @@
 - [Android export validation](android-export-validation.md) — verify the actual signed APK; Gradle configuration success alone misses SDK and JVM build failures.
 - [Expo export port conflicts](expo-export-port.md) — set `RCT_METRO_PORT` when another workflow occupies 8081; Expo export can bundle all platforms without stopping it.
 - [Offline ledger replay](offline-ledger-replay.md) — keep replay protection after deletion and pending drafts separate from confirmed balances.
-- [Browser legacy outbox transition](browser-legacy-outbox.md) — new browser entries go online; keep prior drafts recoverable during the transition.
+- [Shared offline data layer](browser-legacy-outbox.md) — web and mobile WebView share offline ledger/customer changes, scoped replay, and confirmed-balance rules.
 - [Offline shell validation](offline-shell-validation.md) — service-worker checks need compiled assets and a browser-reachable secure origin.
 - [API integration test concurrency](api-integration-test-concurrency.md) — database-backed suites can fail nondeterministically when Vitest runs test files in parallel.
 - [Readiness probe pool](readiness-probe-pool.md) — keep readiness checks isolated and let the client timeout discard its connection before the server-side fallback.

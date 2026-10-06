@@ -28,6 +28,8 @@ import {
   AlertDialogFooter,
 } from '@/components/ui/alert-dialog';
 import { phoneLogout } from '@/lib/phoneAuth';
+import { clearOfflineIdentity, markLocalLogoutPending, readOfflineIdentity } from '@/lib/offlineSession';
+import { clearPersistedQueries } from '@/lib/queryPersister';
 import { clearAllPendingUploads } from '@/lib/pendingUploads';
 import { useLanguage } from '@/lib/i18n';
 import { useAppAuth } from '@/App';
@@ -130,6 +132,7 @@ export function SettingsDrawer({
   const handleConfirmDelete = useCallback(async () => {
     if (isDeleting) return;
     setIsDeleting(true);
+    const offlineIdentity = readOfflineIdentity();
     try {
       const res = await fetch('/api/user/account', {
         method: 'DELETE',
@@ -143,6 +146,8 @@ export function SettingsDrawer({
       queryClient.clear();
       revokeNetworkWrites();
       clearAllPendingUploads();
+      clearOfflineIdentity();
+      void clearPersistedQueries(offlineIdentity?.userId).catch(() => {});
       localStorage.clear();
       setShowDeleteConfirm(false);
       onOpenChange(false);
@@ -178,6 +183,23 @@ export function SettingsDrawer({
   async function handleLogout() {
     if (isLoggingOut) return;
     setIsLoggingOut(true);
+    const offlineIdentity = readOfflineIdentity();
+    if (!navigator.onLine) {
+      markLocalLogoutPending();
+      clearOfflineIdentity();
+      void clearPersistedQueries(offlineIdentity?.userId).catch(() => {});
+      queryClient.clear();
+      revokeNetworkWrites();
+      clearAllPendingUploads();
+      localStorage.removeItem(STORED_OWNER_PUSH_TOKEN_KEY);
+      localStorage.removeItem('selected_business_id');
+      if (isSignedIn) await signOut().catch(() => {});
+      onOpenChange(false);
+      navigate('/sign-in');
+      toast.info('এই ডিভাইস থেকে লগআউট হয়েছে। সংযোগ ফিরলে সার্ভার সেশন বাতিল হবে।');
+      setIsLoggingOut(false);
+      return;
+    }
     try {
       const storedPushToken = localStorage.getItem(STORED_OWNER_PUSH_TOKEN_KEY);
       if (storedPushToken) {
@@ -212,6 +234,8 @@ export function SettingsDrawer({
       if (isSignedIn) await signOut();
       queryClient.clear();
       revokeNetworkWrites();
+      clearOfflineIdentity();
+      void clearPersistedQueries(offlineIdentity?.userId).catch(() => {});
       localStorage.removeItem('selected_business_id');
       clearAllPendingUploads();
       onOpenChange(false);

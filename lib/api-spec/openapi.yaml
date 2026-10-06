@@ -606,6 +606,33 @@ paths:
                 $ref: "#/components/schemas/Party"
         "404":
           description: Not found
+    patch:
+      operationId: updateParty
+      tags: [parties]
+      summary: Update a party's editable details
+      parameters:
+        - name: partyId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PartyUpdate"
+      responses:
+        "200":
+          description: Updated party
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Party"
+        "400":
+          description: Invalid request
+        "404":
+          description: Not found
     delete:
       operationId: deleteParty
       tags: [parties]
@@ -1400,6 +1427,9 @@ components:
         - name
         - role
       properties:
+        id:
+          type: string
+          description: Optional client-generated ID used for safe offline retries.
         name:
           type: string
           minLength: 1
@@ -1416,6 +1446,16 @@ components:
         dueDate:
           type: ["string", "null"]
           format: date
+    PartyUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        phone:
+          type: string
+        dueDate:
+          type: ["string", "null"]
     LedgerEntry:
       type: object
       required:

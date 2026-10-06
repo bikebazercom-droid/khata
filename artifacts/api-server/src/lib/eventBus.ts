@@ -17,6 +17,7 @@ import { logger } from "./logger";
 
 export type EventType =
   | "party.created"
+  | "party.updated"
   | "party.deleted"
   | "ledger.created"
   | "ledger.deleted"

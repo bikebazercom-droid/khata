@@ -14,7 +14,7 @@ describe('cold auth connectivity gate', () => {
   });
   afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
-  it('requires a live server and leaves old local data untouched when fetch fails', async () => {
+  it('keeps cached data available when the server probe fails transiently', async () => {
     const oldSnapshot = JSON.stringify({ ts: 1, entries: { '["/api/parties"]': [{ id: 'old-party' }] } });
     const oldIdentity = JSON.stringify({ userId: 'old-actor', businessId: 'old-business' });
     localStorage.setItem('dkhata_offline_view_v2:old', oldSnapshot);
@@ -31,7 +31,7 @@ describe('cold auth connectivity gate', () => {
       cache: 'no-store',
     }));
     expect(isNetworkWriteAuthorized()).toBe(false);
-    expect(clear).toHaveBeenCalled();
+    expect(clear).not.toHaveBeenCalled();
     expect(localStorage.getItem('dkhata_offline_view_v2:old')).toBe(oldSnapshot);
     expect(localStorage.getItem('dkhata_offline_identity_v2')).toBe(oldIdentity);
     unmount();

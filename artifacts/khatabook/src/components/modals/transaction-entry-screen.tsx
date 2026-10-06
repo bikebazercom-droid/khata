@@ -38,6 +38,9 @@ import { useBusinessContext } from '@/lib/businessContext';
 import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import { useConnectionState } from '@/context/connection-state';
 import { notifyEntrySaved } from '@/components/ui/entry-saved-feedback';
+import { queueEntry } from '@/lib/entryOutbox';
+import { isTransientNetworkError } from '@/lib/offlineErrors';
+import { readOfflineIdentity } from '@/lib/offlineSession';
 
 type KeyKind = 'digit' | 'muted' | 'accent';
 type KeyDef = { label: string; value: string; kind: KeyKind; span?: number };
@@ -738,30 +741,23 @@ export function TransactionEntryScreen({
       toast.error('পরিচয় যাচাই করা যায়নি। আবার লগইন করুন।');
       return;
     }
-    if (!navigator.onLine) {
-      toast.error('ইন্টারনেট সংযোগ প্রয়োজন', {
-        description: 'ব্রাউজারে হিসাব সরাসরি সার্ভারে জমা হয়। সংযোগ ফিরে এলে আবার চেষ্টা করুন।',
-      });
-      return;
-    }
     const capturedBase64 = pendingBase64Ref.current;
     savingRef.current = true;
     try {
       let billImage: string | undefined;
-      if (capturedBase64) {
+      let uploadUnavailable = false;
+      if (capturedBase64 && navigator.onLine) {
         const cachedUpload = uploadedCreateImageRef.current;
         if (cachedUpload?.source === capturedBase64) {
           billImage = cachedUpload.objectPath;
         } else {
           const uploaded = await uploadBillImage(capturedBase64);
           if (!uploaded.ok) {
-            toast.error('বিলের ছবি আপলোড হয়নি', {
-              description: 'ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।',
-            });
-            return;
+            uploadUnavailable = true;
+          } else {
+            billImage = uploaded.objectPath;
+            uploadedCreateImageRef.current = { source: capturedBase64, objectPath: uploaded.objectPath };
           }
-          billImage = uploaded.objectPath;
-          uploadedCreateImageRef.current = { source: capturedBase64, objectPath: billImage };
         }
       }
 
@@ -780,12 +776,41 @@ export function TransactionEntryScreen({
         : crypto.randomUUID();
       createRequestRef.current = { fingerprint, id: requestId };
 
-      await createLedgerEntry(partyId, {
+      const requestData = {
         ...data,
         clientRequestId: requestId,
-      }, {
-        headers: { 'x-business-id': selectedBusinessId ?? '' },
-      });
+      };
+      const savedIdentity = readOfflineIdentity();
+      const activeBusinessId = selectedBusinessId ?? savedIdentity?.businessId ?? null;
+      const saveOfflineDraft = async () => {
+        const actorId = userId ?? savedIdentity?.userId;
+        const businessId = activeBusinessId;
+        if (!actorId || !businessId) throw new Error('পরিচয় বা ব্যবসার তথ্য পাওয়া যায়নি');
+        await queueEntry({
+          id: requestId,
+          actorId,
+          businessId,
+          partyId,
+          data: requestData,
+          ...(capturedBase64 && !billImage ? { imageBase64: capturedBase64 } : {}),
+          createdAt: new Date().toISOString(),
+          status: 'pending',
+        });
+        toast.success('হিসাবটি ডিভাইসে সেভ হয়েছে; সংযোগ ফিরলে সিঙ্ক হবে');
+      };
+
+      if (!navigator.onLine || uploadUnavailable) {
+        await saveOfflineDraft();
+      } else {
+        try {
+          await createLedgerEntry(partyId, requestData, {
+            headers: { 'x-business-id': activeBusinessId ?? '' },
+          });
+        } catch (error) {
+          if (!isTransientNetworkError(error)) throw error;
+          await saveOfflineDraft();
+        }
+      }
 
       queryClient.invalidateQueries({ queryKey: getListLedgerEntriesQueryKey(partyId) });
       queryClient.invalidateQueries({ queryKey: getGetPartyQueryKey(partyId) });

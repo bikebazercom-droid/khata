@@ -23,6 +23,8 @@ import {
   CreatePartyResponse,
   GetPartyParams,
   GetPartyResponse,
+  UpdatePartyBody,
+  UpdatePartyParams,
   ListLedgerEntriesParams,
   ListLedgerEntriesResponse,
   CreateLedgerEntryParams,
@@ -283,8 +285,12 @@ router.post("/parties", async (req, res): Promise<void> => {
     return;
   }
 
-  const { name, phone, role, openingBalance, openingBalanceType, dueDate } =
+  const { id: requestedId, name, phone, role, openingBalance, openingBalanceType, dueDate } =
     parsed.data;
+  if (requestedId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestedId)) {
+    res.status(400).json({ error: "id must be a UUID" });
+    return;
+  }
 
   const signedOpening =
     openingBalance && openingBalance > 0
@@ -294,9 +300,10 @@ router.post("/parties", async (req, res): Promise<void> => {
       : 0;
   const { currentBalance, balanceType } = fromSignedBalance(signedOpening);
 
-  const [party] = await db
+  const [createdParty] = await db
     .insert(partiesTable)
     .values({
+      ...(requestedId ? { id: requestedId } : {}),
       businessId,
       name,
       phone: phone || "",
@@ -306,14 +313,35 @@ router.post("/parties", async (req, res): Promise<void> => {
       dueDate: toDateOnlyString(dueDate ?? null),
       lastTransactionAt: signedOpening !== 0 ? new Date() : null,
     })
+    .onConflictDoNothing({ target: partiesTable.id })
     .returning();
 
-  broadcast(businessId, { type: 'party.created', payload: { partyId: party!.id } });
+  let party = createdParty;
+  if (!party && requestedId) {
+    const [existing] = await db.select().from(partiesTable).where(and(
+      eq(partiesTable.id, requestedId),
+      eq(partiesTable.businessId, businessId),
+    )).limit(1);
+    if (!existing) {
+      res.status(409).json({ error: "Party ID is already in use" });
+      return;
+    }
+    party = existing;
+    res.setHeader("X-Idempotent-Replay", "true");
+  }
+  if (!party) {
+    res.status(500).json({ error: "Could not create party" });
+    return;
+  }
 
-  res.status(201).json(
+  if (createdParty) {
+    broadcast(businessId, { type: 'party.created', payload: { partyId: party.id } });
+  }
+
+  res.status(createdParty ? 201 : 200).json(
     CreatePartyResponse.parse({
       ...party,
-      currentBalance: Number(party!.currentBalance),
+      currentBalance: Number(party.currentBalance),
     }),
   );
 });
@@ -347,6 +375,66 @@ router.get("/parties/:partyId", async (req, res): Promise<void> => {
       currentBalance: Number(party.currentBalance),
     }),
   );
+});
+
+router.patch("/parties/:partyId", async (req, res): Promise<void> => {
+  const { businessId, userId, role } = req as unknown as AuthenticatedRequest;
+  const params = UpdatePartyParams.safeParse(req.params);
+  const body = UpdatePartyBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    const message = !params.success
+      ? params.error.message
+      : !body.success
+        ? body.error.message
+        : "Invalid party update";
+    res.status(400).json({ error: message });
+    return;
+  }
+
+  const { name, phone, dueDate } = body.data;
+  if (name === undefined && phone === undefined && dueDate === undefined) {
+    res.status(400).json({ error: "At least one party field must be provided" });
+    return;
+  }
+  if (name !== undefined && !name.trim()) {
+    res.status(400).json({ error: "Party name cannot be blank" });
+    return;
+  }
+  if (dueDate !== undefined && dueDate !== null && !isValidDateOnly(dueDate)) {
+    res.status(400).json({ error: "dueDate must be a valid YYYY-MM-DD date or null" });
+    return;
+  }
+
+  const result = await db.transaction(async (tx) => {
+    if (!(await actorCanWrite(tx, role, userId, businessId, params.data.partyId))) {
+      return { status: 'denied' } as const;
+    }
+    const [party] = await tx.update(partiesTable).set({
+      ...(name !== undefined ? { name: name.trim() } : {}),
+      ...(phone !== undefined ? { phone: phone.trim() } : {}),
+      ...(dueDate !== undefined ? { dueDate: toDateOnlyString(dueDate) } : {}),
+    }).where(and(
+      eq(partiesTable.id, params.data.partyId),
+      eq(partiesTable.businessId, businessId),
+    )).returning();
+    return party ? { status: 'updated', party } as const : { status: 'missing' } as const;
+  });
+
+  if (result.status === 'denied') {
+    res.status(403).json({ error: "Party access was revoked" });
+    return;
+  }
+  if (result.status === 'missing') {
+    res.status(404).json({ error: "Party not found" });
+    return;
+  }
+
+  const { party } = result;
+  broadcast(businessId, { type: 'party.updated', payload: { partyId: party.id } });
+  res.json(GetPartyResponse.parse({
+    ...party,
+    currentBalance: Number(party.currentBalance),
+  }));
 });
 
 router.get(

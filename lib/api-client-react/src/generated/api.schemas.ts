@@ -266,6 +266,8 @@ export interface Party {
 }
 
 export interface PartyInput {
+  /** Optional client-generated ID used for safe offline retries. */
+  id?: string;
   /** @minLength 1 */
   name: string;
   /** Optional mobile number; may be omitted or blank. */
@@ -274,6 +276,14 @@ export interface PartyInput {
   /** Optional opening balance amount (always positive) */
   openingBalance?: number;
   openingBalanceType?: BalanceType;
+  /** @nullable */
+  dueDate?: string | null;
+}
+
+export interface PartyUpdate {
+  /** @minLength 1 */
+  name?: string;
+  phone?: string;
   /** @nullable */
   dueDate?: string | null;
 }

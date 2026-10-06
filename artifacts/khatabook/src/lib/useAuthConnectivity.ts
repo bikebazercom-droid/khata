@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchMe } from './phoneAuth';
+import { fetchMe, phoneLogout } from './phoneAuth';
+import { clearLocalLogoutPending, isLocalLogoutPending } from './offlineSession';
 
 export type AuthConnectivity = 'probing' | 'online' | 'offline';
 export const AUTH_PROBE_TIMEOUT_MS = 6000;
 const CLERK_BOOT_TIMEOUT_MS = 8000;
 let networkWritesAuthorized = false;
+let offlineMode = typeof navigator !== 'undefined' && !navigator.onLine;
 export function isNetworkWriteAuthorized() { return networkWritesAuthorized; }
-export function markServerReauthenticated() { networkWritesAuthorized = true; }
+export function isOfflineMode() { return offlineMode; }
+export function markServerReauthenticated() { networkWritesAuthorized = true; offlineMode = false; }
 export function revokeNetworkWrites() { networkWritesAuthorized = false; }
 
 /**
@@ -24,13 +27,13 @@ export function useAuthConnectivity(clearQueries: () => void) {
 
   const goOffline = useCallback(() => {
     revokeNetworkWrites();
+    offlineMode = true;
     attempt.current++;
     activeProbe.current?.abort();
     activeProbe.current = null;
     settled.current = false;
-    clearQueries();
     setPhase('offline');
-  }, [clearQueries]);
+  }, []);
 
   const probe = useCallback(async () => {
     if (!navigator.onLine) { goOffline(); return; }
@@ -41,6 +44,20 @@ export function useAuthConnectivity(clearQueries: () => void) {
     activeProbe.current = controller;
     const deadline = setTimeout(() => controller.abort(), AUTH_PROBE_TIMEOUT_MS);
     try {
+      if (isLocalLogoutPending()) {
+        const logoutEvent = await fetch('/api/auth/logout-event', {
+          method: 'POST',
+          credentials: 'include',
+          signal: controller.signal,
+        });
+        if (!logoutEvent.ok && logoutEvent.status !== 401) {
+          const error = new Error('The server could not finish the pending logout') as Error & { status: number };
+          error.status = logoutEvent.status;
+          throw error;
+        }
+        await phoneLogout();
+        clearLocalLogoutPending();
+      }
       const me = await fetchMe(controller.signal);
       if (id !== attempt.current) return;
       if (!me.userId || !me.businessId || (me.role !== 'owner' && me.role !== 'staff')) throw new Error('Invalid identity response');
@@ -51,6 +68,7 @@ export function useAuthConnectivity(clearQueries: () => void) {
       const status = (error as Error & { status?: number }).status;
       if (status === 401 || status === 403) {
         revokeNetworkWrites();
+        offlineMode = false;
         clearQueries();
         settled.current = false;
         setPhase('online'); // public landing / sign-in; never local offline ledger

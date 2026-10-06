@@ -63,6 +63,7 @@ import type {
   OwnerWorkerUpdate,
   Party,
   PartyInput,
+  PartyUpdate,
   PhoneOtpLogoutResult,
   PhoneOtpSendInput,
   PhoneOtpSendResult,
@@ -2178,6 +2179,78 @@ export function useGetParty<TData = Awaited<ReturnType<typeof getParty>>, TError
 
 
 
+
+export const getUpdatePartyUrl = (partyId: string,) => {
+
+
+
+
+  return `/api/parties/${partyId}`
+}
+
+/**
+ * @summary Update a party's editable details
+ */
+export const updateParty = async (partyId: string,
+    partyUpdate: PartyUpdate, options?: RequestInit): Promise<Party> => {
+
+  return customFetch<Party>(getUpdatePartyUrl(partyId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(partyUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdatePartyMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateParty>>, TError,{partyId: string;data: BodyType<PartyUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateParty>>, TError,{partyId: string;data: BodyType<PartyUpdate>}, TContext> => {
+
+const mutationKey = ['updateParty'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateParty>>, {partyId: string;data: BodyType<PartyUpdate>}> = (props) => {
+          const {partyId,data} = props ?? {};
+
+          return  updateParty(partyId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdatePartyMutationResult = NonNullable<Awaited<ReturnType<typeof updateParty>>>
+    export type UpdatePartyMutationBody = BodyType<PartyUpdate>
+    export type UpdatePartyMutationError = ErrorType<void>
+
+    /**
+ * @summary Update a party's editable details
+ */
+export const useUpdateParty = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateParty>>, TError,{partyId: string;data: BodyType<PartyUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateParty>>,
+        TError,
+        {partyId: string;data: BodyType<PartyUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdatePartyMutationOptions(options));
+    }
 
 export const getDeletePartyUrl = (partyId: string,) => {
 

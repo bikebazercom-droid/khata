@@ -408,6 +408,7 @@ export const ListPartiesResponse = zod.array(ListPartiesResponseItem)
 
 
 export const CreatePartyBody = zod.object({
+  "id": zod.string().optional().describe('Optional client-generated ID used for safe offline retries.'),
   "name": zod.string().min(1),
   "phone": zod.string().optional().describe('Optional mobile number; may be omitted or blank.'),
   "role": zod.enum(['CUSTOMER', 'SUPPLIER']),
@@ -437,6 +438,35 @@ export const GetPartyParams = zod.object({
 })
 
 export const GetPartyResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "role": zod.enum(['CUSTOMER', 'SUPPLIER']),
+  "currentBalance": zod.number(),
+  "balanceType": zod.enum(['YOU_WILL_GIVE', 'YOU_WILL_GET']),
+  "dueDate": zod.coerce.date().nullable(),
+  "lastTransactionAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update a party's editable details
+ */
+export const UpdatePartyParams = zod.object({
+  "partyId": zod.coerce.string()
+})
+
+
+
+
+export const UpdatePartyBody = zod.object({
+  "name": zod.string().min(1).optional(),
+  "phone": zod.string().optional(),
+  "dueDate": zod.string().nullish()
+})
+
+export const UpdatePartyResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "phone": zod.string(),

@@ -74,6 +74,7 @@ export * from './ownerWorkerUpdateStatus';
 export * from './party';
 export * from './partyInput';
 export * from './partyRole';
+export * from './partyUpdate';
 export * from './phoneOtpLogoutResult';
 export * from './phoneOtpSendInput';
 export * from './phoneOtpSendResult';

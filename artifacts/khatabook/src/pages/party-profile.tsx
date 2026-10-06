@@ -6,6 +6,7 @@ import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import {
   useGetParty,
   useDeleteParty,
+  useUpdateParty,
   getGetPartyQueryKey,
   getListPartiesQueryKey,
   getGetDashboardSummaryQueryKey,
@@ -13,6 +14,9 @@ import {
   type DashboardSummary,
 } from '@workspace/api-client-react';
 import { shiftSummaryForPartyChange } from '@/lib/optimistic';
+import { queuePartyOperation } from '@/lib/partyOutbox';
+import { readOfflineIdentity } from '@/lib/offlineSession';
+import { isTransientNetworkError } from '@/lib/offlineErrors';
 import {
   ChevronLeft,
   Phone,
@@ -68,16 +72,76 @@ export function PartyProfileView() {
     }
   }, [party?.id]);
 
+  const saveParty = useUpdateParty({
+    mutation: {
+      networkMode: 'always',
+      onMutate: async ({ partyId, data }) => {
+        const partyKey = businessScopedQueryKey(getGetPartyQueryKey(partyId), selectedBusinessId);
+        const partiesKey = businessScopedQueryKey(getListPartiesQueryKey(), selectedBusinessId);
+        const previousParty = queryClient.getQueryData<Party>(partyKey);
+        const previousParties = queryClient.getQueryData<Party[]>(partiesKey);
+        if (previousParty) {
+          queryClient.setQueryData<Party>(partyKey, { ...previousParty, ...data });
+          queryClient.setQueryData<Party[]>(partiesKey, (old) =>
+            old?.map((item) => item.id === partyId ? { ...item, ...data } : item),
+          );
+        }
+        return { partyKey, partiesKey, previousParty, previousParties };
+      },
+      onError: async (error, variables, context) => {
+        const identity = readOfflineIdentity();
+        const businessId = selectedBusinessId ?? identity?.businessId;
+        if (isTransientNetworkError(error) && identity && businessId && context?.previousParty) {
+          const optimisticParty = { ...context.previousParty, ...variables.data };
+          try {
+            await queuePartyOperation({
+              id: crypto.randomUUID(),
+              actorId: identity.userId,
+              businessId,
+              partyId: variables.partyId,
+              kind: 'update',
+              data: variables.data,
+              beforeParty: context.previousParty,
+              optimisticParty,
+              createdAt: new Date().toISOString(),
+              status: 'pending',
+            });
+            toast.success('কাস্টমারের তথ্য ডিভাইসে সেভ হয়েছে; সংযোগ ফিরলে সিঙ্ক হবে');
+            return;
+          } catch {
+            toast.error('অফলাইন স্টোরেজে পরিবর্তন সেভ করা যায়নি');
+          }
+        }
+        if (!context) return;
+        queryClient.setQueryData(context.partyKey, context.previousParty);
+        queryClient.setQueryData(context.partiesKey, context.previousParties);
+        toast.error('কাস্টমারের তথ্য সেভ করা যায়নি');
+      },
+      onSuccess: (updatedParty, variables) => {
+        const partyKey = businessScopedQueryKey(getGetPartyQueryKey(variables.partyId), selectedBusinessId);
+        queryClient.setQueryData(partyKey, updatedParty);
+        toast.success('কাস্টমারের তথ্য সেভ হয়েছে');
+      },
+      onSettled: (_data, error) => {
+        if (error && isTransientNetworkError(error)) return;
+        queryClient.invalidateQueries({ queryKey: getGetPartyQueryKey(id || '') });
+        queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
+      },
+    },
+  });
+
   // Optimistic delete — mirrors the logic in party-view.tsx so the list &
   // summary cards update instantly while the network request runs in background.
   const deleteParty = useDeleteParty({
     mutation: {
+      networkMode: 'always',
       onMutate: async ({ partyId }) => {
         const partiesKey = businessScopedQueryKey(getListPartiesQueryKey(), selectedBusinessId);
         const summaryKey = businessScopedQueryKey(getGetDashboardSummaryQueryKey(), selectedBusinessId);
         const previousParties = queryClient.getQueryData<Party[]>(partiesKey);
         const previousSummary = queryClient.getQueryData<DashboardSummary>(summaryKey);
-        const removedParty = previousParties?.find((p) => p.id === partyId);
+        const removedParty = previousParties?.find((p) => p.id === partyId) ??
+          (party?.id === partyId ? party : undefined);
 
         if (previousParties) {
           queryClient.setQueryData<Party[]>(
@@ -95,15 +159,36 @@ export function PartyProfileView() {
           queryClient.setQueryData<DashboardSummary>(summaryKey, next);
         }
 
-        return { partiesKey, summaryKey, previousParties, previousSummary };
+        return { partiesKey, summaryKey, previousParties, previousSummary, removedParty };
       },
-      onError: (err, _vars, context) => {
+      onError: async (err, vars, context) => {
+        const identity = readOfflineIdentity();
+        const businessId = selectedBusinessId ?? identity?.businessId;
+        if (isTransientNetworkError(err) && identity && businessId && context?.removedParty) {
+          try {
+            await queuePartyOperation({
+              id: crypto.randomUUID(),
+              actorId: identity.userId,
+              businessId,
+              partyId: vars.partyId,
+              kind: 'delete',
+              beforeParty: context.removedParty,
+              createdAt: new Date().toISOString(),
+              status: 'pending',
+            });
+            toast.success('কাস্টমারটি ডিভাইসে সরানো হয়েছে; সংযোগ ফিরলে সিঙ্ক হবে');
+            return;
+          } catch {
+            toast.error('অফলাইন স্টোরেজে পরিবর্তন সেভ করা যায়নি');
+          }
+        }
         console.error('পার্টি ডিলিট ব্যর্থ হয়েছে:', err);
         if (!context) return;
         queryClient.setQueryData(context.partiesKey, context.previousParties);
         queryClient.setQueryData(context.summaryKey, context.previousSummary);
       },
-      onSettled: () => {
+      onSettled: (_data, error) => {
+        if (error && isTransientNetworkError(error)) return;
         queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
       },
@@ -138,8 +223,14 @@ export function PartyProfileView() {
   const otherRoleLabel = isCustomer ? 'সাপ্লায়ার' : 'কাস্টমার';
 
   const handleSave = () => {
-    // No PATCH /parties/:id endpoint yet — show coming-soon toast
-    toast.info('তথ্য পরিবর্তন সেভ করা হয়েছে (শীঘ্রই সার্ভারে সংরক্ষিত হবে)');
+    if (!id || !editName.trim()) {
+      toast.error('কাস্টমারের নাম লিখুন');
+      return;
+    }
+    saveParty.mutate({
+      partyId: id,
+      data: { name: editName.trim(), phone: editMobile.trim() },
+    });
     setIsDirty(false);
   };
 

@@ -17,12 +17,17 @@ import { BusinessContextProvider } from '@/lib/businessContext';
 import { BusinessSwitcherDrawer } from '@/components/modals/business-switcher-drawer';
 import { LanguageProvider } from '@/lib/i18n';
 import { drainEntries, ENTRY_OUTBOX_CHANGED } from '@/lib/entryOutbox';
+import { applyQueuedPartyOperations, drainPartyOperations, PARTY_OUTBOX_CHANGED, PARTY_OUTBOX_REJECTED } from '@/lib/partyOutbox';
 import { clearAllPendingUploads } from '@/lib/pendingUploads';
 import { useBusinessContext } from '@/lib/businessContext';
-import { isNetworkWriteAuthorized, markServerReauthenticated, revokeNetworkWrites, useAuthConnectivity } from '@/lib/useAuthConnectivity';
+import { isNetworkWriteAuthorized, isOfflineMode, markServerReauthenticated, revokeNetworkWrites, useAuthConnectivity } from '@/lib/useAuthConnectivity';
+import { clearLocalLogoutPending, clearOfflineIdentity, isLocalLogoutPending, readOfflineIdentity, saveOfflineIdentity } from '@/lib/offlineSession';
+import { clearPersistedQueries, persistCache, restorePersistedQueries, setQueryPersistenceScope } from '@/lib/queryPersister';
 import { EntrySavedFeedbackHost } from '@/components/ui/entry-saved-feedback';
 import { lazyWithChunkRecovery } from '@/lib/lazyWithChunkRecovery';
 import {
+  getGetDashboardSummaryQueryKey,
+  getListPartiesQueryKey,
   getListNotificationsQueryKey,
   useMarkNotificationRead,
   useRemoveOwnerPushToken,
@@ -124,9 +129,9 @@ const clerkAppearance = {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Browser ledger queries require a live server response. The offline
-      // connection gate prevents ledger routes from mounting without one.
-      networkMode: 'online',
+      // Cached results remain available offline; reconnects refresh them in
+      // the background without blocking the current screen.
+      networkMode: 'offlineFirst',
       //
       // staleTime: 5 min — reduces unnecessary background refetches on
       // every tab switch or component mount. SSE-driven invalidateQueries
@@ -156,6 +161,7 @@ const queryClient = new QueryClient({
     },
   },
 });
+persistCache(queryClient);
 
 // ─── Real-time sync ───────────────────────────────────────────────────────────
 
@@ -165,7 +171,7 @@ const queryClient = new QueryClient({
  * Must be rendered inside both ClerkProvider and QueryClientProvider.
  */
 function RealtimeSyncManager() {
-  const { isAuthenticated, userId, role } = useAppAuth();
+  const { isAuthenticated, userId, role, businessId } = useAppAuth();
   const { selectedBusinessId, setSelectedBusiness } = useBusinessContext();
   const { setIsOnline } = useConnectionState();
   useRealtimeSync(isAuthenticated, setIsOnline);
@@ -173,33 +179,65 @@ function RealtimeSyncManager() {
   const [, navigate] = useLocation();
   const markNotificationRead = useMarkNotificationRead();
   const activeScope = useRef('');
-  const scope = isAuthenticated && userId ? JSON.stringify([userId, selectedBusinessId]) : '';
+  const activeBusinessId = selectedBusinessId ?? businessId;
+  const scope = isAuthenticated && userId ? JSON.stringify([userId, activeBusinessId]) : '';
   activeScope.current = scope;
   useEffect(() => {
     if (!scope || !userId) return;
     activeScope.current = scope;
-    const run = () => {
-      void drainEntries(userId, selectedBusinessId, () => isNetworkWriteAuthorized() && activeScope.current === scope, () => {
-        if (activeScope.current === scope) void qc.invalidateQueries();
-      }).catch(() => {
+    const stillCurrent = () => isNetworkWriteAuthorized() && activeScope.current === scope;
+    const reconcile = () => {
+      void (async () => {
+        await applyQueuedPartyOperations(qc, userId, activeBusinessId ?? '');
+        await drainPartyOperations(userId, activeBusinessId, stillCurrent, () => {
+          if (activeScope.current === scope) {
+            void qc.invalidateQueries({ queryKey: getListNotificationsQueryKey() });
+            void qc.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+            void qc.invalidateQueries({ queryKey: getListPartiesQueryKey() });
+          }
+        }, 'upserts');
+        await drainEntries(userId, activeBusinessId, stillCurrent, () => {
+          if (activeScope.current === scope) void qc.invalidateQueries();
+        });
+        await drainPartyOperations(userId, activeBusinessId, stillCurrent, () => {
+          if (activeScope.current === scope) {
+            void qc.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+            void qc.invalidateQueries({ queryKey: getListPartiesQueryKey() });
+          }
+        }, 'deletes');
+      })().catch(() => {
         toast.error('অফলাইন খসড়া পড়া যাচ্ছে না', { description: 'স্টোরেজ অনুমতি পরীক্ষা করুন; পরে আবার সিঙ্ক হবে।' });
       });
     };
-    run();
-    window.addEventListener('online', run);
-    window.addEventListener(ENTRY_OUTBOX_CHANGED, run);
-    window.addEventListener('banglakhata-connection-restored', run);
-    document.addEventListener('visibilitychange', run);
-    const interval = window.setInterval(run, 15_000);
+    const onRejected = (event: Event) => {
+      const detail = (event as CustomEvent<{ message?: string }>).detail;
+      toast.error('কাস্টমারের পরিবর্তন সিঙ্ক হয়নি', {
+        description: detail?.message ?? 'কাস্টমারের তথ্য যাচাই করে আবার সেভ করুন।',
+      });
+    };
+    setQueryPersistenceScope(userId, activeBusinessId ?? '');
+    void restorePersistedQueries(qc, userId, activeBusinessId ?? '')
+      .then(() => applyQueuedPartyOperations(qc, userId, activeBusinessId ?? ''))
+      .catch(() => {});
+    reconcile();
+    window.addEventListener('online', reconcile);
+    window.addEventListener(ENTRY_OUTBOX_CHANGED, reconcile);
+    window.addEventListener(PARTY_OUTBOX_CHANGED, reconcile);
+    window.addEventListener(PARTY_OUTBOX_REJECTED, onRejected);
+    window.addEventListener('banglakhata-connection-restored', reconcile);
+    document.addEventListener('visibilitychange', reconcile);
+    const interval = window.setInterval(reconcile, 15_000);
     return () => {
       activeScope.current = '';
-      window.removeEventListener('online', run);
-      window.removeEventListener(ENTRY_OUTBOX_CHANGED, run);
-      window.removeEventListener('banglakhata-connection-restored', run);
-      document.removeEventListener('visibilitychange', run);
+      window.removeEventListener('online', reconcile);
+      window.removeEventListener(ENTRY_OUTBOX_CHANGED, reconcile);
+      window.removeEventListener(PARTY_OUTBOX_CHANGED, reconcile);
+      window.removeEventListener(PARTY_OUTBOX_REJECTED, onRejected);
+      window.removeEventListener('banglakhata-connection-restored', reconcile);
+      document.removeEventListener('visibilitychange', reconcile);
       window.clearInterval(interval);
     };
-  }, [scope, userId, selectedBusinessId, qc]);
+  }, [scope, userId, activeBusinessId, qc]);
   useEffect(() => {
     if (!isAuthenticated) return;
     const heartbeat = () => {
@@ -353,15 +391,24 @@ function AuthCacheInvalidator() {
   useEffect(() => {
     if (isError && [401, 403].includes((error as Error & { status?: number })?.status ?? 0)) {
       qc.clear();
+      const cachedIdentity = readOfflineIdentity();
+      clearOfflineIdentity();
+      void clearPersistedQueries(cachedIdentity?.userId).catch(() => {});
       previousAuthorization.current = null;
       return;
     }
     if (isError) return; // A stale successful query is not fresh permission.
     if (!me?.userId || !me.businessId) return;
     const adjustmentPartyIds = (me as typeof me & { adjustmentPartyIds?: string[] }).adjustmentPartyIds ?? [];
+    clearLocalLogoutPending();
+    saveOfflineIdentity({ ...me, adjustmentPartyIds });
+    setQueryPersistenceScope(me.userId, selectedBusinessId ?? me.businessId);
     const previous = previousAuthorization.current;
     if (previous && previous.userId !== me.userId) {
       qc.clear();
+      void clearPersistedQueries(previous.userId).catch(() => {});
+      clearOfflineIdentity();
+      saveOfflineIdentity({ ...me, adjustmentPartyIds });
       clearAllPendingUploads();
       localStorage.removeItem('selected_business_id');
       setSelectedBusiness(me.businessId);
@@ -417,21 +464,34 @@ export function useAppAuth() {
     refetchOnMount: 'always',
     retry: false,
   });
+  const status = (error as Error & { status?: number } | undefined)?.status;
+  const storedIdentity = isLocalLogoutPending() ? null : readOfflineIdentity();
+  const offlineIdentity = storedIdentity &&
+    status !== 401 &&
+    status !== 403 &&
+    (isOfflineMode() || authLoading)
+    ? storedIdentity
+    : null;
+  const resolvedAuthData = authData ?? offlineIdentity ?? undefined;
 
   // Whether we have a definitive answer from auth paths.
   // We need authData to settle for the role.
-  const authSettled = isLoaded && (!enabled || !authLoading);
+  const authSettled = isLoaded && (!enabled || !authLoading || !!offlineIdentity);
 
-  const realAuth = enabled && !isError && !!authData?.userId;
+  const networkFallback = !!offlineIdentity && status !== 401 && status !== 403;
+  const realAuth = enabled && (
+    (!isError && !!authData?.userId) ||
+    (networkFallback && !!offlineIdentity.userId)
+  );
 
   // We MUST gate rendering on authoritative /auth/me to avoid cross-account leak
   const isAuthenticated = authSettled ? realAuth : false;
 
   // Block rendering until auth has settled authoritatively
-  const isLoading = !authSettled;
+  const isLoading = !authSettled && !offlineIdentity;
 
   // Role info: NEVER default to 'owner'. Require the true role from /me.
-  const role = authData?.role || "staff";
+  const role = resolvedAuthData?.role || "staff";
 
   // ── Development bypass — returned AFTER all hooks so hook order is stable ──
   if (devBypass) {
@@ -441,11 +501,11 @@ export function useAppAuth() {
   return {
     isAuthenticated,
     isLoading,
-    authMethod: clerkSignedIn ? 'clerk' : (authData ? 'phone' : null),
+    authMethod: clerkSignedIn ? 'clerk' : (resolvedAuthData ? 'phone' : null),
     role,
-    userId: authData?.userId,
-    businessId: authData?.businessId ?? null,
-    adjustmentPartyIds: (authData as (typeof authData & { adjustmentPartyIds?: string[] }) | undefined)?.adjustmentPartyIds ?? [],
+    userId: resolvedAuthData?.userId,
+    businessId: resolvedAuthData?.businessId ?? null,
+    adjustmentPartyIds: (resolvedAuthData as (typeof resolvedAuthData & { adjustmentPartyIds?: string[] }) | undefined)?.adjustmentPartyIds ?? [],
     authError: isError ? (error as Error).message : null,
   };
 }
@@ -650,6 +710,13 @@ function AppClient() {
   const clearQueries = useCallback(() => queryClient.clear(), []);
   const { phase, goOffline, serverAuthSettled, retry } = useAuthConnectivity(clearQueries);
   const [, setLocation] = useLocation();
+  const cachedIdentity = isLocalLogoutPending() ? null : readOfflineIdentity();
+
+  useEffect(() => {
+    if (!cachedIdentity) return;
+    setQueryPersistenceScope(cachedIdentity.userId, cachedIdentity.businessId);
+    void restorePersistedQueries(queryClient, cachedIdentity.userId, cachedIdentity.businessId).catch(() => {});
+  }, [cachedIdentity?.userId, cachedIdentity?.businessId]);
 
   if (!clerkPubKey) {
     return (
@@ -662,7 +729,7 @@ function AppClient() {
     );
   }
 
-  if (phase === 'offline') {
+  if (phase === 'offline' && !cachedIdentity) {
     return <OnlineConnectionRequired onRetry={() => { void retry(); }} />;
   }
 
@@ -687,7 +754,7 @@ function AppClient() {
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
       <QueryClientProvider client={queryClient}>
-        {phase === 'probing'
+        {phase === 'probing' && !cachedIdentity
           ? <AppSplash />
           : <AppRouter onNetworkFailure={goOffline} onSettled={serverAuthSettled} />}
       </QueryClientProvider>

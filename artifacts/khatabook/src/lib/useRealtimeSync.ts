@@ -161,6 +161,17 @@ export function useRealtimeSync(
       void qc.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
     });
 
+    // ─── party.updated ────────────────────────────────────────────────────
+    es.addEventListener('party.updated', (e: MessageEvent) => {
+      try {
+        const { partyId } = JSON.parse(e.data as string) as { partyId: string };
+        void qc.invalidateQueries({ queryKey: getListPartiesQueryKey() });
+        void qc.invalidateQueries({ queryKey: getGetPartyQueryKey(partyId) });
+      } catch {
+        void qc.invalidateQueries({ queryKey: getListPartiesQueryKey() });
+      }
+    });
+
     // ─── party.deleted ────────────────────────────────────────────────────
     es.addEventListener('party.deleted', (e: MessageEvent) => {
       try {

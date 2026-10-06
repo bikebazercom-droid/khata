@@ -9,6 +9,8 @@ import type { BalanceType } from './balanceType';
 import type { PartyRole } from './partyRole';
 
 export interface PartyInput {
+  /** Optional client-generated ID used for safe offline retries. */
+  id?: string;
   /** @minLength 1 */
   name: string;
   /** Optional mobile number; may be omitted or blank. */

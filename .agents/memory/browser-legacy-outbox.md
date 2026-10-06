@@ -1,10 +1,10 @@
 ---
 name: Browser legacy outbox transition
-description: Project policy for online-only browser entry creation while preserving previously saved drafts.
+description: Offline-first policy for shared browser and mobile WebView ledger data.
 ---
 
-New browser entries must be sent directly to the server. Do not add new browser offline queuing. Keep the old browser outbox drain during the transition so entries recorded by earlier builds can still be confirmed or remain recoverable; do not erase the outbox.
+The shared website data layer is the source of truth for browser and mobile WebView use. New ledger entries and customer create, update, and delete actions may be queued offline. Keep pending data scoped to its actor and business, replay writes idempotently, and never count pending ledger entries as confirmed balances.
 
-**Why:** Switching browser behavior should not strand drafts already saved by earlier builds.
+**Why:** The user explicitly requested offline customer management, reports, and downloads in the shared layer so mobile WebView and web remain aligned while keeping Clerk and phone OTP.
 
-**How to apply:** When changing transaction-entry or sync code, distinguish legacy web replay from new web create behavior.
+**How to apply:** Keep offline reads, durable outboxes, and reconnect/resume replay in the shared website layer. Preserve recoverability for queued work and defer destructive deletes until dependent ledger drafts have synced.

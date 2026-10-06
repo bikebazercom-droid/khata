@@ -3,8 +3,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { useBusinessContext } from '@/lib/businessContext';
 import { businessScopedQueryKey } from '@/lib/businessQueryKey';
+import { queuePartyOperation } from '@/lib/partyOutbox';
+import { readOfflineIdentity } from '@/lib/offlineSession';
+import { isTransientNetworkError } from '@/lib/offlineErrors';
 import {
   useCreateParty,
   PartyRole,
@@ -299,6 +303,7 @@ function AddPartyForm({
   // id/data without ever blocking the UI.
   const createParty = useCreateParty({
     mutation: {
+      networkMode: 'always',
       onMutate: async ({ data }) => {
         const partiesKey = businessScopedQueryKey(getListPartiesQueryKey(), selectedBusinessId);
         const summaryKey = businessScopedQueryKey(getGetDashboardSummaryQueryKey(), selectedBusinessId);
@@ -307,7 +312,7 @@ function AddPartyForm({
 
         const openingBalance = data.openingBalance ?? 0;
         const optimisticParty: Party = {
-          id: `optimistic-${Date.now()}`,
+          id: data.id ?? crypto.randomUUID(),
           name: data.name,
           phone: data.phone ?? '',
           role: data.role,
@@ -330,9 +335,32 @@ function AddPartyForm({
           });
         }
 
-        return { partiesKey, summaryKey, previousParties, previousSummary };
+        return { partiesKey, summaryKey, previousParties, previousSummary, optimisticParty };
       },
-      onError: (err, _vars, context) => {
+      onError: async (err, vars, context) => {
+        const identity = readOfflineIdentity();
+        const businessId = selectedBusinessId ?? identity?.businessId;
+        if (isTransientNetworkError(err) && context?.optimisticParty && identity && businessId) {
+          {
+            try {
+              await queuePartyOperation({
+                id: crypto.randomUUID(),
+                actorId: identity.userId,
+                businessId,
+                partyId: context.optimisticParty.id,
+                kind: 'create',
+                data: { ...vars.data, id: context.optimisticParty.id },
+                optimisticParty: context.optimisticParty,
+                createdAt: new Date().toISOString(),
+                status: 'pending',
+              });
+              toast.success('কাস্টমার ডিভাইসে সেভ হয়েছে; সংযোগ ফিরলে সিঙ্ক হবে');
+              return;
+            } catch {
+              toast.error('অফলাইন স্টোরেজে কাস্টমার সেভ করা যায়নি');
+            }
+          }
+        }
         console.error('কাস্টমার/সাপ্লায়ার যুক্ত করা ব্যর্থ হয়েছে, পরিবর্তন ফিরিয়ে নেওয়া হচ্ছে:', err);
         if (!context) return;
         queryClient.setQueryData(context.partiesKey, context.previousParties);
@@ -376,6 +404,7 @@ function AddPartyForm({
     createParty.mutate({
       data: {
         ...data,
+        id: crypto.randomUUID(),
         // Mobile number is entirely optional — store "" rather than
         // failing when the shop owner only has a name to go on.
         phone: phone ? `+880${phone}` : '',

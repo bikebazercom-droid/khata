@@ -140,17 +140,22 @@ describe('browser ledger entry submission', () => {
     setBrowserOnline(true);
   });
 
-  it('does not POST or queue a new draft while offline and leaves the form open', () => {
+  it('queues a new entry locally while offline and closes the form', async () => {
     setBrowserOnline(false);
     const { onClose } = renderEntry();
 
     enterAmount();
     saveEntry();
 
+    await waitFor(() => expect(mocks.queueEntry).toHaveBeenCalledOnce());
     expect(mocks.createLedgerEntry).not.toHaveBeenCalled();
-    expect(mocks.queueEntry).not.toHaveBeenCalled();
-    expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'এন্ট্রি নিশ্চিত করুন' })).toBeInTheDocument();
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(mocks.queueEntry.mock.calls[0][0]).toMatchObject({
+      actorId: 'user-1',
+      businessId: 'business-1',
+      partyId: PARTY_ID,
+      status: 'pending',
+    });
   });
 
   it('supports manual typing, cursor insertion, selection replacement, and one-character keypad backspace', () => {
@@ -274,9 +279,9 @@ describe('browser ledger entry submission', () => {
     );
   });
 
-  it('keeps the form open on API failure and reuses the same request ID for an unchanged retry', async () => {
+  it('keeps the form open on a server validation failure and reuses the same request ID for retry', async () => {
     mocks.createLedgerEntry
-      .mockRejectedValueOnce(new Error('network failure'))
+      .mockRejectedValueOnce(Object.assign(new Error('invalid entry'), { status: 400 }))
       .mockResolvedValueOnce({ id: 'entry-1' });
     const { onClose } = renderEntry();
     enterAmount();
@@ -297,7 +302,7 @@ describe('browser ledger entry submission', () => {
     expect(mocks.queueEntry).not.toHaveBeenCalled();
   });
 
-  it('does not POST or close the form when the bill image upload fails', async () => {
+  it('saves the entry and bill photo locally when the image upload fails', async () => {
     mocks.uploadBillImage.mockResolvedValue({ ok: false, reason: 'upload-failed' });
     const { onClose } = renderEntry();
     enterAmount();
@@ -307,9 +312,12 @@ describe('browser ledger entry submission', () => {
 
     await waitFor(() => expect(mocks.uploadBillImage).toHaveBeenCalledOnce());
     expect(mocks.createLedgerEntry).not.toHaveBeenCalled();
-    expect(mocks.queueEntry).not.toHaveBeenCalled();
-    expect(mocks.playTransactionSuccessSound).not.toHaveBeenCalled();
-    expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'এন্ট্রি নিশ্চিত করুন' })).toBeInTheDocument();
+    await waitFor(() => expect(mocks.queueEntry).toHaveBeenCalledOnce());
+    expect(mocks.queueEntry.mock.calls[0][0]).toMatchObject({
+      partyId: PARTY_ID,
+      imageBase64: 'data:image/jpeg;base64,captured-bill',
+      status: 'pending',
+    });
+    expect(onClose).toHaveBeenCalledOnce();
   });
 });
