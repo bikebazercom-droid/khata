@@ -13,7 +13,7 @@
       "supportsTablet": false
     },
     "android": {
-      "package": "com.banglakhata.mobile",
+      "package": "com.banglakhata.app",
       "versionCode": 1,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
