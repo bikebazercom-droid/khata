@@ -167,9 +167,8 @@ export function TransactionEntryScreen({
 
   // In edit mode: pre-populate the expression with the existing amount so the
   // user sees the current value immediately when the screen opens.
-  const [expression, setExpression] = useState(() =>
-    isEditMode ? trimNumberForExpression(initialEntry!.amount) : ''
-  );
+  const initialExpression = isEditMode ? trimNumberForExpression(initialEntry!.amount) : '';
+  const [expression, setExpression] = useState(initialExpression);
   // Dedicated calculator memory register (M+/M-/MR/MC), independent of the
   // live expression/result state above.
   const [memoryValue, setMemoryValue] = useState(0);
@@ -198,9 +197,14 @@ export function TransactionEntryScreen({
   const memoryValueRef = useRef(0);
   // Mirrors `expression` so keypad handlers can synchronously insert at the
   // current caret without stale state or side effects inside a state updater.
-  const expressionRef = useRef('');
+  const expressionRef = useRef(initialExpression);
   const amountInputRef = useRef<HTMLInputElement>(null);
-  const selectionRef = useRef<TextSelection>({ start: 0, end: 0 });
+  // Calculator presses should continue the existing number when edit mode
+  // opens, even before the amount input has been focused or selected.
+  const selectionRef = useRef<TextSelection>({
+    start: initialExpression.length,
+    end: initialExpression.length,
+  });
   const pendingSelectionRef = useRef<TextSelection | null>(null);
   const setExpressionAtSelection = useCallback((next: string, selection: TextSelection) => {
     const clamped = {

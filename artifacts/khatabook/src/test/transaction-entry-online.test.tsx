@@ -227,6 +227,17 @@ describe('browser ledger entry submission', () => {
     expect(amount.value).toBe('১৪');
   });
 
+  it('appends a keypad digit to the end of a prefilled amount when editing', () => {
+    renderEditEntry(makeLedgerEntry({ amount: 88 }));
+    const amount = screen.getByRole('textbox', { name: 'পরিমাণ লিখুন' }) as HTMLInputElement;
+
+    expect(amount.value).toBe('৮৮');
+    pressCalculatorKey('5');
+
+    expect(amount.value).toBe('৮৮৫');
+    expect(amount.selectionStart).toBe(3);
+  });
+
   it('lets every digit, decimal, and arithmetic operator update the editable expression', () => {
     renderEntry();
     const amount = screen.getByRole('textbox', { name: 'পরিমাণ লিখুন' }) as HTMLInputElement;
