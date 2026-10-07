@@ -136,6 +136,7 @@ export function TransactionEntryScreen({
   partyId,
   partyName,
   partyRole,
+  adjustmentPartyName,
   type,
   onClose,
   initialEntry,
@@ -143,6 +144,7 @@ export function TransactionEntryScreen({
   partyId: string;
   partyName: string;
   partyRole: Party['role'];
+  adjustmentPartyName?: string;
   type: LedgerEntryType;
   onClose: () => void;
   /** When provided the screen opens in edit mode, pre-populated with the
@@ -901,7 +903,7 @@ export function TransactionEntryScreen({
               above, not instead of it. */}
           {showMetadata && (
             <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50/60">
-              <p className="text-sm font-mono font-medium text-slate-500 truncate">
+              <p data-testid="calculator-live-display" className="text-sm font-mono font-medium text-slate-500 truncate">
                 {formulaPreviewText}
               </p>
             </div>
@@ -996,6 +998,24 @@ export function TransactionEntryScreen({
             )
           )}
         </div>
+
+        {isEditMode && initialEntry?.isTransfer && (
+          <div
+            data-testid="edit-adjustment-summary"
+            role="note"
+            className="min-h-11 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 flex items-center gap-2"
+          >
+            <ArrowLeftRight className="w-4 h-4 text-blue-600 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs font-extrabold text-blue-900 truncate">
+                অ্যাডজাস্টমেন্ট{adjustmentPartyName ? ` · ${adjustmentPartyName}` : ''}
+              </p>
+              <p className="text-[10px] leading-4 font-medium text-blue-800">
+                পরিমাণ বদলালে দুই খাতাই আপডেট হবে; লিঙ্কড খাতা অপরিবর্তিত থাকবে।
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Row 2: adjustment toggle — create mode only */}
         {!isEditMode && canAdjustSource && (

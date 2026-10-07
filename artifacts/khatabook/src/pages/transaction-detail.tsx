@@ -477,6 +477,7 @@ export function TransactionDetailPage() {
           partyId={partyId}
           partyName={party.name}
           partyRole={party.role}
+          adjustmentPartyName={transferParty?.name}
           type={entry.type as LedgerEntryType}
           initialEntry={entry}
           onClose={() => setIsEditOpen(false)}

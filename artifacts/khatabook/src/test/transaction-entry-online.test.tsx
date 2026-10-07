@@ -98,6 +98,48 @@ function renderEntry(partyRole: PartyRole = PartyRole.CUSTOMER) {
   return { ...view, queryClient, invalidateQueries, onClose };
 }
 
+function makeLedgerEntry(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'entry-1',
+    partyId: PARTY_ID,
+    type: LedgerEntryType.YOU_GAVE,
+    amount: 100,
+    description: 'পুরনো বিবরণ',
+    billReference: null,
+    billImage: null,
+    createdAt: '2026-05-01T00:00:00.000Z',
+    dueDate: null,
+    isTransfer: false,
+    transferPartyId: null,
+    linkedEntryId: null,
+    ...overrides,
+  } as NonNullable<React.ComponentProps<typeof TransactionEntryScreen>['initialEntry']>;
+}
+
+function renderEditEntry(initialEntry = makeLedgerEntry(), adjustmentPartyName?: string) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+  const onClose = vi.fn();
+  const view = render(
+    <QueryClientProvider client={queryClient}>
+      <TransactionEntryScreen
+        partyId={PARTY_ID}
+        partyName="রহিম"
+        partyRole={PartyRole.CUSTOMER}
+        adjustmentPartyName={adjustmentPartyName}
+        type={initialEntry.type}
+        initialEntry={initialEntry}
+        onClose={onClose}
+      />
+    </QueryClientProvider>,
+  );
+  return { ...view, queryClient, onClose };
+}
+
 function enterAmount(amount = '1') {
   for (const digit of amount) fireEvent.click(screen.getByRole('button', { name: digit }));
 }
@@ -138,6 +180,7 @@ describe('browser ledger entry submission', () => {
 
   afterEach(() => {
     setBrowserOnline(true);
+    vi.unstubAllGlobals();
   });
 
   it('queues a new entry locally while offline and closes the form', async () => {
@@ -201,6 +244,49 @@ describe('browser ledger entry submission', () => {
 
     pressCalculatorKey('=');
     expect(amount.value).toBe('২০.২৫');
+  });
+
+  it('edits an existing adjustment with the calculator while keeping its linked party fixed', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('fetch', fetchMock);
+    const { onClose } = renderEditEntry(
+      makeLedgerEntry({
+        isTransfer: true,
+        transferPartyId: 'target-party',
+        linkedEntryId: 'counter-entry',
+      }),
+      'করিম',
+    );
+
+    expect(screen.getByTestId('edit-adjustment-summary')).toHaveTextContent('করিম');
+    expect(screen.getByTestId('edit-adjustment-summary')).toHaveTextContent('দুই খাতাই আপডেট হবে');
+    expect(screen.queryByTestId('button-toggle-adjustment')).not.toBeInTheDocument();
+    expect(screen.getByTestId('calculator-key-M+')).toBeInTheDocument();
+    expect(screen.getByTestId('calculator-key-M-')).toBeInTheDocument();
+    expect(screen.getByTestId('calculator-live-display')).toHaveTextContent('১০০ = ১০০');
+
+    fireEvent.change(screen.getByTestId('input-transaction-amount'), {
+      target: { value: '200+50' },
+    });
+    expect(screen.getByTestId('calculator-live-display')).toHaveTextContent('২০০+৫০ = ২৫০');
+
+    fireEvent.click(screen.getByRole('button', { name: 'সংরক্ষণ করুন' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(request.body));
+    expect(body).toMatchObject({ amount: 250, type: LedgerEntryType.YOU_GAVE });
+    expect(body).not.toHaveProperty('isTransfer');
+    expect(body).not.toHaveProperty('transferPartyId');
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a regular transaction regular while editing', () => {
+    renderEditEntry();
+    expect(screen.queryByTestId('edit-adjustment-summary')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('button-toggle-adjustment')).not.toBeInTheDocument();
+    expect(screen.getByTestId('calculator-key-M+')).toBeInTheDocument();
+    expect(screen.getByTestId('calculator-live-display')).toHaveTextContent('১০০ = ১০০');
   });
 
   it('plays a tap sound for keypad presses and the MRC control', () => {
