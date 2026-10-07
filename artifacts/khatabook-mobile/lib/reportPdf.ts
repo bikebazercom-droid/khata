@@ -131,26 +131,47 @@ function reportShell(title: string, businessName: string, body: string): string 
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <style>
-        @page { size: A4; margin: 16mm 14mm; }
+        @page {
+          size: A4;
+          margin: 25mm 14mm 22mm;
+          @bottom-left {
+            content: "বাংলাখাতা · এই প্রতিবেদনটি অ্যাপ থেকে তৈরি করা হয়েছে।";
+            color: #fff;
+            background: #1b426f;
+            font: 9px system-ui, "Noto Sans Bengali", sans-serif;
+            padding: 8px 12px;
+          }
+          @bottom-right {
+            content: "Page " counter(page) " of " counter(pages);
+            color: #fff;
+            background: #1b426f;
+            font: 9px Arial, sans-serif;
+            padding: 8px 12px;
+          }
+        }
         * { box-sizing: border-box; }
         body { margin: 0; color: #13283e; font-family: system-ui, "Noto Sans Bengali", "Noto Sans", sans-serif; font-size: 12px; }
-        .brand { padding: 14px 18px; background: #1b426f; color: #fff; border-radius: 8px 8px 0 0; }
+        .brand { position: fixed; top: -21mm; left: 0; right: 0; padding: 10px 18px; background: #1b426f; color: #fff; }
         .brand-name { font-size: 16px; font-weight: 700; }
         .brand-caption { margin-top: 4px; opacity: .8; font-size: 10px; }
-        .body { padding: 20px 4px 8px; }
+        .body { padding: 0 4px 8px; }
         h1 { margin: 0 0 6px; text-align: center; font-size: 20px; }
         .subtitle { text-align: center; color: #64748b; margin-bottom: 18px; }
-        .summary { display: flex; gap: 8px; margin: 14px 0 20px; }
+        .summary { display: flex; gap: 8px; margin: 14px 0 20px; break-inside: avoid; page-break-inside: avoid; }
         .summary-card { flex: 1; border: 1px solid #dce5ee; border-radius: 8px; padding: 10px; }
         .summary-label { color: #64748b; font-size: 10px; margin-bottom: 5px; }
         .summary-value { font-weight: 700; font-size: 13px; }
         .red { color: #b42318; } .green { color: #16845b; }
-        table { width: 100%; border-collapse: collapse; font-size: 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 10px; table-layout: fixed; }
         th, td { padding: 7px 6px; border: 1px solid #dce5ee; text-align: left; vertical-align: top; }
         th { background: #f0f4f8; font-weight: 700; }
+        thead { display: table-header-group; }
+        tbody { display: table-row-group; }
+        tr, img, .opening-balance { break-inside: avoid; page-break-inside: avoid; }
+        .date-heading { break-after: avoid; page-break-after: avoid; }
         .right { text-align: right; white-space: nowrap; }
-        .footer { color: #64748b; border-top: 1px solid #dce5ee; margin-top: 20px; padding-top: 10px; font-size: 9px; }
-        tr { page-break-inside: avoid; }
+        .grand-total { break-inside: avoid; page-break-inside: avoid; font-weight: 700; background: #f8fafc; }
+        .grand-total td { border-color: #cbd5e1; }
       </style>
     </head>
     <body>
@@ -162,7 +183,6 @@ function reportShell(title: string, businessName: string, body: string): string 
         <h1>${escapeHtml(title)}</h1>
         ${body}
       </main>
-      <footer class="footer">বাংলাখাতা · এই প্রতিবেদনটি অ্যাপ থেকে তৈরি করা হয়েছে।</footer>
     </body>
   </html>`;
 }
@@ -185,7 +205,7 @@ export function buildPartyStatementHtml({
     const amount = money(entry.amount);
     const runningBalance = statement.runningBalances.get(entry.id) ?? 0;
     const description = entry.description || (entry.isTransfer ? 'ট্রান্সফার' : isGave ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন');
-    return `<tr>
+    return `<tr class="statement-row">
       <td>${escapeHtml(formatDate(ledgerEntryDateKey(entry)))}</td>
       <td>${escapeHtml(description)}${entry.billReference ? `<br><span style="color:#64748b">রেফ: ${escapeHtml(entry.billReference)}</span>` : ''}${billImages.has(entry.id) ? `<br><img src="${escapeHtml(billImages.get(entry.id) ?? '')}" alt="বিলের ছবি" style="width:64px;height:48px;object-fit:cover;margin-top:4px;border-radius:4px" />` : ''}</td>
       <td class="right ${isGave ? 'red' : ''}">${isGave ? amount : '—'}</td>
@@ -201,10 +221,24 @@ export function buildPartyStatementHtml({
       <div class="summary-card"><div class="summary-label">আপনি পেয়েছেন</div><div class="summary-value green">${money(statement.received)}</div></div>
       <div class="summary-card"><div class="summary-label">বর্তমান ব্যালেন্স</div><div class="summary-value">${escapeHtml(balanceLabel(statement.closingBalance))}</div></div>
     </div>
-    <p>ওপেনিং ব্যালেন্স: <strong>${escapeHtml(balanceLabel(statement.openingBalance))}</strong></p>
-    <table>
-      <thead><tr><th>তারিখ</th><th>বিবরণ</th><th class="right">দেওয়া</th><th class="right">পাওয়া</th><th class="right">ব্যালেন্স</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="5" style="text-align:center;color:#64748b">এই সময়ে কোনো লেনদেন নেই</td></tr>'}</tbody>
+    <p class="opening-balance">ওপেনিং ব্যালেন্স: <strong>${escapeHtml(balanceLabel(statement.openingBalance))}</strong></p>
+    <table class="statement-table">
+      <thead><tr>
+        <th style="width:16%">তারিখ</th>
+        <th style="width:34%">ডিটেলস</th>
+        <th class="right" style="width:16%">ডেবিট (-)</th>
+        <th class="right" style="width:16%">ক্রেডিট (+)</th>
+        <th class="right" style="width:18%">ব্যালেন্স</th>
+      </tr></thead>
+      <tbody>
+        ${rows || '<tr><td colspan="5" style="text-align:center;color:#64748b">এই সময়ে কোনো লেনদেন নেই</td></tr>'}
+        <tr class="grand-total">
+          <td colspan="2">সর্বমোট</td>
+          <td class="right red">${money(statement.gave)}</td>
+          <td class="right green">${money(statement.received)}</td>
+          <td class="right">${escapeHtml(balanceLabel(statement.closingBalance))}</td>
+        </tr>
+      </tbody>
     </table>`;
   return reportShell(`${roleLabel} স্টেটমেন্ট`, businessName, body);
 }

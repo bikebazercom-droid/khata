@@ -21,6 +21,7 @@
 - [React Query context singleton](react-query-context-singleton.md) — shared generated hooks must use the app's single `@tanstack/react-query` instance across pnpm workspace links.
 - [Ledger timestamp timezone](ledger-timestamp-timezone.md) — display transaction creation times in the viewer's local timezone while preserving date-only due dates.
 - [Web party PDF ordering](ledger-statement-order.md) — show the single-party web ledger PDF newest-first while retaining chronologically computed running balances.
+- [Web PDF capture lifecycle](web-pdf-html2canvas-capture.md) — keep html2canvas target nodes attached and preserve source computed styles when paginating iframe markup.
 - [Large transaction amounts](large-transaction-amounts.md) — keep complete formatted values inside party-history cards at narrow phone widths.
 - [Party-role report and transfer scope](party-role-scope.md) — supplier/customer reports and transfers must never cross roles; retain existing business isolation.
 - [Adjustment editing scope](adjustment-edit-scope.md) — edit mode can create, retarget, or unlink adjustments, with atomic pair updates and confirmation before unlinking.

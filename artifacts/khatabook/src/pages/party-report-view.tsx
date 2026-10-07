@@ -14,8 +14,6 @@ import {
   getGetPartyQueryKey,
   getListLedgerEntriesQueryKey,
 } from '@workspace/api-client-react';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import {
   ChevronLeft,
   Calendar as CalendarIcon,
@@ -47,6 +45,7 @@ import {
   calculatePartyStatementSummary,
   filterPartyStatementEntriesByRange,
 } from '@/lib/party-statement';
+import { generatePaginatedStatementPdf } from '@/lib/paginated-statement-pdf';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
 
 // ─── Report Options Bottom Sheet ──────────────────────────────────────────────
@@ -280,7 +279,7 @@ export function PartyReportView() {
         const openNote = row.dayKey === openingBalanceDayKey
           ? `<td style="border:0;text-align:right;font-weight:400;color:#64748b;font-size:11px;white-space:nowrap;">(ওপেনিং ব্যালেন্স: ${fmtBal(openingBalance)})</td>`
           : '<td style="border:0;"></td>';
-        tableRows += `<tr style="background:#f1f5f9;">
+        tableRows += `<tr data-pdf-kind="day" style="background:#f1f5f9;">
           <td colspan="5" style="padding:0;border:1px solid #cbd5e1;">
             <table style="width:100%;border-collapse:collapse;"><tr>
               <td style="border:0;padding:7px 10px;font-weight:700;font-size:12px;">${row.dayLabel}</td>
@@ -299,7 +298,7 @@ export function PartyReportView() {
         ? `<td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:right;background:#f0fdf4;font-size:12px;">${fmtAmt(row.credit)}</td>`
         : '<td style="padding:7px 10px;border:1px solid #e2e8f0;background:#f0fdf4;"></td>';
 
-      tableRows += `<tr>
+      tableRows += `<tr data-pdf-kind="entry">
         <td style="padding:7px 10px;border:1px solid #e2e8f0;font-size:11px;white-space:nowrap;">${row.dateTime}</td>
         <td style="padding:7px 10px;border:1px solid #e2e8f0;font-size:11px;word-break:break-word;">${details}</td>
         ${debitCell}
@@ -309,11 +308,11 @@ export function PartyReportView() {
     }
 
     if (!tableRows) {
-      tableRows = `<tr><td colspan="5" style="padding:16px;text-align:center;color:#94a3b8;border:1px solid #e2e8f0;">কোনো লেনদেন নেই</td></tr>`;
+      tableRows = `<tr data-pdf-kind="empty"><td colspan="5" style="padding:16px;text-align:center;color:#94a3b8;border:1px solid #e2e8f0;">কোনো লেনদেন নেই</td></tr>`;
     }
 
     // YOU_GAVE entries are debits; YOU_GOT entries are credits.
-    tableRows += `<tr style="background:#f8fafc;font-weight:700;">
+    tableRows += `<tr data-pdf-kind="total" style="background:#f8fafc;font-weight:700;">
       <td colspan="2" style="padding:8px 10px;border:1px solid #cbd5e1;font-size:12px;">সর্বমোট</td>
       <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;background:#fef2f2;font-size:12px;">${fmtAmt(totalDebit)}</td>
       <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;background:#f0fdf4;font-size:12px;">${fmtAmt(totalCredit)}</td>
@@ -336,14 +335,24 @@ export function PartyReportView() {
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Noto Sans Bengali',sans-serif;background:#e8ecf1;color:#1e293b;padding:24px 0 40px}
-  .page{background:#fff;width:740px;margin:0 auto;box-shadow:0 2px 16px rgba(0,0,0,.15)}
+  body{font-family:'Noto Sans Bengali',sans-serif;background:#fff;color:#1e293b;padding:0}
+  .statement-pdf-source{position:absolute;left:-20000px;top:0;width:190mm}
+  .statement-pdf-page{width:210mm;height:297mm;padding:8mm 10mm;background:#fff;display:flex;flex-direction:column;overflow:hidden;color:#1e293b}
+  .statement-pdf-header{flex:0 0 13mm;width:100%}
+  .statement-pdf-main{display:flex;flex:1 1 auto;flex-direction:column;min-height:0;overflow:hidden;padding-top:4mm}
+  .statement-pdf-intro{flex:0 0 auto;margin-bottom:2mm}
+  .statement-pdf-table{width:100%;flex:0 0 auto;table-layout:fixed;border-collapse:collapse;font-size:12px;margin-top:3mm}
+  .statement-pdf-page thead{display:table-header-group}
+  .statement-pdf-page tr{break-inside:avoid;page-break-inside:avoid}
+  .statement-pdf-footer{flex:0 0 auto;margin-top:4mm}
+  .statement-pdf-meta{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#64748b;margin-bottom:4px}
+  .statement-pdf-page-number{font-family:Arial,sans-serif;white-space:nowrap}
 </style>
 </head><body>
-<div class="page">
+<div class="statement-pdf-source">
 
   <!-- Header -->
-  <div style="background:#003366;display:flex;justify-content:space-between;align-items:center;padding:14px 22px;color:#fff;">
+  <div class="statement-pdf-header" style="background:#003366;display:flex;justify-content:space-between;align-items:center;padding:14px 22px;color:#fff;">
     <span style="font-size:16px;font-weight:700;">${safeName}</span>
     <div style="display:flex;align-items:center;gap:8px;">
       <span style="font-size:20px;">📒</span>
@@ -351,8 +360,7 @@ export function PartyReportView() {
     </div>
   </div>
 
-  <!-- Body -->
-  <div style="padding:26px 28px;">
+  <div class="statement-pdf-intro">
 
     <!-- Title -->
     <div style="text-align:center;margin-bottom:20px;">
@@ -362,7 +370,7 @@ export function PartyReportView() {
     </div>
 
     <!-- Summary box -->
-    <table style="width:100%;border-collapse:collapse;border:1px solid #cbd5e1;margin-bottom:18px;">
+    <table style="width:100%;border-collapse:collapse;border:1px solid #cbd5e1;margin-bottom:18px;break-inside:avoid;page-break-inside:avoid;">
       <tr>
         <td style="padding:12px 14px;border-right:1px solid #cbd5e1;width:25%;vertical-align:top;">
           <div style="font-size:11px;color:#64748b;margin-bottom:5px;">ওপেনিং ব্যালেন্স</div>
@@ -390,8 +398,10 @@ export function PartyReportView() {
       এন্ট্রির সংখ্যা: ${dateFiltered.length} (${curLbl})
     </div>
 
-    <!-- Transaction table -->
-    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;">
+  </div>
+
+  <!-- Transaction table -->
+  <table class="statement-pdf-table" style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;">
       <thead>
         <tr style="background:#f8fafc;">
           <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:left;font-size:12px;color:#374151;font-weight:700;width:24%;">তারিখ</th>
@@ -404,13 +414,12 @@ export function PartyReportView() {
       <tbody>${tableRows}</tbody>
     </table>
 
-    <!-- Footer line -->
-    <div style="display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;margin-top:6px;">
+  <!-- Repeated footer: page number is filled after all rows are paginated. -->
+  <div class="statement-pdf-footer">
+  <div class="statement-pdf-meta">
       <span>রিপোর্ট তৈরি হয়েছে : ${timeStr} | ${dateStr}</span>
-      <span>Page 1 of 1</span>
+      <span class="statement-pdf-page-number">Page 1 of 1</span>
     </div>
-
-  </div>
 
   <!-- Bottom banner -->
   <div style="background:#003366;color:#fff;padding:12px 22px;display:flex;justify-content:space-between;align-items:center;font-size:12px;">
@@ -424,67 +433,12 @@ export function PartyReportView() {
   </div>
 
 </div>
+  </div>
 </body></html>`;
   };
 
   const generatePdfBlob = (): Promise<Blob> =>
-    new Promise((resolve, reject) => {
-      const iframe = document.createElement('iframe');
-      iframe.style.cssText =
-        'position:fixed;left:-9999px;top:0;width:820px;height:1200px;border:none;visibility:hidden;';
-      document.body.appendChild(iframe);
-
-      const cleanup = () => {
-        if (document.body.contains(iframe)) document.body.removeChild(iframe);
-      };
-
-      iframe.onload = async () => {
-        try {
-          const iframeDoc = iframe.contentDocument!;
-
-          // 1. Wait for the iframe's font-loading queue to settle
-          await iframeDoc.fonts.ready;
-
-          // 2. Explicitly request every weight used in the PDF
-          await Promise.allSettled([
-            iframeDoc.fonts.load('400 16px "Noto Sans Bengali"'),
-            iframeDoc.fonts.load('600 16px "Noto Sans Bengali"'),
-            iframeDoc.fonts.load('700 16px "Noto Sans Bengali"'),
-            iframeDoc.fonts.load('900 16px "Noto Sans Bengali"'),
-          ]);
-
-          // 3. Verify the font actually loaded (CDN might be slow/blocked).
-          //    If it hasn't loaded yet, wait up to 3 s more before capturing.
-          const bengaliReady = iframeDoc.fonts.check('700 16px "Noto Sans Bengali"');
-          await new Promise(r => setTimeout(r, bengaliReady ? 200 : 3000));
-
-          const canvas  = await html2canvas(iframeDoc.body, {
-            scale: 2, useCORS: true, allowTaint: true,
-            backgroundColor: '#e8ecf1', logging: false, windowWidth: 820,
-          });
-          const imgData = canvas.toDataURL('image/jpeg', 0.95);
-          const pdf     = new jsPDF('p', 'mm', 'a4');
-          const pdfW = 210, pdfH = 297;
-          const imgH    = (canvas.height * pdfW) / canvas.width;
-          let yOffset = 0, first = true;
-          while (yOffset < imgH) {
-            if (!first) pdf.addPage();
-            pdf.addImage(imgData, 'JPEG', 0, -yOffset, pdfW, imgH);
-            yOffset += pdfH;
-            first = false;
-          }
-          resolve(pdf.output('blob'));
-        } catch (err) {
-          reject(err);
-        } finally {
-          cleanup();
-        }
-      };
-      iframe.onerror = e => { cleanup(); reject(e); };
-
-      const doc = iframe.contentDocument!;
-      doc.open(); doc.write(buildPdfHtml()); doc.close();
-    });
+    generatePaginatedStatementPdf(buildPdfHtml());
 
   const pdfFilename = () =>
     `Banglakhata_${(party?.name ?? 'Report').replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;

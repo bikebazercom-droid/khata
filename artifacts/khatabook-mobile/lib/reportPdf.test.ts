@@ -49,6 +49,27 @@ describe('party statement PDF helpers', () => {
     expect(html).toContain('&lt;invoice&gt;');
   });
 
+  it('prints the same five-column ledger header and a repeated page-number footer', () => {
+    const statement = calculatePartyStatement([ledgerEntry], 'all');
+    const html = buildPartyStatementHtml({
+      businessName: 'Shop',
+      party,
+      periodLabel: 'সব সময়',
+      statement,
+    });
+
+    expect(html).toContain('<th style="width:16%">তারিখ</th>');
+    expect(html).toContain('ডিটেলস');
+    expect(html).toContain('ডেবিট (-)');
+    expect(html).toContain('ক্রেডিট (+)');
+    expect(html).toContain('ব্যালেন্স');
+    expect(html).toContain('class="grand-total"');
+    expect(html).toMatch(/@page\s*\{\s*size: A4;/);
+    expect(html).toContain('@bottom-right');
+    expect(html).toContain('counter(page)');
+    expect(html).toContain('counter(pages)');
+  });
+
   it('filters statement rows by date and search while retaining the real opening and running balance', () => {
     const records: LedgerRecord[] = [
       { ...ledgerEntry, id: 'before', amount: 30, dueDate: '2025-06-01', createdAt: '2025-06-12T10:00:00.000Z' },
