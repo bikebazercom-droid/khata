@@ -68,15 +68,19 @@ afterAll(async () => {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-async function createParty(name: string) {
+async function createParty(
+  name: string,
+  currentBalance = "100.00",
+  role: "CUSTOMER" | "SUPPLIER" = "CUSTOMER",
+) {
   const [party] = await testDb
     .insert(partiesTable)
     .values({
       businessId,
       name,
       phone: "",
-      role: "CUSTOMER",
-      currentBalance: "100.00",
+      role,
+      currentBalance,
       balanceType: "YOU_WILL_GET",
     })
     .returning();
@@ -103,6 +107,41 @@ async function fetchEntry(id: string) {
     .from(ledgerEntriesTable)
     .where(eq(ledgerEntriesTable.id, id));
   return row ?? null;
+}
+
+async function fetchParty(id: string) {
+  const [row] = await testDb.select().from(partiesTable).where(eq(partiesTable.id, id));
+  return row ?? null;
+}
+
+function signedBalance(party: NonNullable<Awaited<ReturnType<typeof fetchParty>>>) {
+  const amount = Number(party.currentBalance);
+  return party.balanceType === "YOU_WILL_GET" ? amount : -amount;
+}
+
+async function createTransferPair(sourcePartyId: string, targetPartyId: string, amount = "50.00") {
+  const [primary] = await testDb.insert(ledgerEntriesTable).values({
+    partyId: sourcePartyId,
+    type: "YOU_GAVE",
+    amount,
+    description: "adjusted with target",
+    isTransfer: true,
+    transferPartyId: targetPartyId,
+  }).returning();
+  const [counter] = await testDb.insert(ledgerEntriesTable).values({
+    partyId: targetPartyId,
+    type: "YOU_GOT",
+    amount,
+    description: "adjusted with source",
+    isTransfer: true,
+    transferPartyId: sourcePartyId,
+    linkedEntryId: primary!.id,
+  }).returning();
+  const [linkedPrimary] = await testDb.update(ledgerEntriesTable)
+    .set({ linkedEntryId: counter!.id })
+    .where(eq(ledgerEntriesTable.id, primary!.id))
+    .returning();
+  return { primary: linkedPrimary!, counter: counter! };
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -304,5 +343,116 @@ describe("PATCH ledger-entry — bill photo replacement cleanup", () => {
     expect(updated?.billImage).toBe("/objects/uploads/brand-new-uuid");
 
     vi.restoreAllMocks();
+  });
+});
+
+describe("PATCH ledger-entry — adjustment transitions", () => {
+  it("converts a regular entry to a linked adjustment and updates both balances", async () => {
+    const source = await createParty("Convert source", "150.00");
+    const target = await createParty("Convert target", "100.00");
+    const entry = await createEntry(source.id);
+
+    const response = await request(makeApp(businessId))
+      .patch(`/parties/${source.id}/ledger-entries/${entry.id}`)
+      .send({
+        amount: 80,
+        type: "YOU_GAVE",
+        description: "converted adjustment",
+        isTransfer: true,
+        transferPartyId: target.id,
+      })
+      .expect(200);
+
+    const saved = await fetchEntry(entry.id);
+    const counter = saved?.linkedEntryId ? await fetchEntry(saved.linkedEntryId) : null;
+    expect(response.body).toMatchObject({
+      isTransfer: true,
+      transferPartyId: target.id,
+      linkedEntryId: saved?.linkedEntryId,
+    });
+    expect(counter).toMatchObject({
+      partyId: target.id,
+      type: "YOU_GOT",
+      amount: "80.00",
+      transferPartyId: source.id,
+      linkedEntryId: entry.id,
+    });
+    expect(signedBalance((await fetchParty(source.id))!)).toBe(180);
+    expect(signedBalance((await fetchParty(target.id))!)).toBe(20);
+  });
+
+  it("retargets the linked row and reverses the old and new party balances atomically", async () => {
+    const source = await createParty("Retarget source", "150.00");
+    const oldTarget = await createParty("Retarget old", "50.00");
+    const newTarget = await createParty("Retarget new", "100.00");
+    const { primary, counter } = await createTransferPair(source.id, oldTarget.id);
+
+    await request(makeApp(businessId))
+      .patch(`/parties/${source.id}/ledger-entries/${primary.id}`)
+      .send({
+        amount: 80,
+        type: "YOU_GAVE",
+        isTransfer: true,
+        transferPartyId: newTarget.id,
+      })
+      .expect(200);
+
+    const saved = await fetchEntry(primary.id);
+    const movedCounter = await fetchEntry(counter.id);
+    expect(saved).toMatchObject({ isTransfer: true, transferPartyId: newTarget.id, linkedEntryId: counter.id });
+    expect(movedCounter).toMatchObject({
+      partyId: newTarget.id,
+      amount: "80.00",
+      type: "YOU_GOT",
+      transferPartyId: source.id,
+      linkedEntryId: primary.id,
+    });
+    expect(signedBalance((await fetchParty(source.id))!)).toBe(180);
+    expect(signedBalance((await fetchParty(oldTarget.id))!)).toBe(100);
+    expect(signedBalance((await fetchParty(newTarget.id))!)).toBe(20);
+  });
+
+  it("removes the paired row when an adjustment is disabled and restores both balances", async () => {
+    const source = await createParty("Unlink source", "150.00");
+    const target = await createParty("Unlink target", "50.00");
+    const { primary, counter } = await createTransferPair(source.id, target.id);
+
+    await request(makeApp(businessId))
+      .patch(`/parties/${source.id}/ledger-entries/${primary.id}`)
+      .send({
+        amount: 60,
+        type: "YOU_GAVE",
+        isTransfer: false,
+        transferPartyId: null,
+      })
+      .expect(200);
+
+    expect(await fetchEntry(primary.id)).toMatchObject({
+      isTransfer: false,
+      transferPartyId: null,
+      linkedEntryId: null,
+      amount: "60.00",
+    });
+    expect(await fetchEntry(counter.id)).toBeNull();
+    expect(signedBalance((await fetchParty(source.id))!)).toBe(160);
+    expect(signedBalance((await fetchParty(target.id))!)).toBe(100);
+  });
+
+  it("rejects linking to a different party role without changing either ledger", async () => {
+    const source = await createParty("Role source", "150.00");
+    const supplier = await createParty("Role supplier", "100.00", "SUPPLIER");
+    const entry = await createEntry(source.id);
+
+    await request(makeApp(businessId))
+      .patch(`/parties/${source.id}/ledger-entries/${entry.id}`)
+      .send({
+        isTransfer: true,
+        transferPartyId: supplier.id,
+      })
+      .expect(400);
+
+    expect(await fetchEntry(entry.id)).toMatchObject({ isTransfer: false, transferPartyId: null });
+    expect(signedBalance((await fetchParty(source.id))!)).toBe(150);
+    expect(signedBalance((await fetchParty(supplier.id))!)).toBe(100);
   });
 });

@@ -136,7 +136,6 @@ export function TransactionEntryScreen({
   partyId,
   partyName,
   partyRole,
-  adjustmentPartyName,
   type,
   onClose,
   initialEntry,
@@ -144,7 +143,6 @@ export function TransactionEntryScreen({
   partyId: string;
   partyName: string;
   partyRole: Party['role'];
-  adjustmentPartyName?: string;
   type: LedgerEntryType;
   onClose: () => void;
   /** When provided the screen opens in edit mode, pre-populated with the
@@ -292,9 +290,11 @@ export function TransactionEntryScreen({
   // are visible without requiring a keypad interaction first.
   const [hasInteracted, setHasInteracted] = useState(isEditMode);
 
-  // ── Transfer / adjustment state (create mode only) ────────────────────────
-  const [isTransferMode, setIsTransferMode] = useState(false);
-  const [transferPartyId, setTransferPartyId] = useState<string | null>(null);
+  // ── Transfer / adjustment state ──────────────────────────────────────────
+  const [isTransferMode, setIsTransferMode] = useState(() => Boolean(initialEntry?.isTransfer));
+  const [transferPartyId, setTransferPartyId] = useState<string | null>(
+    () => initialEntry?.transferPartyId ?? null,
+  );
   const [transferSearch, setTransferSearch] = useState('');
 
   // Fetch party list for the transfer dropdown (only when toggle is on).
@@ -303,7 +303,7 @@ export function TransactionEntryScreen({
     adjustmentTargetParams,
     {
       query: {
-        enabled: canAdjustSource && isTransferMode && !isEditMode,
+        enabled: canAdjustSource && isTransferMode,
         queryKey: businessScopedQueryKey(
           getListAdjustmentTargetsQueryKey(adjustmentTargetParams),
           selectedBusinessId,
@@ -318,6 +318,24 @@ export function TransactionEntryScreen({
   // Controls the "unsaved changes" confirmation dialog shown when the user
   // presses back with a dirty edit-mode form.
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
+
+  const handleToggleAdjustment = useCallback(() => {
+    if (isEditMode && initialEntry?.isTransfer && isTransferMode) {
+      setShowUnlinkConfirm(true);
+      return;
+    }
+    setIsTransferMode((current) => !current);
+    setTransferPartyId(null);
+    setTransferSearch('');
+  }, [isEditMode, initialEntry, isTransferMode]);
+
+  const confirmUnlinkAdjustment = useCallback(() => {
+    setIsTransferMode(false);
+    setTransferPartyId(null);
+    setTransferSearch('');
+    setShowUnlinkConfirm(false);
+  }, []);
 
   const isGet = type === LedgerEntryType.YOU_GOT;
   const hasFormula = /[+\-*/%]/.test(expression.replace(/^-/, ''));
@@ -354,6 +372,10 @@ export function TransactionEntryScreen({
       memoryHistory.length > 0 ? memoryValue : (liveResult ?? 0);
     if (Math.abs(currentAmount - initialEntry.amount) > 0.001) return true;
 
+    // Adjustment state and the selected counterparty are editable too.
+    if (isTransferMode !== Boolean(initialEntry.isTransfer)) return true;
+    if (isTransferMode && transferPartyId !== (initialEntry.transferPartyId ?? null)) return true;
+
     // Description
     if (description !== (initialEntry.description ?? '')) return true;
 
@@ -374,7 +396,7 @@ export function TransactionEntryScreen({
   }, [
     isEditMode, initialEntry,
     memoryHistory.length, memoryValue, liveResult,
-    description, dueDate, billImage,
+    description, dueDate, billImage, isTransferMode, transferPartyId,
   ]);
 
   // The authoritative amount used for saving and the header title — always
@@ -564,10 +586,28 @@ export function TransactionEntryScreen({
       return;
     }
 
+    const selectedTransferParty = transferPartyList.find((p) => p.id === transferPartyId);
+    if (isTransferMode && (
+      !canAdjustSource ||
+      !transferPartyId ||
+      selectedTransferParty?.role !== partyRole ||
+      (userRole !== 'owner' && !adjustmentPartyIds.includes(transferPartyId))
+    )) {
+      toast.warning(`${partyRoleLabel} বেছে নিন`, {
+        description: 'অ্যাডজাস্টমেন্ট সংরক্ষণ করতে একই ধরনের অন্য একটি পক্ষ বেছে নিন।',
+      });
+      return;
+    }
+
     const entriesKey = businessScopedQueryKey(getListLedgerEntriesQueryKey(partyId), selectedBusinessId);
     const partyKey   = businessScopedQueryKey(getGetPartyQueryKey(partyId), selectedBusinessId);
     const partiesKey = businessScopedQueryKey(getListPartiesQueryKey(), selectedBusinessId);
     const summaryKey = businessScopedQueryKey(getGetDashboardSummaryQueryKey(), selectedBusinessId);
+    const affectedPartyIds = new Set([
+      partyId,
+      initialEntry.isTransfer ? initialEntry.transferPartyId : null,
+      isTransferMode ? transferPartyId : null,
+    ].filter((id): id is string => Boolean(id)));
 
     // ── 1. Snapshot ──────────────────────────────────────────────────────
     const previousEntries = queryClient.getQueryData<LedgerEntry[]>(entriesKey);
@@ -581,6 +621,9 @@ export function TransactionEntryScreen({
       amount:      finalAmount,
       type,
       description,
+      isTransfer: isTransferMode,
+      transferPartyId: isTransferMode ? transferPartyId : null,
+      linkedEntryId: isTransferMode ? (initialEntry.linkedEntryId ?? null) : null,
       dueDate:     dueDate
         ? (new Date(`${dueDate}T00:00:00`) as unknown as null)
         : null,
@@ -676,6 +719,8 @@ export function TransactionEntryScreen({
               type,
               description,
               dueDate:     dueDate || undefined,
+              isTransfer: isTransferMode,
+              transferPartyId: isTransferMode ? transferPartyId : null,
               ...(billImageChanged ? { billImage: objectPath } : {}),
             }),
           },
@@ -685,10 +730,22 @@ export function TransactionEntryScreen({
           console.error('[PATCH] server error body:', JSON.stringify(errBody));
           throw new Error(`HTTP ${res.status}: ${JSON.stringify(errBody)}`);
         }
+        const savedEntry = await res.json() as LedgerEntry;
+        queryClient.setQueryData<LedgerEntry[]>(entriesKey, (old) =>
+          (old ?? []).map((entry) =>
+            entry.id === savedEntry.id ? { ...updatedEntry, ...savedEntry } : entry,
+          ),
+        );
 
         // ── 5. Background reconciliation ──────────────────────────────────
-        queryClient.invalidateQueries({ queryKey: entriesKey });
-        queryClient.invalidateQueries({ queryKey: partyKey });
+        for (const affectedPartyId of affectedPartyIds) {
+          queryClient.invalidateQueries({
+            queryKey: businessScopedQueryKey(getListLedgerEntriesQueryKey(affectedPartyId), selectedBusinessId),
+          });
+          queryClient.invalidateQueries({
+            queryKey: businessScopedQueryKey(getGetPartyQueryKey(affectedPartyId), selectedBusinessId),
+          });
+        }
         queryClient.invalidateQueries({ queryKey: partiesKey });
         queryClient.invalidateQueries({ queryKey: summaryKey });
       } catch (err) {
@@ -705,7 +762,9 @@ export function TransactionEntryScreen({
   }, [
     initialEntry, memoryHistory.length, memoryValue, expression,
     partyId, type, description, dueDate, billImage,
-    queryClient, clearMemory, onClose, BASE, isOnline,
+    queryClient, clearMemory, onClose, BASE, isOnline, selectedBusinessId,
+    isTransferMode, transferPartyId, transferPartyList, canAdjustSource,
+    partyRole, partyRoleLabel, userRole, adjustmentPartyIds,
   ]);
 
   const savingRef = useRef(false);
@@ -999,32 +1058,32 @@ export function TransactionEntryScreen({
           )}
         </div>
 
-        {isEditMode && initialEntry?.isTransfer && (
+        {isEditMode && initialEntry?.isTransfer && !canAdjustSource && (
           <div
-            data-testid="edit-adjustment-summary"
+            data-testid="edit-adjustment-readonly"
             role="note"
             className="min-h-11 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 flex items-center gap-2"
           >
             <ArrowLeftRight className="w-4 h-4 text-blue-600 shrink-0" />
             <div className="min-w-0">
               <p className="text-xs font-extrabold text-blue-900 truncate">
-                অ্যাডজাস্টমেন্ট{adjustmentPartyName ? ` · ${adjustmentPartyName}` : ''}
+                অ্যাডজাস্টমেন্ট
               </p>
               <p className="text-[10px] leading-4 font-medium text-blue-800">
-                পরিমাণ বদলালে দুই খাতাই আপডেট হবে; লিঙ্কড খাতা অপরিবর্তিত থাকবে।
+                আপনার এই লেনদেনের অ্যাডজাস্টমেন্ট পরিবর্তনের অনুমতি নেই।
               </p>
             </div>
           </div>
         )}
 
-        {/* Row 2: adjustment toggle — create mode only */}
-        {!isEditMode && canAdjustSource && (
+        {/* Row 2: adjustment toggle — available for both new and existing entries */}
+        {canAdjustSource && (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
             {/* Compact toggle row */}
             <button
               type="button"
               data-testid="button-toggle-adjustment"
-              onClick={() => { setIsTransferMode((v) => !v); setTransferPartyId(null); setTransferSearch(''); }}
+              onClick={handleToggleAdjustment}
               className="w-full h-11 flex items-center justify-between px-4 active:bg-slate-50 transition-colors"
             >
               <span className="flex items-center gap-2 text-sm font-semibold text-slate-700 min-w-0">
@@ -1050,6 +1109,9 @@ export function TransactionEntryScreen({
             {/* Counterparties of the source party's role — only when toggle is ON */}
             {isTransferMode && (
               <div className="border-t border-slate-100 px-3 pb-3">
+                <p className="pt-2 text-[10px] font-medium text-blue-700">
+                  সংরক্ষণ করলে দুই পক্ষের খাতা একসাথে আপডেট হবে।
+                </p>
                 <input
                   value={transferSearch}
                   data-testid="input-adjustment-party-search"
@@ -1186,6 +1248,32 @@ export function TransactionEntryScreen({
                 )}
               >
                 হ্যাঁ, সংরক্ষণ করুন
+              </button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+      {isEditMode && initialEntry?.isTransfer && (
+        <AlertDialog open={showUnlinkConfirm} onOpenChange={setShowUnlinkConfirm}>
+          <AlertDialogContent className="max-w-sm rounded-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-slate-800">
+                অ্যাডজাস্টমেন্ট লিংক সরাবেন?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-slate-600">
+                লিংক সরালে অন্য পক্ষের খাতা থেকে মিলানো এন্ট্রিটি মুছে যাবে এবং দুই পক্ষের বাকি হিসাব আপডেট হবে।
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="font-bold">
+                না, লিংক রাখুন
+              </AlertDialogCancel>
+              <button
+                type="button"
+                onClick={confirmUnlinkAdjustment}
+                className="inline-flex items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-red-700"
+              >
+                হ্যাঁ, লিংক সরান
               </button>
             </AlertDialogFooter>
           </AlertDialogContent>

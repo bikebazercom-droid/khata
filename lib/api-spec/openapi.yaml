@@ -1551,6 +1551,12 @@ components:
         billImage: { type: ["string", "null"] }
         entryDate: { type: ["string", "null"], format: date }
         dueDate: { type: ["string", "null"], format: date }
+        isTransfer:
+          type: boolean
+          description: Whether this entry should be paired with another party's ledger entry.
+        transferPartyId:
+          type: ["string", "null"]
+          description: Required with isTransfer=true; set to null with isTransfer=false.
     DashboardSummary:
       type: object
       required:

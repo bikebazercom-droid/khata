@@ -3,8 +3,8 @@ name: Adjustment editing scope
 description: Product boundary for editing ledger adjustment entries.
 ---
 
-When editing an existing adjustment, let users recalculate its amount and update details, but keep the linked party fixed. Ordinary ledger entries remain ordinary; do not provide edit-time conversion, retargeting, or removal of an adjustment link unless the user changes this decision.
+The transaction edit screen must expose the same adjustment control as entry creation. Users may convert a regular entry to an adjustment, retarget an existing adjustment, or remove its link. Removing a link must confirm that the paired row will be deleted and both balances recalculated; the server must apply pair changes atomically and enforce same-business, same-role, and staff-grant checks.
 
-**Why:** The user chose to keep the linked party fixed while editing; linked entries represent one paired movement across two balances.
+**Why:** The user later changed the earlier fixed-party restriction and explicitly requested link, retarget, and adjustment controls while editing.
 
-**How to apply:** Show the existing linked party as read-only in edit mode and use pair-aware API updates so amount changes stay synchronized.
+**How to apply:** Keep the edit and create flows aligned. Treat the primary entry, counter-entry, and every affected party balance as one transaction; require confirmation before unlinking.

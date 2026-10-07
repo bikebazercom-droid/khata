@@ -34,72 +34,10 @@ import {
   SendPaymentReminderResponse,
   DeletePartyParams,
   DeletePartyResponse,
+  PatchLedgerEntryParams,
+  PatchLedgerEntryBody,
+  PatchLedgerEntryResponse,
 } from "@workspace/api-zod";
-// Inline validators for the PATCH ledger-entry route (not in OpenAPI spec).
-type PatchLedgerEntryParamsData = { partyId: string; entryId: string };
-type PatchLedgerEntryBodyData = {
-  amount?: number;
-  type?: "YOU_GAVE" | "YOU_GOT";
-  description?: string;
-  billReference?: string | null;
-  billImage?: string | null;
-  entryDate?: string | null;
-  dueDate?: string | null;
-};
-
-function isValidDateOnly(value: unknown): value is string {
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const parsed = new Date(`${value}T00:00:00.000Z`);
-  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
-}
-
-const PatchLedgerEntryParams = {
-  safeParse(v: unknown): { success: true; data: PatchLedgerEntryParamsData } | { success: false; error: { message: string } } {
-    const x = v as Record<string, unknown>;
-    if (typeof x?.partyId === "string" && typeof x?.entryId === "string") {
-      return { success: true, data: { partyId: x.partyId, entryId: x.entryId } };
-    }
-    return { success: false, error: { message: "partyId and entryId must be strings" } };
-  },
-};
-
-const PatchLedgerEntryBody = {
-  safeParse(v: unknown): { success: true; data: PatchLedgerEntryBodyData } | { success: false; error: { message: string } } {
-    const x = v as Record<string, unknown>;
-    if (typeof x !== "object" || x === null) return { success: false, error: { message: "body must be an object" } };
-    const allowed = new Set(["amount", "type", "description", "billReference", "billImage", "entryDate", "dueDate"]);
-    if (Object.keys(x).some((key) => !allowed.has(key))) {
-      return { success: false, error: { message: "body contains an unsupported field" } };
-    }
-    if (x.amount !== undefined && (typeof x.amount !== "number" || !Number.isFinite(x.amount) || x.amount <= 0)) {
-      return { success: false, error: { message: "amount must be a positive number" } };
-    }
-    if (x.type !== undefined && x.type !== "YOU_GAVE" && x.type !== "YOU_GOT") {
-      return { success: false, error: { message: "type must be YOU_GAVE or YOU_GOT" } };
-    }
-    if (x.description !== undefined && typeof x.description !== "string") {
-      return { success: false, error: { message: "description must be a string" } };
-    }
-    if (x.billReference !== undefined && x.billReference !== null && typeof x.billReference !== "string") {
-      return { success: false, error: { message: "billReference must be a string or null" } };
-    }
-    if (x.billImage !== undefined && x.billImage !== null) {
-      if (typeof x.billImage !== "string" || !x.billImage.startsWith("/objects/")) {
-        return { success: false, error: { message: "billImage must start with /objects/" } };
-      }
-    }
-    for (const field of ["entryDate", "dueDate"] as const) {
-      if (x[field] !== undefined && x[field] !== null && !isValidDateOnly(x[field])) {
-        return { success: false, error: { message: `${field} must be a valid ISO date` } };
-      }
-    }
-    return { success: true, data: x as PatchLedgerEntryBodyData };
-  },
-};
-
-const PatchLedgerEntryResponse = {
-  parse(v: unknown) { return v; },
-};
 
 // Owner grant edits/deletion lock the same user row. A staff write either
 // commits before revocation or sees the revoked grants; it cannot race past it.
@@ -194,6 +132,30 @@ import { type AuthenticatedRequest } from "../middlewares/requireAuth";
 const router: IRouter = Router();
 const isUuid = (value: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+
+function ledgerDelta(type: "YOU_GAVE" | "YOU_GOT", amount: number): number {
+  return type === "YOU_GAVE" ? amount : -amount;
+}
+
+function removeAdjustmentSuffix(description: string, partyName: string): string {
+  const suffix = ` — অ্যাডজাস্ট করা হয়েছে ${partyName}-এর সাথে`;
+  if (description.endsWith(suffix)) return description.slice(0, -suffix.length).trim();
+  const bareSuffix = `অ্যাডজাস্ট করা হয়েছে ${partyName}-এর সাথে`;
+  return description === bareSuffix ? "" : description;
+}
+
+function withAdjustmentSuffix(description: string, partyName: string): string {
+  const suffix = `অ্যাডজাস্ট করা হয়েছে ${partyName}-এর সাথে`;
+  const normalized = description.trim();
+  if (normalized === suffix || normalized.endsWith(` — ${suffix}`)) return normalized;
+  return normalized ? `${normalized} — ${suffix}` : suffix;
+}
+
+function isValidDateOnly(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
 
 // Grants authorize choosing a counterparty, never reading its ledger or balance.
 router.get("/adjustment-targets", async (req, res): Promise<void> => {
@@ -782,6 +744,28 @@ router.patch(
       res.status(400).json({ error: body.error.message });
       return;
     }
+    const rawBody = req.body as Record<string, unknown>;
+    const hasTransferMode = Object.prototype.hasOwnProperty.call(rawBody, "isTransfer");
+    const hasTransferParty = Object.prototype.hasOwnProperty.call(rawBody, "transferPartyId");
+    if (hasTransferMode !== hasTransferParty) {
+      res.status(400).json({ error: "isTransfer and transferPartyId must be provided together" });
+      return;
+    }
+    if (body.data.billImage != null && !body.data.billImage.startsWith("/objects/")) {
+      res.status(400).json({ error: "billImage must start with /objects/" });
+      return;
+    }
+    if (hasTransferMode) {
+      const targetId = body.data.transferPartyId ?? null;
+      if (body.data.isTransfer === true && (!targetId || !isUuid(targetId))) {
+        res.status(400).json({ error: "A valid transferPartyId is required for an adjustment" });
+        return;
+      }
+      if (body.data.isTransfer === false && targetId !== null) {
+        res.status(400).json({ error: "transferPartyId must be null when isTransfer is false" });
+        return;
+      }
+    }
 
     // Fetch the full party row — needed for balance recalculation when the
     // amount or direction changes, and for ownership verification.
@@ -815,177 +799,285 @@ router.patch(
       return;
     }
 
-    // A transfer's two ledger rows must change together. Never update only one
-    // amount/direction or its counterparty balance would diverge permanently.
-    if (entry.isTransfer && (
-      body.data.amount !== undefined ||
-      body.data.type !== undefined ||
-      body.data.entryDate !== undefined
-    )) {
-      const updatedPair = await db.transaction(async (tx) => {
-        if (!entry.transferPartyId || !entry.linkedEntryId) return null;
-        if (!(await actorCanWrite(tx, role, userId, businessId, party.id, entry.transferPartyId))) {
-          return { denied: true } as const;
-        }
-        const locked = await tx.select().from(partiesTable).where(and(
-          eq(partiesTable.businessId, businessId),
-          inArray(partiesTable.id, [party.id, entry.transferPartyId]),
-        )).orderBy(partiesTable.id).for("update");
-        if (locked.length !== 2) return null;
-        const [current] = await tx.select().from(ledgerEntriesTable)
-          .where(and(eq(ledgerEntriesTable.id, entry.id), eq(ledgerEntriesTable.partyId, party.id)))
-          .for("update").limit(1);
-        const [counter] = await tx.select().from(ledgerEntriesTable)
-          .where(and(eq(ledgerEntriesTable.id, entry.linkedEntryId), eq(ledgerEntriesTable.partyId, entry.transferPartyId)))
-          .for("update").limit(1);
-        if (!current || !counter || !current.isTransfer || !counter.isTransfer ||
-            current.linkedEntryId !== counter.id || counter.linkedEntryId !== current.id) return null;
-        const amount = body.data.amount ?? Number(current.amount);
-        const type = body.data.type ?? current.type;
-        const counterType = type === "YOU_GAVE" ? "YOU_GOT" : "YOU_GAVE";
-        const changed = {
-          ...(body.data.amount !== undefined ? { amount: amount.toFixed(2) } : {}),
-          ...(body.data.type !== undefined ? { type } : {}),
-          ...(body.data.description !== undefined ? { description: body.data.description } : {}),
-          ...(body.data.billReference !== undefined ? { billReference: body.data.billReference || null } : {}),
-          ...(body.data.billImage !== undefined ? { billImage: body.data.billImage } : {}),
-          ...(body.data.entryDate ? { createdAt: new Date(`${body.data.entryDate}T00:00:00.000Z`) } : {}),
-          ...(body.data.dueDate !== undefined ? { dueDate: body.data.dueDate || null } : {}),
-        };
-        const [saved] = await tx.update(ledgerEntriesTable).set(changed)
-          .where(eq(ledgerEntriesTable.id, current.id)).returning();
-        await tx.update(ledgerEntriesTable).set({
-          amount: amount.toFixed(2),
-          type: counterType,
-          ...(body.data.entryDate ? { createdAt: new Date(`${body.data.entryDate}T00:00:00.000Z`) } : {}),
-        })
-          .where(eq(ledgerEntriesTable.id, counter.id));
-        for (const row of locked) {
-          const oldEntry = row.id === party.id ? current : counter;
-          const nextType = row.id === party.id ? type : counterType;
-          const previousDelta = oldEntry.type === "YOU_GAVE" ? Number(oldEntry.amount) : -Number(oldEntry.amount);
-          const nextDelta = nextType === "YOU_GAVE" ? amount : -amount;
-          await tx.update(partiesTable).set(fromSignedBalance(
-            toSignedBalance(row) - previousDelta + nextDelta,
-          )).where(eq(partiesTable.id, row.id));
-        }
-        return { saved: saved!, counterId: counter.id, counterPartyId: counter.partyId,
-          oldBillImage: current.billImage };
-      });
-      if (!updatedPair) { res.status(409).json({ error: "Linked adjustment is unavailable" }); return; }
-      if ("denied" in updatedPair) { res.status(403).json({ error: "Adjustment access was revoked" }); return; }
-      if (body.data.billImage !== undefined && updatedPair.oldBillImage &&
-          updatedPair.oldBillImage !== body.data.billImage && updatedPair.oldBillImage.startsWith("/objects/")) {
-        new ObjectStorageService().deleteObjectEntity(updatedPair.oldBillImage).catch((err: unknown) =>
-          req.log?.error({ err }, "Failed to delete replaced adjustment bill photo"));
-      }
-      broadcast(businessId, { type: "ledger.updated", payload: { partyId: party.id, entryId: entry.id } });
-      broadcast(businessId, { type: "ledger.updated",
-        payload: { partyId: updatedPair.counterPartyId, entryId: updatedPair.counterId } });
-      res.json(PatchLedgerEntryResponse.parse({ ...updatedPair.saved, amount: Number(updatedPair.saved.amount) }));
+    const hasTransferState = hasTransferMode && hasTransferParty;
+    const desiredIsTransfer = hasTransferState ? body.data.isTransfer! : entry.isTransfer;
+    const desiredTransferPartyId = hasTransferState
+      ? (body.data.isTransfer ? body.data.transferPartyId ?? null : null)
+      : (entry.isTransfer ? entry.transferPartyId : null);
+    if (hasTransferState && desiredIsTransfer && desiredTransferPartyId === party.id) {
+      res.status(400).json({ error: "An adjustment must link to a different party" });
       return;
     }
 
-    // Build the update set from only the fields provided in the body.
-    // Fields omitted by the caller are left untouched in the database.
-    const updateSet: Partial<{
-      billImage: string | null;
-      billReference: string | null;
-      createdAt: Date;
-      amount: string;
-      type: "YOU_GAVE" | "YOU_GOT";
-      description: string;
-      dueDate: string | null;
-    }> = {};
+    const partyIdsToLock = Array.from(new Set([
+      party.id,
+      ...(entry.isTransfer && entry.transferPartyId ? [entry.transferPartyId] : []),
+      ...(desiredIsTransfer && desiredTransferPartyId ? [desiredTransferPartyId] : []),
+    ]));
 
-    if (body.data.billImage !== undefined) updateSet.billImage = body.data.billImage;
-    if (body.data.billReference !== undefined) updateSet.billReference = body.data.billReference;
-    if (body.data.amount    !== undefined) updateSet.amount    = body.data.amount.toFixed(2);
-    if (body.data.type      !== undefined) updateSet.type      = body.data.type;
-    if (body.data.description !== undefined) updateSet.description = body.data.description;
-    if (body.data.dueDate   !== undefined) updateSet.dueDate   = body.data.dueDate || null;
-    if (body.data.entryDate) updateSet.createdAt = new Date(`${body.data.entryDate}T00:00:00.000Z`);
-
+    // A linked adjustment is one financial operation. Create, retarget, edit,
+    // or remove both sides and all affected balances inside the same transaction.
     const mutation = await db.transaction(async (tx) => {
-      if (!(await actorCanWrite(tx, role, userId, businessId, party.id))) {
+      const oldTargetId = entry.isTransfer ? entry.transferPartyId ?? undefined : undefined;
+      if (!(await actorCanWrite(tx, role, userId, businessId, party.id, oldTargetId))) {
+        return { status: "denied" } as const;
+      }
+      if (desiredIsTransfer && desiredTransferPartyId &&
+          desiredTransferPartyId !== oldTargetId &&
+          !(await actorCanWrite(tx, role, userId, businessId, party.id, desiredTransferPartyId))) {
         return { status: "denied" } as const;
       }
 
-      const [currentParty] = await tx.select().from(partiesTable).where(and(
-        eq(partiesTable.id, party.id),
+      const lockedParties = await tx.select().from(partiesTable).where(and(
         eq(partiesTable.businessId, businessId),
-      )).for("update").limit(1);
+        inArray(partiesTable.id, partyIdsToLock),
+      )).orderBy(partiesTable.id).for("update");
+      if (lockedParties.length !== partyIdsToLock.length) {
+        return { status: "party_missing" } as const;
+      }
+      const currentParty = lockedParties.find((row) => row.id === party.id);
+      if (!currentParty) return { status: "missing" } as const;
+
       const [currentEntry] = await tx.select().from(ledgerEntriesTable).where(and(
         eq(ledgerEntriesTable.id, params.data.entryId),
         eq(ledgerEntriesTable.partyId, party.id),
       )).for("update").limit(1);
-      if (!currentParty || !currentEntry) return { status: "missing" } as const;
-
-      const [saved] = await tx.update(ledgerEntriesTable)
-        .set(updateSet)
-        .where(and(
-          eq(ledgerEntriesTable.id, params.data.entryId),
-          eq(ledgerEntriesTable.partyId, party.id),
-        ))
-        .returning();
-      if (!saved) return { status: "missing" } as const;
-
-      if (body.data.amount !== undefined || body.data.type !== undefined) {
-        const oldAmount = Number(currentEntry.amount);
-        const newAmount = body.data.amount ?? oldAmount;
-        const oldType = currentEntry.type as "YOU_GAVE" | "YOU_GOT";
-        const newType = body.data.type ?? oldType;
-        const oldDelta = oldType === "YOU_GAVE" ? oldAmount : -oldAmount;
-        const newDelta = newType === "YOU_GAVE" ? newAmount : -newAmount;
-        const nextSigned = toSignedBalance(currentParty) - oldDelta + newDelta;
-        await tx.update(partiesTable)
-          .set(fromSignedBalance(nextSigned))
-          .where(eq(partiesTable.id, party.id));
+      if (!currentEntry) return { status: "missing" } as const;
+      if (currentEntry.isTransfer !== entry.isTransfer ||
+          currentEntry.transferPartyId !== entry.transferPartyId ||
+          currentEntry.linkedEntryId !== entry.linkedEntryId) {
+        return { status: "conflict" } as const;
       }
 
-      return { status: "updated", updated: saved, oldBillImage: currentEntry.billImage } as const;
+      const currentTargetId = currentEntry.isTransfer ? currentEntry.transferPartyId : null;
+      const currentTarget = currentTargetId
+        ? lockedParties.find((row) => row.id === currentTargetId)
+        : undefined;
+      const nextTarget = desiredIsTransfer && desiredTransferPartyId
+        ? lockedParties.find((row) => row.id === desiredTransferPartyId)
+        : undefined;
+      if (currentEntry.isTransfer && (!currentTargetId || !currentEntry.linkedEntryId || !currentTarget)) {
+        return { status: "broken_link" } as const;
+      }
+      if (currentTarget && currentTarget.role !== currentParty.role) {
+        return { status: "broken_link" } as const;
+      }
+      if (desiredIsTransfer && (!desiredTransferPartyId || !nextTarget)) {
+        return { status: "party_missing" } as const;
+      }
+      if (nextTarget && nextTarget.role !== currentParty.role) {
+        return { status: "role_mismatch" } as const;
+      }
+
+      let currentCounter: typeof ledgerEntriesTable.$inferSelect | undefined;
+      if (currentEntry.isTransfer) {
+        const [counter] = await tx.select().from(ledgerEntriesTable).where(and(
+          eq(ledgerEntriesTable.id, currentEntry.linkedEntryId!),
+          eq(ledgerEntriesTable.partyId, currentTargetId!),
+        )).for("update").limit(1);
+        const oppositeType = currentEntry.type === "YOU_GAVE" ? "YOU_GOT" : "YOU_GAVE";
+        if (!counter || !counter.isTransfer ||
+            counter.transferPartyId !== currentParty.id ||
+            counter.linkedEntryId !== currentEntry.id ||
+            counter.type !== oppositeType ||
+            Number(counter.amount) !== Number(currentEntry.amount)) {
+          return { status: "broken_link" } as const;
+        }
+        currentCounter = counter;
+      }
+
+      const amount = Number((body.data.amount ?? Number(currentEntry.amount)).toFixed(2));
+      const amountText = amount.toFixed(2);
+      const type = body.data.type ?? currentEntry.type;
+      const counterType = type === "YOU_GAVE" ? "YOU_GOT" : "YOU_GAVE";
+      const transferStateChanged = desiredIsTransfer !== currentEntry.isTransfer ||
+        desiredTransferPartyId !== currentTargetId;
+      const submittedDescription = body.data.description ?? currentEntry.description;
+      let description = submittedDescription;
+      if (desiredIsTransfer && nextTarget && (transferStateChanged || body.data.description !== undefined)) {
+        const baseDescription = currentTarget
+          ? removeAdjustmentSuffix(submittedDescription, currentTarget.name)
+          : submittedDescription;
+        description = withAdjustmentSuffix(baseDescription, nextTarget.name);
+      } else if (!desiredIsTransfer && currentTarget) {
+        description = removeAdjustmentSuffix(submittedDescription, currentTarget.name);
+      }
+
+      const createdAt = body.data.entryDate
+        ? new Date(`${body.data.entryDate.toISOString().slice(0, 10)}T00:00:00.000Z`)
+        : currentEntry.createdAt;
+      const dueDate = body.data.dueDate === undefined
+        ? currentEntry.dueDate
+        : body.data.dueDate === null
+          ? null
+          : body.data.dueDate.toISOString().slice(0, 10);
+      const nextBillImage = body.data.billImage !== undefined
+        ? body.data.billImage
+        : currentEntry.billImage;
+      const nextBillReference = body.data.billReference !== undefined
+        ? body.data.billReference
+        : currentEntry.billReference;
+
+      let counterId = currentCounter?.id ?? null;
+      if (desiredIsTransfer && !currentEntry.isTransfer && nextTarget && desiredTransferPartyId) {
+        const [createdCounter] = await tx.insert(ledgerEntriesTable).values({
+          partyId: desiredTransferPartyId,
+          createdByUserId: isUuid(userId) ? userId : null,
+          type: counterType,
+          amount: amountText,
+          description: `অ্যাডজাস্ট করা হয়েছে ${currentParty.name}-এর সাথে`,
+          createdAt,
+          dueDate,
+          isTransfer: true,
+          transferPartyId: currentParty.id,
+          linkedEntryId: currentEntry.id,
+        }).returning();
+        if (!createdCounter) return { status: "missing" } as const;
+        counterId = createdCounter.id;
+      } else if (desiredIsTransfer && currentCounter && nextTarget && desiredTransferPartyId) {
+        await tx.update(ledgerEntriesTable).set({
+          partyId: desiredTransferPartyId,
+          type: counterType,
+          amount: amountText,
+          description: `অ্যাডজাস্ট করা হয়েছে ${currentParty.name}-এর সাথে`,
+          createdAt,
+          dueDate,
+          isTransfer: true,
+          transferPartyId: currentParty.id,
+          linkedEntryId: currentEntry.id,
+        }).where(eq(ledgerEntriesTable.id, currentCounter.id));
+      }
+
+      const [saved] = await tx.update(ledgerEntriesTable).set({
+        amount: amountText,
+        type,
+        description,
+        billImage: nextBillImage,
+        billReference: nextBillReference,
+        createdAt,
+        dueDate,
+        isTransfer: desiredIsTransfer,
+        transferPartyId: desiredIsTransfer ? desiredTransferPartyId : null,
+        linkedEntryId: desiredIsTransfer ? counterId : null,
+      }).where(and(
+        eq(ledgerEntriesTable.id, currentEntry.id),
+        eq(ledgerEntriesTable.partyId, currentParty.id),
+      )).returning();
+      if (!saved) return { status: "missing" } as const;
+
+      if (currentCounter && !desiredIsTransfer) {
+        await redactDeletedEntryReceipts(tx, businessId, [currentCounter.id]);
+        await tx.delete(ledgerEntriesTable).where(eq(ledgerEntriesTable.id, currentCounter.id));
+      }
+
+      const balanceDeltas = new Map<string, number>();
+      const addBalanceDelta = (partyId: string, delta: number) => {
+        balanceDeltas.set(partyId, (balanceDeltas.get(partyId) ?? 0) + delta);
+      };
+      addBalanceDelta(
+        currentParty.id,
+        -ledgerDelta(currentEntry.type, Number(currentEntry.amount)) + ledgerDelta(type, amount),
+      );
+      if (currentCounter && currentTargetId) {
+        addBalanceDelta(currentTargetId, -ledgerDelta(currentCounter.type, Number(currentCounter.amount)));
+      }
+      if (desiredIsTransfer && desiredTransferPartyId) {
+        addBalanceDelta(desiredTransferPartyId, ledgerDelta(counterType, amount));
+      }
+      const now = new Date();
+      for (const lockedParty of lockedParties) {
+        const delta = balanceDeltas.get(lockedParty.id) ?? 0;
+        if (delta !== 0) {
+          await tx.update(partiesTable).set({
+            ...fromSignedBalance(toSignedBalance(lockedParty) + delta),
+            lastTransactionAt: now,
+          }).where(eq(partiesTable.id, lockedParty.id));
+        }
+      }
+
+      return {
+        status: "updated",
+        saved,
+        oldBillImage: currentEntry.billImage,
+        removedCounterBillImage: currentCounter && !desiredIsTransfer ? currentCounter.billImage : null,
+        oldTargetId: currentTargetId,
+        newTargetId: desiredIsTransfer ? desiredTransferPartyId : null,
+        counterId,
+        counterCreated: desiredIsTransfer && !currentEntry.isTransfer,
+        counterRemoved: Boolean(currentCounter && !desiredIsTransfer),
+        counterMoved: Boolean(currentCounter && desiredIsTransfer && currentTargetId !== desiredTransferPartyId),
+      } as const;
     });
+
     if (mutation.status === "denied") {
-      res.status(403).json({ error: "Party access was revoked" });
+      res.status(403).json({ error: "Adjustment access was revoked or is not permitted" });
       return;
     }
     if (mutation.status === "missing") {
-      res.status(404).json({ error: "Entry not found" });
+      res.status(404).json({ error: "Entry or party not found" });
       return;
     }
-    const updated = mutation.updated;
+    if (mutation.status === "party_missing") {
+      res.status(403).json({ error: "Adjustment party is unavailable" });
+      return;
+    }
+    if (mutation.status === "role_mismatch") {
+      res.status(400).json({ error: "Adjustment parties must have the same role" });
+      return;
+    }
+    if (mutation.status === "broken_link") {
+      res.status(409).json({ error: "Linked adjustment is unavailable or inconsistent" });
+      return;
+    }
+    if (mutation.status === "conflict") {
+      res.status(409).json({ error: "This entry changed while it was being edited; reload and try again" });
+      return;
+    }
 
-    // If billImage was replaced or nulled out, delete the superseded object
-    // from storage.  We do this after the DB update so a storage failure cannot
-    // leave the database in an inconsistent state.  The deletion is attempted
-    // fire-and-forget so a storage error never blocks the PATCH response.
-    const billImageReplaced =
-      body.data.billImage !== undefined &&          // caller sent billImage
-      mutation.oldBillImage !== null &&              // entry previously had a photo
-      mutation.oldBillImage !== body.data.billImage && // the value actually changed
-      mutation.oldBillImage.startsWith("/objects/"); // it is a managed object path
-
-    if (billImageReplaced) {
-      const storageService = new ObjectStorageService();
-      storageService.deleteObjectEntity(mutation.oldBillImage!).catch((err: unknown) => {
-        req.log?.error(
-          { err, objectPath: mutation.oldBillImage },
-          "Failed to delete superseded bill photo from storage during entry patch",
-        );
+    const storageService = new ObjectStorageService();
+    const imagesToDelete = new Set<string>();
+    if (body.data.billImage !== undefined && mutation.oldBillImage &&
+        mutation.oldBillImage !== body.data.billImage && mutation.oldBillImage.startsWith("/objects/")) {
+      imagesToDelete.add(mutation.oldBillImage);
+    }
+    if (mutation.removedCounterBillImage?.startsWith("/objects/")) {
+      imagesToDelete.add(mutation.removedCounterBillImage);
+    }
+    for (const objectPath of imagesToDelete) {
+      storageService.deleteObjectEntity(objectPath).catch((err: unknown) => {
+        req.log?.error({ err, objectPath }, "Failed to delete superseded bill photo during entry patch");
       });
     }
 
     broadcast(businessId, {
       type: "ledger.updated",
-      payload: { partyId: params.data.partyId, entryId: params.data.entryId },
+      payload: { partyId: party.id, entryId: params.data.entryId },
     });
+    if (mutation.oldTargetId && mutation.counterId) {
+      if (mutation.counterRemoved || mutation.counterMoved) {
+        broadcast(businessId, {
+          type: "ledger.deleted",
+          payload: { partyId: mutation.oldTargetId, entryId: mutation.counterId },
+        });
+      } else {
+        broadcast(businessId, {
+          type: "ledger.updated",
+          payload: { partyId: mutation.oldTargetId, entryId: mutation.counterId },
+        });
+      }
+    }
+    if (mutation.newTargetId && mutation.counterId && (mutation.counterCreated || mutation.counterMoved)) {
+      broadcast(businessId, {
+        type: "ledger.created",
+        payload: { partyId: mutation.newTargetId, entryId: mutation.counterId },
+      });
+    }
 
-    res.json(
-      PatchLedgerEntryResponse.parse({
-        ...updated,
-        amount: Number(updated!.amount),
-      }),
-    );
+    res.json(PatchLedgerEntryResponse.parse({
+      ...mutation.saved,
+      amount: Number(mutation.saved.amount),
+      ...(role === "staff" ? { linkedEntryId: null } : {}),
+    }));
   },
 );
 

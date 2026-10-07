@@ -585,7 +585,9 @@ export const PatchLedgerEntryBody = zod.object({
   "billReference": zod.string().nullish(),
   "billImage": zod.string().nullish(),
   "entryDate": zod.coerce.date().nullish(),
-  "dueDate": zod.coerce.date().nullish()
+  "dueDate": zod.coerce.date().nullish(),
+  "isTransfer": zod.boolean().optional().describe('Whether this entry should be paired with another party\'s ledger entry.'),
+  "transferPartyId": zod.string().nullish().describe('Required with isTransfer=true; set to null with isTransfer=false.')
 })
 
 export const PatchLedgerEntryResponse = zod.object({

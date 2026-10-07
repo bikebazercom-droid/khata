@@ -353,6 +353,13 @@ export interface LedgerEntryPatch {
   entryDate?: string | null;
   /** @nullable */
   dueDate?: string | null;
+  /** Whether this entry should be paired with another party's ledger entry. */
+  isTransfer?: boolean;
+  /**
+     * Required with isTransfer=true; set to null with isTransfer=false.
+     * @nullable
+     */
+  transferPartyId?: string | null;
 }
 
 export interface DashboardSummary {

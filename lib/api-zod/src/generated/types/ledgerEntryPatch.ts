@@ -20,4 +20,11 @@ export interface LedgerEntryPatch {
   entryDate?: Date | null;
   /** @nullable */
   dueDate?: Date | null;
+  /** Whether this entry should be paired with another party's ledger entry. */
+  isTransfer?: boolean;
+  /**
+     * Required with isTransfer=true; set to null with isTransfer=false.
+     * @nullable
+     */
+  transferPartyId?: string | null;
 }

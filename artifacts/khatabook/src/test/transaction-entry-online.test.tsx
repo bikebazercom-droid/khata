@@ -116,7 +116,7 @@ function makeLedgerEntry(overrides: Record<string, unknown> = {}) {
   } as NonNullable<React.ComponentProps<typeof TransactionEntryScreen>['initialEntry']>;
 }
 
-function renderEditEntry(initialEntry = makeLedgerEntry(), adjustmentPartyName?: string) {
+function renderEditEntry(initialEntry = makeLedgerEntry()) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -130,7 +130,6 @@ function renderEditEntry(initialEntry = makeLedgerEntry(), adjustmentPartyName?:
         partyId={PARTY_ID}
         partyName="রহিম"
         partyRole={PartyRole.CUSTOMER}
-        adjustmentPartyName={adjustmentPartyName}
         type={initialEntry.type}
         initialEntry={initialEntry}
         onClose={onClose}
@@ -246,8 +245,22 @@ describe('browser ledger entry submission', () => {
     expect(amount.value).toBe('২০.২৫');
   });
 
-  it('edits an existing adjustment with the calculator while keeping its linked party fixed', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+  it('shows the full adjustment control and retargets an existing adjustment', async () => {
+    mocks.useListAdjustmentTargets.mockReturnValue({
+      data: [
+        { id: 'target-party', name: 'করিম', role: PartyRole.CUSTOMER },
+        { id: 'other-target', name: 'সালমা', role: PartyRole.CUSTOMER },
+      ],
+    });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => makeLedgerEntry({
+        amount: 250,
+        isTransfer: true,
+        transferPartyId: 'other-target',
+        linkedEntryId: 'counter-entry',
+      }),
+    });
     vi.stubGlobal('fetch', fetchMock);
     const { onClose } = renderEditEntry(
       makeLedgerEntry({
@@ -255,12 +268,12 @@ describe('browser ledger entry submission', () => {
         transferPartyId: 'target-party',
         linkedEntryId: 'counter-entry',
       }),
-      'করিম',
     );
 
-    expect(screen.getByTestId('edit-adjustment-summary')).toHaveTextContent('করিম');
-    expect(screen.getByTestId('edit-adjustment-summary')).toHaveTextContent('দুই খাতাই আপডেট হবে');
-    expect(screen.queryByTestId('button-toggle-adjustment')).not.toBeInTheDocument();
+    expect(screen.getByTestId('button-toggle-adjustment')).toBeInTheDocument();
+    expect(screen.getByTestId('input-adjustment-party-search')).toBeInTheDocument();
+    expect(screen.getByTestId('button-adjustment-party-target-party')).toBeInTheDocument();
+    expect(screen.getByTestId('button-adjustment-party-other-target')).toBeInTheDocument();
     expect(screen.getByTestId('calculator-key-M+')).toBeInTheDocument();
     expect(screen.getByTestId('calculator-key-M-')).toBeInTheDocument();
     expect(screen.getByTestId('calculator-live-display')).toHaveTextContent('১০০ = ১০০');
@@ -269,24 +282,84 @@ describe('browser ledger entry submission', () => {
       target: { value: '200+50' },
     });
     expect(screen.getByTestId('calculator-live-display')).toHaveTextContent('২০০+৫০ = ২৫০');
+    fireEvent.click(screen.getByTestId('button-adjustment-party-other-target'));
 
     fireEvent.click(screen.getByRole('button', { name: 'সংরক্ষণ করুন' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
 
     const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
     const body = JSON.parse(String(request.body));
-    expect(body).toMatchObject({ amount: 250, type: LedgerEntryType.YOU_GAVE });
-    expect(body).not.toHaveProperty('isTransfer');
-    expect(body).not.toHaveProperty('transferPartyId');
+    expect(body).toMatchObject({
+      amount: 250,
+      type: LedgerEntryType.YOU_GAVE,
+      isTransfer: true,
+      transferPartyId: 'other-target',
+    });
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it('keeps a regular transaction regular while editing', () => {
+  it('lets a regular transaction become an adjustment while editing', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => makeLedgerEntry({
+        isTransfer: true,
+        transferPartyId: 'target-party',
+        linkedEntryId: 'counter-entry',
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
     renderEditEntry();
-    expect(screen.queryByTestId('edit-adjustment-summary')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('button-toggle-adjustment')).not.toBeInTheDocument();
+
+    expect(screen.getByTestId('button-toggle-adjustment')).toBeInTheDocument();
+    expect(screen.queryByTestId('input-adjustment-party-search')).not.toBeInTheDocument();
     expect(screen.getByTestId('calculator-key-M+')).toBeInTheDocument();
     expect(screen.getByTestId('calculator-live-display')).toHaveTextContent('১০০ = ১০০');
+    fireEvent.click(screen.getByTestId('button-toggle-adjustment'));
+    fireEvent.click(screen.getByTestId('button-adjustment-party-target-party'));
+    fireEvent.click(screen.getByRole('button', { name: 'সংরক্ষণ করুন' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(JSON.parse(String(request.body))).toMatchObject({
+      isTransfer: true,
+      transferPartyId: 'target-party',
+    });
+  });
+
+  it('confirms before unlinking an existing adjustment and sends the paired removal state', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => makeLedgerEntry({
+        isTransfer: false,
+        transferPartyId: null,
+        linkedEntryId: null,
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderEditEntry(makeLedgerEntry({
+      isTransfer: true,
+      transferPartyId: 'target-party',
+      linkedEntryId: 'counter-entry',
+    }));
+
+    fireEvent.click(screen.getByTestId('button-toggle-adjustment'));
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(
+      'অন্য পক্ষের খাতা থেকে মিলানো এন্ট্রিটি মুছে যাবে',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'না, লিংক রাখুন' }));
+    expect(screen.getByTestId('input-adjustment-party-search')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('button-toggle-adjustment'));
+    fireEvent.click(screen.getByRole('button', { name: 'হ্যাঁ, লিংক সরান' }));
+    expect(screen.queryByTestId('input-adjustment-party-search')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'সংরক্ষণ করুন' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(JSON.parse(String(request.body))).toMatchObject({
+      isTransfer: false,
+      transferPartyId: null,
+    });
   });
 
   it('plays a tap sound for keypad presses and the MRC control', () => {
