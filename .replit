@@ -21,4 +21,4 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
-packages = ["jdk17", "jdk24"]
+packages = ["freetype", "gumbo", "harfbuzz", "jbig2dec", "jdk17", "jdk24", "libjpeg_turbo", "mupdf", "openjpeg", "swig", "xcbuild"]
