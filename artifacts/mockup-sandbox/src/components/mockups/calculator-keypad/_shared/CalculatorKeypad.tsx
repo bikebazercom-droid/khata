@@ -56,10 +56,10 @@ function Key({
         willChange: 'background-color',
       }}
       className={[
-        'h-14 font-bold text-lg flex items-center justify-center transition-[background-color,transform] duration-[50ms] ease-out select-none',
+        'font-bold flex items-center justify-center transition-[background-color,transform] duration-[50ms] ease-out select-none',
         isReference
-          ? `rounded-[5px] ${referenceShadow} active:scale-[0.98] active:brightness-95`
-          : 'rounded-xl active:scale-[0.95]',
+          ? `h-11 text-base rounded-[5px] ${referenceShadow} active:scale-[0.98] active:brightness-95`
+          : 'h-14 text-lg rounded-xl active:scale-[0.95]',
         !isReference && 'active:bg-[#4A3C31] active:text-white active:shadow-none',
         keyKind === 'digit' && `bg-white text-slate-800 ${isReference ? referenceShadow : 'shadow-sm'}`,
         keyKind === 'muted' && (isReference
@@ -93,12 +93,15 @@ export function CalculatorKeypad({ variant }: { variant: Variant }) {
   const rowGap = variant === 'reference-matched' ? 'space-y-1.5' : 'space-y-2';
   const gridGap = variant === 'reference-matched' ? 'gap-1.5' : 'gap-2';
   const padding = variant === 'reference-matched'
-    ? 'pt-2.5 pr-2.5 pl-2.5 pb-4'
+    ? 'pt-2 pr-2 pl-2 pb-2'
     : 'pt-3 pr-3 pl-3 pb-4';
+  const compactContainer = variant === 'reference-matched'
+    ? 'max-h-[min(52dvh,22rem)] overflow-y-auto'
+    : '';
 
   return (
     <div
-      className={`w-full bg-[#eef2f7] ${padding} ${rowGap} shrink-0`}
+      className={`w-full bg-[#eef2f7] ${padding} ${rowGap} ${compactContainer} shrink-0`}
       style={{ transform: 'translate3d(0,0,0)', backfaceVisibility: 'hidden' }}
     >
       <div

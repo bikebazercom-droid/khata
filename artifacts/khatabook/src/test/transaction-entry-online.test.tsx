@@ -245,6 +245,8 @@ describe('browser ledger entry submission', () => {
     const mutedKeys = ['C', 'M+', 'M-', 'DEL', '/', '%', '*'];
     for (const value of mutedKeys) {
       expect(screen.getByTestId(`calculator-key-${value}`)).toHaveClass(
+        'h-11',
+        'text-base',
         'rounded-[5px]',
         shadowClass,
         'bg-[#cbdced]',
@@ -253,6 +255,8 @@ describe('browser ledger entry submission', () => {
 
     for (const digit of [...'0123456789', '=']) {
       expect(screen.getByTestId(`calculator-key-${digit}`)).toHaveClass(
+        'h-11',
+        'text-base',
         'rounded-[5px]',
         shadowClass,
         'bg-white',
@@ -261,6 +265,8 @@ describe('browser ledger entry submission', () => {
 
     for (const value of ['-', '+']) {
       expect(screen.getByTestId(`calculator-key-${value}`)).toHaveClass(
+        'h-11',
+        'text-base',
         'rounded-[5px]',
         shadowClass,
         'bg-[#0d55ad]',
@@ -280,6 +286,13 @@ describe('browser ledger entry submission', () => {
       expect(row?.children).toHaveLength(4);
     }
     expect(expectedGridRows[1]?.parentElement).toHaveClass('space-y-1.5');
+    expect(expectedGridRows[0]?.parentElement).toHaveClass(
+      'max-h-[min(52dvh,22rem)]',
+      'overflow-y-auto',
+      'pt-2',
+      'pr-2',
+      'pl-2',
+    );
 
     const splitOperatorCell = screen.getByTestId('calculator-key-/').parentElement;
     expect(splitOperatorCell).toHaveClass('flex', 'min-w-0', 'gap-1.5');

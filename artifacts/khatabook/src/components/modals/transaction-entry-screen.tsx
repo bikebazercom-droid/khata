@@ -124,7 +124,7 @@ const Key = memo(function Key({
         willChange: 'background-color',
       }}
       className={cn(
-        'h-14 rounded-[5px] shadow-[0_2px_4px_rgba(0,0,0,0.15)] font-bold text-lg flex items-center justify-center active:scale-[0.95] transition-[background-color,transform,filter] duration-[50ms] ease-out select-none',
+        'h-11 rounded-[5px] shadow-[0_2px_4px_rgba(0,0,0,0.15)] font-bold text-base flex items-center justify-center active:scale-[0.95] transition-[background-color,transform,filter] duration-[50ms] ease-out select-none',
         // CSS-only press feedback keeps taps responsive without repainting
         // the rest of the calculator grid.
         'active:brightness-95',
@@ -1176,7 +1176,7 @@ export function TransactionEntryScreen({
           compositor layer so key presses never trigger a main-thread paint
           of the whole grid on low-end mobile devices. */}
       <div
-        className="pt-2.5 pr-2.5 pl-2.5 pb-[calc(1rem+var(--safe-bottom))] space-y-1.5 shrink-0 bg-[#eef2f7]"
+        className="max-h-[min(52dvh,22rem)] overflow-y-auto pt-2 pr-2 pl-2 pb-[calc(0.5rem+var(--safe-bottom))] space-y-1.5 shrink-0 bg-[#eef2f7]"
         style={{ transform: 'translate3d(0,0,0)', backfaceVisibility: 'hidden' }}
       >
         {/* MRC bar: shown whenever the memory history has at least one
@@ -1190,7 +1190,7 @@ export function TransactionEntryScreen({
               playCalculatorTapSound();
               handleMrcTap();
             }}
-            className="w-full h-12 rounded-[5px] shadow-[0_2px_4px_rgba(0,0,0,0.15)] bg-[#0d55ad] text-white font-extrabold text-base flex items-center justify-center active:scale-[0.98] active:brightness-95 transition-[background-color,transform,filter] duration-[50ms] ease-out"
+            className="w-full h-10 rounded-[5px] shadow-[0_2px_4px_rgba(0,0,0,0.15)] bg-[#0d55ad] text-white font-extrabold text-sm flex items-center justify-center active:scale-[0.98] active:brightness-95 transition-[background-color,transform,filter] duration-[50ms] ease-out"
           >
             MRC = {formatCurrency(memoryValue)}
           </button>
