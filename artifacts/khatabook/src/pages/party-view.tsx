@@ -57,8 +57,8 @@ function entryDateKey(entry: { dueDate: string | null; createdAt: string | Date 
 }
 
 function currencyAmountColumnWidth(viewportWidth: number): number {
-  if (viewportWidth < 380) return 72;
-  if (viewportWidth < 480) return 80;
+  if (viewportWidth < 380) return 80;
+  if (viewportWidth < 480) return 88;
   return 96;
 }
 
@@ -78,7 +78,7 @@ function balanceBadgeFontSize(value: string, availableWidth: number): string {
   const estimatedWidthInEm = Array.from(value).reduce((width, character) => {
     if (character === '৳') return width + 0.9;
     if (character === ',' || character === '.') return width + 0.35;
-    if (/\d/.test(character)) return width + 0.68;
+    if (/[0-9০-৯]/.test(character)) return width + 0.68;
     if (/\s/.test(character)) return width + 0.3;
     return width + 0.55;
   }, 0);
@@ -525,7 +525,7 @@ export function PartyView() {
         ) : (
           <>
             {/* Column headers */}
-            <div className="sticky top-0 z-[5] grid grid-cols-[minmax(0,1fr)_4.5rem_4.5rem] min-[380px]:grid-cols-[minmax(0,1fr)_5rem_5rem] min-[480px]:grid-cols-[minmax(0,1fr)_6rem_6rem] bg-[#F5F6F8] px-1.5 py-2 text-[8px] font-bold uppercase tracking-wider text-slate-500 min-[480px]:px-3 min-[480px]:text-[10px]">
+            <div className="sticky top-0 z-[5] grid grid-cols-[minmax(0,1fr)_5rem_5rem] min-[380px]:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] min-[480px]:grid-cols-[minmax(0,1fr)_6rem_6rem] bg-[#F5F6F8] px-1.5 py-2 text-[8px] font-bold uppercase tracking-wider text-slate-500 min-[480px]:px-3 min-[480px]:text-[10px]">
               <span>এন্ট্রি</span>
               <span className="min-w-0 px-1 text-center leading-tight">আপনি দিয়েছেন</span>
               <span className="min-w-0 px-1 text-right leading-tight">আপনি পেয়েছেন</span>
@@ -563,7 +563,7 @@ export function PartyView() {
                           if (userRole === 'owner' && e.key === 'Enter') navigate(`/party/${id}/entry/${entry.id}`);
                         }}
                         className={cn(
-                          "grid grid-cols-[minmax(0,1fr)_4.5rem_4.5rem] min-[380px]:grid-cols-[minmax(0,1fr)_5rem_5rem] min-[480px]:grid-cols-[minmax(0,1fr)_6rem_6rem] items-stretch gap-0 overflow-hidden rounded-xl border border-[#EBEBEB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.07)] animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both transition-colors",
+                          "grid grid-cols-[minmax(0,1fr)_5rem_5rem] min-[380px]:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] min-[480px]:grid-cols-[minmax(0,1fr)_6rem_6rem] items-stretch gap-0 overflow-hidden rounded-xl border border-[#EBEBEB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.07)] animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both transition-colors",
                           userRole === 'owner' ? "cursor-pointer active:bg-slate-50" : ""
                         )}
                         style={{ animationDelay: `${i * 30}ms` }}

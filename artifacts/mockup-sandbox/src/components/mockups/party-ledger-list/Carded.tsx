@@ -46,8 +46,8 @@ function formatCurrency(amount: number) {
 }
 
 function amountColumnWidth(viewportWidth: number) {
-  if (viewportWidth < 380) return 72;
-  if (viewportWidth < 480) return 80;
+  if (viewportWidth < 380) return 80;
+  if (viewportWidth < 480) return 88;
   return 96;
 }
 
@@ -83,7 +83,7 @@ export function Carded() {
 
   return (
     <main className="party-ledger-preview min-h-screen bg-[#F5F6F8] pb-8">
-      <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_4.5rem_4.5rem] min-[380px]:grid-cols-[minmax(0,1fr)_5rem_5rem] min-[480px]:grid-cols-[minmax(0,1fr)_6rem_6rem] bg-[#F5F6F8] px-1.5 py-2 text-[8px] font-bold uppercase tracking-wider text-slate-500 min-[480px]:px-3 min-[480px]:text-[10px]">
+      <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_5rem_5rem] min-[380px]:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] min-[480px]:grid-cols-[minmax(0,1fr)_6rem_6rem] bg-[#F5F6F8] px-1.5 py-2 text-[8px] font-bold uppercase tracking-wider text-slate-500 min-[480px]:px-3 min-[480px]:text-[10px]">
         <span>এন্ট্রি</span>
         <span className="px-1 text-center leading-tight">আপনি দিয়েছেন</span>
         <span className="px-1 text-right leading-tight">আপনি পেয়েছেন</span>
@@ -103,7 +103,7 @@ export function Carded() {
               return (
                 <article
                   key={entry.id}
-                  className="grid grid-cols-[minmax(0,1fr)_4.5rem_4.5rem] min-[380px]:grid-cols-[minmax(0,1fr)_5rem_5rem] min-[480px]:grid-cols-[minmax(0,1fr)_6rem_6rem] items-stretch overflow-hidden rounded-xl border border-[#EBEBEB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.07)]"
+                  className="grid grid-cols-[minmax(0,1fr)_5rem_5rem] min-[380px]:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] min-[480px]:grid-cols-[minmax(0,1fr)_6rem_6rem] items-stretch overflow-hidden rounded-xl border border-[#EBEBEB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.07)]"
                 >
                   <div className="min-w-0 py-2.5 pl-2 pr-1 min-[480px]:py-3 min-[480px]:pl-3 min-[480px]:pr-2">
                     <p className="flex flex-wrap items-center gap-1 text-[10px] font-bold leading-snug text-slate-800 min-[480px]:text-[12px]">
