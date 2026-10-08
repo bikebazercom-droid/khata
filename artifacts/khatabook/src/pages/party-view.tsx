@@ -527,8 +527,8 @@ export function PartyView() {
             {/* Column headers */}
             <div className="sticky top-0 z-[5] grid grid-cols-[minmax(0,1fr)_5rem_5rem] min-[380px]:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] min-[480px]:grid-cols-[minmax(0,1fr)_6rem_6rem] bg-[#F5F6F8] px-1.5 py-2 text-[8px] font-bold uppercase tracking-wider text-slate-500 min-[480px]:px-3 min-[480px]:text-[10px]">
               <span>এন্ট্রি</span>
-              <span className="min-w-0 px-1 text-center leading-tight">আপনি দিয়েছেন</span>
-              <span className="min-w-0 px-1 text-right leading-tight">আপনি পেয়েছেন</span>
+              <span className="min-w-0 px-1 text-center leading-tight text-red-500">আপনি দিয়েছেন</span>
+              <span className="min-w-0 px-1 text-right leading-tight text-emerald-500">আপনি পেয়েছেন</span>
             </div>
 
             {groupedEntries.map((group) => (
