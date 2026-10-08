@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useAudioPlayer } from 'expo-audio';
 import { useColors } from '@/hooks/useColors';
 import { evaluateCalculatorExpression, formatExpression, formatMoney, trimNumberForExpression } from '@/lib/domain';
 
@@ -31,10 +30,6 @@ export function Calculator({
   children?: (parts: { display: React.ReactNode; keypad: React.ReactNode }) => React.ReactNode;
 }) {
   const colors = useColors();
-  const tapAudioPlayer = useAudioPlayer(
-    require('../assets/audio/calculator-key-tap.mp3'),
-    { downloadFirst: true },
-  );
   const [expression, setExpression] = useState(initialAmount > 0 ? trimNumberForExpression(initialAmount) : '');
   const [selection, setSelection] = useState<TextSelection>(() => {
     const caret = initialAmount > 0 ? trimNumberForExpression(initialAmount).length : 0;
@@ -104,7 +99,6 @@ export function Calculator({
   };
 
   const handleMemoryRecall = () => {
-    playTapSound();
     if (justRecalled) {
       setMemoryValue(0);
       setMemoryHistory([]);
@@ -118,19 +112,6 @@ export function Calculator({
     setSelection({ start: recalled.length, end: recalled.length });
     setJustRecalled(true);
     onAmountChange(memoryValue);
-  };
-
-  const playTapSound = () => {
-    try {
-      try {
-        tapAudioPlayer.currentTime = 0;
-      } catch {
-        // Playback should still be attempted if the initial seek is unavailable.
-      }
-      tapAudioPlayer.play();
-    } catch {
-      // Audio is optional and must not block calculator interactions.
-    }
   };
 
   const partialResult = result ?? (expression
@@ -191,7 +172,6 @@ export function Calculator({
                 <Pressable
                   key={key.value}
                   onPress={() => {
-                    playTapSound();
                     handleKey(key);
                   }}
                   disabled={disabled}

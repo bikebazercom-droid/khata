@@ -27,7 +27,6 @@ import { ChevronLeft, Camera, X, ArrowLeftRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { cn, evaluateCalculatorExpression, formatCurrency, formatExpressionForDisplay, toBengaliDigits, trimNumberForExpression } from '@/lib/utils';
-import { playCalculatorTapSound } from '@/lib/calculator-sound';
 import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic';
 import { CameraCaptureModal } from '@/components/modals/camera-capture-modal';
 import { scanDocument } from '@/lib/document-scan';
@@ -111,7 +110,6 @@ const Key = memo(function Key({
       type="button"
       data-testid={`calculator-key-${def.value}`}
       onClick={() => {
-        playCalculatorTapSound();
         onPress(def.value);
       }}
       style={{
@@ -1187,7 +1185,6 @@ export function TransactionEntryScreen({
           <button
             type="button"
             onClick={() => {
-              playCalculatorTapSound();
               handleMrcTap();
             }}
             className="w-full h-10 rounded-[5px] shadow-[0_2px_4px_rgba(0,0,0,0.15)] bg-[#0d55ad] text-white font-extrabold text-sm flex items-center justify-center active:scale-[0.98] active:brightness-95 transition-[background-color,transform,filter] duration-[50ms] ease-out"

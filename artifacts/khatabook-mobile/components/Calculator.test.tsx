@@ -2,17 +2,6 @@ import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const audioMocks = vi.hoisted(() => ({
-  player: {
-    currentTime: 1,
-    play: vi.fn(),
-  },
-}));
-
-vi.mock('expo-audio', () => ({
-  useAudioPlayer: () => audioMocks.player,
-}));
-
 import { Calculator } from '@/components/Calculator';
 
 afterEach(cleanup);
@@ -42,8 +31,6 @@ describe('Calculator', () => {
     expect(onInteraction).toHaveBeenCalled();
     expect(onAmountChange).toHaveBeenLastCalledWith(7);
     expect((screen.getByTestId('calculator-expression') as HTMLInputElement).value).toBe('7');
-    expect(audioMocks.player.currentTime).toBe(0);
-    expect(audioMocks.player.play).toHaveBeenCalledOnce();
   });
 
   it('reveals the metadata flow when the amount is entered directly', () => {

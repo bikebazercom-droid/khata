@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import WebView, { type WebViewNavigation } from 'react-native-webview';
-import { useAudioPlayer } from 'expo-audio';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { useColors } from '@/hooks/useColors';
@@ -83,10 +82,6 @@ export function WebAppScreen() {
   const nativeAuth = useOptionalAuth();
   const initialNativeSessionCaptured = useRef(false);
   const playSuccessSound = useTransactionSuccessSound();
-  const calculatorAudioPlayer = useAudioPlayer(
-    require('../assets/audio/calculator-key-tap.mp3'),
-    { downloadFirst: true },
-  );
   const webAppUrl = resolveVisualFixtureUrl(
     getWebAppUrl(),
     Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.search : '',
@@ -406,22 +401,8 @@ export function WebAppScreen() {
 
     if (event.nativeEvent.data === 'transaction-success') {
       playSuccessSound();
-      return;
-    }
-    if (event.nativeEvent.data !== 'calculator-key-tap') return;
-
-    try {
-      try {
-        calculatorAudioPlayer.currentTime = 0;
-      } catch {
-        // Playback should still be attempted if the initial seek is unavailable.
-      }
-      calculatorAudioPlayer.play();
-    } catch {
-      // Audio is optional and must not block calculator interactions.
     }
   }, [
-    calculatorAudioPlayer,
     nativeAuth?.clearNativeSession,
     playSuccessSound,
     requestOwnerPushToken,

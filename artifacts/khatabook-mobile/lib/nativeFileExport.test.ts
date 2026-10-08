@@ -86,7 +86,7 @@ describe('native WebView file export', () => {
   });
 
   it('parses only messages from the export bridge', () => {
-    expect(parseNativeFileExportRequest('calculator-key-tap')).toBeNull();
+    expect(parseNativeFileExportRequest('not-a-native-export-request')).toBeNull();
     expect(parseNativeFileExportRequest(JSON.stringify({
       type: NATIVE_FILE_EXPORT_MESSAGE,
       requestId: 'export-3',
