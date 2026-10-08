@@ -238,34 +238,41 @@ describe('browser ledger entry submission', () => {
     expect(amount.selectionStart).toBe(3);
   });
 
-  it('uses compact keypad spacing and the requested key color hierarchy', () => {
+  it('matches the reference keypad shape, elevation, colors, and column alignment', () => {
     renderEntry();
 
-    const mutedKeys = ['C', 'M+', 'M-', 'DEL', '/', '%', '*', '='];
+    const shadowClass = 'shadow-[0_2px_4px_rgba(0,0,0,0.15)]';
+    const mutedKeys = ['C', 'M+', 'M-', 'DEL', '/', '%', '*'];
     for (const value of mutedKeys) {
       expect(screen.getByTestId(`calculator-key-${value}`)).toHaveClass(
-        'rounded-lg',
-        'bg-[#e6eef8]',
+        'rounded-[5px]',
+        shadowClass,
+        'bg-[#cbdced]',
       );
     }
 
-    for (const digit of '0123456789') {
+    for (const digit of [...'0123456789', '=']) {
       expect(screen.getByTestId(`calculator-key-${digit}`)).toHaveClass(
-        'rounded-lg',
+        'rounded-[5px]',
+        shadowClass,
         'bg-white',
       );
     }
 
     for (const value of ['-', '+']) {
       expect(screen.getByTestId(`calculator-key-${value}`)).toHaveClass(
-        'rounded-lg',
-        'bg-[#0b3d91]',
+        'rounded-[5px]',
+        shadowClass,
+        'bg-[#0d55ad]',
       );
     }
 
     const numberRow = screen.getByTestId('calculator-key-7').parentElement;
     expect(numberRow).toHaveClass('grid', 'grid-cols-5', 'gap-1.5');
     expect(numberRow?.parentElement).toHaveClass('space-y-1.5');
+    expect(numberRow?.children).toHaveLength(5);
+    expect(numberRow?.children[3]).toBe(screen.getByTestId('calculator-key-/'));
+    expect(numberRow?.children[4]).toBe(screen.getByTestId('calculator-key-%'));
   });
 
   it('lets every digit, decimal, and arithmetic operator update the editable expression', () => {

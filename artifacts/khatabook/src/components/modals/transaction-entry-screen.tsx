@@ -87,7 +87,7 @@ const ROW_123: KeyDef[] = [
 const ROW_0DOT: KeyDef[] = [
   { label: '0', value: '0', kind: 'digit' },
   { label: '.', value: '.', kind: 'digit' },
-  { label: '=', value: '=', kind: 'muted' },
+  { label: '=', value: '=', kind: 'digit' },
   { label: '+', value: '+', kind: 'accent', span: 2 },
 ];
 
@@ -115,13 +115,13 @@ const Key = memo(function Key({ def, onPress }: { def: KeyDef; onPress: (value: 
         willChange: 'background-color',
       }}
       className={cn(
-        'h-14 rounded-lg font-bold text-lg flex items-center justify-center active:scale-[0.95] transition-[background-color,transform,filter] duration-[50ms] ease-out select-none',
+        'h-14 rounded-[5px] shadow-[0_2px_4px_rgba(0,0,0,0.15)] font-bold text-lg flex items-center justify-center active:scale-[0.95] transition-[background-color,transform,filter] duration-[50ms] ease-out select-none',
         // CSS-only press feedback keeps taps responsive without repainting
         // the rest of the calculator grid.
-        'active:brightness-95 active:shadow-none',
-        def.kind === 'digit' && 'bg-white text-slate-800 shadow-sm',
-        def.kind === 'muted' && 'bg-[#e6eef8] text-[#123f86] shadow-sm',
-        def.kind === 'accent' && 'bg-[#0b3d91] text-white shadow-sm'
+        'active:brightness-95',
+        def.kind === 'digit' && 'bg-white text-slate-800',
+        def.kind === 'muted' && 'bg-[#cbdced] text-[#123f86]',
+        def.kind === 'accent' && 'bg-[#0d55ad] text-white'
       )}
     >
       {def.label}
@@ -1180,7 +1180,7 @@ export function TransactionEntryScreen({
               playCalculatorTapSound();
               handleMrcTap();
             }}
-            className="w-full h-12 rounded-lg bg-[#0b3d91] text-white font-extrabold text-base flex items-center justify-center active:scale-[0.98] active:brightness-95 transition-[background-color,transform,filter] duration-[50ms] ease-out"
+            className="w-full h-12 rounded-[5px] shadow-[0_2px_4px_rgba(0,0,0,0.15)] bg-[#0d55ad] text-white font-extrabold text-base flex items-center justify-center active:scale-[0.98] active:brightness-95 transition-[background-color,transform,filter] duration-[50ms] ease-out"
           >
             MRC = {formatCurrency(memoryValue)}
           </button>

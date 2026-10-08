@@ -37,7 +37,12 @@ function Key({
 }) {
   const isReference = variant === 'reference-matched';
   const memoryRow = ['C', 'M+', 'M-', 'DEL'].includes(def.value);
-  const keyKind = isReference && def.value === 'DEL' ? 'muted' : def.kind;
+  const keyKind = isReference && def.value === 'DEL'
+    ? 'muted'
+    : isReference && def.value === '='
+      ? 'digit'
+      : def.kind;
+  const referenceShadow = 'shadow-[0_2px_4px_rgba(0,0,0,0.15)]';
 
   return (
     <button
@@ -50,16 +55,18 @@ function Key({
       }}
       className={[
         'h-14 font-bold text-lg flex items-center justify-center transition-[background-color,transform] duration-[50ms] ease-out select-none',
-        isReference ? 'rounded-lg active:scale-[0.98] active:brightness-95' : 'rounded-xl active:scale-[0.95]',
+        isReference
+          ? `rounded-[5px] ${referenceShadow} active:scale-[0.98] active:brightness-95`
+          : 'rounded-xl active:scale-[0.95]',
         !isReference && 'active:bg-[#4A3C31] active:text-white active:shadow-none',
-        keyKind === 'digit' && 'bg-white text-slate-800 shadow-sm',
+        keyKind === 'digit' && `bg-white text-slate-800 ${isReference ? referenceShadow : 'shadow-sm'}`,
         keyKind === 'muted' && (isReference
-          ? 'bg-[#e6eef8] text-[#123f86] shadow-sm'
+          ? `bg-[#cbdced] text-[#123f86] ${referenceShadow}`
           : 'bg-blue-50 text-blue-900 shadow-sm'),
         keyKind === 'accent' && (isReference
-          ? 'bg-[#0b3d91] text-white shadow-sm active:bg-blue-950'
+          ? `bg-[#0d55ad] text-white ${referenceShadow}`
           : 'bg-[#0b3d91] text-white shadow-sm'),
-        isReference && memoryRow && 'rounded-lg',
+        isReference && memoryRow && 'rounded-[5px]',
       ].filter(Boolean).join(' ')}
     >
       {def.label}
