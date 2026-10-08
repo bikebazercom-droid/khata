@@ -16,6 +16,8 @@ export type StatementOptions = {
 export type PartyStatement = {
   entries: LedgerRecord[];
   entriesAscending: LedgerRecord[];
+  rangeStart: Date | null;
+  rangeEnd: Date | null;
   openingBalance: number;
   gave: number;
   received: number;
@@ -29,6 +31,11 @@ function localDateKey(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function dateFromLocalKey(dateKey: string): Date {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return new Date(year!, month! - 1, day!);
 }
 
 function ledgerEntryDateKey(entry: Pick<LedgerRecord, 'dueDate' | 'createdAt'>): string {
@@ -93,10 +100,19 @@ export function calculatePartyStatement(
   }
   const gave = dateFiltered.reduce((total, entry) => total + (entry.type === 'YOU_GAVE' ? entry.amount : 0), 0);
   const received = dateFiltered.reduce((total, entry) => total + (entry.type === 'YOU_GOT' ? entry.amount : 0), 0);
+  const allDateKeys = period === 'all'
+    ? entries.map(ledgerEntryDateKey).sort()
+    : [];
 
   return {
     entries: sortLedgerEntriesChronologically(filtered).reverse(),
     entriesAscending: entriesAscending.filter((entry) => !normalizedSearch || (entry.description ?? '').toLocaleLowerCase().includes(normalizedSearch)),
+    rangeStart: period === 'all'
+      ? (allDateKeys.length ? dateFromLocalKey(allDateKeys[0]!) : null)
+      : start,
+    rangeEnd: period === 'all'
+      ? (allDateKeys.length ? dateFromLocalKey(allDateKeys[allDateKeys.length - 1]!) : null)
+      : endDate,
     openingBalance,
     gave,
     received,
@@ -151,9 +167,10 @@ function reportShell(title: string, businessName: string, body: string): string 
         }
         * { box-sizing: border-box; }
         body { margin: 0; color: #13283e; font-family: system-ui, "Noto Sans Bengali", "Noto Sans", sans-serif; font-size: 12px; }
-        .brand { position: fixed; top: -21mm; left: 0; right: 0; padding: 10px 18px; background: #1b426f; color: #fff; }
-        .brand-name { font-size: 16px; font-weight: 700; }
-        .brand-caption { margin-top: 4px; opacity: .8; font-size: 10px; }
+        .brand { position: fixed; top: -21mm; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 18px; background: #1b426f; color: #fff; }
+        .brand-name { min-width: 0; font-size: 14px; line-height: 1.25; font-weight: 700; overflow-wrap: anywhere; }
+        .brand-mark { display: flex; flex: 0 0 auto; align-items: center; gap: 7px; white-space: nowrap; font-size: 13px; font-weight: 700; }
+        .brand-icon { font-size: 18px; line-height: 1; }
         .body { padding: 0 4px 8px; }
         h1 { margin: 0 0 6px; text-align: center; font-size: 20px; }
         .subtitle { text-align: center; color: #64748b; margin-bottom: 18px; }
@@ -177,7 +194,10 @@ function reportShell(title: string, businessName: string, body: string): string 
     <body>
       <header class="brand">
         <div class="brand-name">${escapeHtml(businessName || 'বাংলাখাতা')}</div>
-        <div class="brand-caption">BanglaKhata · ${escapeHtml(formatDate(new Date().toISOString()))}</div>
+        <div class="brand-mark" aria-label="বাংলা খাতা">
+          <span class="brand-icon" aria-hidden="true">📒</span>
+          <span>বাংলা খাতা</span>
+        </div>
       </header>
       <main class="body">
         <h1>${escapeHtml(title)}</h1>
@@ -190,13 +210,11 @@ function reportShell(title: string, businessName: string, body: string): string 
 export function buildPartyStatementHtml({
   businessName,
   party,
-  periodLabel,
   statement,
   billImages = new Map(),
 }: {
   businessName: string;
   party: PartyRecord;
-  periodLabel: string;
   statement: PartyStatement;
   billImages?: Map<string, string>;
 }): string {
@@ -214,8 +232,11 @@ export function buildPartyStatementHtml({
     </tr>`;
   }).join('');
   const roleLabel = party.role === 'CUSTOMER' ? 'কাস্টমার' : 'সাপ্লায়ার';
+  const dateRangeLabel = statement.rangeStart && statement.rangeEnd
+    ? `${formatDate(localDateKey(statement.rangeStart))} - ${formatDate(localDateKey(statement.rangeEnd))}`
+    : 'কোনো লেনদেন নেই';
   const body = `
-    <div class="subtitle">${escapeHtml(party.name)} · ${roleLabel}${party.phone ? ` · ${escapeHtml(party.phone)}` : ''}<br>${escapeHtml(periodLabel)}</div>
+    <div class="subtitle">${roleLabel}${party.phone ? ` · ${escapeHtml(party.phone)}` : ''}<br>${escapeHtml(dateRangeLabel)}</div>
     <div class="summary">
       <div class="summary-card"><div class="summary-label">আপনি দিয়েছেন</div><div class="summary-value red">${money(statement.gave)}</div></div>
       <div class="summary-card"><div class="summary-label">আপনি পেয়েছেন</div><div class="summary-value green">${money(statement.received)}</div></div>
@@ -240,7 +261,7 @@ export function buildPartyStatementHtml({
         </tr>
       </tbody>
     </table>`;
-  return reportShell(`${roleLabel} স্টেটমেন্ট`, businessName, body);
+  return reportShell(`${party.name} এর স্টেটমেন্ট`, businessName, body);
 }
 
 export function buildGlobalLedgerReportHtml({

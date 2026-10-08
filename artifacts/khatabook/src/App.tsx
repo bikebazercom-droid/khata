@@ -16,6 +16,7 @@ import { authMeQueryKey } from '@/lib/authQueryKeys';
 import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import { useRetryPendingUploads } from '@/lib/useRetryPendingUploads';
 import { BusinessContextProvider } from '@/lib/businessContext';
+import type { BusinessInfo } from '@/lib/businessContext';
 import { BusinessSwitcherDrawer } from '@/components/modals/business-switcher-drawer';
 import { LanguageProvider } from '@/lib/i18n';
 import { drainEntries, ENTRY_OUTBOX_CHANGED } from '@/lib/entryOutbox';
@@ -375,7 +376,7 @@ function NativePushRegistrationManager() {
 
 function AuthCacheInvalidator() {
   const qc = useQueryClient();
-  const { selectedBusinessId, setSelectedBusiness } = useBusinessContext();
+  const { selectedBusinessId, setSelectedBusiness, setBusinesses } = useBusinessContext();
   const { isLoaded, userId: clerkUserId } = useAuth();
   const previousAuthorization = useRef<{
     userId: string;
@@ -424,10 +425,11 @@ function AuthCacheInvalidator() {
   useEffect(() => {
     if (!me?.userId || isError) return;
     let active = true;
-    void fetch('/api/businesses', { credentials: 'include' }).then(async (response) => {
+    void fetch('/api/businesses', { credentials: 'include', cache: 'no-store' }).then(async (response) => {
       if (!response.ok) return;
-      const businesses = await response.json() as { id: string }[];
+      const businesses = await response.json() as BusinessInfo[];
       if (active) {
+        setBusinesses(businesses);
         const ids = businesses.map((business) => business.id);
         if (selectedBusinessId && !ids.includes(selectedBusinessId)) {
           qc.removeQueries({ predicate: (query) => query.queryKey[0] !== 'auth-me' });
@@ -436,7 +438,7 @@ function AuthCacheInvalidator() {
       }
     }).catch(() => { /* No new local business grants during an outage. */ });
     return () => { active = false; };
-  }, [me, isError, selectedBusinessId, setSelectedBusiness, qc]);
+  }, [me, isError, selectedBusinessId, setSelectedBusiness, setBusinesses, qc]);
 
   return null;
 }

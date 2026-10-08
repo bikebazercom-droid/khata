@@ -105,9 +105,8 @@ export default function PartyDetailScreen() {
       const { images, failedCount } = await embedPartyStatementBillImages(statement.entries, token);
       const storeName = settingsQuery.data?.storeName || selectedBusinessName || identity?.businessName || 'Banglakhata';
       const html = buildPartyStatementHtml({
-        businessName: storeName,
+        businessName: selectedBusinessName || storeName,
         party,
-        periodLabel: 'সকল লেনদেন',
         statement,
         billImages: images,
       });

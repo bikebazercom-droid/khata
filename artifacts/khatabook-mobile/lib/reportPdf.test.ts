@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { GlobalLedgerRecord, LedgerRecord, PartyRecord } from '@/lib/domain';
+import { formatDate, type GlobalLedgerRecord, type LedgerRecord, type PartyRecord } from '@/lib/domain';
 
 vi.mock('expo-print', () => ({ printAsync: vi.fn(), printToFileAsync: vi.fn() }));
 vi.mock('expo-sharing', () => ({ isAvailableAsync: vi.fn(), shareAsync: vi.fn() }));
@@ -41,7 +41,6 @@ describe('party statement PDF helpers', () => {
     const html = buildPartyStatementHtml({
       businessName: 'Shop',
       party,
-      periodLabel: 'সব সময়',
       statement,
       billImages: new Map([[ledgerEntry.id, 'data:image/png;base64,AQID']]),
     });
@@ -54,7 +53,6 @@ describe('party statement PDF helpers', () => {
     const html = buildPartyStatementHtml({
       businessName: 'Shop',
       party,
-      periodLabel: 'সব সময়',
       statement,
     });
 
@@ -70,6 +68,21 @@ describe('party statement PDF helpers', () => {
     expect(html).toContain('counter(pages)');
   });
 
+  it('uses the active book in the header and prints the party title with the exact date range', () => {
+    const statement = calculatePartyStatement([ledgerEntry], 'all');
+    const html = buildPartyStatementHtml({
+      businessName: 'আমার খাতা',
+      party,
+      statement,
+    });
+
+    expect(html).toContain('<div class="brand-name">আমার খাতা</div>');
+    expect(html).toContain('<div class="brand-mark"');
+    expect(html).toContain('Alice এর স্টেটমেন্ট');
+    expect(html).toContain(`${formatDate('2025-06-15')} - ${formatDate('2025-06-15')}`);
+    expect(html).not.toContain('সব সময়');
+  });
+
   it('filters statement rows by date and search while retaining the real opening and running balance', () => {
     const records: LedgerRecord[] = [
       { ...ledgerEntry, id: 'before', amount: 30, dueDate: '2025-06-01', createdAt: '2025-06-12T10:00:00.000Z' },
@@ -81,6 +94,8 @@ describe('party statement PDF helpers', () => {
       endDate: new Date(2025, 5, 15),
       search: 'MATCHED',
     });
+    expect(statement.rangeStart).toEqual(new Date(2025, 5, 10));
+    expect(statement.rangeEnd).toEqual(new Date(2025, 5, 15));
     expect(statement.openingBalance).toBe(30);
     expect(statement.entries.map((item) => item.id)).toEqual(['match']);
     expect(statement.gave).toBe(2);
@@ -100,7 +115,6 @@ describe('party statement PDF helpers', () => {
     const html = buildPartyStatementHtml({
       businessName: 'Shop',
       party,
-      periodLabel: 'সব সময়',
       statement,
     });
 

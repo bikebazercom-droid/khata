@@ -6,13 +6,16 @@
  */
 import { useMemo, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
+import { useAppAuth } from '@/App';
 import { useBusinessContext } from '@/lib/businessContext';
 import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import {
   useGetParty,
   useListLedgerEntries,
+  useGetBusinessSettings,
   getGetPartyQueryKey,
   getListLedgerEntriesQueryKey,
+  getGetBusinessSettingsQueryKey,
 } from '@workspace/api-client-react';
 import {
   ChevronLeft,
@@ -44,6 +47,7 @@ import {
   buildPartyStatementRows,
   calculatePartyStatementSummary,
   filterPartyStatementEntriesByRange,
+  resolvePartyStatementDateRange,
 } from '@/lib/party-statement';
 import { generatePaginatedStatementPdf } from '@/lib/paginated-statement-pdf';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
@@ -163,13 +167,18 @@ export function PartyReportView() {
   const [, params]    = useRoute('/party/:id/report');
   const id            = params?.id ?? '';
   const [, navigate]  = useLocation();
-  const { selectedBusinessId } = useBusinessContext();
+  const { businessId } = useAppAuth();
+  const { selectedBusinessId, businesses } = useBusinessContext();
+  const activeBusinessId = selectedBusinessId ?? businessId;
 
   const { data: party,      isLoading: partyLoading   } = useGetParty(id, {
     query: { enabled: !!id, queryKey: businessScopedQueryKey(getGetPartyQueryKey(id), selectedBusinessId) },
   });
   const { data: allEntries = [], isLoading: entriesLoading } = useListLedgerEntries(id, {
     query: { enabled: !!id, queryKey: businessScopedQueryKey(getListLedgerEntriesQueryKey(id), selectedBusinessId) },
+  });
+  const { data: businessSettings } = useGetBusinessSettings({
+    query: { queryKey: businessScopedQueryKey(getGetBusinessSettingsQueryKey(), selectedBusinessId) },
   });
 
   // ── UI state ──
@@ -209,6 +218,11 @@ export function PartyReportView() {
   }), [allEntries, dateFiltered, party, reportRange]);
   const { openingBalance, totalDebit, totalCredit, closingBalance } = statementSummary;
   const isGet = closingBalance >= 0;
+  const activeBusinessName =
+    businesses.find((business) => business.id === activeBusinessId)?.name
+    ?? (!activeBusinessId ? businesses[0]?.name : undefined)
+    ?? businessSettings?.storeName
+    ?? 'আমার খাতা';
 
   const runningBalances = useMemo(() => {
     const sorted = [...dateFiltered].sort(
@@ -248,14 +262,15 @@ export function PartyReportView() {
     const phone = party?.phone ?? '';
     const safeName = escapeHtml(name);
     const safePhone = escapeHtml(phone);
+    const partyRoleLabel = party?.role === 'CUSTOMER' ? 'কাস্টমার' : 'সাপ্লায়ার';
     const now   = new Date();
 
-    const range     = reportRange;
+    const statementRange = resolvePartyStatementDateRange(reportRange, dateFiltered);
     const periodStr = (() => {
-      if (!range) return 'সকল এন্ট্রি';
-      const s = format(range.start, 'd MMMM yyyy', { locale: bn });
-      const e = format(range.end,   'd MMMM yyyy', { locale: bn });
-      return s === e ? s : `${s} - ${e}`;
+      if (!statementRange) return 'কোনো লেনদেন নেই';
+      const s = format(statementRange.start, 'd MMMM yyyy', { locale: bn });
+      const e = format(statementRange.end,   'd MMMM yyyy', { locale: bn });
+      return `${s} - ${e}`;
     })();
 
     // Plain amount — no currency symbol (used inside table cells)
@@ -352,9 +367,9 @@ export function PartyReportView() {
 <div class="statement-pdf-source">
 
   <!-- Header -->
-  <div class="statement-pdf-header" style="background:#003366;display:flex;justify-content:space-between;align-items:center;padding:14px 22px;color:#fff;">
-    <span style="font-size:16px;font-weight:700;">${safeName}</span>
-    <div style="display:flex;align-items:center;gap:8px;">
+  <div class="statement-pdf-header" style="background:#003366;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 18px;color:#fff;">
+    <span style="min-width:0;font-size:14px;font-weight:700;line-height:1.2;overflow-wrap:anywhere;">${escapeHtml(activeBusinessName)}</span>
+    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;white-space:nowrap;">
       <span style="font-size:20px;">📒</span>
       <span style="font-size:15px;font-weight:700;">বাংলা খাতা</span>
     </div>
@@ -365,6 +380,7 @@ export function PartyReportView() {
     <!-- Title -->
     <div style="text-align:center;margin-bottom:20px;">
       <div style="font-size:18px;font-weight:700;color:#1e293b;">${safeName} এর স্টেটমেন্ট</div>
+        <div style="font-size:12px;color:#64748b;margin-top:4px;">${partyRoleLabel}</div>
       ${phone ? `<div style="font-size:12px;color:#64748b;margin-top:4px;">ফোন নম্বর: ${safePhone}</div>` : ''}
       <div style="font-size:12px;color:#64748b;margin-top:3px;">(${periodStr})</div>
     </div>
@@ -375,7 +391,7 @@ export function PartyReportView() {
         <td style="padding:12px 14px;border-right:1px solid #cbd5e1;width:25%;vertical-align:top;">
           <div style="font-size:11px;color:#64748b;margin-bottom:5px;">ওপেনিং ব্যালেন্স</div>
           <div style="font-size:15px;font-weight:700;color:${openBalClr};">৳${fmtBal(openingBalance)}</div>
-          ${range ? `<div style="font-size:10px;color:#94a3b8;margin-top:3px;">(on ${format(range.start,'d MMMM yyyy',{locale:bn})})</div>` : ''}
+          ${statementRange ? `<div style="font-size:10px;color:#94a3b8;margin-top:3px;">(on ${format(statementRange.start,'d MMMM yyyy',{locale:bn})})</div>` : ''}
         </td>
         <td style="padding:12px 14px;border-right:1px solid #cbd5e1;width:25%;vertical-align:top;">
           <div style="font-size:11px;color:#64748b;margin-bottom:5px;">মোট ডেবিট / খরচ (-)</div>

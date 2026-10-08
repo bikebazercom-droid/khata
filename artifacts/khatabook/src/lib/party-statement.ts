@@ -32,6 +32,27 @@ export interface PartyStatementRow {
 
 type BalanceType = 'YOU_WILL_GET' | 'YOU_WILL_GIVE';
 
+export function resolvePartyStatementDateRange(
+  selectedRange: { start: Date; end: Date } | null,
+  entries: readonly PartyStatementEntry[],
+): { start: Date; end: Date } | null {
+  if (selectedRange) return selectedRange;
+  if (entries.length === 0) return null;
+
+  const dateKeys = entries
+    .map((entry) => getLedgerEntryDateKey(entry.dueDate, entry.createdAt))
+    .sort();
+  const toLocalDate = (dateKey: string) => {
+    const [year, month, day] = dateKey.split('-').map(Number);
+    return new Date(year!, month! - 1, day!);
+  };
+
+  return {
+    start: toLocalDate(dateKeys[0]!),
+    end: toLocalDate(dateKeys[dateKeys.length - 1]!),
+  };
+}
+
 function signedDelta(entry: PartyStatementEntry): number {
   return entry.type === 'YOU_GAVE' ? entry.amount : -entry.amount;
 }

@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { getGetBusinessSettingsQueryKey, useGetBusinessSettings, useGetParty, useListLedgerEntries } from '@workspace/api-client-react';
 import { AppButton, Card, EmptyState, EntryRow, LoadingState, Notice, Page, PageHeader, StatCard } from '@/components/Kit';
 import { useAuth } from '@/contexts/AuthContext';
+import { useBusinessScope } from '@/contexts/BusinessScopeContext';
 import { errorMessage, formatMoney, type LedgerRecord, type PartyRecord } from '@/lib/domain';
 import { useColors } from '@/hooks/useColors';
 import { buildPartyStatementHtml, calculatePartyStatement, embedPartyStatementBillImages, shareReportPdf, type StatementPeriod } from '@/lib/reportPdf';
@@ -26,6 +27,7 @@ function periodLabel(period: StatementPeriod, start: string, end: string): strin
 export default function PartyStatementScreen() {
   const colors = useColors();
   const { identity, getApiToken } = useAuth();
+  const { selectedBusinessName } = useBusinessScope();
   const params = useLocalSearchParams<{ partyId: string }>();
   const partyId = params.partyId;
   const [period, setPeriod] = useState<StatementPeriod>('all');
@@ -66,9 +68,8 @@ export default function PartyStatementScreen() {
       const token = await getApiToken().catch(() => null);
       const { images, failedCount } = await embedPartyStatementBillImages(statement.entries, token);
       const html = buildPartyStatementHtml({
-        businessName: settingsQuery.data?.storeName || identity?.businessName || 'বাংলাখাতা',
+        businessName: selectedBusinessName || settingsQuery.data?.storeName || identity?.businessName || 'আমার খাতা',
         party,
-        periodLabel: periodLabel(period, startText, endText),
         statement,
         billImages: images,
       });
