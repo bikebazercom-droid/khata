@@ -8,6 +8,7 @@ import { pool, readinessDb, readinessPool } from "@workspace/db";
 import * as schema from "@workspace/db/schema";
 import { sql } from "drizzle-orm";
 import healthRouter, { createHealthRouter } from "./health";
+import { createApiRouter } from "./index";
 
 const { Pool } = pg;
 
@@ -54,6 +55,37 @@ describe("readiness PostgreSQL pool integration", () => {
     },
     10_000,
   );
+
+  it("keeps liveness and working readiness public through the API router", async () => {
+    const apiApp = express();
+    apiApp.use("/api", createApiRouter());
+
+    await request(apiApp)
+      .get("/api/healthz")
+      .expect(200, { status: "ok" });
+
+    await request(apiApp)
+      .get("/api/readyz")
+      .expect(200, { status: "ready" });
+  });
+
+  it("keeps failed readiness public through the API router", async () => {
+    const failingApiApp = express();
+    const failingHealthRouter = createHealthRouter(() =>
+      Promise.reject(new Error("database unavailable")),
+    );
+    failingApiApp.use("/api", createApiRouter(failingHealthRouter));
+
+    await request(failingApiApp)
+      .get("/api/healthz")
+      .expect(200, { status: "ok" });
+
+    const response = await request(failingApiApp)
+      .get("/api/readyz")
+      .expect(503, { status: "not_ready" });
+
+    expect(response.headers["set-cookie"]).toBeUndefined();
+  });
 
   it(
     "bounds a stalled PostgreSQL handshake and shares the in-flight connection attempt",
