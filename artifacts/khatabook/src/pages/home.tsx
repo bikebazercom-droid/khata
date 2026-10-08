@@ -1,37 +1,59 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
+import { useQueryClient } from '@tanstack/react-query';
 import { useBusinessContext } from '@/lib/businessContext';
 import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import { isOfflineMode } from '@/lib/useAuthConnectivity';
 import {
   useListParties,
   getListPartiesQueryKey,
+  getGetPartyQueryKey,
+  useUpdateParty,
   useGetBusinessSettings,
   getGetBusinessSettingsQueryKey,
   PartyRole,
   DueFilter,
+  type Party,
 } from '@workspace/api-client-react';
 import { useMemo } from 'react';
 import { Search, Plus, Settings, User, ChevronRight, UserPlus2, SlidersHorizontal, FileText, Users, Pencil, FolderOpen, X, ScanLine } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, escapeHtml } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AddPartyModal } from '@/components/modals/add-party-modal';
 import { BengaliLedgerScanner } from '@/components/modals/bengali-ledger-scanner';
 import { SettingsDrawer, loadShopProfile } from '@/components/modals/settings-drawer';
 import { AddStaffDialog } from '@/components/modals/add-staff-dialog';
 import { RenameStoreDialog } from '@/components/modals/rename-store-dialog';
-import { formatDistanceToNow } from 'date-fns';
-import { bn as bnLocale } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useLanguage } from '@/lib/i18n';
 import { useAppAuth } from '@/App';
 import { ENTRY_OUTBOX_CHANGED, listRejectedEntries } from '@/lib/entryOutbox';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { resolveLedgerBookName } from '@/lib/ledger-book-name';
+import { LongPressPartyName } from '@/components/long-press-party-name';
+import { queuePartyOperation } from '@/lib/partyOutbox';
+import { readOfflineIdentity } from '@/lib/offlineSession';
+import { isTransientNetworkError } from '@/lib/offlineErrors';
+
+function partyBalanceFontSize(value: string): string {
+  const widthInEm = Array.from(value).reduce((width, character) => {
+    if (character === '৳') return width + 0.9;
+    if (character === ',' || character === '.') return width + 0.35;
+    return width + 0.68;
+  }, 0);
+  const availableWidth = typeof window === 'undefined'
+    ? 126
+    : Math.min(146, window.innerWidth * 0.33);
+  return `${Math.max(10, Math.min(15, availableWidth / (widthInEm * 1.08)))}px`;
+}
 
 export function HomeView() {
   const { openSwitcher, businesses, selectedBusinessId, setSelectedBusiness } = useBusinessContext();
   const { role: userRole, userId, businessId } = useAppAuth();
+  const queryClient = useQueryClient();
   const activeBusiness = businesses.find((b) => b.id === selectedBusinessId);
   const [role, setRole] = useState<PartyRole>(PartyRole.CUSTOMER);
   const [search, setSearch] = useState('');
@@ -78,6 +100,9 @@ export function HomeView() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
   const [isRenameStoreOpen, setIsRenameStoreOpen] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<Party | null>(null);
+  const [renameName, setRenameName] = useState('');
+  const [renameError, setRenameError] = useState('');
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const businessScopeKey = userId && selectedBusinessId
@@ -89,6 +114,7 @@ export function HomeView() {
     : 0;
 
   const { data: settings } = useGetBusinessSettings({ query: { enabled: userRole === 'owner', queryKey: businessScopedQueryKey(getGetBusinessSettingsQueryKey(), selectedBusinessId) } });
+  const activeBookName = resolveLedgerBookName(settings?.storeName, activeBusiness?.name);
   const summaryParams = { role };
   const partyParams = { role, search, dueFilter: apiDueFilter };
   const { data: summaryParties = [] } = useListParties(summaryParams, {
@@ -97,6 +123,125 @@ export function HomeView() {
   const { data: queriedParties } = useListParties(partyParams, {
     query: { queryKey: businessScopedQueryKey(getListPartiesQueryKey(partyParams), selectedBusinessId) },
   });
+
+  const renamePartyMutation = useUpdateParty({
+    mutation: {
+      networkMode: 'always',
+      onMutate: async ({ partyId, data }) => {
+        const businessScope = selectedBusinessId ?? '__default_business__';
+        const listQueries = queryClient.getQueryCache().findAll({
+          predicate: (query) => {
+            const lastKey = query.queryKey[query.queryKey.length - 1];
+            return query.queryKey[0] === 'listParties' &&
+              typeof lastKey === 'object' &&
+              lastKey !== null &&
+              'activeBusinessId' in lastKey &&
+              (lastKey as { activeBusinessId?: unknown }).activeBusinessId === businessScope;
+          },
+        });
+        await Promise.all(listQueries.map((query) =>
+          queryClient.cancelQueries({ queryKey: query.queryKey, exact: true }),
+        ));
+        const listSnapshots = listQueries.map((query) => ({
+          queryKey: query.queryKey,
+          data: queryClient.getQueryData<Party[]>(query.queryKey),
+        }));
+        const partyKey = businessScopedQueryKey(getGetPartyQueryKey(partyId), selectedBusinessId);
+        const previousDetail = queryClient.getQueryData<Party>(partyKey);
+        const beforeParty = previousDetail ??
+          listSnapshots.map((snapshot) => snapshot.data?.find((party) => party.id === partyId))
+            .find((party): party is Party => !!party) ??
+          (renameTarget?.id === partyId ? renameTarget : undefined);
+
+        for (const snapshot of listSnapshots) {
+          queryClient.setQueryData<Party[]>(snapshot.queryKey, (old) =>
+            old?.map((party) => party.id === partyId ? { ...party, ...data } : party),
+          );
+        }
+        if (beforeParty) {
+          queryClient.setQueryData<Party>(partyKey, { ...beforeParty, ...data });
+        }
+
+        return { listSnapshots, partyKey, previousDetail, beforeParty };
+      },
+      onError: async (error, variables, context) => {
+        const identity = readOfflineIdentity();
+        const activeBusinessId = selectedBusinessId ?? identity?.businessId;
+        if (isTransientNetworkError(error) && identity && activeBusinessId && context?.beforeParty) {
+          try {
+            const optimisticParty = { ...context.beforeParty, ...variables.data };
+            await queuePartyOperation({
+              id: crypto.randomUUID(),
+              actorId: identity.userId,
+              businessId: activeBusinessId,
+              partyId: variables.partyId,
+              kind: 'update',
+              data: variables.data,
+              beforeParty: context.beforeParty,
+              optimisticParty,
+              createdAt: new Date().toISOString(),
+              status: 'pending',
+            });
+            toast.success('নাম ডিভাইসে সেভ হয়েছে; সংযোগ ফিরলে সিঙ্ক হবে');
+            setRenameTarget(null);
+            return;
+          } catch {
+            toast.error('অফলাইন স্টোরেজে নাম সেভ করা যায়নি');
+          }
+        }
+
+        if (context) {
+          for (const snapshot of context.listSnapshots) {
+            if (snapshot.data) queryClient.setQueryData(snapshot.queryKey, snapshot.data);
+          }
+          if (context.previousDetail) {
+            queryClient.setQueryData(context.partyKey, context.previousDetail);
+          } else {
+            queryClient.removeQueries({ queryKey: context.partyKey, exact: true });
+          }
+        }
+        toast.error('নাম পরিবর্তন করা যায়নি');
+      },
+      onSuccess: (updatedParty, variables, context) => {
+        if (context) {
+          queryClient.setQueryData(context.partyKey, updatedParty);
+          for (const snapshot of context.listSnapshots) {
+            queryClient.setQueryData<Party[]>(snapshot.queryKey, (old) =>
+              old?.map((party) => party.id === variables.partyId ? updatedParty : party),
+            );
+          }
+        }
+        toast.success('নাম পরিবর্তন করা হয়েছে');
+        setRenameTarget(null);
+      },
+      onSettled: (_data, error, variables) => {
+        if (error && isTransientNetworkError(error)) return;
+        queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetPartyQueryKey(variables.partyId) });
+      },
+    },
+  });
+
+  const openPartyRename = (party: Party) => {
+    if (userRole !== 'owner') return;
+    setRenameTarget(party);
+    setRenameName(party.name);
+    setRenameError('');
+  };
+
+  const savePartyRename = () => {
+    if (!renameTarget) return;
+    const trimmedName = renameName.trim();
+    if (!trimmedName) {
+      setRenameError('নাম খালি রাখা যাবে না');
+      return;
+    }
+    if (trimmedName === renameTarget.name) {
+      setRenameTarget(null);
+      return;
+    }
+    renamePartyMutation.mutate({ partyId: renameTarget.id, data: { name: trimmedName } });
+  };
   const offlineParties = useMemo(() => {
     const term = search.trim().toLocaleLowerCase();
     const today = new Date().toISOString().slice(0, 10);
@@ -238,7 +383,12 @@ export function HomeView() {
     setIsExportingPdf(true);
 
     const shopProfile   = loadShopProfile();
-    const storeName     = shopProfile.businessName || settings?.storeName || 'Banglakhata';
+    const storeName = resolveLedgerBookName(
+      settings?.storeName,
+      activeBusiness?.name,
+      shopProfile.businessName,
+    ) ?? 'Banglakhata';
+    const safeStoreName = escapeHtml(storeName);
     const roleLabel     = role === PartyRole.CUSTOMER ? t('customer') : t('supplier');
     const nameColHeader = role === PartyRole.CUSTOMER ? t('pdfName') : t('pdfSupplierNameCol');
     const statementTitle = role === PartyRole.CUSTOMER ? t('pdfCustomerStatement') : t('pdfSupplierStatement');
@@ -300,7 +450,7 @@ export function HomeView() {
     container.innerHTML = `
       <!-- 1. Top Navy Header -->
       <div style="background:#003366;display:flex;justify-content:space-between;align-items:center;padding:16px 24px;color:#fff;font-size:20px;font-weight:bold;box-sizing:border-box;">
-        <span>${storeName}</span>
+        <span>${safeStoreName}</span>
         <span style="letter-spacing:0.5px;">📘 Banglakhata</span>
       </div>
 
@@ -431,7 +581,7 @@ export function HomeView() {
     } finally {
       setIsExportingPdf(false);
     }
-  }, [parties, role, appliedFilter, settings?.storeName, t]);
+  }, [parties, role, appliedFilter, settings?.storeName, activeBusiness?.name, t]);
 
   return (
     <div className="flex flex-col h-full w-full bg-white relative">
@@ -451,7 +601,7 @@ export function HomeView() {
               aria-label="বাংলা খাতা"
             >
               <h1 className="font-extrabold tracking-tight text-[15px] text-white truncate max-w-[120px]">
-                {activeBusiness?.name || settings?.storeName || t('loading')}
+                {activeBookName || t('loading')}
               </h1>
               {userRole === 'owner' && <ChevronRight className="w-3.5 h-3.5 text-white/60 shrink-0 rotate-90" />}
             </button>
@@ -668,7 +818,7 @@ export function HomeView() {
                 onClick={() => navigate(`/party/${party.id}`)}
                 onKeyDown={(e) => e.key === 'Enter' && navigate(`/party/${party.id}`)}
                 className={cn(
-                  'flex items-center justify-between p-4 active:bg-slate-50 transition-all w-full text-left relative cursor-pointer',
+                  'flex items-center justify-between gap-3 p-4 active:bg-slate-50 transition-all w-full text-left relative cursor-pointer',
                   location === `/party/${party.id}` && 'bg-blue-50/40',
                   'animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both'
                 )}
@@ -676,37 +826,35 @@ export function HomeView() {
               >
                 <div
                   className={cn(
-                    'w-[52px] h-[52px] rounded-full flex items-center justify-center font-bold text-lg mr-4 shrink-0',
+                    'w-[52px] h-[52px] rounded-full flex items-center justify-center font-bold text-lg shrink-0',
                     party.balanceType === 'YOU_WILL_GET' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
                   )}
                 >
                   {party.name.charAt(0).toUpperCase()}
                 </div>
-                <div className="flex-1 min-w-0 pr-3">
-                  <div className="flex justify-between items-center mb-1">
-                    <p className="font-bold text-slate-900 truncate text-[15px]">{party.name}</p>
-                    {party.lastTransactionAt && (
-                      <span className="text-[10px] font-medium text-slate-400 shrink-0 ml-2">
-                        {formatDistanceToNow(new Date(party.lastTransactionAt), {
-                          addSuffix: true,
-                          locale: bnLocale,
-                        })}
-                      </span>
-                    )}
+                <div className="flex-1 min-w-0">
+                  <div className="mb-1 min-w-0">
+                    <LongPressPartyName
+                      name={party.name}
+                      canRename={userRole === 'owner'}
+                      onClick={() => navigate(`/party/${party.id}`)}
+                      onLongPress={() => openPartyRename(party)}
+                    />
                   </div>
                   <p className="text-xs font-medium text-slate-500 truncate">{party.phone}</p>
                 </div>
-                <div className="shrink-0 flex items-center gap-1.5">
+                <div className="shrink-0 flex items-center gap-1.5 max-w-[46%]">
                   <button
                     type="button"
                     onClick={userRole === 'owner' ? (e) => handleInstantShare(e, party) : undefined}
                     disabled={userRole !== 'owner'}
-                    className="text-right active:scale-95 transition-transform"
+                    className="min-w-0 text-right active:scale-95 transition-transform"
                     aria-label={`${party.name} balance`}
                   >
                     <p
+                      style={{ fontSize: partyBalanceFontSize(formatCurrency(party.currentBalance)) }}
                       className={cn(
-                        'text-[15px] font-bold tracking-tight',
+                        'font-bold tracking-tight leading-tight whitespace-nowrap',
                         party.balanceType === 'YOU_WILL_GET' ? 'text-emerald-600' : 'text-red-600'
                       )}
                     >
@@ -757,6 +905,58 @@ export function HomeView() {
       <SettingsDrawer open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
       <AddStaffDialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen} />
       <RenameStoreDialog open={isRenameStoreOpen} onOpenChange={setIsRenameStoreOpen} />
+      <Dialog
+        open={!!renameTarget}
+        onOpenChange={(open) => {
+          if (!open && !renamePartyMutation.isPending) {
+            setRenameTarget(null);
+            setRenameError('');
+          }
+        }}
+      >
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>গ্রাহক / সরবরাহকারীর নাম পরিবর্তন</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-500">
+            {renameTarget?.name} — নতুন নাম লিখুন
+          </p>
+          <Input
+            autoFocus
+            value={renameName}
+            onChange={(event) => {
+              setRenameName(event.target.value);
+              setRenameError('');
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') savePartyRename();
+            }}
+            maxLength={120}
+            placeholder="নাম লিখুন"
+            className={cn('h-12 rounded-xl font-semibold', renameError && 'border-red-400')}
+          />
+          {renameError && <p className="text-xs font-semibold text-red-600">{renameError}</p>}
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              disabled={renamePartyMutation.isPending}
+              onClick={() => setRenameTarget(null)}
+            >
+              বাতিল
+            </Button>
+            <Button
+              type="button"
+              className="flex-1"
+              disabled={renamePartyMutation.isPending}
+              onClick={savePartyRename}
+            >
+              {renamePartyMutation.isPending ? 'সেভ হচ্ছে…' : 'সেভ করুন'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Advanced filter & sort bottom sheet ── */}
       {isFilterSheetOpen && (

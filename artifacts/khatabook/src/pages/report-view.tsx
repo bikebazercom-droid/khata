@@ -19,7 +19,7 @@ import { ChevronLeft, Calendar as CalendarIcon, Search, ChevronDown, FileDown, F
 import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { formatCurrency, cn, toBengaliDigits } from '@/lib/utils';
+import { formatCurrency, cn, toBengaliDigits, escapeHtml } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { BengaliCalendarModal } from '@/components/modals/bengali-calendar-modal';
 import { formatBengaliDateInput } from '@/lib/bengali-date';
@@ -35,6 +35,7 @@ import {
 import { filterGlobalLedgerEntriesByRole } from '@/lib/global-ledger-report-role';
 import { getLedgerEntryDateKey } from '@/lib/date-time';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
+import { resolveLedgerBookName } from '@/lib/ledger-book-name';
 
 const PERIOD_LABELS: Record<ReportPeriod, string> = {
   ALL: 'সব',
@@ -90,7 +91,8 @@ function formatReportEntryTimestamp(
 
 export function ReportView() {
   const [, navigate] = useLocation();
-  const { selectedBusinessId } = useBusinessContext();
+  const { selectedBusinessId, businesses } = useBusinessContext();
+  const activeBusinessName = businesses.find((business) => business.id === selectedBusinessId)?.name;
 
   // useSearch() uses useSyncExternalStore and can produce a stale snapshot in
   // React 18 concurrent mode before the pushState event is committed.
@@ -156,7 +158,11 @@ export function ReportView() {
   const handleDownload = async () => {
     setIsGenerating(true);
     const shopProfile = loadShopProfile();
-    const storeName  = shopProfile.businessName || settings?.storeName || 'বাংলাখাতা';
+    const storeName = resolveLedgerBookName(
+      settings?.storeName,
+      activeBusinessName,
+      shopProfile.businessName,
+    ) ?? 'বাংলাখাতা';
     const dateStr    = toBengaliDigits(new Date().toLocaleDateString('bn-BD', {
       day: 'numeric',
       month: 'long',
@@ -194,7 +200,7 @@ export function ReportView() {
     container.innerHTML = `
       <!-- 1. Top Navy Header -->
       <div style="background:#003366;display:flex;justify-content:space-between;align-items:center;padding:16px 24px;color:#fff;font-size:20px;font-weight:bold;box-sizing:border-box;">
-        <span>${storeName}</span>
+        <span>${escapeHtml(storeName)}</span>
         <span style="letter-spacing:0.5px;">📘 বাংলা খাতা</span>
       </div>
 

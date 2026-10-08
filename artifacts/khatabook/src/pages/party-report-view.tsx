@@ -39,6 +39,7 @@ import {
 import { bn } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { formatCurrency, cn } from '@/lib/utils';
+import { resolveLedgerBookName } from '@/lib/ledger-book-name';
 import { BengaliCalendarModal } from '@/components/modals/bengali-calendar-modal';
 import { formatBengaliDateInput } from '@/lib/bengali-date';
 import { ReportPeriodDrawer, type ReportPeriod } from '@/components/modals/report-period-drawer';
@@ -218,11 +219,11 @@ export function PartyReportView() {
   }), [allEntries, dateFiltered, party, reportRange]);
   const { openingBalance, totalDebit, totalCredit, closingBalance } = statementSummary;
   const isGet = closingBalance >= 0;
-  const activeBusinessName =
-    businesses.find((business) => business.id === activeBusinessId)?.name
-    ?? (!activeBusinessId ? businesses[0]?.name : undefined)
-    ?? businessSettings?.storeName
-    ?? 'আমার খাতা';
+  const activeBusinessName = resolveLedgerBookName(
+    businessSettings?.storeName,
+    businesses.find((business) => business.id === activeBusinessId)?.name,
+    !activeBusinessId ? businesses[0]?.name : undefined,
+  ) ?? 'আমার খাতা';
 
   const runningBalances = useMemo(() => {
     const sorted = [...dateFiltered].sort(

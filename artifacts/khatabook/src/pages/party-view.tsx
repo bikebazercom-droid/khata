@@ -25,6 +25,7 @@ import {
   ArrowLeftRight,
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
+import { resolveLedgerBookName } from '@/lib/ledger-book-name';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { TransactionEntryScreen } from '@/components/modals/transaction-entry-screen';
@@ -88,7 +89,7 @@ export function PartyView() {
   const id = params?.id;
   const [, navigate] = useLocation();
   const { role: userRole, userId } = useAppAuth();
-  const { selectedBusinessId } = useBusinessContext();
+  const { selectedBusinessId, businesses } = useBusinessContext();
   const [pendingEntries, setPendingEntries] = useState<QueuedEntry[]>([]);
   const [outboxError, setOutboxError] = useState('');
   useEffect(() => {
@@ -127,7 +128,8 @@ export function PartyView() {
   const [isGeneratingReminder, setIsGeneratingReminder] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
-  const storeName = settings?.storeName || 'Banglakhata';
+  const activeBusinessName = businesses.find((business) => business.id === selectedBusinessId)?.name;
+  const storeName = resolveLedgerBookName(settings?.storeName, activeBusinessName) ?? 'Banglakhata';
 
   // Reconstruct balances chronologically, then show the live history and PDFs
   // newest-first. The PDF renderer keeps these per-entry balance snapshots.

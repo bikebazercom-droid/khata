@@ -5,6 +5,18 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+const HTML_ESCAPE_CHARACTERS: Readonly<Record<string, string>> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+};
+
+export function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => HTML_ESCAPE_CHARACTERS[character] ?? character);
+}
+
 // ── Bengali numeral helpers ────────────────────────────────────────────────────
 
 /** Maps ASCII digits to their Unicode Bengali equivalents. */
