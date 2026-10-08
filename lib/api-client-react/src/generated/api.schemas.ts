@@ -43,12 +43,17 @@ export interface BengaliLedgerScanResult {
 
 export interface BengaliLedgerBulkEntry {
   partyId: string;
+  /**
+     * @maximum 90071992547409.9
+     * @exclusiveMinimum 0
+     */
   amount: number;
   type: LedgerEntryType;
   note?: string;
 }
 
 export interface BengaliLedgerBulkSaveInput {
+  /** @minItems 1 */
   entries: BengaliLedgerBulkEntry[];
 }
 
@@ -273,7 +278,10 @@ export interface PartyInput {
   /** Optional mobile number; may be omitted or blank. */
   phone?: string;
   role: PartyRole;
-  /** Optional opening balance amount (always positive) */
+  /**
+     * Optional opening balance amount (always positive)
+     * @maximum 90071992547409.9
+     */
   openingBalance?: number;
   openingBalanceType?: BalanceType;
   /** @nullable */
@@ -318,7 +326,10 @@ export interface LedgerEntryInput {
      */
   clientRequestId?: string;
   type: LedgerEntryType;
-  /** @exclusiveMinimum 0 */
+  /**
+     * @maximum 90071992547409.9
+     * @exclusiveMinimum 0
+     */
   amount: number;
   description?: string;
   /** @nullable */
@@ -342,7 +353,10 @@ export interface LedgerEntryInput {
 
 export interface LedgerEntryPatch {
   type?: LedgerEntryType;
-  /** @exclusiveMinimum 0 */
+  /**
+     * @maximum 90071992547409.9
+     * @exclusiveMinimum 0
+     */
   amount?: number;
   description?: string;
   /** @nullable */
@@ -421,6 +435,7 @@ export interface BusinessSettingsUpdate {
   storeName?: string;
   /** @minLength 1 */
   language?: string;
+  /** @maximum 90071992547409.9 */
   onlineCollectionBalance?: number;
 }
 

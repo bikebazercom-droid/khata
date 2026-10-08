@@ -327,6 +327,44 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
     }
   });
 
+  it("stores twenty-billion ledger amounts exactly and rejects values beyond the supported limit", async () => {
+    const [largeAmountParty] = await db.insert(partiesTable).values({
+      businessId,
+      name: `Large amount ${crypto.randomUUID()}`,
+      role: "CUSTOMER",
+      phone: "",
+    }).returning();
+    const partyId = largeAmountParty!.id;
+
+    try {
+      const created = await request(app)
+        .post(`/parties/${partyId}/ledger-entries`)
+        .set("Authorization", "Bearer owner")
+        .send({ type: "YOU_GAVE", amount: 20_000_000_000.01 });
+      expect(created.status, JSON.stringify(created.body)).toBe(201);
+      expect(created.body.amount).toBe(20_000_000_000.01);
+
+      const [storedEntry] = await db.select().from(ledgerEntriesTable)
+        .where(eq(ledgerEntriesTable.id, created.body.id));
+      const [updatedParty] = await db.select().from(partiesTable)
+        .where(eq(partiesTable.id, partyId));
+      expect(storedEntry?.amount).toBe("20000000000.01");
+      expect(updatedParty?.currentBalance).toBe("20000000000.01");
+
+      const rejected = await request(app)
+        .post(`/parties/${partyId}/ledger-entries`)
+        .set("Authorization", "Bearer owner")
+        .send({ type: "YOU_GAVE", amount: 90_071_992_547_410 });
+      expect(rejected.status).toBe(400);
+      expect(rejected.body).toEqual({ error: "Amount exceeds the supported limit" });
+      expect(await db.select().from(ledgerEntriesTable)
+        .where(eq(ledgerEntriesTable.partyId, partyId))).toHaveLength(1);
+    } finally {
+      await db.delete(ledgerEntriesTable).where(eq(ledgerEntriesTable.partyId, partyId));
+      await db.delete(partiesTable).where(eq(partiesTable.id, partyId));
+    }
+  });
+
   it("atomically deduplicates concurrent normal entries, scopes keys by actor/business, and never recreates a deleted entry", async () => {
     expect((await patch({ partyIds: [a, b, c], adjustmentPartyIds: [a, b] })).status).toBe(200);
     const key = crypto.randomUUID();

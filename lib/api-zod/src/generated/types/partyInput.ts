@@ -16,7 +16,10 @@ export interface PartyInput {
   /** Optional mobile number; may be omitted or blank. */
   phone?: string;
   role: PartyRole;
-  /** Optional opening balance amount (always positive) */
+  /**
+     * Optional opening balance amount (always positive)
+     * @maximum 90071992547409.9
+     */
   openingBalance?: number;
   openingBalanceType?: BalanceType;
   /** @nullable */

@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import path from "path";
@@ -17,6 +17,7 @@ import { ensureDefaultBusiness } from "./middlewares/requireAuth";
 import { migrateBillImages } from "./lib/migrateBillImages";
 import { mountFrontendHosting } from "./lib/frontend-hosting";
 import { trustedProxyCidrs } from "./middlewares/ipBlock";
+import { isDatabaseNumericOverflow } from "./lib/apiValidation";
 
 const app: Express = express();
 const corsAllowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')
@@ -88,6 +89,14 @@ app.use(
 const __dirname_app   = path.dirname(fileURLToPath(import.meta.url));
 
 app.use("/api", router);
+app.use((error: unknown, req: Request, res: Response, next: NextFunction) => {
+  if (isDatabaseNumericOverflow(error)) {
+    logger.warn({ requestId: req.id, code: "22003" }, "Database numeric value exceeded its supported range");
+    res.status(400).json({ error: "Amount exceeds the supported limit" });
+    return;
+  }
+  next(error);
+});
 
 // Hostinger's single Node app can serve the two built Vite apps on the same
 // origin. Replit keeps serving these as separate artifacts unless explicitly

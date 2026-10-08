@@ -1,19 +1,24 @@
 export function isTransientNetworkError(error: unknown): boolean {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
-  if (typeof error !== 'object' || error === null) {
-    return error instanceof Error && /network|fetch|offline|timeout|connection/i.test(error.message);
-  }
-  const record = error as {
+  const record = typeof error === 'object' && error !== null
+    ? error as {
     status?: unknown;
     response?: { status?: unknown };
     message?: unknown;
-  };
-  const status = typeof record.status === 'number'
+    }
+    : undefined;
+  const status = typeof record?.status === 'number'
     ? record.status
-    : typeof record.response?.status === 'number'
+    : typeof record?.response?.status === 'number'
       ? record.response.status
       : undefined;
-  if (status !== undefined) return status === 0 || status >= 500;
+  // An HTTP response means the request reached a server. Server-side failures
+  // and validation rejections must be shown to the user, not replayed as if
+  // they were caused by lost connectivity.
+  if (status !== undefined) return status === 0;
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
+  if (!record) {
+    return error instanceof Error && /network|fetch|offline|timeout|connection/i.test(error.message);
+  }
   return typeof record.message === 'string' &&
     /network|fetch|offline|timeout|timed out|connection/i.test(record.message);
 }

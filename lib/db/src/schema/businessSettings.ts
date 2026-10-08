@@ -12,7 +12,7 @@ export const businessSettingsTable = pgTable("business_settings", {
   storeName: text("store_name").notNull().default("আমার খাতা"),
   language: text("language").notNull().default("English"),
   onlineCollectionBalance: numeric("online_collection_balance", {
-    precision: 12,
+    precision: 20,
     scale: 2,
   })
     .notNull()

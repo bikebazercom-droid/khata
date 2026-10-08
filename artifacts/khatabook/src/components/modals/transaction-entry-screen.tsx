@@ -39,6 +39,7 @@ import { useConnectionState } from '@/context/connection-state';
 import { notifyEntrySaved } from '@/components/ui/entry-saved-feedback';
 import { queueEntry } from '@/lib/entryOutbox';
 import { isTransientNetworkError } from '@/lib/offlineErrors';
+import { isLedgerAmountLimitError } from '@/lib/ledgerSaveError';
 import { readOfflineIdentity } from '@/lib/offlineSession';
 
 type KeyKind = 'digit' | 'muted' | 'accent';
@@ -723,7 +724,10 @@ export function TransactionEntryScreen({
         if (!res.ok) {
           const errBody = await res.json().catch(() => ({}));
           console.error('[PATCH] server error body:', JSON.stringify(errBody));
-          throw new Error(`HTTP ${res.status}: ${JSON.stringify(errBody)}`);
+          throw Object.assign(new Error(`HTTP ${res.status}: ${JSON.stringify(errBody)}`), {
+            status: res.status,
+            data: errBody,
+          });
         }
         const savedEntry = await res.json() as LedgerEntry;
         queryClient.setQueryData<LedgerEntry[]>(entriesKey, (old) =>
@@ -751,7 +755,13 @@ export function TransactionEntryScreen({
         queryClient.setQueryData(partyKey,   previousParty);
         queryClient.setQueryData(partiesKey, previousParties);
         queryClient.setQueryData(summaryKey, previousSummary);
-        toast.error('লেনদেন আপডেট ব্যর্থ হয়েছে — পরিবর্তন বাতিল হয়েছে');
+        if (isLedgerAmountLimitError(err)) {
+          toast.error('লেনদেনের পরিমাণ সীমা ছাড়িয়েছে', {
+            description: 'পরিমাণ কমিয়ে আবার চেষ্টা করুন। পরিবর্তন সংরক্ষণ হয়নি।',
+          });
+        } else {
+          toast.error('লেনদেন আপডেট ব্যর্থ হয়েছে — পরিবর্তন বাতিল হয়েছে');
+        }
       }
     })();
   }, [
@@ -880,9 +890,15 @@ export function TransactionEntryScreen({
       onClose();
     } catch (error) {
       console.error('Online ledger entry save failed:', error);
-      toast.error('সার্ভারে হিসাব জমা হয়নি', {
-        description: 'সংযোগ পরীক্ষা করে এই ফর্ম থেকে আবার চেষ্টা করুন। এন্ট্রি সংরক্ষিত হয়নি।',
-      });
+      if (isLedgerAmountLimitError(error)) {
+        toast.error('লেনদেনের পরিমাণ সীমা ছাড়িয়েছে', {
+          description: 'পরিমাণ কমিয়ে আবার চেষ্টা করুন। এন্ট্রি সংরক্ষিত হয়নি।',
+        });
+      } else {
+        toast.error('সার্ভারে হিসাব জমা হয়নি', {
+          description: 'তথ্য যাচাই করে আবার চেষ্টা করুন। এন্ট্রি সংরক্ষিত হয়নি।',
+        });
+      }
     } finally {
       savingRef.current = false;
     }

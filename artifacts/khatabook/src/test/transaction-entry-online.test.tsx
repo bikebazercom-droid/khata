@@ -2,6 +2,7 @@ import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   LedgerEntryType,
   PartyRole,
@@ -168,10 +169,12 @@ describe('browser ledger entry submission', () => {
     mocks.scanDocument.mockResolvedValue('data:image/jpeg;base64,captured-bill');
     mocks.queueEntry.mockReset();
     mocks.playTransactionSuccessSound.mockReset();
+    vi.restoreAllMocks();
     mocks.createLedgerEntry.mockResolvedValue({ id: 'entry-1' });
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     setBrowserOnline(true);
     vi.unstubAllGlobals();
   });
@@ -192,6 +195,23 @@ describe('browser ledger entry submission', () => {
       partyId: PARTY_ID,
       status: 'pending',
     });
+  });
+
+  it('submits a twenty-billion amount online instead of misclassifying it as an offline draft', async () => {
+    const { onClose } = renderEntry();
+    fireEvent.change(screen.getByRole('textbox', { name: 'পরিমাণ লিখুন' }), {
+      target: { value: '20000000000' },
+    });
+
+    saveEntry();
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    expect(mocks.createLedgerEntry).toHaveBeenCalledWith(
+      PARTY_ID,
+      expect.objectContaining({ amount: 20_000_000_000 }),
+      expect.anything(),
+    );
+    expect(mocks.queueEntry).not.toHaveBeenCalled();
   });
 
   it('supports manual typing, cursor insertion, selection replacement, and one-character keypad backspace', () => {
@@ -529,6 +549,40 @@ describe('browser ledger entry submission', () => {
     const firstRequest = mocks.createLedgerEntry.mock.calls[0][1];
     const retryRequest = mocks.createLedgerEntry.mock.calls[1][1];
     expect(retryRequest.clientRequestId).toBe(firstRequest.clientRequestId);
+    expect(mocks.queueEntry).not.toHaveBeenCalled();
+  });
+
+  it('shows an amount-limit toast for a server rejection and does not queue it offline', async () => {
+    const errorToast = vi.spyOn(toast, 'error').mockImplementation(() => '' as never);
+    mocks.createLedgerEntry.mockRejectedValueOnce(Object.assign(
+      new Error('HTTP 400'),
+      { status: 400, data: { error: 'Amount exceeds the supported limit' } },
+    ));
+    const { onClose } = renderEntry();
+    enterAmount();
+
+    saveEntry();
+
+    await waitFor(() => expect(errorToast).toHaveBeenCalledWith(
+      'লেনদেনের পরিমাণ সীমা ছাড়িয়েছে',
+      expect.objectContaining({ description: expect.stringContaining('পরিমাণ কমিয়ে') }),
+    ));
+    expect(mocks.queueEntry).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'এন্ট্রি নিশ্চিত করুন' })).toBeInTheDocument();
+  });
+
+  it('does not treat an HTTP 500 response as a connectivity failure', async () => {
+    mocks.createLedgerEntry.mockImplementationOnce(async () => {
+      setBrowserOnline(false);
+      throw Object.assign(new Error('HTTP 500'), { status: 500 });
+    });
+    renderEntry();
+    enterAmount();
+
+    saveEntry();
+
+    await waitFor(() => expect(mocks.createLedgerEntry).toHaveBeenCalledOnce());
     expect(mocks.queueEntry).not.toHaveBeenCalled();
   });
 

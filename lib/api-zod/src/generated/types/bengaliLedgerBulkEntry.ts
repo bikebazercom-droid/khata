@@ -9,6 +9,10 @@ import type { LedgerEntryType } from './ledgerEntryType';
 
 export interface BengaliLedgerBulkEntry {
   partyId: string;
+  /**
+     * @maximum 90071992547409.9
+     * @exclusiveMinimum 0
+     */
   amount: number;
   type: LedgerEntryType;
   note?: string;

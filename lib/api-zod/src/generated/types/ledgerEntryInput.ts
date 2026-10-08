@@ -14,7 +14,10 @@ export interface LedgerEntryInput {
      */
   clientRequestId?: string;
   type: LedgerEntryType;
-  /** @exclusiveMinimum 0 */
+  /**
+     * @maximum 90071992547409.9
+     * @exclusiveMinimum 0
+     */
   amount: number;
   description?: string;
   /** @nullable */

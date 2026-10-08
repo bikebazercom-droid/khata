@@ -9,6 +9,7 @@ import {
 } from "@workspace/api-zod";
 import { getOrCreateBusinessSettings } from "../lib/khatabook";
 import { type AuthenticatedRequest } from "../middlewares/requireAuth";
+import { apiValidationErrorMessage } from "../lib/apiValidation";
 
 const router: IRouter = Router();
 
@@ -27,7 +28,7 @@ router.patch("/settings", async (req, res): Promise<void> => {
   const { businessId } = req as AuthenticatedRequest;
   const parsed = UpdateBusinessSettingsBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
+    res.status(400).json({ error: apiValidationErrorMessage(parsed.error) });
     return;
   }
 

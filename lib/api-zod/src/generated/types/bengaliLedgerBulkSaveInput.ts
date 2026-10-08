@@ -8,5 +8,6 @@
 import type { BengaliLedgerBulkEntry } from './bengaliLedgerBulkEntry';
 
 export interface BengaliLedgerBulkSaveInput {
+  /** @minItems 1 */
   entries: BengaliLedgerBulkEntry[];
 }

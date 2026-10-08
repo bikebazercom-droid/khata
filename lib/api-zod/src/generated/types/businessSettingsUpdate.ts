@@ -11,5 +11,6 @@ export interface BusinessSettingsUpdate {
   storeName?: string;
   /** @minLength 1 */
   language?: string;
+  /** @maximum 90071992547409.9 */
   onlineCollectionBalance?: number;
 }

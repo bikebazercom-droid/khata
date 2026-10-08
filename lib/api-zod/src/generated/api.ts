@@ -31,13 +31,19 @@ export const ScanBengaliLedgerResponse = zod.object({
 /**
  * @summary Save reviewed scan entries
  */
+export const bulkSaveBengaliLedgerBodyEntriesItemAmountExclusiveMin = 0;
+export const bulkSaveBengaliLedgerBodyEntriesItemAmountMax = 90071992547409.9;
+
+
+
+
 export const BulkSaveBengaliLedgerBody = zod.object({
   "entries": zod.array(zod.object({
   "partyId": zod.string(),
-  "amount": zod.number(),
+  "amount": zod.number().gt(bulkSaveBengaliLedgerBodyEntriesItemAmountExclusiveMin).max(bulkSaveBengaliLedgerBodyEntriesItemAmountMax),
   "type": zod.enum(['YOU_GAVE', 'YOU_GOT']),
   "note": zod.string().optional()
-}))
+})).min(1)
 })
 
 export const BulkSaveBengaliLedgerResponse = zod.object({
@@ -354,12 +360,14 @@ export const GetBusinessSettingsResponse = zod.object({
  */
 
 
+export const updateBusinessSettingsBodyOnlineCollectionBalanceMax = 90071992547409.9;
+
 
 
 export const UpdateBusinessSettingsBody = zod.object({
   "storeName": zod.string().min(1).optional(),
   "language": zod.string().min(1).optional(),
-  "onlineCollectionBalance": zod.number().optional()
+  "onlineCollectionBalance": zod.number().max(updateBusinessSettingsBodyOnlineCollectionBalanceMax).optional()
 })
 
 export const UpdateBusinessSettingsResponse = zod.object({
@@ -412,6 +420,8 @@ export const ListPartiesResponse = zod.array(ListPartiesResponseItem)
  * @summary Create a new customer or supplier
  */
 
+export const createPartyBodyOpeningBalanceMax = 90071992547409.9;
+
 
 
 export const CreatePartyBody = zod.object({
@@ -419,7 +429,7 @@ export const CreatePartyBody = zod.object({
   "name": zod.string().min(1),
   "phone": zod.string().optional().describe('Optional mobile number; may be omitted or blank.'),
   "role": zod.enum(['CUSTOMER', 'SUPPLIER']),
-  "openingBalance": zod.number().optional().describe('Optional opening balance amount (always positive)'),
+  "openingBalance": zod.number().max(createPartyBodyOpeningBalanceMax).optional().describe('Optional opening balance amount (always positive)'),
   "openingBalanceType": zod.enum(['YOU_WILL_GIVE', 'YOU_WILL_GET']).optional(),
   "dueDate": zod.coerce.date().nullish()
 })
@@ -534,13 +544,14 @@ export const CreateLedgerEntryParams = zod.object({
 
 export const createLedgerEntryBodyClientRequestIdRegExp = new RegExp('^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
 export const createLedgerEntryBodyAmountExclusiveMin = 0;
+export const createLedgerEntryBodyAmountMax = 90071992547409.9;
 
 
 
 export const CreateLedgerEntryBody = zod.object({
   "clientRequestId": zod.string().regex(createLedgerEntryBodyClientRequestIdRegExp).optional().describe('Stable UUID for retry-safe creation. Scoped to the authenticated actor and business.'),
   "type": zod.enum(['YOU_GAVE', 'YOU_GOT']),
-  "amount": zod.number().gt(createLedgerEntryBodyAmountExclusiveMin),
+  "amount": zod.number().gt(createLedgerEntryBodyAmountExclusiveMin).max(createLedgerEntryBodyAmountMax),
   "description": zod.string().optional(),
   "billReference": zod.string().nullish(),
   "billImage": zod.string().nullish().describe('Cloud storage object path for the scanned bill\/receipt image (e.g. \/objects\/uploads\/uuid).'),
@@ -575,12 +586,13 @@ export const PatchLedgerEntryParams = zod.object({
 })
 
 export const patchLedgerEntryBodyAmountExclusiveMin = 0;
+export const patchLedgerEntryBodyAmountMax = 90071992547409.9;
 
 
 
 export const PatchLedgerEntryBody = zod.object({
   "type": zod.enum(['YOU_GAVE', 'YOU_GOT']).optional(),
-  "amount": zod.number().gt(patchLedgerEntryBodyAmountExclusiveMin).optional(),
+  "amount": zod.number().gt(patchLedgerEntryBodyAmountExclusiveMin).max(patchLedgerEntryBodyAmountMax).optional(),
   "description": zod.string().optional(),
   "billReference": zod.string().nullish(),
   "billImage": zod.string().nullish(),

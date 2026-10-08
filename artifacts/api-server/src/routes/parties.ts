@@ -38,6 +38,7 @@ import {
   PatchLedgerEntryBody,
   PatchLedgerEntryResponse,
 } from "@workspace/api-zod";
+import { apiValidationErrorMessage } from "../lib/apiValidation";
 
 // Owner grant edits/deletion lock the same user row. A staff write either
 // commits before revocation or sees the revoked grants; it cannot race past it.
@@ -243,7 +244,7 @@ router.post("/parties", async (req, res): Promise<void> => {
   const { businessId } = req as unknown as AuthenticatedRequest;
   const parsed = CreatePartyBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
+    res.status(400).json({ error: apiValidationErrorMessage(parsed.error) });
     return;
   }
 
@@ -461,7 +462,7 @@ router.post(
     }
     const body = CreateLedgerEntryBody.safeParse(req.body);
     if (!body.success) {
-      res.status(400).json({ error: body.error.message });
+      res.status(400).json({ error: apiValidationErrorMessage(body.error) });
       return;
     }
 
@@ -741,7 +742,7 @@ router.patch(
 
     const body = PatchLedgerEntryBody.safeParse(req.body);
     if (!body.success) {
-      res.status(400).json({ error: body.error.message });
+      res.status(400).json({ error: apiValidationErrorMessage(body.error) });
       return;
     }
     const rawBody = req.body as Record<string, unknown>;

@@ -14,6 +14,8 @@ import {
   toDateOnlyString,
 } from "../lib/khatabook";
 import { type AuthenticatedRequest } from "../middlewares/requireAuth";
+import { BulkSaveBengaliLedgerBody } from "@workspace/api-zod";
+import { apiValidationErrorMessage } from "../lib/apiValidation";
 
 const router = Router();
 
@@ -164,16 +166,6 @@ If no transactions are found in the image, return {"items":[]}.`,
 router.post("/scan/bulk-save", async (req, res): Promise<void> => {
   const { businessId, userId, role } = req as unknown as AuthenticatedRequest;
 
-  const body = req.body as unknown;
-  if (
-    typeof body !== "object" ||
-    body === null ||
-    !Array.isArray((body as Record<string, unknown>).entries)
-  ) {
-    res.status(400).json({ error: "entries array is required" });
-    return;
-  }
-
   type BulkEntry = {
     partyId: string;
     amount: number;
@@ -181,40 +173,17 @@ router.post("/scan/bulk-save", async (req, res): Promise<void> => {
     note?: string;
   };
 
-  const rawEntries = (body as { entries: unknown[] }).entries;
-  const entries: BulkEntry[] = [];
-
-  for (const item of rawEntries) {
-    if (typeof item !== "object" || item === null) {
-      res.status(400).json({ error: "each entry must be an object" });
-      return;
-    }
-    const i = item as Record<string, unknown>;
-    if (typeof i.partyId !== "string") {
-      res.status(400).json({ error: "partyId is required for each entry" });
-      return;
-    }
-    const amount = Number(i.amount);
-    if (!isFinite(amount) || amount <= 0) {
-      res.status(400).json({ error: `invalid amount: ${i.amount}` });
-      return;
-    }
-    if (i.type !== "YOU_GAVE" && i.type !== "YOU_GOT") {
-      res.status(400).json({ error: `invalid type: ${i.type}` });
-      return;
-    }
-    entries.push({
-      partyId: i.partyId,
-      amount,
-      type: i.type,
-      note: typeof i.note === "string" ? i.note : "",
-    });
-  }
-
-  if (entries.length === 0) {
-    res.status(400).json({ error: "entries must not be empty" });
+  const parsed = BulkSaveBengaliLedgerBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: apiValidationErrorMessage(parsed.error) });
     return;
   }
+  const entries: BulkEntry[] = parsed.data.entries.map((item) => ({
+    partyId: item.partyId,
+    amount: item.amount,
+    type: item.type,
+    note: item.note ?? "",
+  }));
 
   // Verify all referenced parties belong to this business
   const uniquePartyIds = [...new Set(entries.map((e) => e.partyId))];

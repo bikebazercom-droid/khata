@@ -27,7 +27,7 @@ export const partiesTable = pgTable("parties", {
   // query, but the ADD PARTY form and API never require a value here.
   phone: text("phone").notNull().default(""),
   role: partyRoleEnum("role").notNull(),
-  currentBalance: numeric("current_balance", { precision: 12, scale: 2 })
+  currentBalance: numeric("current_balance", { precision: 20, scale: 2 })
     .notNull()
     .default("0"),
   balanceType: balanceTypeEnum("balance_type").notNull().default("YOU_WILL_GET"),

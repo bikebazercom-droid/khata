@@ -1134,7 +1134,7 @@ components:
       required: [partyId, amount, type]
       properties:
         partyId: { type: string }
-        amount: { type: number }
+        amount: { type: number, exclusiveMinimum: 0, maximum: 90071992547409.9 }
         type: { $ref: "#/components/schemas/LedgerEntryType" }
         note: { type: string }
     BengaliLedgerBulkSaveInput:
@@ -1143,6 +1143,7 @@ components:
       properties:
         entries:
           type: array
+          minItems: 1
           items: { $ref: "#/components/schemas/BengaliLedgerBulkEntry" }
     BengaliLedgerBulkSaveResult:
       type: object
@@ -1452,6 +1453,7 @@ components:
           $ref: "#/components/schemas/PartyRole"
         openingBalance:
           type: number
+          maximum: 90071992547409.9
           description: Optional opening balance amount (always positive)
         openingBalanceType:
           $ref: "#/components/schemas/BalanceType"
@@ -1523,6 +1525,7 @@ components:
         amount:
           type: number
           exclusiveMinimum: 0
+          maximum: 90071992547409.9
         description:
           type: string
         billReference:
@@ -1545,7 +1548,7 @@ components:
       type: object
       properties:
         type: { $ref: "#/components/schemas/LedgerEntryType" }
-        amount: { type: number, exclusiveMinimum: 0 }
+        amount: { type: number, exclusiveMinimum: 0, maximum: 90071992547409.9 }
         description: { type: string }
         billReference: { type: ["string", "null"] }
         billImage: { type: ["string", "null"] }
@@ -1641,6 +1644,7 @@ components:
           minLength: 1
         onlineCollectionBalance:
           type: number
+          maximum: 90071992547409.9
     ReminderMessage:
       type: object
       required:
