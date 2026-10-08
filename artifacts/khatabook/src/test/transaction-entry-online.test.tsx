@@ -239,6 +239,7 @@ describe('browser ledger entry submission', () => {
     const mutedKeys = ['C', 'M+', 'M-', 'DEL', '/', '%', '*'];
     for (const value of mutedKeys) {
       expect(screen.getByTestId(`calculator-key-${value}`)).toHaveClass(
+        'calculator-key',
         'h-11',
         'text-base',
         'rounded-[5px]',
@@ -249,6 +250,7 @@ describe('browser ledger entry submission', () => {
 
     for (const digit of [...'0123456789', '=']) {
       expect(screen.getByTestId(`calculator-key-${digit}`)).toHaveClass(
+        'calculator-key',
         'h-11',
         'text-base',
         'rounded-[5px]',
@@ -259,6 +261,7 @@ describe('browser ledger entry submission', () => {
 
     for (const value of ['-', '+']) {
       expect(screen.getByTestId(`calculator-key-${value}`)).toHaveClass(
+        'calculator-key',
         'h-11',
         'text-base',
         'rounded-[5px]',
@@ -299,6 +302,10 @@ describe('browser ledger entry submission', () => {
       const button = screen.getByTestId(`calculator-key-${value}`);
       expect(button.parentElement?.children[3]).toBe(button);
     }
+
+    pressCalculatorKey('5');
+    pressCalculatorKey('M+');
+    expect(screen.getByRole('button', { name: /MRC =/ })).toHaveClass('calculator-key');
   });
 
   it('lets every digit, decimal, and arithmetic operator update the editable expression', () => {

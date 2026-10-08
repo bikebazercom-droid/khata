@@ -109,30 +109,16 @@ const Key = memo(function Key({
     <button
       type="button"
       data-testid={`calculator-key-${def.value}`}
-      onClick={() => {
-        onPress(def.value);
-      }}
-      style={{
-        // Hardware-accelerated, GPU-composited layer: the browser can flip
-        // the `:active` background on its own compositor thread instead of
-        // repainting, so there's zero lag on low-end mobile devices even
-        // during fast repeated taps.
-        transform: 'translate3d(0,0,0)',
-        backfaceVisibility: 'hidden',
-        willChange: 'background-color',
-      }}
+      onClick={() => onPress(def.value)}
       className={cn(
-        'h-11 rounded-[5px] shadow-[0_2px_4px_rgba(0,0,0,0.15)] font-bold text-base flex items-center justify-center active:scale-[0.95] transition-[background-color,transform,filter] duration-[50ms] ease-out select-none',
-        // CSS-only press feedback keeps taps responsive without repainting
-        // the rest of the calculator grid.
-        'active:brightness-95',
+        'calculator-key h-11 rounded-[5px] shadow-[0_2px_4px_rgba(0,0,0,0.15)] font-bold text-base flex items-center justify-center select-none',
         def.kind === 'digit' && 'bg-white text-slate-800',
         def.kind === 'muted' && 'bg-[#cbdced] text-[#123f86]',
         def.kind === 'accent' && 'bg-[#0d55ad] text-white',
         className,
       )}
     >
-      {def.label}
+      <span>{def.label}</span>
     </button>
   );
 });
@@ -1187,9 +1173,9 @@ export function TransactionEntryScreen({
             onClick={() => {
               handleMrcTap();
             }}
-            className="w-full h-10 rounded-[5px] shadow-[0_2px_4px_rgba(0,0,0,0.15)] bg-[#0d55ad] text-white font-extrabold text-sm flex items-center justify-center active:scale-[0.98] active:brightness-95 transition-[background-color,transform,filter] duration-[50ms] ease-out"
+            className="calculator-key w-full h-10 rounded-[5px] shadow-[0_2px_4px_rgba(0,0,0,0.15)] bg-[#0d55ad] text-white font-extrabold text-sm flex items-center justify-center"
           >
-            MRC = {formatCurrency(memoryValue)}
+            <span>MRC = {formatCurrency(memoryValue)}</span>
           </button>
         )}
         <div

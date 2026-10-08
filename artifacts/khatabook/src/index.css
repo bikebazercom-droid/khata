@@ -244,3 +244,39 @@ textarea {
     height: auto;
   }
 }
+
+@layer components {
+  .calculator-key {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    transform: translate3d(0, 0, 0);
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 90ms ease-out;
+  }
+
+  .calculator-key::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: rgba(72, 60, 50, 0.36);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 90ms ease-out;
+    z-index: 0;
+  }
+
+  .calculator-key > span {
+    position: relative;
+    z-index: 1;
+  }
+
+  .calculator-key:active:not(:disabled) {
+    transform: translate3d(0, 0, 0) scale(0.96);
+  }
+
+  .calculator-key:active:not(:disabled)::after {
+    opacity: 1;
+  }
+}
