@@ -39,7 +39,7 @@ import {
 } from '@/lib/ledger-report';
 import { billImageSrc, prefetchImagesForPdf } from '@/lib/billImageStorage';
 import { toast } from 'sonner';
-import { format, isToday } from 'date-fns';
+import { differenceInCalendarDays, format } from 'date-fns';
 import { formatLedgerEntryDateTime, getLedgerEntryDateKey } from '@/lib/date-time';
 import { useAppAuth } from '@/App';
 import { useBusinessContext } from '@/lib/businessContext';
@@ -66,6 +66,15 @@ function currencyAmountFontSize(value: string): string {
   // The amount tracks are 6rem wide with 8px horizontal padding, leaving
   // 88px of text space. Keep a small safety margin for font metric variance.
   return `${Math.min(14, 84 / (estimatedWidthInEm * 1.12))}px`;
+}
+
+const bengaliIntegerFormatter = new Intl.NumberFormat('bn-BD', { useGrouping: false });
+
+function relativeLedgerDate(date: Date): string {
+  const dayDifference = differenceInCalendarDays(new Date(), date);
+  if (dayDifference === 0) return 'আজ';
+  const dayCount = bengaliIntegerFormatter.format(Math.abs(dayDifference));
+  return dayDifference > 0 ? `${dayCount} দিন আগে` : `${dayCount} দিন পরে`;
 }
 
 /** Groups already-sorted entries by calendar day, preserving the given order. */
@@ -457,7 +466,7 @@ export function PartyView() {
       )}
 
       {/* Scrollable ledger area */}
-      <div className="flex-1 min-h-0 overflow-y-auto pb-4">
+      <div className="flex-1 min-h-0 overflow-y-auto bg-[#F5F6F8] pb-4">
         {outboxError && <p role="alert" className="m-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{outboxError}</p>}
         {pendingEntries.length > 0 && (
           <section className="m-3 rounded-xl border border-amber-200 bg-amber-50 p-3" aria-label="অপেক্ষমাণ এন্ট্রি">
@@ -489,21 +498,20 @@ export function PartyView() {
         ) : (
           <>
             {/* Column headers */}
-            <div className="sticky top-0 z-[5] bg-[#f8fafc] grid grid-cols-[minmax(0,1fr)_minmax(0,6rem)_minmax(0,6rem)] gap-3 px-4 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            <div className="sticky top-0 z-[5] grid grid-cols-[minmax(0,1fr)_6rem_6rem] bg-[#F5F6F8] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
               <span>এন্ট্রি</span>
-              <span className="w-24 min-w-0 text-center leading-tight">আপনি দিয়েছেন</span>
-              <span className="w-24 min-w-0 text-right leading-tight">আপনি পেয়েছেন</span>
+              <span className="min-w-0 px-1 text-center leading-tight">আপনি দিয়েছেন</span>
+              <span className="min-w-0 px-1 text-right leading-tight">আপনি পেয়েছেন</span>
             </div>
 
             {groupedEntries.map((group) => (
               <div key={group.dayKey}>
-                <div className="sticky top-[26px] z-[4] flex justify-center py-2 bg-[#f8fafc]/95 backdrop-blur-sm">
-                  <span className="text-[11px] font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
-                    {format(group.date, 'd MMM yy')}
-                    {isToday(group.date) ? ' • আজ' : ''}
+                <div className="sticky top-[26px] z-[4] flex justify-center bg-[#F5F6F8]/95 py-1.5 backdrop-blur-sm">
+                  <span className="text-[11px] font-semibold tracking-wide text-slate-500">
+                    {format(group.date, 'd MMM yy')} • {relativeLedgerDate(group.date)}
                   </span>
                 </div>
-                <div className="px-3 space-y-2">
+                <div className="space-y-2 px-2.5">
                   {group.items.map((entry, i) => {
                     const isGave = entry.type === 'YOU_GAVE';
                     const imgSrc = billImageSrc(entry.billImage);
@@ -522,12 +530,12 @@ export function PartyView() {
                           if (userRole === 'owner' && e.key === 'Enter') navigate(`/party/${id}/entry/${entry.id}`);
                         }}
                         className={cn(
-                          "bg-white rounded-xl shadow-sm grid grid-cols-[minmax(0,1fr)_minmax(0,6rem)_minmax(0,6rem)] gap-3 items-center overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both transition-colors",
+                          "grid grid-cols-[minmax(0,1fr)_6rem_6rem] items-stretch gap-0 overflow-hidden rounded-xl border border-[#EBEBEB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.07)] animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both transition-colors",
                           userRole === 'owner' ? "cursor-pointer active:bg-slate-50" : ""
                         )}
                         style={{ animationDelay: `${i * 30}ms` }}
                       >
-                        <div className="min-w-0 py-3 pl-4">
+                        <div className="min-w-0 py-3 pl-3 pr-2">
                           <p className="text-[12px] font-bold text-slate-700 flex items-center gap-1.5 flex-wrap">
                             {formatLedgerEntryDateTime(entry.dueDate, entry.createdAt)}
                             {entry.isTransfer && (
@@ -536,15 +544,17 @@ export function PartyView() {
                               </span>
                             )}
                           </p>
-                          <p className={cn(
-                            'text-[11px] font-semibold mt-0.5',
-                            entry.balanceAfter >= 0 ? 'text-emerald-500' : 'text-red-500',
+                          <span className={cn(
+                            'mt-1 inline-flex max-w-full items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold leading-snug',
+                            entry.balanceAfter >= 0
+                              ? 'bg-[#EAF4F1] text-emerald-800'
+                              : 'bg-[#FFF0F0] text-red-700',
                           )}>
-                            ব্যালেন্স:{' '}
-                            <span className="inline-block max-w-full" style={{ overflowWrap: 'anywhere' }}>
+                            <span className="shrink-0">ব্যালেন্স:</span>
+                            <span className="ml-1 min-w-0" style={{ overflowWrap: 'anywhere' }}>
                               {formatCurrency(Math.abs(entry.balanceAfter))}
                             </span>
-                          </p>
+                          </span>
                           {entry.isTransfer ? (
                             <p className={cn('text-[11px] font-bold mt-0.5 truncate', isGave ? 'text-red-500' : 'text-emerald-500')}>
                               {(() => {
@@ -582,22 +592,28 @@ export function PartyView() {
                             </button>
                           )}
                         </div>
-                        {/* আপনি দিয়েছেন — always pink/red bg */}
-                        <div className="min-w-0 h-full flex items-center justify-center px-1 py-3 bg-[#FFF5F5]">
+                        {/* You-gave amounts occupy the debit column; tint it only when populated. */}
+                        <div className={cn(
+                          'min-w-0 flex items-center justify-end px-1 py-3',
+                          isGave && 'bg-[#FFF5F5]',
+                        )}>
                           {isGave && (
                             <span
-                              className="block w-full min-w-0 whitespace-nowrap text-center font-extrabold text-red-700 leading-tight"
+                              className="block w-full min-w-0 whitespace-nowrap text-right font-extrabold leading-tight text-red-700"
                               style={{ fontSize: amountFontSize }}
                             >
                               {formattedAmount}
                             </span>
                           )}
                         </div>
-                        {/* আপনি পেয়েছেন — always white bg */}
-                        <div className="min-w-0 h-full flex items-center justify-end px-1 py-3 bg-white">
+                        {/* You-got amounts occupy the credit column; tint it only when populated. */}
+                        <div className={cn(
+                          'min-w-0 flex items-center justify-end px-1 py-3',
+                          !isGave && 'bg-[#F0F8F5]',
+                        )}>
                           {!isGave && (
                             <span
-                              className="block w-full min-w-0 whitespace-nowrap text-right font-extrabold text-emerald-600 leading-tight"
+                              className="block w-full min-w-0 whitespace-nowrap text-right font-extrabold leading-tight text-emerald-700"
                               style={{ fontSize: amountFontSize }}
                             >
                               {formattedAmount}
