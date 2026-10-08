@@ -238,6 +238,36 @@ describe('browser ledger entry submission', () => {
     expect(amount.selectionStart).toBe(3);
   });
 
+  it('uses compact keypad spacing and the requested key color hierarchy', () => {
+    renderEntry();
+
+    const mutedKeys = ['C', 'M+', 'M-', 'DEL', '/', '%', '*', '='];
+    for (const value of mutedKeys) {
+      expect(screen.getByTestId(`calculator-key-${value}`)).toHaveClass(
+        'rounded-lg',
+        'bg-[#e6eef8]',
+      );
+    }
+
+    for (const digit of '0123456789') {
+      expect(screen.getByTestId(`calculator-key-${digit}`)).toHaveClass(
+        'rounded-lg',
+        'bg-white',
+      );
+    }
+
+    for (const value of ['-', '+']) {
+      expect(screen.getByTestId(`calculator-key-${value}`)).toHaveClass(
+        'rounded-lg',
+        'bg-[#0b3d91]',
+      );
+    }
+
+    const numberRow = screen.getByTestId('calculator-key-7').parentElement;
+    expect(numberRow).toHaveClass('grid', 'grid-cols-5', 'gap-1.5');
+    expect(numberRow?.parentElement).toHaveClass('space-y-1.5');
+  });
+
   it('lets every digit, decimal, and arithmetic operator update the editable expression', () => {
     renderEntry();
     const amount = screen.getByRole('textbox', { name: 'পরিমাণ লিখুন' }) as HTMLInputElement;
