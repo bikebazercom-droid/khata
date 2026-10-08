@@ -43,7 +43,7 @@ import { isTransientNetworkError } from '@/lib/offlineErrors';
 import { readOfflineIdentity } from '@/lib/offlineSession';
 
 type KeyKind = 'digit' | 'muted' | 'accent';
-type KeyDef = { label: string; value: string; kind: KeyKind; span?: number };
+type KeyDef = { label: string; value: string; kind: KeyKind };
 type TextSelection = { start: number; end: number };
 
 function normalizeCalculatorInput(raw: string): string {
@@ -69,6 +69,8 @@ const ROW_789: KeyDef[] = [
   { label: '7', value: '7', kind: 'digit' },
   { label: '8', value: '8', kind: 'digit' },
   { label: '9', value: '9', kind: 'digit' },
+];
+const ROW_789_OPERATORS: KeyDef[] = [
   { label: '÷', value: '/', kind: 'muted' },
   { label: '%', value: '%', kind: 'muted' },
 ];
@@ -76,26 +78,34 @@ const ROW_456: KeyDef[] = [
   { label: '4', value: '4', kind: 'digit' },
   { label: '5', value: '5', kind: 'digit' },
   { label: '6', value: '6', kind: 'digit' },
-  { label: '×', value: '*', kind: 'muted', span: 2 },
+  { label: '×', value: '*', kind: 'muted' },
 ];
 const ROW_123: KeyDef[] = [
   { label: '1', value: '1', kind: 'digit' },
   { label: '2', value: '2', kind: 'digit' },
   { label: '3', value: '3', kind: 'digit' },
-  { label: '−', value: '-', kind: 'accent', span: 2 },
+  { label: '−', value: '-', kind: 'accent' },
 ];
 const ROW_0DOT: KeyDef[] = [
   { label: '0', value: '0', kind: 'digit' },
   { label: '.', value: '.', kind: 'digit' },
   { label: '=', value: '=', kind: 'digit' },
-  { label: '+', value: '+', kind: 'accent', span: 2 },
+  { label: '+', value: '+', kind: 'accent' },
 ];
 
 // Memoized so a parent re-render (typing, memory updates, description edits,
 // etc.) never re-renders the 20+ key buttons — only `onPress` identity and
 // `def` (a stable module-level constant) are compared, and `onPress` is a
 // useCallback below, so in practice these never re-render after mount.
-const Key = memo(function Key({ def, onPress }: { def: KeyDef; onPress: (value: string) => void }) {
+const Key = memo(function Key({
+  def,
+  onPress,
+  className,
+}: {
+  def: KeyDef;
+  onPress: (value: string) => void;
+  className?: string;
+}) {
   return (
     <button
       type="button"
@@ -105,7 +115,6 @@ const Key = memo(function Key({ def, onPress }: { def: KeyDef; onPress: (value: 
         onPress(def.value);
       }}
       style={{
-        ...(def.span ? { gridColumn: `span ${def.span}` } : undefined),
         // Hardware-accelerated, GPU-composited layer: the browser can flip
         // the `:active` background on its own compositor thread instead of
         // repainting, so there's zero lag on low-end mobile devices even
@@ -121,7 +130,8 @@ const Key = memo(function Key({ def, onPress }: { def: KeyDef; onPress: (value: 
         'active:brightness-95',
         def.kind === 'digit' && 'bg-white text-slate-800',
         def.kind === 'muted' && 'bg-[#cbdced] text-[#123f86]',
-        def.kind === 'accent' && 'bg-[#0d55ad] text-white'
+        def.kind === 'accent' && 'bg-[#0d55ad] text-white',
+        className,
       )}
     >
       {def.label}
@@ -1185,27 +1195,52 @@ export function TransactionEntryScreen({
             MRC = {formatCurrency(memoryValue)}
           </button>
         )}
-        <div className="grid grid-cols-4 gap-1.5">
+        <div
+          className="grid gap-1.5"
+          style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}
+        >
           {ROW_MEMORY.map((k) => (
             <Key key={k.value} def={k} onPress={pressKey} />
           ))}
         </div>
-        <div className="grid grid-cols-5 gap-1.5">
+        <div
+          className="grid gap-1.5"
+          style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}
+        >
           {ROW_789.map((k) => (
             <Key key={k.value} def={k} onPress={pressKey} />
           ))}
+          <div className="flex min-w-0 gap-1.5">
+            {ROW_789_OPERATORS.map((k) => (
+              <Key
+                key={k.value}
+                def={k}
+                onPress={pressKey}
+                className="min-w-0 flex-1"
+              />
+            ))}
+          </div>
         </div>
-        <div className="grid grid-cols-5 gap-1.5">
+        <div
+          className="grid gap-1.5"
+          style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}
+        >
           {ROW_456.map((k) => (
             <Key key={k.value} def={k} onPress={pressKey} />
           ))}
         </div>
-        <div className="grid grid-cols-5 gap-1.5">
+        <div
+          className="grid gap-1.5"
+          style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}
+        >
           {ROW_123.map((k) => (
             <Key key={k.value} def={k} onPress={pressKey} />
           ))}
         </div>
-        <div className="grid grid-cols-5 gap-1.5">
+        <div
+          className="grid gap-1.5"
+          style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}
+        >
           {ROW_0DOT.map((k) => (
             <Key key={k.value} def={k} onPress={pressKey} />
           ))}

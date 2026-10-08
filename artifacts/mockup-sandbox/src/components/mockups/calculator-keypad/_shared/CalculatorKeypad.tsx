@@ -31,9 +31,11 @@ const ROW_0DOT: KeyDef[] = [
 function Key({
   def,
   variant,
+  className,
 }: {
   def: KeyDef;
   variant: Variant;
+  className?: string;
 }) {
   const isReference = variant === 'reference-matched';
   const memoryRow = ['C', 'M+', 'M-', 'DEL'].includes(def.value);
@@ -48,7 +50,7 @@ function Key({
     <button
       type="button"
       style={{
-        ...(def.span ? { gridColumn: `span ${def.span}` } : undefined),
+        ...(def.span && !isReference ? { gridColumn: `span ${def.span}` } : undefined),
         transform: 'translate3d(0,0,0)',
         backfaceVisibility: 'hidden',
         willChange: 'background-color',
@@ -67,6 +69,7 @@ function Key({
           ? `bg-[#0d55ad] text-white ${referenceShadow}`
           : 'bg-[#0b3d91] text-white shadow-sm'),
         isReference && memoryRow && 'rounded-[5px]',
+        className,
       ].filter(Boolean).join(' ')}
     >
       {def.label}
@@ -98,14 +101,53 @@ export function CalculatorKeypad({ variant }: { variant: Variant }) {
       className={`w-full bg-[#eef2f7] ${padding} ${rowGap} shrink-0`}
       style={{ transform: 'translate3d(0,0,0)', backfaceVisibility: 'hidden' }}
     >
-      <div className={`grid grid-cols-4 ${gridGap}`}>
+      <div
+        className={`grid ${gridGap}`}
+        style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}
+      >
         {renderRow(memoryRow, variant)}
       </div>
-      {[ROW_789, ROW_456, ROW_123, ROW_0DOT].map((row, index) => (
-        <div key={index} className={`grid grid-cols-5 ${gridGap}`}>
-          {renderRow(row, variant)}
-        </div>
-      ))}
+      {variant === 'reference-matched' ? (
+        <>
+          <div
+            className={`grid ${gridGap}`}
+            style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}
+          >
+            {renderRow(ROW_789.slice(0, 3), variant)}
+            <div className={`flex min-w-0 ${gridGap}`}>
+              <Key
+                def={ROW_789[3]}
+                variant={variant}
+                className="min-w-0 flex-1"
+              />
+              <Key
+                def={ROW_789[4]}
+                variant={variant}
+                className="min-w-0 flex-1"
+              />
+            </div>
+          </div>
+          {[ROW_456, ROW_123, ROW_0DOT].map((row, index) => (
+            <div
+              key={index}
+              className={`grid ${gridGap}`}
+              style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}
+            >
+              {renderRow(row, variant)}
+            </div>
+          ))}
+        </>
+      ) : (
+        [ROW_789, ROW_456, ROW_123, ROW_0DOT].map((row, index) => (
+          <div
+            key={index}
+            className={`grid ${gridGap}`}
+            style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}
+          >
+            {renderRow(row, variant)}
+          </div>
+        ))
+      )}
     </div>
   );
 }

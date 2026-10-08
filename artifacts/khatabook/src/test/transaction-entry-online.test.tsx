@@ -267,12 +267,31 @@ describe('browser ledger entry submission', () => {
       );
     }
 
-    const numberRow = screen.getByTestId('calculator-key-7').parentElement;
-    expect(numberRow).toHaveClass('grid', 'grid-cols-5', 'gap-1.5');
-    expect(numberRow?.parentElement).toHaveClass('space-y-1.5');
-    expect(numberRow?.children).toHaveLength(5);
-    expect(numberRow?.children[3]).toBe(screen.getByTestId('calculator-key-/'));
-    expect(numberRow?.children[4]).toBe(screen.getByTestId('calculator-key-%'));
+    const expectedGridRows = [
+      screen.getByTestId('calculator-key-C').parentElement,
+      screen.getByTestId('calculator-key-7').parentElement,
+      screen.getByTestId('calculator-key-4').parentElement,
+      screen.getByTestId('calculator-key-1').parentElement,
+      screen.getByTestId('calculator-key-0').parentElement,
+    ];
+    for (const row of expectedGridRows) {
+      expect(row).toHaveClass('grid', 'gap-1.5');
+      expect(row).toHaveStyle({ gridTemplateColumns: 'repeat(4, 1fr)' });
+      expect(row?.children).toHaveLength(4);
+    }
+    expect(expectedGridRows[1]?.parentElement).toHaveClass('space-y-1.5');
+
+    const splitOperatorCell = screen.getByTestId('calculator-key-/').parentElement;
+    expect(splitOperatorCell).toHaveClass('flex', 'min-w-0', 'gap-1.5');
+    expect(splitOperatorCell?.children).toHaveLength(2);
+    expect(splitOperatorCell?.children[0]).toBe(screen.getByTestId('calculator-key-/'));
+    expect(splitOperatorCell?.children[1]).toBe(screen.getByTestId('calculator-key-%'));
+    expect(expectedGridRows[1]?.children[3]).toBe(splitOperatorCell);
+
+    for (const value of ['DEL', '*', '-', '+']) {
+      const button = screen.getByTestId(`calculator-key-${value}`);
+      expect(button.parentElement?.children[3]).toBe(button);
+    }
   });
 
   it('lets every digit, decimal, and arithmetic operator update the editable expression', () => {
