@@ -56,16 +56,34 @@ function entryDateKey(entry: { dueDate: string | null; createdAt: string | Date 
   return getLedgerEntryDateKey(entry.dueDate, entry.createdAt);
 }
 
-function currencyAmountFontSize(value: string): string {
+function currencyAmountColumnWidth(viewportWidth: number): number {
+  if (viewportWidth < 380) return 72;
+  if (viewportWidth < 480) return 80;
+  return 96;
+}
+
+function currencyAmountFontSize(value: string, columnWidth: number): string {
   const estimatedWidthInEm = Array.from(value).reduce((width, character) => {
     if (character === '৳') return width + 0.9;
     if (character === ',' || character === '.') return width + 0.35;
     return width + 0.68;
   }, 0);
 
-  // The amount tracks are 6rem wide with 8px horizontal padding, leaving
-  // 88px of text space. Keep a small safety margin for font metric variance.
-  return `${Math.min(14, 84 / (estimatedWidthInEm * 1.12))}px`;
+  const availableWidth = columnWidth - 8;
+  const maxFontSize = columnWidth < 80 ? 11 : columnWidth < 96 ? 12 : 14;
+  return `${Math.min(maxFontSize, availableWidth / (estimatedWidthInEm * 1.12))}px`;
+}
+
+function balanceBadgeFontSize(value: string, availableWidth: number): string {
+  const estimatedWidthInEm = Array.from(value).reduce((width, character) => {
+    if (character === '৳') return width + 0.9;
+    if (character === ',' || character === '.') return width + 0.35;
+    if (/\d/.test(character)) return width + 0.68;
+    if (/\s/.test(character)) return width + 0.3;
+    return width + 0.55;
+  }, 0);
+
+  return `${Math.min(10, availableWidth / (estimatedWidthInEm * 1.12))}px`;
 }
 
 const bengaliIntegerFormatter = new Intl.NumberFormat('bn-BD', { useGrouping: false });
@@ -97,6 +115,15 @@ export function PartyView() {
   const [, params] = useRoute('/party/:id');
   const id = params?.id;
   const [, navigate] = useLocation();
+  const [viewportWidth, setViewportWidth] = useState(() => (
+    typeof window === 'undefined' ? 768 : window.innerWidth
+  ));
+  useEffect(() => {
+    const updateViewportWidth = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', updateViewportWidth);
+    return () => window.removeEventListener('resize', updateViewportWidth);
+  }, []);
+  const amountColumnWidth = currencyAmountColumnWidth(viewportWidth);
   const { role: userRole, userId } = useAppAuth();
   const { selectedBusinessId, businesses } = useBusinessContext();
   const [pendingEntries, setPendingEntries] = useState<QueuedEntry[]>([]);
@@ -498,7 +525,7 @@ export function PartyView() {
         ) : (
           <>
             {/* Column headers */}
-            <div className="sticky top-0 z-[5] grid grid-cols-[minmax(0,1fr)_6rem_6rem] bg-[#F5F6F8] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            <div className="sticky top-0 z-[5] grid grid-cols-[minmax(0,1fr)_4.5rem_4.5rem] min-[380px]:grid-cols-[minmax(0,1fr)_5rem_5rem] min-[480px]:grid-cols-[minmax(0,1fr)_6rem_6rem] bg-[#F5F6F8] px-1.5 py-2 text-[8px] font-bold uppercase tracking-wider text-slate-500 min-[480px]:px-3 min-[480px]:text-[10px]">
               <span>এন্ট্রি</span>
               <span className="min-w-0 px-1 text-center leading-tight">আপনি দিয়েছেন</span>
               <span className="min-w-0 px-1 text-right leading-tight">আপনি পেয়েছেন</span>
@@ -511,12 +538,18 @@ export function PartyView() {
                     {format(group.date, 'd MMM yy')} • {relativeLedgerDate(group.date)}
                   </span>
                 </div>
-                <div className="space-y-2 px-2.5">
+                <div className="space-y-2 px-1.5 min-[480px]:px-2.5">
                   {group.items.map((entry, i) => {
                     const isGave = entry.type === 'YOU_GAVE';
                     const imgSrc = billImageSrc(entry.billImage);
                     const formattedAmount = formatCurrency(entry.amount);
-                    const amountFontSize = currencyAmountFontSize(formattedAmount);
+                    const amountFontSize = currencyAmountFontSize(formattedAmount, amountColumnWidth);
+                    const formattedBalance = formatCurrency(Math.abs(entry.balanceAfter));
+                    const balanceAvailableWidth = Math.max(40, viewportWidth - 38 - (2 * amountColumnWidth));
+                    const balanceFontSize = balanceBadgeFontSize(
+                      `ব্যালেন্স: ${formattedBalance}`,
+                      balanceAvailableWidth,
+                    );
                     return (
                       <div
                         key={entry.id}
@@ -530,13 +563,13 @@ export function PartyView() {
                           if (userRole === 'owner' && e.key === 'Enter') navigate(`/party/${id}/entry/${entry.id}`);
                         }}
                         className={cn(
-                          "grid grid-cols-[minmax(0,1fr)_6rem_6rem] items-stretch gap-0 overflow-hidden rounded-xl border border-[#EBEBEB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.07)] animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both transition-colors",
+                          "grid grid-cols-[minmax(0,1fr)_4.5rem_4.5rem] min-[380px]:grid-cols-[minmax(0,1fr)_5rem_5rem] min-[480px]:grid-cols-[minmax(0,1fr)_6rem_6rem] items-stretch gap-0 overflow-hidden rounded-xl border border-[#EBEBEB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.07)] animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both transition-colors",
                           userRole === 'owner' ? "cursor-pointer active:bg-slate-50" : ""
                         )}
                         style={{ animationDelay: `${i * 30}ms` }}
                       >
-                        <div className="min-w-0 py-3 pl-3 pr-2">
-                          <p className="text-[12px] font-bold text-slate-700 flex items-center gap-1.5 flex-wrap">
+                        <div className="min-w-0 py-2.5 pl-2 pr-1 min-[480px]:py-3 min-[480px]:pl-3 min-[480px]:pr-2">
+                          <p className="flex flex-wrap items-center gap-1 text-[10px] font-bold text-slate-700 min-[480px]:gap-1.5 min-[480px]:text-[12px]">
                             {formatLedgerEntryDateTime(entry.dueDate, entry.createdAt)}
                             {entry.isTransfer && (
                               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 text-[9px] font-bold">
@@ -545,14 +578,14 @@ export function PartyView() {
                             )}
                           </p>
                           <span className={cn(
-                            'mt-1 inline-flex max-w-full items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold leading-snug',
+                            'mt-1 inline-flex max-w-full flex-nowrap items-center whitespace-nowrap rounded-md px-1 py-0.5 text-[8px] font-semibold leading-snug min-[380px]:text-[9px] min-[480px]:px-1.5 min-[480px]:text-[10px]',
                             entry.balanceAfter >= 0
                               ? 'bg-[#EAF4F1] text-emerald-800'
                               : 'bg-[#FFF0F0] text-red-700',
-                          )}>
+                          )} style={{ fontSize: balanceFontSize }}>
                             <span className="shrink-0">ব্যালেন্স:</span>
-                            <span className="ml-1 min-w-0" style={{ overflowWrap: 'anywhere' }}>
-                              {formatCurrency(Math.abs(entry.balanceAfter))}
+                            <span className="ml-1 min-w-0 whitespace-nowrap">
+                              {formattedBalance}
                             </span>
                           </span>
                           {entry.isTransfer ? (
@@ -594,7 +627,7 @@ export function PartyView() {
                         </div>
                         {/* You-gave amounts occupy the debit column; tint it only when populated. */}
                         <div className={cn(
-                          'min-w-0 flex items-center justify-end px-1 py-3',
+                          'min-w-0 flex items-center justify-end px-0.5 py-2.5 min-[480px]:px-1 min-[480px]:py-3',
                           isGave && 'bg-[#FFF5F5]',
                         )}>
                           {isGave && (
@@ -608,7 +641,7 @@ export function PartyView() {
                         </div>
                         {/* You-got amounts occupy the credit column; tint it only when populated. */}
                         <div className={cn(
-                          'min-w-0 flex items-center justify-end px-1 py-3',
+                          'min-w-0 flex items-center justify-end px-0.5 py-2.5 min-[480px]:px-1 min-[480px]:py-3',
                           !isGave && 'bg-[#F0F8F5]',
                         )}>
                           {!isGave && (
