@@ -63,7 +63,7 @@ const ROW_MEMORY: KeyDef[] = [
   { label: 'C', value: 'C', kind: 'muted' },
   { label: 'M+', value: 'M+', kind: 'muted' },
   { label: 'M-', value: 'M-', kind: 'muted' },
-  { label: '⌫', value: 'DEL', kind: 'digit' },
+  { label: '⌫', value: 'DEL', kind: 'muted' },
 ];
 const ROW_789: KeyDef[] = [
   { label: '7', value: '7', kind: 'digit' },
@@ -115,15 +115,12 @@ const Key = memo(function Key({ def, onPress }: { def: KeyDef; onPress: (value: 
         willChange: 'background-color',
       }}
       className={cn(
-        'h-14 rounded-xl font-bold text-lg flex items-center justify-center active:scale-[0.95] transition-[background-color,transform] duration-[50ms] ease-out select-none',
-        // Tactile press feedback: every key — digit, operator, or memory
-        // control — flashes to a warm charcoal-brown the instant it's
-        // pressed, then snaps back on release, like a phone dialer keypad.
-        // This is pure CSS :active — no React state involved, so pressing
-        // a key never triggers a re-render just for the visual feedback.
-        'active:bg-[#4A3C31] active:text-white active:shadow-none',
+        'h-14 rounded-lg font-bold text-lg flex items-center justify-center active:scale-[0.95] transition-[background-color,transform,filter] duration-[50ms] ease-out select-none',
+        // CSS-only press feedback keeps taps responsive without repainting
+        // the rest of the calculator grid.
+        'active:brightness-95 active:shadow-none',
         def.kind === 'digit' && 'bg-white text-slate-800 shadow-sm',
-        def.kind === 'muted' && 'bg-blue-50 text-blue-900 shadow-sm',
+        def.kind === 'muted' && 'bg-[#e6eef8] text-[#123f86] shadow-sm',
         def.kind === 'accent' && 'bg-[#0b3d91] text-white shadow-sm'
       )}
     >
@@ -1169,7 +1166,7 @@ export function TransactionEntryScreen({
           compositor layer so key presses never trigger a main-thread paint
           of the whole grid on low-end mobile devices. */}
       <div
-        className="pt-3 pr-3 pl-3 pb-[calc(1rem+var(--safe-bottom))] space-y-2 shrink-0 bg-[#eef2f7]"
+        className="pt-2.5 pr-2.5 pl-2.5 pb-[calc(1rem+var(--safe-bottom))] space-y-1.5 shrink-0 bg-[#eef2f7]"
         style={{ transform: 'translate3d(0,0,0)', backfaceVisibility: 'hidden' }}
       >
         {/* MRC bar: shown whenever the memory history has at least one
@@ -1183,32 +1180,32 @@ export function TransactionEntryScreen({
               playCalculatorTapSound();
               handleMrcTap();
             }}
-            className="w-full h-12 rounded-xl bg-[#0b3d91] text-white font-extrabold text-base flex items-center justify-center active:scale-[0.98] active:bg-[#4A3C31] transition-[background-color,transform] duration-[50ms] ease-out"
+            className="w-full h-12 rounded-lg bg-[#0b3d91] text-white font-extrabold text-base flex items-center justify-center active:scale-[0.98] active:brightness-95 transition-[background-color,transform,filter] duration-[50ms] ease-out"
           >
             MRC = {formatCurrency(memoryValue)}
           </button>
         )}
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-4 gap-1.5">
           {ROW_MEMORY.map((k) => (
             <Key key={k.value} def={k} onPress={pressKey} />
           ))}
         </div>
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-5 gap-1.5">
           {ROW_789.map((k) => (
             <Key key={k.value} def={k} onPress={pressKey} />
           ))}
         </div>
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-5 gap-1.5">
           {ROW_456.map((k) => (
             <Key key={k.value} def={k} onPress={pressKey} />
           ))}
         </div>
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-5 gap-1.5">
           {ROW_123.map((k) => (
             <Key key={k.value} def={k} onPress={pressKey} />
           ))}
         </div>
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-5 gap-1.5">
           {ROW_0DOT.map((k) => (
             <Key key={k.value} def={k} onPress={pressKey} />
           ))}
