@@ -864,6 +864,88 @@ export const UpdateAdminOtpConfigResponse = zod.object({
 })
 
 
+/**
+ * @summary Get public report branding and support links
+ */
+export const getPublicReportBrandingResponseWebsiteUrlMax = 2048;
+
+export const getPublicReportBrandingResponsePlayStoreUrlMax = 2048;
+
+export const getPublicReportBrandingResponseSupportPhoneMax = 80;
+
+export const getPublicReportBrandingResponseSupportEmailMax = 254;
+
+
+
+export const GetPublicReportBrandingResponse = zod.object({
+  "websiteUrl": zod.string().max(getPublicReportBrandingResponseWebsiteUrlMax),
+  "playStoreUrl": zod.string().max(getPublicReportBrandingResponsePlayStoreUrlMax),
+  "supportPhone": zod.string().max(getPublicReportBrandingResponseSupportPhoneMax),
+  "supportEmail": zod.string().max(getPublicReportBrandingResponseSupportEmailMax)
+})
+
+
+/**
+ * @summary Get report branding configuration
+ */
+export const getAdminReportBrandingResponseWebsiteUrlMax = 2048;
+
+export const getAdminReportBrandingResponsePlayStoreUrlMax = 2048;
+
+export const getAdminReportBrandingResponseSupportPhoneMax = 80;
+
+export const getAdminReportBrandingResponseSupportEmailMax = 254;
+
+
+
+export const GetAdminReportBrandingResponse = zod.object({
+  "websiteUrl": zod.string().max(getAdminReportBrandingResponseWebsiteUrlMax),
+  "playStoreUrl": zod.string().max(getAdminReportBrandingResponsePlayStoreUrlMax),
+  "supportPhone": zod.string().max(getAdminReportBrandingResponseSupportPhoneMax),
+  "supportEmail": zod.string().max(getAdminReportBrandingResponseSupportEmailMax),
+  "updatedAt": zod.coerce.date().nullable()
+})
+
+
+/**
+ * @summary Update report branding configuration
+ */
+export const updateAdminReportBrandingBodyWebsiteUrlMax = 2048;
+
+export const updateAdminReportBrandingBodyPlayStoreUrlMax = 2048;
+
+export const updateAdminReportBrandingBodySupportPhoneMax = 80;
+
+export const updateAdminReportBrandingBodySupportEmailMax = 254;
+
+
+
+export const UpdateAdminReportBrandingBody = zod.object({
+  "websiteUrl": zod.string().max(updateAdminReportBrandingBodyWebsiteUrlMax),
+  "playStoreUrl": zod.string().max(updateAdminReportBrandingBodyPlayStoreUrlMax),
+  "supportPhone": zod.string().max(updateAdminReportBrandingBodySupportPhoneMax),
+  "supportEmail": zod.string().max(updateAdminReportBrandingBodySupportEmailMax)
+})
+
+export const updateAdminReportBrandingResponseWebsiteUrlMax = 2048;
+
+export const updateAdminReportBrandingResponsePlayStoreUrlMax = 2048;
+
+export const updateAdminReportBrandingResponseSupportPhoneMax = 80;
+
+export const updateAdminReportBrandingResponseSupportEmailMax = 254;
+
+
+
+export const UpdateAdminReportBrandingResponse = zod.object({
+  "websiteUrl": zod.string().max(updateAdminReportBrandingResponseWebsiteUrlMax),
+  "playStoreUrl": zod.string().max(updateAdminReportBrandingResponsePlayStoreUrlMax),
+  "supportPhone": zod.string().max(updateAdminReportBrandingResponseSupportPhoneMax),
+  "supportEmail": zod.string().max(updateAdminReportBrandingResponseSupportEmailMax),
+  "updatedAt": zod.coerce.date().nullable()
+})
+
+
 export const ListBlockedIpsResponse = zod.object({
   "items": zod.array(zod.object({
   "ip": zod.string(),

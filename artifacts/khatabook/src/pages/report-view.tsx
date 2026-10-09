@@ -6,7 +6,9 @@ import {
   useListGlobalLedgerEntries,
   getListGlobalLedgerEntriesQueryKey,
   useGetBusinessSettings,
+  useGetPublicReportBranding,
   getGetBusinessSettingsQueryKey,
+  getGetPublicReportBrandingQueryKey,
   PartyRole,
 } from '@workspace/api-client-react';
 import {
@@ -36,6 +38,12 @@ import { filterGlobalLedgerEntriesByRole } from '@/lib/global-ledger-report-role
 import { getLedgerEntryDateKey } from '@/lib/date-time';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
 import { resolveLedgerBookName } from '@/lib/ledger-book-name';
+import { addPdfLinkAnnotations } from '@/lib/pdf-link-annotations';
+import {
+  renderPdfBrandLogo,
+  renderPdfInstallButton,
+  renderPdfSupportBox,
+} from '@/lib/pdf-report-branding';
 
 const PERIOD_LABELS: Record<ReportPeriod, string> = {
   ALL: 'সব',
@@ -109,6 +117,13 @@ export function ReportView() {
   const { data: settings } = useGetBusinessSettings({
     query: { queryKey: businessScopedQueryKey(getGetBusinessSettingsQueryKey(), selectedBusinessId) },
   });
+  const { data: reportBranding } = useGetPublicReportBranding({
+    query: {
+      queryKey: getGetPublicReportBrandingQueryKey(),
+      staleTime: 0,
+      refetchOnMount: 'always',
+    },
+  });
 
   const [period, setPeriod] = useState<ReportPeriod>('ALL');
   const [isPeriodOpen, setIsPeriodOpen] = useState(false);
@@ -168,8 +183,6 @@ export function ReportView() {
       month: 'long',
       year: 'numeric',
     }));
-    const footerPhone   = shopProfile.phone   || '';
-
     const pdfEntries = sortGlobalLedgerEntriesChronologically(entries);
     const rowsHtml = pdfEntries.map(e => {
       const isGave   = e.type === 'YOU_GAVE';
@@ -201,7 +214,7 @@ export function ReportView() {
       <!-- 1. Top Navy Header -->
       <div style="background:#003366;display:flex;justify-content:space-between;align-items:center;padding:16px 24px;color:#fff;font-size:20px;font-weight:bold;box-sizing:border-box;">
         <span>${escapeHtml(storeName)}</span>
-        <span style="letter-spacing:0.5px;">📘 বাংলা খাতা</span>
+        ${renderPdfBrandLogo(reportBranding?.websiteUrl)}
       </div>
 
       <div style="padding:30px;box-sizing:border-box;">
@@ -257,10 +270,11 @@ export function ReportView() {
       <div style="background:#003366;color:#fff;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:40px;font-size:13px;box-sizing:border-box;">
         <div style="display:flex;align-items:center;gap:10px;">
           <span>এখনই বাংলা খাতা ব্যবহার শুরু করুন</span>
-          <span style="background:#fff;color:#003366;padding:4px 10px;font-weight:bold;border-radius:4px;">ইনস্টল করুন</span>
+          ${renderPdfInstallButton(reportBranding?.playStoreUrl)}
         </div>
-        <div>
-          ${footerPhone ? `📞 ${footerPhone}` : 'সাহায্যের জন্য যোগাযোগ করুন'} | নিয়ম ও শর্তাবলী প্রযোজ্য
+        <div style="text-align:right;">
+          ${renderPdfSupportBox(reportBranding?.supportPhone, reportBranding?.supportEmail)}
+          <div>নিয়ম ও শর্তাবলী প্রযোজ্য</div>
         </div>
       </div>
     `;
@@ -270,7 +284,6 @@ export function ReportView() {
       const canvas = await html2canvas(container, {
         scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff',
       });
-      document.body.removeChild(container);
 
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
       const pdf     = new jsPDF('p', 'mm', 'a4');
@@ -285,6 +298,8 @@ export function ReportView() {
         yOffset += pdfH;
         first = false;
       }
+      addPdfLinkAnnotations(pdf, container);
+      document.body.removeChild(container);
 
       const tag      = isSupplier ? 'সরবরাহকারী' : 'গ্রাহক';
       const fileDate = toBengaliDigits(new Date().toISOString().split('T')[0]);

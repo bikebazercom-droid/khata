@@ -15,6 +15,7 @@ import adminRouter from "./admin";
 import uploadsRouter from "./uploadBinary";
 import downloadsRouter from "./downloads";
 import downloadConfigsRouter from "./downloadConfigs";
+import reportBrandingRouter from "./reportBranding";
 import scanRouter from "./scan";
 import ownerRouter from "./owner";
 import notificationsRouter from "./notifications";
@@ -34,6 +35,7 @@ export function createApiRouter(
   router.use(authRouter);
   router.use(downloadsRouter);
   router.use(downloadConfigsRouter);
+  router.use(reportBrandingRouter);
   // Direct local-disk uploads use a short-lived signed capability URL, just like
   // the GCS presigned PUT. Mount before session auth so clients need no header.
   router.use(localUploadRouter);

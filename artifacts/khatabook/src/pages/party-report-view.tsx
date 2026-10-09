@@ -13,9 +13,11 @@ import {
   useGetParty,
   useListLedgerEntries,
   useGetBusinessSettings,
+  useGetPublicReportBranding,
   getGetPartyQueryKey,
   getListLedgerEntriesQueryKey,
   getGetBusinessSettingsQueryKey,
+  getGetPublicReportBrandingQueryKey,
 } from '@workspace/api-client-react';
 import {
   ChevronLeft,
@@ -51,6 +53,12 @@ import {
   resolvePartyStatementDateRange,
 } from '@/lib/party-statement';
 import { generatePaginatedStatementPdf } from '@/lib/paginated-statement-pdf';
+import { addPdfLinkAnnotations } from '@/lib/pdf-link-annotations';
+import {
+  renderPdfBrandLogo,
+  renderPdfInstallButton,
+  renderPdfSupportBox,
+} from '@/lib/pdf-report-branding';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
 
 // ─── Report Options Bottom Sheet ──────────────────────────────────────────────
@@ -180,6 +188,13 @@ export function PartyReportView() {
   });
   const { data: businessSettings } = useGetBusinessSettings({
     query: { queryKey: businessScopedQueryKey(getGetBusinessSettingsQueryKey(), selectedBusinessId) },
+  });
+  const { data: reportBranding } = useGetPublicReportBranding({
+    query: {
+      queryKey: getGetPublicReportBrandingQueryKey(),
+      staleTime: 0,
+      refetchOnMount: 'always',
+    },
   });
 
   // ── UI state ──
@@ -371,8 +386,7 @@ export function PartyReportView() {
   <div class="statement-pdf-header" style="background:#003366;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 18px;color:#fff;">
     <span style="min-width:0;font-size:14px;font-weight:700;line-height:1.2;overflow-wrap:anywhere;">${escapeHtml(activeBusinessName)}</span>
     <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;white-space:nowrap;">
-      <span style="font-size:20px;">📒</span>
-      <span style="font-size:15px;font-weight:700;">বাংলা খাতা</span>
+      <span style="font-size:15px;font-weight:700;">${renderPdfBrandLogo(reportBranding?.websiteUrl)}</span>
     </div>
   </div>
 
@@ -442,10 +456,11 @@ export function PartyReportView() {
   <div style="background:#003366;color:#fff;padding:12px 22px;display:flex;justify-content:space-between;align-items:center;font-size:12px;">
     <div style="display:flex;align-items:center;gap:10px;">
       <span>এখনই বাংলা খাতা ব্যবহার শুরু করুন</span>
-      <span style="background:#fff;color:#003366;padding:3px 10px;font-weight:700;border-radius:3px;font-size:11px;">ইনস্টল করুন</span>
+      ${renderPdfInstallButton(reportBranding?.playStoreUrl)}
     </div>
     <div style="text-align:right;font-size:11px;opacity:0.85;">
-      ${phone ? `📞 ${safePhone}` : ''}<br/>নিয়ম ও শর্তাবলী প্রযোজ্য
+      ${renderPdfSupportBox(reportBranding?.supportPhone, reportBranding?.supportEmail)}
+      <div>নিয়ম ও শর্তাবলী প্রযোজ্য</div>
     </div>
   </div>
 

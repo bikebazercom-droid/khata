@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { MessageSquare, Save, Download, Monitor, Upload, CheckCircle2, FileUp, AlertCircle, Apple } from "lucide-react";
+import { MessageSquare, Save, Download, Monitor, Upload, CheckCircle2, FileUp, AlertCircle, Apple, Globe2, Link2, Phone, Mail } from "lucide-react";
 import { formatDate } from "@/lib/format";
 
 // ── Download-config types & hook ─────────────────────────────────────────────
@@ -63,6 +63,82 @@ function useDownloadConfig() {
   }, [toast]);
 
   return { data, loading, saving, error, save, reload: load };
+}
+
+interface ReportBrandingValues {
+  websiteUrl: string;
+  playStoreUrl: string;
+  supportPhone: string;
+  supportEmail: string;
+  updatedAt: string | null;
+}
+
+function useReportBranding() {
+  const [values, setValues] = useState<ReportBrandingValues>({
+    websiteUrl: "",
+    playStoreUrl: "",
+    supportPhone: "",
+    supportEmail: "",
+    updatedAt: null,
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await adminFetch("/api/admin/report-branding");
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+      setValues({
+        websiteUrl: body.websiteUrl ?? "",
+        playStoreUrl: body.playStoreUrl ?? "",
+        supportPhone: body.supportPhone ?? "",
+        supportEmail: body.supportEmail ?? "",
+        updatedAt: body.updatedAt ?? null,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load report settings.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const save = useCallback(async (input: Omit<ReportBrandingValues, "updatedAt">) => {
+    setSaving(true);
+    try {
+      const response = await adminFetch("/api/admin/report-branding", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+      setValues({
+        websiteUrl: body.websiteUrl ?? "",
+        playStoreUrl: body.playStoreUrl ?? "",
+        supportPhone: body.supportPhone ?? "",
+        supportEmail: body.supportEmail ?? "",
+        updatedAt: body.updatedAt ?? null,
+      });
+      toast({ title: "সংরক্ষিত হয়েছে ✓", description: "রিপোর্টের লিংক ও যোগাযোগের তথ্য আপডেট হয়েছে।" });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "সংরক্ষণ ব্যর্থ",
+        description: err instanceof Error ? err.message : "রিপোর্ট সেটিংস সংরক্ষণ করা যায়নি।",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }, [toast]);
+
+  return { values, setValues, loading, saving, error, save, reload: load };
 }
 
 // ── Binary file info types & hook ─────────────────────────────────────────────
@@ -327,6 +403,7 @@ export default function SettingsPage() {
     save: dlSave,
     reload: reloadDlConfig,
   } = useDownloadConfig();
+  const reportBranding = useReportBranding();
 
   const [windowsExeUrl,   setWindowsExeUrl]   = useState("");
 
@@ -341,6 +418,12 @@ export default function SettingsPage() {
   const handleDlSave = (e: React.FormEvent) => {
     e.preventDefault();
     void dlSave({ windowsExeUrl });
+  };
+
+  const handleReportBrandingSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    const { websiteUrl, playStoreUrl, supportPhone, supportEmail } = reportBranding.values;
+    void reportBranding.save({ websiteUrl, playStoreUrl, supportPhone, supportEmail });
   };
 
   // ── Binary file upload ──────────────────────────────────────────────────────
@@ -380,7 +463,7 @@ export default function SettingsPage() {
   }, [toast, reloadBinInfo]);
 
   // ── Loading skeleton ────────────────────────────────────────────────────────
-  if (otpLoading || dlLoading) {
+  if (otpLoading || dlLoading || reportBranding.loading) {
     return (
       <SidebarLayout>
         <div className="animate-pulse space-y-6 max-w-2xl">
@@ -433,6 +516,104 @@ export default function SettingsPage() {
             </div>)}
           </CardContent>
         </Card>
+
+        <form onSubmit={handleReportBrandingSave}>
+          <Card className="shadow-sm border-none bg-white">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-blue-500/10 rounded-lg">
+                  <Globe2 className="w-5 h-5 text-blue-700" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">রিপোর্ট ও স্টেটমেন্টের লিংক ও যোগাযোগ</CardTitle>
+                  <CardDescription>
+                    PDF-এর বাংলা খাতা লোগো, ইনস্টল বাটন এবং সাপোর্ট তথ্য নিয়ন্ত্রণ করুন
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5 pt-4 border-t">
+              {reportBranding.error && (
+                <div role="alert" className="rounded bg-red-50 text-red-700 p-3 text-sm flex flex-wrap items-center justify-between gap-2">
+                  <span>Could not load report settings. {reportBranding.error}</span>
+                  <Button type="button" variant="outline" size="sm" onClick={() => void reportBranding.reload()}>
+                    Retry
+                  </Button>
+                </div>
+              )}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="space-y-2 text-sm font-medium">
+                  Website URL
+                  <span className="relative block">
+                    <Globe2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      className="pl-9"
+                      type="url"
+                      maxLength={2048}
+                      placeholder="https://example.com"
+                      value={reportBranding.values.websiteUrl}
+                      onChange={e => reportBranding.setValues(v => ({ ...v, websiteUrl: e.target.value }))}
+                    />
+                  </span>
+                </label>
+                <label className="space-y-2 text-sm font-medium">
+                  Google Play Store URL
+                  <span className="relative block">
+                    <Link2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      className="pl-9"
+                      type="url"
+                      maxLength={2048}
+                      placeholder="https://play.google.com/store/apps/details?id=..."
+                      value={reportBranding.values.playStoreUrl}
+                      onChange={e => reportBranding.setValues(v => ({ ...v, playStoreUrl: e.target.value }))}
+                    />
+                  </span>
+                </label>
+                <label className="space-y-2 text-sm font-medium">
+                  Support phone
+                  <span className="relative block">
+                    <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      className="pl-9"
+                      type="tel"
+                      maxLength={80}
+                      placeholder="+880 1XXXXXXXXX"
+                      value={reportBranding.values.supportPhone}
+                      onChange={e => reportBranding.setValues(v => ({ ...v, supportPhone: e.target.value }))}
+                    />
+                  </span>
+                </label>
+                <label className="space-y-2 text-sm font-medium">
+                  Support email
+                  <span className="relative block">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      className="pl-9"
+                      type="email"
+                      maxLength={254}
+                      placeholder="support@example.com"
+                      value={reportBranding.values.supportEmail}
+                      onChange={e => reportBranding.setValues(v => ({ ...v, supportEmail: e.target.value }))}
+                    />
+                  </span>
+                </label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                ফাঁকা রাখলে সংশ্লিষ্ট লিংক বা সাপোর্ট তথ্য PDF-এ দেখানো হবে না। Website ও Play Store লিংকে HTTPS ব্যবহার করুন।
+              </p>
+            </CardContent>
+            <CardFooter className="bg-slate-50 border-t py-4 px-6 flex justify-between items-center rounded-b-xl">
+              <div className="text-xs text-muted-foreground">
+                {reportBranding.values.updatedAt ? `Last updated: ${formatDate(reportBranding.values.updatedAt)}` : "No changes saved yet"}
+              </div>
+              <Button type="submit" disabled={reportBranding.saving} className="bg-emerald-600 hover:bg-emerald-700">
+                <Save className="w-4 h-4 mr-2" />
+                {reportBranding.saving ? "সংরক্ষণ হচ্ছে…" : "পরিবর্তন সংরক্ষণ করুন"}
+              </Button>
+            </CardFooter>
+          </Card>
+        </form>
 
         {/* ── Download & Store Links ─────────────────────────────────────── */}
         <form onSubmit={handleDlSave}>

@@ -1,5 +1,6 @@
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { addPdfLinkAnnotations } from './pdf-link-annotations';
 
 type StatementPage = {
   element: HTMLDivElement;
@@ -320,6 +321,7 @@ async function renderPdfPages(sourceDoc: Document, renderDoc: Document): Promise
       const image = canvas.toDataURL('image/jpeg', 0.97);
       if (index > 0) pdf.addPage();
       pdf.addImage(image, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+      addPdfLinkAnnotations(pdf, page.element, index);
       page.element.remove();
     }
 

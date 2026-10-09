@@ -1026,6 +1026,54 @@ paths:
               schema:
                 $ref: "#/components/schemas/AdminOtpConfig"
 
+  /public/report-branding:
+    get:
+      operationId: getPublicReportBranding
+      tags: [settings]
+      summary: Get public report branding and support links
+      responses:
+        "200":
+          description: Public links and support contacts used by reports
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicReportBranding"
+  /admin/report-branding:
+    get:
+      operationId: getAdminReportBranding
+      tags: [admin]
+      summary: Get report branding configuration
+      security:
+        - adminBearer: []
+      responses:
+        "200":
+          description: Current report branding configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminReportBranding"
+    put:
+      operationId: updateAdminReportBranding
+      tags: [admin]
+      summary: Update report branding configuration
+      security:
+        - adminBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportBrandingInput"
+      responses:
+        "200":
+          description: Updated report branding configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminReportBranding"
+        "400":
+          description: Invalid URL or contact value
+
   /admin/blocked-ips:
     get:
       operationId: listBlockedIps
@@ -1903,6 +1951,37 @@ components:
       required: [enabled]
       properties:
         enabled: { type: boolean }
+
+    PublicReportBranding:
+      type: object
+      required: [websiteUrl, playStoreUrl, supportPhone, supportEmail]
+      properties:
+        websiteUrl: { type: string, maxLength: 2048 }
+        playStoreUrl: { type: string, maxLength: 2048 }
+        supportPhone: { type: string, maxLength: 80 }
+        supportEmail: { type: string, maxLength: 254 }
+
+    AdminReportBranding:
+      type: object
+      required: [websiteUrl, playStoreUrl, supportPhone, supportEmail, updatedAt]
+      properties:
+        websiteUrl: { type: string, maxLength: 2048 }
+        playStoreUrl: { type: string, maxLength: 2048 }
+        supportPhone: { type: string, maxLength: 80 }
+        supportEmail: { type: string, maxLength: 254 }
+        updatedAt:
+          type: ["string", "null"]
+          format: date-time
+
+    ReportBrandingInput:
+      type: object
+      required: [websiteUrl, playStoreUrl, supportPhone, supportEmail]
+      additionalProperties: false
+      properties:
+        websiteUrl: { type: string, maxLength: 2048 }
+        playStoreUrl: { type: string, maxLength: 2048 }
+        supportPhone: { type: string, maxLength: 80 }
+        supportEmail: { type: string, maxLength: 254 }
 
     IpBlockInput:
       type: object

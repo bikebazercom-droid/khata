@@ -27,7 +27,16 @@ const DOWNLOADS    = path.resolve(__dirname, "../public/downloads");
 const WINDOWS_FILE = path.join(DOWNLOADS, "banglakhata-windows.exe");
 
 async function getConfig() {
-  const [row] = await db.select().from(downloadConfigsTable).limit(1);
+  // This legacy download endpoint only needs legacy fields. Keep it usable
+  // while external databases apply the separate report-branding migration.
+  const [row] = await db
+    .select({
+      id: downloadConfigsTable.id,
+      windowsExeUrl: downloadConfigsTable.windowsExeUrl,
+      updatedAt: downloadConfigsTable.updatedAt,
+    })
+    .from(downloadConfigsTable)
+    .limit(1);
   return row ?? null;
 }
 
@@ -86,12 +95,18 @@ router.post("/admin/download-configs", requireAdmin as any, async (req, res) => 
         .update(downloadConfigsTable)
         .set({ windowsExeUrl, updatedAt: now })
         .where(eq(downloadConfigsTable.id, existing.id))
-        .returning();
+        .returning({
+          windowsExeUrl: downloadConfigsTable.windowsExeUrl,
+          updatedAt: downloadConfigsTable.updatedAt,
+        });
     } else {
       [row] = await db
         .insert(downloadConfigsTable)
         .values({ windowsExeUrl, updatedAt: now })
-        .returning();
+        .returning({
+          windowsExeUrl: downloadConfigsTable.windowsExeUrl,
+          updatedAt: downloadConfigsTable.updatedAt,
+        });
     }
 
     res.json({

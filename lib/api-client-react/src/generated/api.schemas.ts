@@ -624,6 +624,41 @@ export interface AdminOtpConfigInput {
   enabled: boolean;
 }
 
+export interface PublicReportBranding {
+  /** @maxLength 2048 */
+  websiteUrl: string;
+  /** @maxLength 2048 */
+  playStoreUrl: string;
+  /** @maxLength 80 */
+  supportPhone: string;
+  /** @maxLength 254 */
+  supportEmail: string;
+}
+
+export interface AdminReportBranding {
+  /** @maxLength 2048 */
+  websiteUrl: string;
+  /** @maxLength 2048 */
+  playStoreUrl: string;
+  /** @maxLength 80 */
+  supportPhone: string;
+  /** @maxLength 254 */
+  supportEmail: string;
+  /** @nullable */
+  updatedAt: string | null;
+}
+
+export interface ReportBrandingInput {
+  /** @maxLength 2048 */
+  websiteUrl: string;
+  /** @maxLength 2048 */
+  playStoreUrl: string;
+  /** @maxLength 80 */
+  supportPhone: string;
+  /** @maxLength 254 */
+  supportEmail: string;
+}
+
 export interface IpBlockInput {
   ip: string;
   reason?: string;

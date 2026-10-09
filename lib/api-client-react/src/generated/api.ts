@@ -26,6 +26,7 @@ import type {
   AdminLoginResult,
   AdminOtpConfig,
   AdminOtpConfigInput,
+  AdminReportBranding,
   AdminStats,
   AdminUserDetail,
   AdminUserUpdate,
@@ -69,8 +70,10 @@ import type {
   PhoneOtpSendResult,
   PhoneOtpSession,
   PhoneOtpVerifyInput,
+  PublicReportBranding,
   PushTokenInput,
   ReminderMessage,
+  ReportBrandingInput,
   UploadUrlRequest,
   UploadUrlResponse
 } from './api.schemas';
@@ -3463,6 +3466,231 @@ export const useUpdateAdminOtpConfig = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateAdminOtpConfigMutationOptions(options));
+    }
+
+export const getGetPublicReportBrandingUrl = () => {
+
+
+
+
+  return `/api/public/report-branding`
+}
+
+/**
+ * @summary Get public report branding and support links
+ */
+export const getPublicReportBranding = async ( options?: RequestInit): Promise<PublicReportBranding> => {
+
+  return customFetch<PublicReportBranding>(getGetPublicReportBrandingUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPublicReportBrandingQueryKey = () => {
+    return [
+    `/api/public/report-branding`
+    ] as const;
+    }
+
+
+export const getGetPublicReportBrandingQueryOptions = <TData = Awaited<ReturnType<typeof getPublicReportBranding>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicReportBranding>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPublicReportBrandingQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPublicReportBranding>>> = ({ signal }) => getPublicReportBranding({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPublicReportBranding>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPublicReportBrandingQueryResult = NonNullable<Awaited<ReturnType<typeof getPublicReportBranding>>>
+export type GetPublicReportBrandingQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get public report branding and support links
+ */
+
+export function useGetPublicReportBranding<TData = Awaited<ReturnType<typeof getPublicReportBranding>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPublicReportBranding>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPublicReportBrandingQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAdminReportBrandingUrl = () => {
+
+
+
+
+  return `/api/admin/report-branding`
+}
+
+/**
+ * @summary Get report branding configuration
+ */
+export const getAdminReportBranding = async ( options?: RequestInit): Promise<AdminReportBranding> => {
+
+  return customFetch<AdminReportBranding>(getGetAdminReportBrandingUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminReportBrandingQueryKey = () => {
+    return [
+    `/api/admin/report-branding`
+    ] as const;
+    }
+
+
+export const getGetAdminReportBrandingQueryOptions = <TData = Awaited<ReturnType<typeof getAdminReportBranding>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminReportBranding>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminReportBrandingQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminReportBranding>>> = ({ signal }) => getAdminReportBranding({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminReportBranding>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminReportBrandingQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminReportBranding>>>
+export type GetAdminReportBrandingQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get report branding configuration
+ */
+
+export function useGetAdminReportBranding<TData = Awaited<ReturnType<typeof getAdminReportBranding>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminReportBranding>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminReportBrandingQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateAdminReportBrandingUrl = () => {
+
+
+
+
+  return `/api/admin/report-branding`
+}
+
+/**
+ * @summary Update report branding configuration
+ */
+export const updateAdminReportBranding = async (reportBrandingInput: ReportBrandingInput, options?: RequestInit): Promise<AdminReportBranding> => {
+
+  return customFetch<AdminReportBranding>(getUpdateAdminReportBrandingUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(reportBrandingInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateAdminReportBrandingMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminReportBranding>>, TError,{data: BodyType<ReportBrandingInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAdminReportBranding>>, TError,{data: BodyType<ReportBrandingInput>}, TContext> => {
+
+const mutationKey = ['updateAdminReportBranding'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAdminReportBranding>>, {data: BodyType<ReportBrandingInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateAdminReportBranding(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAdminReportBrandingMutationResult = NonNullable<Awaited<ReturnType<typeof updateAdminReportBranding>>>
+    export type UpdateAdminReportBrandingMutationBody = BodyType<ReportBrandingInput>
+    export type UpdateAdminReportBrandingMutationError = ErrorType<void>
+
+    /**
+ * @summary Update report branding configuration
+ */
+export const useUpdateAdminReportBranding = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminReportBranding>>, TError,{data: BodyType<ReportBrandingInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAdminReportBranding>>,
+        TError,
+        {data: BodyType<ReportBrandingInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateAdminReportBrandingMutationOptions(options));
     }
 
 export const getListBlockedIpsUrl = () => {
