@@ -10,7 +10,9 @@ import {
   getGetPartyQueryKey,
   useUpdateParty,
   useGetBusinessSettings,
+  useGetPublicReportBranding,
   getGetBusinessSettingsQueryKey,
+  getGetPublicReportBrandingQueryKey,
   PartyRole,
   DueFilter,
   type Party,
@@ -37,6 +39,10 @@ import { LongPressPartyName } from '@/components/long-press-party-name';
 import { queuePartyOperation } from '@/lib/partyOutbox';
 import { readOfflineIdentity } from '@/lib/offlineSession';
 import { isTransientNetworkError } from '@/lib/offlineErrors';
+import {
+  renderPdfInstallButton,
+  renderPdfSupportContacts,
+} from '@/lib/pdf-report-branding';
 
 function partyBalanceFontSize(value: string): string {
   const widthInEm = Array.from(value).reduce((width, character) => {
@@ -115,6 +121,13 @@ export function HomeView() {
     : 0;
 
   const { data: settings } = useGetBusinessSettings({ query: { enabled: userRole === 'owner', queryKey: businessScopedQueryKey(getGetBusinessSettingsQueryKey(), activeBusinessId) } });
+  const { data: reportBranding } = useGetPublicReportBranding({
+    query: {
+      queryKey: getGetPublicReportBrandingQueryKey(),
+      staleTime: 0,
+      refetchOnMount: 'always',
+    },
+  });
   const activeBookName = resolveLedgerBookName(activeBusiness?.name, settings?.storeName);
   const summaryParams = { role };
   const partyParams = { role, search, dueFilter: apiDueFilter };
@@ -515,10 +528,11 @@ export function HomeView() {
       <div style="background:#003366;color:#fff;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:40px;font-size:13px;box-sizing:border-box;">
         <div style="display:flex;align-items:center;gap:10px;">
           <span>${t('pdfFooterCta')}</span>
-          <span style="background:#fff;color:#003366;padding:4px 10px;font-weight:bold;border-radius:4px;">${t('pdfInstall')}</span>
+          ${renderPdfInstallButton(reportBranding?.playStoreUrl)}
         </div>
-        <div>
-          ${footerPhone ? `📞 ${footerPhone}` : t('pdfFooterSupport')} | ${t('pdfFooterTerms')}
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;max-width:80mm;text-align:right;font-size:9px;line-height:1.3;color:#dbeafe;">
+          ${renderPdfSupportContacts(reportBranding?.supportPhone || footerPhone, reportBranding?.supportEmail)}
+          <div>${t('pdfFooterTerms')}</div>
         </div>
       </div>
     `;

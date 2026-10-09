@@ -57,7 +57,7 @@ import { addPdfLinkAnnotations } from '@/lib/pdf-link-annotations';
 import {
   renderPdfBrandLogo,
   renderPdfInstallButton,
-  renderPdfSupportBox,
+  renderPdfSupportContacts,
 } from '@/lib/pdf-report-branding';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
 
@@ -453,13 +453,13 @@ export function PartyReportView() {
     </div>
 
   <!-- Bottom banner -->
-  <div style="background:#003366;color:#fff;padding:12px 22px;display:flex;justify-content:space-between;align-items:center;font-size:12px;">
-    <div style="display:flex;align-items:center;gap:10px;">
+  <div style="background:#003366;color:#fff;padding:10px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:12px;">
+    <div style="display:flex;align-items:center;gap:10px;min-width:0;">
       <span>এখনই বাংলা খাতা ব্যবহার শুরু করুন</span>
       ${renderPdfInstallButton(reportBranding?.playStoreUrl)}
     </div>
-    <div style="text-align:right;font-size:11px;opacity:0.85;">
-      ${renderPdfSupportBox(reportBranding?.supportPhone, reportBranding?.supportEmail)}
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;max-width:80mm;text-align:right;font-size:9px;line-height:1.3;color:#dbeafe;">
+      ${renderPdfSupportContacts(reportBranding?.supportPhone, reportBranding?.supportEmail)}
       <div>নিয়ম ও শর্তাবলী প্রযোজ্য</div>
     </div>
   </div>

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   renderPdfBrandLogo,
   renderPdfInstallButton,
-  renderPdfSupportBox,
+  renderPdfSupportContacts,
 } from "./pdf-report-branding";
 
 describe("PDF report branding", () => {
@@ -20,13 +20,16 @@ describe("PDF report branding", () => {
       .toContain("<span");
   });
 
-  it("renders clickable phone and email contacts in a blue support box", () => {
-    const support = renderPdfSupportBox("+880 1712-345678", "support@example.com");
-    expect(support).toContain("background:#dbeafe");
+  it("renders clickable phone and email as compact footer text without a separate box", () => {
+    const support = renderPdfSupportContacts("+880 1712-345678", "support@example.com");
+    expect(support).toContain("font-size:9px");
+    expect(support).not.toContain("background:");
+    expect(support).not.toContain("border:");
+    expect(support).toContain("color:#dbeafe");
     expect(support).toContain('href="tel:+8801712345678"');
     expect(support).toContain('href="mailto:support@example.com"');
-    expect(renderPdfSupportBox("", "")).toBe("");
-    expect(renderPdfSupportBox("+৮৮০ ১৭১২-৩৪৫৬৭৮", ""))
+    expect(renderPdfSupportContacts("", "")).toBe("");
+    expect(renderPdfSupportContacts("+৮৮০ ১৭১২-৩৪৫৬৭৮", ""))
       .toContain('href="tel:+8801712345678"');
   });
 

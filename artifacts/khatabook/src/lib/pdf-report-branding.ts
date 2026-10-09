@@ -46,7 +46,7 @@ export function renderPdfInstallButton(playStoreUrl?: string | null): string {
     : `<span style="${style}">ইনস্টল করুন</span>`;
 }
 
-export function renderPdfSupportBox(
+export function renderPdfSupportContacts(
   supportPhone?: string | null,
   supportEmail?: string | null,
 ): string {
@@ -61,15 +61,15 @@ export function renderPdfSupportBox(
       ? `+${safePhoneDigits}`
       : safePhoneDigits;
     contacts.push(
-      `<a href="tel:${escapePdfHtml(telTarget)}" style="color:#123b67;text-decoration:none;overflow-wrap:anywhere;">☎ ${escapePdfHtml(phone)}</a>`,
+      `<a href="tel:${escapePdfHtml(telTarget)}" style="color:#dbeafe;text-decoration:none;overflow-wrap:anywhere;">☎ ${escapePdfHtml(phone)}</a>`,
     );
   }
   if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     contacts.push(
-      `<a href="mailto:${escapePdfHtml(email)}" style="color:#123b67;text-decoration:none;overflow-wrap:anywhere;">✉ ${escapePdfHtml(email)}</a>`,
+      `<a href="mailto:${escapePdfHtml(email)}" style="color:#dbeafe;text-decoration:none;overflow-wrap:anywhere;">✉ ${escapePdfHtml(email)}</a>`,
     );
   }
   if (!contacts.length) return "";
 
-  return `<div style="display:inline-flex;flex-direction:column;align-items:flex-start;gap:3px;max-width:70mm;background:#dbeafe;border:1px solid #93c5fd;border-radius:4px;padding:5px 8px;margin-bottom:5px;color:#123b67;font-size:10px;line-height:1.35;">${contacts.join("")}</div>`;
+  return `<div style="display:flex;flex-wrap:wrap;justify-content:flex-end;column-gap:10px;row-gap:1px;max-width:80mm;color:#dbeafe;font-size:9px;line-height:1.3;text-align:right;">${contacts.join("")}</div>`;
 }

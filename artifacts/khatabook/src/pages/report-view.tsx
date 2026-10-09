@@ -42,7 +42,7 @@ import { addPdfLinkAnnotations } from '@/lib/pdf-link-annotations';
 import {
   renderPdfBrandLogo,
   renderPdfInstallButton,
-  renderPdfSupportBox,
+  renderPdfSupportContacts,
 } from '@/lib/pdf-report-branding';
 
 const PERIOD_LABELS: Record<ReportPeriod, string> = {
@@ -267,13 +267,13 @@ export function ReportView() {
       </div>
 
       <!-- 5. Deep Navy Footer Strip -->
-      <div style="background:#003366;color:#fff;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:40px;font-size:13px;box-sizing:border-box;">
-        <div style="display:flex;align-items:center;gap:10px;">
+      <div style="background:#003366;color:#fff;padding:12px 24px;display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:40px;font-size:13px;box-sizing:border-box;">
+        <div style="display:flex;align-items:center;gap:10px;min-width:0;">
           <span>এখনই বাংলা খাতা ব্যবহার শুরু করুন</span>
           ${renderPdfInstallButton(reportBranding?.playStoreUrl)}
         </div>
-        <div style="text-align:right;">
-          ${renderPdfSupportBox(reportBranding?.supportPhone, reportBranding?.supportEmail)}
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;max-width:80mm;text-align:right;font-size:9px;line-height:1.3;color:#dbeafe;">
+          ${renderPdfSupportContacts(reportBranding?.supportPhone, reportBranding?.supportEmail)}
           <div>নিয়ম ও শর্তাবলী প্রযোজ্য</div>
         </div>
       </div>
