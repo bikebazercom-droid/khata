@@ -42,11 +42,13 @@ export function createApiRouter(
 
   // Admin routes — use their own JWT auth (adminBearer), not Clerk.
   router.use(adminRouter);
+  // Desktop installer status/upload routes also use admin JWTs. Mount them
+  // before user-session auth so admin tokens are not rejected as Clerk sessions.
+  router.use(uploadsRouter);
 
   // All routes below require a valid session (Clerk or phone OTP).
   router.use(requireAuth as any);
   router.use(enforceRoleAccess);
-  router.use(uploadsRouter);
 
   // Storage routes — all require auth (upload mints write-capable presigned URLs;
   // object serving requires auth so bill images are only accessible to signed-in users).

@@ -9,7 +9,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { Redirect, Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
-import { useEffect, type ReactNode } from 'react';
+import { Component, useEffect, type ReactNode } from 'react';
 import { setAuthTokenGetter } from '@workspace/api-client-react';
 import {
   ADMIN_AUTH_CHANGED_EVENT,
@@ -113,6 +113,41 @@ function AdminGuard({ children }: { children: ReactNode }) {
   return isAuthenticated ? <>{children}</> : <div className="min-h-screen" aria-busy="true" />;
 }
 
+class SettingsErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <main role="alert" className="min-h-screen bg-slate-50 p-8">
+          <div className="mx-auto max-w-xl rounded-lg border bg-white p-6 shadow-sm">
+            <h1 className="text-lg font-semibold">Settings could not be loaded</h1>
+            <p className="mt-2 text-sm text-slate-600">
+              Your admin session is still active. Reload this page to try again.
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-4 rounded-md border px-4 py-2 text-sm font-medium hover:bg-slate-50"
+            >
+              Reload Settings
+            </button>
+          </div>
+        </main>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 function ProtectedDashboard() {
   return <AdminGuard><DashboardPage /></AdminGuard>;
 }
@@ -126,7 +161,13 @@ function ProtectedUserDetail() {
 }
 
 function ProtectedSettings() {
-  return <AdminGuard><SettingsPage /></AdminGuard>;
+  return (
+    <AdminGuard>
+      <SettingsErrorBoundary>
+        <SettingsPage />
+      </SettingsErrorBoundary>
+    </AdminGuard>
+  );
 }
 
 function Router() {

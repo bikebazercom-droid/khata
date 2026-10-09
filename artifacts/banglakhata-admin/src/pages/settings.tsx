@@ -73,6 +73,38 @@ interface ReportBrandingValues {
   updatedAt: string | null;
 }
 
+function getResponseError(body: unknown, fallback: string): string {
+  if (body && typeof body === "object" && "error" in body) {
+    const error = (body as { error?: unknown }).error;
+    if (typeof error === "string" && error.trim()) return error;
+  }
+  return fallback;
+}
+
+function normalizeReportBranding(
+  body: unknown,
+  fallback: Partial<ReportBrandingValues> = {},
+): ReportBrandingValues {
+  const values = body && typeof body === "object"
+    ? body as Partial<ReportBrandingValues>
+    : {};
+  const updatedAt = typeof values.updatedAt === "string" &&
+      Number.isFinite(Date.parse(values.updatedAt))
+    ? values.updatedAt
+    : typeof fallback.updatedAt === "string" &&
+        Number.isFinite(Date.parse(fallback.updatedAt))
+      ? fallback.updatedAt
+      : null;
+
+  return {
+    websiteUrl: typeof values.websiteUrl === "string" ? values.websiteUrl : fallback.websiteUrl ?? "",
+    playStoreUrl: typeof values.playStoreUrl === "string" ? values.playStoreUrl : fallback.playStoreUrl ?? "",
+    supportPhone: typeof values.supportPhone === "string" ? values.supportPhone : fallback.supportPhone ?? "",
+    supportEmail: typeof values.supportEmail === "string" ? values.supportEmail : fallback.supportEmail ?? "",
+    updatedAt,
+  };
+}
+
 function useReportBranding() {
   const [values, setValues] = useState<ReportBrandingValues>({
     websiteUrl: "",
@@ -91,15 +123,11 @@ function useReportBranding() {
     setError(null);
     try {
       const response = await adminFetch("/api/admin/report-branding");
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
-      setValues({
-        websiteUrl: body.websiteUrl ?? "",
-        playStoreUrl: body.playStoreUrl ?? "",
-        supportPhone: body.supportPhone ?? "",
-        supportEmail: body.supportEmail ?? "",
-        updatedAt: body.updatedAt ?? null,
-      });
+      const body: unknown = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(getResponseError(body, `HTTP ${response.status}`));
+      }
+      setValues(normalizeReportBranding(body));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load report settings.");
     } finally {
@@ -117,15 +145,11 @@ function useReportBranding() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
-      setValues({
-        websiteUrl: body.websiteUrl ?? "",
-        playStoreUrl: body.playStoreUrl ?? "",
-        supportPhone: body.supportPhone ?? "",
-        supportEmail: body.supportEmail ?? "",
-        updatedAt: body.updatedAt ?? null,
-      });
+      const body: unknown = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(getResponseError(body, `HTTP ${response.status}`));
+      }
+      setValues(normalizeReportBranding(body, input));
       toast({ title: "সংরক্ষিত হয়েছে ✓", description: "রিপোর্টের লিংক ও যোগাযোগের তথ্য আপডেট হয়েছে।" });
     } catch (err) {
       toast({
@@ -356,7 +380,8 @@ export default function SettingsPage() {
   const [ipReason, setIpReason] = useState("");
   const saveIp = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!blockedIps?.policy.configured || !blockedIps.policy.clientIpAvailable) return;
+    const policy = blockedIps?.policy;
+    if (!policy?.configured || !policy.clientIpAvailable) return;
     if (!window.confirm(`Block ${newIp}? This may affect everyone on a shared network.`)) return;
     blockIp.mutate({ data: { ip: newIp, reason: ipReason } }, {
       onSuccess: () => {
@@ -492,21 +517,21 @@ export default function SettingsPage() {
                 </Button>
               </div>
             ) : (
-              <p role="status" className={`rounded p-3 text-sm ${blockedIps?.policy.configured && blockedIps.policy.clientIpAvailable ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
-                {blockedIps?.policy.message ?? "Checking client IP policy…"}
-                {blockedIps?.policy.configured && !blockedIps.policy.clientIpAvailable &&
+              <p role="status" className={`rounded p-3 text-sm ${blockedIps?.policy?.configured && blockedIps.policy.clientIpAvailable ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
+                {blockedIps?.policy?.message ?? "Checking client IP policy…"}
+                {blockedIps?.policy?.configured && !blockedIps.policy.clientIpAvailable &&
                   " This request has no verifiable forwarded client IP; blocking is disabled."}
               </p>
             )}
             <form onSubmit={saveIp} className="flex flex-wrap gap-2">
               <Input className="flex-1 min-w-40" placeholder="IPv4 or IPv6 address" value={newIp}
-                onChange={e => setNewIp(e.target.value)} disabled={!blockedIps?.policy.clientIpAvailable} required />
+                onChange={e => setNewIp(e.target.value)} disabled={!blockedIps?.policy?.clientIpAvailable} required />
               <Input className="flex-1 min-w-40" placeholder="Reason (optional)" maxLength={500}
                 value={ipReason} onChange={e => setIpReason(e.target.value)} />
-              <Button type="submit" variant="destructive" disabled={blockIp.isPending || !blockedIps?.policy.clientIpAvailable}>Block IP</Button>
+              <Button type="submit" variant="destructive" disabled={blockIp.isPending || !blockedIps?.policy?.clientIpAvailable}>Block IP</Button>
             </form>
-            {blockedIps?.items.length === 0 && <p className="text-sm text-muted-foreground">No blocked IPs.</p>}
-            {blockedIps?.items.map((entry) => <div key={entry.ip} className="flex items-center justify-between gap-2 border-t pt-2 text-sm">
+            {blockedIps?.items?.length === 0 && <p className="text-sm text-muted-foreground">No blocked IPs.</p>}
+            {blockedIps?.items?.map((entry) => <div key={entry.ip} className="flex items-center justify-between gap-2 border-t pt-2 text-sm">
               <span><strong className="font-mono">{entry.ip}</strong> {entry.reason && `· ${entry.reason}`}</span>
               <Button type="button" size="sm" variant="outline" disabled={unblockIp.isPending}
                 onClick={() => unblockIp.mutate({ ip: entry.ip }, {
