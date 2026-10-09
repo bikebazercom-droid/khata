@@ -14,6 +14,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import WebView, { type WebViewNavigation } from 'react-native-webview';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
+import {
+  getNativeContactsForWebView,
+  NATIVE_CONTACTS_RESULT_EVENT,
+  parseNativeContactsRequest,
+  type NativeContactsResponse,
+} from '@/lib/nativeContacts';
 import { useColors } from '@/hooks/useColors';
 import { getWebAppUrl, resolveWebAppStartUrl } from '@/lib/webAppUrl';
 import { resolveVisualFixtureUrl } from '@/lib/visualFixtureUrl';
@@ -361,6 +367,57 @@ export function WebAppScreen() {
             requestId: request.requestId,
             ok: false,
             error: 'ফাইল তৈরি বা শেয়ার করা যায়নি। আবার চেষ্টা করুন।',
+          });
+        },
+      );
+      return;
+    }
+
+    const contactsRequest = parseNativeContactsRequest(event.nativeEvent.data);
+    if (contactsRequest) {
+      const sourceUrl = event.nativeEvent.url;
+      if (!webAppUrl || !sourceUrl || !hasSameOrigin(sourceUrl, webAppUrl)) return;
+
+      const sendContactsResponse = (response: NativeContactsResponse) => {
+        const script = `window.dispatchEvent(new CustomEvent(${JSON.stringify(NATIVE_CONTACTS_RESULT_EVENT)}, { detail: ${JSON.stringify(response)} })); true;`;
+        webViewRef.current?.injectJavaScript(script);
+      };
+
+      void getNativeContactsForWebView().then(
+        (result) => {
+          if (!result.ok) {
+            sendContactsResponse({
+              requestId: contactsRequest.requestId,
+              ok: false,
+              complete: true,
+              error: result.error,
+            });
+            return;
+          }
+
+          const contacts = result.contacts;
+          const batchSize = 80;
+          const batches = Math.max(1, Math.ceil(contacts.length / batchSize));
+          for (let batchIndex = 0; batchIndex < batches; batchIndex += 1) {
+            const start = batchIndex * batchSize;
+            const batch = contacts.slice(start, start + batchSize);
+            const response: NativeContactsResponse = {
+              requestId: contactsRequest.requestId,
+              ok: true,
+              complete: batchIndex === batches - 1,
+              contacts: batch,
+            };
+            const script = `window.dispatchEvent(new CustomEvent(${JSON.stringify(NATIVE_CONTACTS_RESULT_EVENT)}, { detail: ${JSON.stringify(response)} })); true;`;
+            webViewRef.current?.injectJavaScript(script);
+          }
+        },
+        (error: unknown) => {
+          console.warn('Could not read device contacts:', error);
+          sendContactsResponse({
+            requestId: contactsRequest.requestId,
+            ok: false,
+            complete: true,
+            error: 'ফোনের কন্টাক্ট পড়া যায়নি। আবার চেষ্টা করুন অথবা নাম দিয়ে ম্যানুয়ালি যোগ করুন।',
           });
         },
       );

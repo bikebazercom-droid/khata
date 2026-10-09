@@ -24,7 +24,8 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.READ_CONTACTS"
       ]
     },
     "web": {
@@ -37,6 +38,12 @@
         {
           "photosPermission": "BanglaKhata uses your photo library to attach bill images to ledger entries.",
           "cameraPermission": "BanglaKhata uses the camera to photograph bills for ledger entries."
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "BanglaKhata accesses your contacts only when you choose to add a customer or supplier from your phone."
         }
       ],
       [
