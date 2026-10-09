@@ -52,9 +52,10 @@ function partyBalanceFontSize(value: string): string {
 
 export function HomeView() {
   const { openSwitcher, businesses, selectedBusinessId, setSelectedBusiness } = useBusinessContext();
-  const { role: userRole, userId, businessId } = useAppAuth();
+  const { isAuthenticated, role: userRole, userId, businessId, needsBookName } = useAppAuth();
   const queryClient = useQueryClient();
-  const activeBusiness = businesses.find((b) => b.id === selectedBusinessId);
+  const activeBusinessId = selectedBusinessId ?? businessId;
+  const activeBusiness = businesses.find((b) => b.id === activeBusinessId);
   const [role, setRole] = useState<PartyRole>(PartyRole.CUSTOMER);
   const [search, setSearch] = useState('');
   const [location, navigate] = useLocation();
@@ -113,8 +114,8 @@ export function HomeView() {
     ? rejectedDraftSummary.count
     : 0;
 
-  const { data: settings } = useGetBusinessSettings({ query: { enabled: userRole === 'owner', queryKey: businessScopedQueryKey(getGetBusinessSettingsQueryKey(), selectedBusinessId) } });
-  const activeBookName = resolveLedgerBookName(settings?.storeName, activeBusiness?.name);
+  const { data: settings } = useGetBusinessSettings({ query: { enabled: userRole === 'owner', queryKey: businessScopedQueryKey(getGetBusinessSettingsQueryKey(), activeBusinessId) } });
+  const activeBookName = resolveLedgerBookName(activeBusiness?.name, settings?.storeName);
   const summaryParams = { role };
   const partyParams = { role, search, dueFilter: apiDueFilter };
   const { data: summaryParties = [] } = useListParties(summaryParams, {
@@ -384,8 +385,8 @@ export function HomeView() {
 
     const shopProfile   = loadShopProfile();
     const storeName = resolveLedgerBookName(
-      settings?.storeName,
       activeBusiness?.name,
+      settings?.storeName,
       shopProfile.businessName,
     ) ?? 'Banglakhata';
     const safeStoreName = escapeHtml(storeName);
@@ -588,7 +589,7 @@ export function HomeView() {
       {/* Fixed deep-blue top header */}
       <div className="shrink-0 bg-[#1B3A6B] pb-9 z-10">
         <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-[calc(1rem+var(--safe-top))]">
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex flex-1 items-center gap-2 min-w-0">
             <img
               src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/logo-icon.svg`}
               alt="Banglakhata"
@@ -597,10 +598,10 @@ export function HomeView() {
             <button
               type="button"
               onClick={userRole === 'owner' ? openSwitcher : undefined}
-              className={cn("flex items-center gap-1.5 transition-opacity min-w-0", userRole === 'owner' ? "active:opacity-75" : "")}
+              className={cn("flex flex-1 items-center gap-1.5 transition-opacity min-w-0", userRole === 'owner' ? "active:opacity-75" : "")}
               aria-label="বাংলা খাতা"
             >
-              <h1 className="font-extrabold tracking-tight text-[15px] text-white truncate max-w-[120px]">
+              <h1 className="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] text-left font-extrabold leading-tight tracking-tight text-[15px] text-white">
                 {activeBookName || t('loading')}
               </h1>
               {userRole === 'owner' && <ChevronRight className="w-3.5 h-3.5 text-white/60 shrink-0 rotate-90" />}
@@ -904,7 +905,12 @@ export function HomeView() {
       <AddPartyModal open={isAddPartyOpen} onOpenChange={setIsAddPartyOpen} defaultRole={role} />
       <SettingsDrawer open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
       <AddStaffDialog open={isAddStaffOpen} onOpenChange={setIsAddStaffOpen} />
-      <RenameStoreDialog open={isRenameStoreOpen} onOpenChange={setIsRenameStoreOpen} />
+      <RenameStoreDialog
+        open={isRenameStoreOpen || (isAuthenticated && userRole === 'owner' && needsBookName)}
+        onOpenChange={setIsRenameStoreOpen}
+        isOnboarding={isAuthenticated && userRole === 'owner' && needsBookName}
+        businessId={activeBusinessId ?? undefined}
+      />
       <Dialog
         open={!!renameTarget}
         onOpenChange={(open) => {

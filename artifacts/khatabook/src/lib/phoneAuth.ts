@@ -16,6 +16,7 @@ export interface MeResponse {
   userId: string;
   businessId: string;
   businessName?: string;
+  needsBookName?: boolean;
   phone?: string;
   authMethod: "clerk" | "phone";
   role?: "owner" | "staff";

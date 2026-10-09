@@ -220,9 +220,9 @@ export function PartyReportView() {
   const { openingBalance, totalDebit, totalCredit, closingBalance } = statementSummary;
   const isGet = closingBalance >= 0;
   const activeBusinessName = resolveLedgerBookName(
-    businessSettings?.storeName,
     businesses.find((business) => business.id === activeBusinessId)?.name,
     !activeBusinessId ? businesses[0]?.name : undefined,
+    businessSettings?.storeName,
   ) ?? 'আমার খাতা';
 
   const runningBalances = useMemo(() => {

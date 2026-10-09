@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, businessSettingsTable } from "@workspace/db";
+import { db, businessSettingsTable, businessesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { broadcast } from "../lib/eventBus";
 import {
@@ -36,7 +36,12 @@ router.patch("/settings", async (req, res): Promise<void> => {
 
   const updates: Partial<typeof businessSettingsTable.$inferInsert> = {};
   if (parsed.data.storeName !== undefined) {
-    updates.storeName = parsed.data.storeName;
+    const storeName = parsed.data.storeName.trim();
+    if (!storeName) {
+      res.status(400).json({ error: "storeName must not be blank" });
+      return;
+    }
+    updates.storeName = storeName;
   }
   if (parsed.data.language !== undefined) {
     updates.language = parsed.data.language;
@@ -45,11 +50,20 @@ router.patch("/settings", async (req, res): Promise<void> => {
     updates.onlineCollectionBalance = parsed.data.onlineCollectionBalance.toFixed(2);
   }
 
-  const [updated] = await db
-    .update(businessSettingsTable)
-    .set(updates)
-    .where(eq(businessSettingsTable.id, existing.id))
-    .returning();
+  const updated = await db.transaction(async (tx) => {
+    const [settings] = await tx
+      .update(businessSettingsTable)
+      .set(updates)
+      .where(eq(businessSettingsTable.id, existing.id))
+      .returning();
+    if (!settings) throw new Error("Business settings disappeared during update");
+    if (parsed.data.storeName !== undefined) {
+      await tx.update(businessesTable)
+        .set({ name: updates.storeName! })
+        .where(eq(businessesTable.id, businessId));
+    }
+    return settings;
+  });
 
   broadcast(businessId, { type: 'settings.updated', payload: {} });
 

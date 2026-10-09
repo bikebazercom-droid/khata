@@ -165,7 +165,7 @@ export function PartyView() {
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
   const activeBusinessName = businesses.find((business) => business.id === selectedBusinessId)?.name;
-  const storeName = resolveLedgerBookName(settings?.storeName, activeBusinessName) ?? 'Banglakhata';
+  const storeName = resolveLedgerBookName(activeBusinessName, settings?.storeName) ?? 'Banglakhata';
 
   // Reconstruct balances chronologically, then show the live history and PDFs
   // newest-first. The PDF renderer keeps these per-entry balance snapshots.

@@ -3,6 +3,7 @@
 - [Orval date query-param coercion bug](orval-date-query-param-coercion.md) — generated zod schemas use bare `zod.date()` for `format: date` query params, always failing req.query parsing.
 - [Orval and Zod format compatibility](orval-zod-format-compat.md) — OpenAPI UUID/email formats generate Zod 4 methods in this Zod 3 setup; omit them unless codegen is fixed.
 - [Khatabook auth & multi-tenancy](khatabook-auth-multitenancy.md) — seed-business rules, session revocation, Expo Clerk SSO, and DB setup gotchas.
+- [First-book name onboarding](first-book-name-onboarding.md) — an empty business/settings name marks a new owner’s first book as needing a custom name.
 - [Worker invitation identity](worker-invite-identity.md) — one pending invite per verified identity across businesses avoids arbitrary first-sign-in claims.
 - [Android export validation](android-export-validation.md) — verify the actual signed APK; Gradle configuration success alone misses SDK and JVM build failures.
 - [Expo export port conflicts](expo-export-port.md) — set `RCT_METRO_PORT` when another workflow occupies 8081; Expo export can bundle all platforms without stopping it.

@@ -86,7 +86,7 @@ router.post("/businesses", async (req, res) => {
     // Ensure default settings row exists
     await db
       .insert(businessSettingsTable)
-      .values({ businessId: biz!.id })
+      .values({ businessId: biz!.id, storeName: name.trim() })
       .onConflictDoNothing();
 
     // Link to user

@@ -76,6 +76,29 @@ async function linkUserBusiness(userId: string, businessId: string) {
     .onConflictDoNothing();
 }
 
+async function createBusinessForNameSetup(): Promise<string> {
+  const [business] = await db
+    .insert(businessesTable)
+    .values({ name: "" })
+    .returning({ id: businessesTable.id });
+  await db.insert(businessSettingsTable)
+    .values({ businessId: business!.id, storeName: "" })
+    .onConflictDoNothing();
+  return business!.id;
+}
+
+async function requireSeedBusinessNameSetup(): Promise<void> {
+  await db.update(businessesTable)
+    .set({ name: "" })
+    .where(eq(businessesTable.id, SEED_BUSINESS_ID));
+  await db.insert(businessSettingsTable)
+    .values({ businessId: SEED_BUSINESS_ID, storeName: "" })
+    .onConflictDoUpdate({
+      target: businessSettingsTable.businessId,
+      set: { storeName: "" },
+    });
+}
+
 async function claimWorkerInvite(identity: { email?: string; phone?: string; clerkUserId?: string }, existing?: AppUser) {
   return db.transaction(async (tx) => {
     const identityCondition = identity.email
@@ -185,13 +208,9 @@ export async function getOrCreateClerkUser(
   let businessId: string;
   if (!seedOwner) {
     businessId = SEED_BUSINESS_ID;
+    await requireSeedBusinessNameSetup();
   } else {
-    const [biz] = await db.insert(businessesTable).values({}).returning();
-    businessId = biz!.id;
-    await db
-      .insert(businessSettingsTable)
-      .values({ businessId })
-      .onConflictDoNothing();
+    businessId = await createBusinessForNameSetup();
   }
 
   const [user] = await db
@@ -229,13 +248,9 @@ export async function getOrCreatePhoneUser(
   let businessId: string;
   if (!seedOwner) {
     businessId = SEED_BUSINESS_ID;
+    await requireSeedBusinessNameSetup();
   } else {
-    const [biz] = await db.insert(businessesTable).values({}).returning();
-    businessId = biz!.id;
-    await db
-      .insert(businessSettingsTable)
-      .values({ businessId })
-      .onConflictDoNothing();
+    businessId = await createBusinessForNameSetup();
   }
 
   const [user] = await db

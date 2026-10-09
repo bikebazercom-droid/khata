@@ -159,8 +159,8 @@ export function ReportView() {
     setIsGenerating(true);
     const shopProfile = loadShopProfile();
     const storeName = resolveLedgerBookName(
-      settings?.storeName,
       activeBusinessName,
+      settings?.storeName,
       shopProfile.businessName,
     ) ?? 'বাংলাখাতা';
     const dateStr    = toBengaliDigits(new Date().toLocaleDateString('bn-BD', {

@@ -326,6 +326,10 @@ router.post(
     // it as a Bearer token on subsequent API requests.
     // Mobile keeps this token in SecureStore; phoneSessionVersion revokes it on logout.
     const token = jwt.sign(sessionPayload, process.env.SESSION_SECRET!);
+    const [business] = await db.select({ name: businessesTable.name })
+      .from(businessesTable)
+      .where(eq(businessesTable.id, user.businessId))
+      .limit(1);
 
     res.json({
       success: true,
@@ -333,6 +337,10 @@ router.post(
       businessId: user.businessId,
       phone: normalized,
       token,
+      role: user.role,
+      authMethod: "phone",
+      businessName: business?.name ?? "",
+      needsBookName: user.role === "owner" && !business?.name.trim(),
     });
   },
 );
@@ -467,6 +475,7 @@ router.get(
       businessId: auth.businessId,
       userId: auth.userId,
       businessName: business?.name ?? "",
+      needsBookName: auth.role === "owner" && !business?.name.trim(),
       authMethod: auth.authMethod,
       adjustmentPartyIds: auth.role === "staff" ? targets.map((party) => party.id) : [],
       ...(auth.phone ? { phone: auth.phone } : {}),

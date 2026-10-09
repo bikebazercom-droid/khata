@@ -229,15 +229,15 @@ export function BusinessSwitcherDrawer() {
                       style={{ borderColor: isActive ? '#0052B4' : '#E5E7EB' }}
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
                           <div
                             className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-[15px] shrink-0"
                             style={{ backgroundColor: color }}
                           >
                             {initials(biz.name)}
                           </div>
-                          <div>
-                            <p className="text-[17px] font-bold text-slate-800 leading-tight">{biz.name}</p>
+                          <div className="min-w-0 flex-1">
+                            <p className="whitespace-normal break-words [overflow-wrap:anywhere] text-[17px] font-bold leading-tight text-slate-800">{biz.name}</p>
                             <p className="text-[13px] text-slate-400 mt-0.5">{biz.partyCount} {t('khataCustomers')}</p>
                           </div>
                         </div>

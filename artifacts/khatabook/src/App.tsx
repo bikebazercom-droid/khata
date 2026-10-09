@@ -431,8 +431,10 @@ function AuthCacheInvalidator() {
       if (active) {
         setBusinesses(businesses);
         const ids = businesses.map((business) => business.id);
-        if (selectedBusinessId && !ids.includes(selectedBusinessId)) {
-          qc.removeQueries({ predicate: (query) => query.queryKey[0] !== 'auth-me' });
+        if (!selectedBusinessId || !ids.includes(selectedBusinessId)) {
+          if (selectedBusinessId) {
+            qc.removeQueries({ predicate: (query) => query.queryKey[0] !== 'auth-me' });
+          }
           setSelectedBusiness(me.businessId);
         }
       }
@@ -499,7 +501,7 @@ export function useAppAuth() {
 
   // ── Development bypass — returned AFTER all hooks so hook order is stable ──
   if (devBypass) {
-    return { isAuthenticated: true, isLoading: false, authMethod: 'dev' as const, role: 'owner' as const, userId: 'dev-user', businessId: null, adjustmentPartyIds: [] as string[] };
+    return { isAuthenticated: true, isLoading: false, authMethod: 'dev' as const, role: 'owner' as const, userId: 'dev-user', businessId: null, needsBookName: false, adjustmentPartyIds: [] as string[] };
   }
 
   return {
@@ -509,6 +511,7 @@ export function useAppAuth() {
     role,
     userId: resolvedAuthData?.userId,
     businessId: resolvedAuthData?.businessId ?? null,
+    needsBookName: resolvedAuthData?.needsBookName ?? false,
     adjustmentPartyIds: (resolvedAuthData as (typeof resolvedAuthData & { adjustmentPartyIds?: string[] }) | undefined)?.adjustmentPartyIds ?? [],
     authError: isError ? (error as Error).message : null,
   };
