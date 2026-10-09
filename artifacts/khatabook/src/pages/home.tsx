@@ -40,6 +40,7 @@ import { queuePartyOperation } from '@/lib/partyOutbox';
 import { readOfflineIdentity } from '@/lib/offlineSession';
 import { isTransientNetworkError } from '@/lib/offlineErrors';
 import {
+  fitPdfHeaderNameFontSize,
   renderPdfInstallButton,
   renderPdfSupportContacts,
 } from '@/lib/pdf-report-branding';
@@ -463,10 +464,16 @@ export function HomeView() {
 
     container.innerHTML = `
       <!-- 1. Top Navy Header -->
-      <div style="background:#003366;display:flex;justify-content:space-between;align-items:center;padding:16px 24px;color:#fff;font-size:20px;font-weight:bold;box-sizing:border-box;">
-        <span>${safeStoreName}</span>
-        <span style="letter-spacing:0.5px;">📘 Banglakhata</span>
-      </div>
+      <table role="presentation" style="width:100%;table-layout:fixed;border-collapse:collapse;background:#003366;color:#fff;box-sizing:border-box;">
+        <tr>
+          <td style="width:68%;padding:12px 12px;vertical-align:middle;">
+            <div style="font-size:${fitPdfHeaderNameFontSize(storeName, 510, 20)}px;font-weight:bold;line-height:1.15;white-space:nowrap;">${safeStoreName}</div>
+          </td>
+          <td style="width:32%;padding:12px 12px;text-align:right;vertical-align:middle;white-space:nowrap;font-size:16px;">
+            <span style="letter-spacing:0.5px;">📘 Banglakhata</span>
+          </td>
+        </tr>
+      </table>
 
       <div style="padding:30px;box-sizing:border-box;">
         <!-- 2. Title -->
@@ -525,16 +532,18 @@ export function HomeView() {
       </div>
 
       <!-- 5. Deep Navy Footer Strip -->
-      <div style="background:#003366;color:#fff;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;margin-top:40px;font-size:13px;box-sizing:border-box;">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span>${t('pdfFooterCta')}</span>
-          ${renderPdfInstallButton(reportBranding?.playStoreUrl)}
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;max-width:80mm;text-align:right;font-size:9px;line-height:1.3;color:#dbeafe;">
-          ${renderPdfSupportContacts(reportBranding?.supportPhone || footerPhone, reportBranding?.supportEmail)}
-          <div>${t('pdfFooterTerms')}</div>
-        </div>
-      </div>
+      <table role="presentation" style="width:100%;table-layout:fixed;border-collapse:collapse;background:#003366;color:#fff;margin-top:40px;box-sizing:border-box;font-size:11px;line-height:1.4;">
+        <tr>
+          <td style="width:58%;padding:10px 12px;vertical-align:middle;">
+            <span>${t('pdfFooterCta')}</span>
+            <span style="display:inline-block;vertical-align:middle;margin-left:8px;">${renderPdfInstallButton(reportBranding?.playStoreUrl)}</span>
+          </td>
+          <td style="width:42%;padding:8px 12px;vertical-align:middle;text-align:right;color:#dbeafe;">
+            ${renderPdfSupportContacts(reportBranding?.supportPhone || footerPhone, reportBranding?.supportEmail)}
+            <div style="margin-top:3px;padding-top:3px;border-top:1px solid rgba(219,234,254,0.35);font-size:9px;line-height:1.4;white-space:nowrap;">${t('pdfFooterTerms')}</div>
+          </td>
+        </tr>
+      </table>
     `;
 
     document.body.appendChild(container);

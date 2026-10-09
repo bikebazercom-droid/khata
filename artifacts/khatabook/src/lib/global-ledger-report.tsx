@@ -5,6 +5,7 @@ import { formatCurrency } from '@/lib/utils';
 import { billImageSrc } from '@/lib/billImageStorage';
 import { getLedgerEntryDateKey } from './date-time';
 import { sortGlobalLedgerEntriesChronologically } from './global-ledger-report-order';
+import { fitPdfHeaderNameFontSize, getPdfSupportContactLinks } from './pdf-report-branding';
 
 export interface GlobalReportEntry {
   id: string;
@@ -25,6 +26,8 @@ interface GlobalReportDocumentProps {
   periodLabel: string;
   /** Entries are sorted by business date before monthly grouping and rendering. */
   entries: GlobalReportEntry[];
+  supportPhone?: string | null;
+  supportEmail?: string | null;
 }
 
 function entryDate(entry: GlobalReportEntry) {
@@ -83,11 +86,12 @@ const GRID_BORDER = '0.75px solid #000000';
  * column and every month closes with a debit/credit subtotal row.
  */
 export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocumentProps>(
-  ({ storeName, periodLabel, entries }, ref) => {
+  ({ storeName, periodLabel, entries, supportPhone, supportEmail }, ref) => {
     const monthGroups = groupByMonth(entries);
     const totalDebit = entries.reduce((sum, e) => (e.type === 'YOU_GAVE' ? sum + e.amount : sum), 0);
     const totalCredit = entries.reduce((sum, e) => (e.type === 'YOU_GOT' ? sum + e.amount : sum), 0);
     const netBalance = totalCredit - totalDebit;
+    const supportContacts = getPdfSupportContactLinks(supportPhone, supportEmail);
 
     return (
       <div
@@ -100,21 +104,17 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
         }}
       >
         {/* Top banner: business branding (left) + app identity (right) */}
-        <div
-          style={{
-            backgroundColor: COLOR_BRAND,
-            padding: '16px 32px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <h1 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: '#ffffff', letterSpacing: '0.02em' }}>{storeName}</h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ width: '10px', height: '10px', backgroundColor: '#ffffff', borderRadius: '2px', display: 'inline-block' }} />
-            <span style={{ fontSize: '14px', fontWeight: 700, color: '#ffffff' }}>Banglakhata</span>
-          </div>
-        </div>
+        <table role="presentation" style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', backgroundColor: COLOR_BRAND }}>
+          <tbody><tr>
+            <td style={{ width: '68%', padding: '12px 24px', verticalAlign: 'middle' }}>
+              <h1 style={{ fontSize: `${fitPdfHeaderNameFontSize(storeName, 440, 16)}px`, fontWeight: 700, margin: 0, color: '#ffffff', letterSpacing: '0.02em', lineHeight: 1.15, whiteSpace: 'nowrap' }}>{storeName}</h1>
+            </td>
+            <td style={{ width: '32%', padding: '12px 24px', textAlign: 'right', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+              <span style={{ width: '10px', height: '10px', backgroundColor: '#ffffff', borderRadius: '2px', display: 'inline-block', marginRight: '6px' }} />
+              <span style={{ fontSize: '14px', fontWeight: 700, color: '#ffffff' }}>Banglakhata</span>
+            </td>
+          </tr></tbody>
+        </table>
 
         <div style={{ padding: '24px 32px 32px' }}>
           <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 4px' }}>
@@ -261,26 +261,23 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
             single tall canvas into pages, so a bar pinned here cannot repeat on
             every physical page the way "Page X of Y" (stamped separately via
             jsPDF, per page) does. */}
-        <div
-          style={{
-            backgroundColor: COLOR_BRAND,
-            padding: '14px 32px',
-            marginTop: '28px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <p style={{ fontSize: '11px', fontWeight: 700, color: '#ffffff', margin: 0 }}>
-            {storeName} থেকে স্বয়ংক্রিয়ভাবে তৈরি করা এই রিপোর্টটি Banglakhata ব্যবহার করে তৈরি।
-          </p>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ fontSize: '11px', fontWeight: 700, color: '#ffffff', margin: 0 }}>
-              সাহায্যের জন্য {storeName}-এর সাথে যোগাযোগ করুন
-            </p>
-            <p style={{ fontSize: '9px', color: '#c7d2fe', margin: '2px 0 0' }}>নিয়ম ও শর্তাবলী প্রযোজ্য</p>
-          </div>
-        </div>
+        <table role="presentation" style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', backgroundColor: COLOR_BRAND, marginTop: '28px', fontSize: '10px', lineHeight: 1.4 }}>
+          <tbody><tr>
+            <td style={{ width: '58%', padding: '10px 14px', verticalAlign: 'middle', color: '#ffffff', fontWeight: 700 }}>
+              {storeName} থেকে স্বয়ংক্রিয়ভাবে তৈরি করা এই রিপোর্টটি Banglakhata ব্যবহার করে তৈরি।
+            </td>
+            <td style={{ width: '42%', padding: '8px 14px', verticalAlign: 'middle', textAlign: 'right', color: '#dbeafe', fontSize: '9px' }}>
+              {supportContacts.map((contact) => (
+                <div key={contact.href} style={{ margin: '0 0 2px', lineHeight: 1.4, overflowWrap: 'anywhere' }}>
+                  <a href={contact.href} style={{ color: '#dbeafe', textDecoration: 'none', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{contact.label}</a>
+                </div>
+              ))}
+              <div style={{ marginTop: '3px', paddingTop: '3px', borderTop: '1px solid rgba(219,234,254,0.35)', lineHeight: 1.4, whiteSpace: 'nowrap' }}>
+                নিয়ম ও শর্তাবলী প্রযোজ্য
+              </div>
+            </td>
+          </tr></tbody>
+        </table>
       </div>
     );
   }

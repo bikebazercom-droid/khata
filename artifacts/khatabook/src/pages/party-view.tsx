@@ -5,7 +5,9 @@ import {
   useListLedgerEntries,
   useListParties,
   useGetBusinessSettings,
+  useGetPublicReportBranding,
   getGetBusinessSettingsQueryKey,
+  getGetPublicReportBrandingQueryKey,
   getGetPartyQueryKey,
   getListPartiesQueryKey,
   getListLedgerEntriesQueryKey,
@@ -151,6 +153,13 @@ export function PartyView() {
   const { data: party, isLoading: partyLoading } = useGetParty(id || '', { query: { enabled: !!id, queryKey: businessScopedQueryKey(getGetPartyQueryKey(id || ''), selectedBusinessId) } });
   const { data: entries = [], isLoading: entriesLoading } = useListLedgerEntries(id || '', { query: { enabled: !!id, queryKey: businessScopedQueryKey(getListLedgerEntriesQueryKey(id || ''), selectedBusinessId) } });
   const { data: settings } = useGetBusinessSettings({ query: { enabled: userRole === 'owner', queryKey: businessScopedQueryKey(getGetBusinessSettingsQueryKey(), selectedBusinessId) } });
+  const { data: reportBranding } = useGetPublicReportBranding({
+    query: {
+      queryKey: getGetPublicReportBrandingQueryKey(),
+      staleTime: 0,
+      refetchOnMount: 'always',
+    },
+  });
   const partiesParams = {};
   const { data: allParties = [] } = useListParties(partiesParams, {
     query: { queryKey: businessScopedQueryKey(getListPartiesQueryKey(partiesParams), selectedBusinessId) },
@@ -695,7 +704,14 @@ export function PartyView() {
 
       {/* Off-screen printable ledger report used to render the actual PDF via html2pdf */}
       <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -1 }} aria-hidden="true">
-        <LedgerReportDocument ref={reportRef} storeName={storeName} party={party} entries={ascendingEntries} />
+        <LedgerReportDocument
+          ref={reportRef}
+          storeName={storeName}
+          party={party}
+          entries={ascendingEntries}
+          supportPhone={reportBranding?.supportPhone}
+          supportEmail={reportBranding?.supportEmail}
+        />
       </div>
 
       {/* SMS dialog (distinct simulated flow) */}

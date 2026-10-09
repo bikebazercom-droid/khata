@@ -55,6 +55,7 @@ import {
 import { generatePaginatedStatementPdf } from '@/lib/paginated-statement-pdf';
 import { addPdfLinkAnnotations } from '@/lib/pdf-link-annotations';
 import {
+  fitPdfHeaderNameFontSize,
   renderPdfBrandLogo,
   renderPdfInstallButton,
   renderPdfSupportContacts,
@@ -383,12 +384,16 @@ export function PartyReportView() {
 <div class="statement-pdf-source">
 
   <!-- Header -->
-  <div class="statement-pdf-header" style="background:#003366;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 18px;color:#fff;">
-    <span style="min-width:0;font-size:14px;font-weight:700;line-height:1.2;overflow-wrap:anywhere;">${escapeHtml(activeBusinessName)}</span>
-    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;white-space:nowrap;">
-      <span style="font-size:15px;font-weight:700;">${renderPdfBrandLogo(reportBranding?.websiteUrl)}</span>
-    </div>
-  </div>
+  <table class="statement-pdf-header" role="presentation" style="width:100%;table-layout:fixed;border-collapse:collapse;background:#003366;color:#fff;">
+    <tr>
+      <td style="width:72%;padding:6px 12px;vertical-align:middle;">
+        <div style="font-size:${fitPdfHeaderNameFontSize(activeBusinessName, 460, 14)}px;font-weight:700;line-height:1.15;white-space:nowrap;">${escapeHtml(activeBusinessName)}</div>
+      </td>
+      <td style="width:28%;padding:6px 12px;text-align:right;vertical-align:middle;white-space:nowrap;">
+        <span style="font-size:15px;font-weight:700;">${renderPdfBrandLogo(reportBranding?.websiteUrl)}</span>
+      </td>
+    </tr>
+  </table>
 
   <div class="statement-pdf-intro">
 
@@ -453,16 +458,18 @@ export function PartyReportView() {
     </div>
 
   <!-- Bottom banner -->
-  <div style="background:#003366;color:#fff;padding:10px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:12px;">
-    <div style="display:flex;align-items:center;gap:10px;min-width:0;">
-      <span>এখনই বাংলা খাতা ব্যবহার শুরু করুন</span>
-      ${renderPdfInstallButton(reportBranding?.playStoreUrl)}
-    </div>
-    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;max-width:80mm;text-align:right;font-size:9px;line-height:1.3;color:#dbeafe;">
-      ${renderPdfSupportContacts(reportBranding?.supportPhone, reportBranding?.supportEmail)}
-      <div>নিয়ম ও শর্তাবলী প্রযোজ্য</div>
-    </div>
-  </div>
+  <table role="presentation" style="width:100%;table-layout:fixed;border-collapse:collapse;background:#003366;color:#fff;font-size:11px;line-height:1.4;">
+    <tr>
+      <td style="width:58%;padding:10px 12px;vertical-align:middle;">
+        <span>এখনই বাংলা খাতা ব্যবহার শুরু করুন</span>
+        <span style="display:inline-block;vertical-align:middle;margin-left:8px;">${renderPdfInstallButton(reportBranding?.playStoreUrl)}</span>
+      </td>
+      <td style="width:42%;padding:8px 12px;vertical-align:middle;text-align:right;color:#dbeafe;">
+        ${renderPdfSupportContacts(reportBranding?.supportPhone, reportBranding?.supportEmail)}
+        <div style="margin-top:3px;padding-top:3px;border-top:1px solid rgba(219,234,254,0.35);font-size:9px;line-height:1.4;white-space:nowrap;">নিয়ম ও শর্তাবলী প্রযোজ্য</div>
+      </td>
+    </tr>
+  </table>
 
 </div>
   </div>
