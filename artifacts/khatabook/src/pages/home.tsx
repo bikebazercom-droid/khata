@@ -588,52 +588,53 @@ export function HomeView() {
     <div className="flex flex-col h-full w-full bg-white relative">
       {/* Fixed deep-blue top header */}
       <div className="shrink-0 bg-[#1B3A6B] pb-9 z-10">
-        <div className="flex items-center justify-between gap-2 px-4 pb-3 pt-[calc(1rem+var(--safe-top))]">
-          <div className="flex flex-1 items-center gap-2 min-w-0">
+        <div className="flex items-center justify-between gap-1 px-2 pb-3 pt-[calc(1rem+var(--safe-top))] sm:gap-2 sm:px-4">
+          <div className="flex min-w-0 flex-1 items-center gap-1 sm:gap-2">
             <img
               src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/logo-icon.svg`}
               alt="Banglakhata"
-              className="w-9 h-9 shrink-0"
+              className="h-8 w-8 shrink-0 sm:h-9 sm:w-9"
             />
             <button
               type="button"
               onClick={userRole === 'owner' ? openSwitcher : undefined}
-              className={cn("flex flex-1 items-center gap-1.5 transition-opacity min-w-0", userRole === 'owner' ? "active:opacity-75" : "")}
-              aria-label="বাংলা খাতা"
+              className={cn("flex min-w-0 flex-1 flex-row items-center gap-1 overflow-hidden transition-opacity sm:gap-1.5", userRole === 'owner' ? "active:opacity-75" : "")}
+              aria-label={activeBookName || 'বাংলা খাতা'}
+              title={activeBookName || undefined}
             >
-              <h1 className="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] text-left font-extrabold leading-tight tracking-tight text-[15px] text-white">
+              <h1 className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left font-extrabold leading-tight tracking-tight text-[12px] text-white sm:text-[15px]">
                 {activeBookName || t('loading')}
               </h1>
-              {userRole === 'owner' && <ChevronRight className="w-3.5 h-3.5 text-white/60 shrink-0 rotate-90" />}
+              {userRole === 'owner' && <ChevronRight className="h-3 w-3 shrink-0 rotate-90 text-white/60 sm:h-3.5 sm:w-3.5" />}
             </button>
             {userRole === 'owner' && (
               <button
                 onClick={() => setIsRenameStoreOpen(true)}
                 aria-label="দোকানের নাম সম্পাদনা করুন"
-                className="w-6 h-6 shrink-0 rounded-md flex items-center justify-center text-white/60 active:bg-white/15 active:text-white transition-all"
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-white/60 transition-all active:bg-white/15 active:text-white sm:h-6 sm:w-6"
               >
-                <Pencil className="w-3.5 h-3.5" />
+                <Pencil className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
               </button>
             )}
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             {userRole === 'owner' ? (
               <>
                 <NotificationBell businessId={selectedBusinessId} onOpenParty={openNotifiedParty} />
                 <button
                   onClick={() => navigate('/access')}
-                  className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-2 rounded-xl active:scale-95 transition-all"
+                  className="flex items-center gap-1 rounded-lg bg-white/15 px-2 py-2 text-[10px] font-bold text-white transition-all hover:bg-white/25 active:scale-95 sm:gap-1.5 sm:rounded-xl sm:px-3 sm:text-xs"
                 >
-                  <UserPlus2 className="w-3.5 h-3.5" />
+                  <UserPlus2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                   অ্যাক্সেস
                 </button>
                 <button
                   onClick={() => navigate('/staff-deployment')}
                   aria-label="ডিউটি ফোল্ডার"
-                  className="w-9 h-9 rounded-xl bg-white/15 text-white flex items-center justify-center active:scale-95 active:bg-white/25 transition-all"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 text-white transition-all active:scale-95 active:bg-white/25 sm:h-9 sm:w-9 sm:rounded-xl"
                 >
-                  <FolderOpen className="w-[18px] h-[18px]" />
+                  <FolderOpen className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
                 </button>
               </>
             ) : (
