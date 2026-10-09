@@ -17,6 +17,7 @@ import React from 'react';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { render } from '@testing-library/react';
 import { LedgerReportDocument, type ReportEntry, type ReportParty } from '../lib/ledger-report';
+import { fitPdfHeaderNameFontSize } from '../lib/pdf-report-branding';
 import { formatCurrency } from '../lib/utils';
 
 // ---------------------------------------------------------------------------
@@ -205,5 +206,46 @@ describe('LedgerReportDocument — statement ordering', () => {
       `${formatCurrency(654)} Dr`,
       `${formatCurrency(321)} Dr`,
     ]);
+  });
+});
+
+describe('LedgerReportDocument — long PDF branding', () => {
+  it.each([
+    'Hazari Gold LLC — Eastern Trading & Wholesale Division',
+    'হাজারি গোল্ড লিমিটেড, ব্যবসায়িক খাতা ও হিসাব বিভাগ',
+  ])('keeps the shop name and support footer separated for "%s"', (storeName) => {
+    const supportPhone = '+880 1712-345678 ext. 9876543210';
+    const supportEmail = 'statement-support-team-banglakhata-international-operations@example-support-domain.org';
+    const { container } = render(
+      <LedgerReportDocument
+        storeName={storeName}
+        party={PARTY}
+        entries={[makeEntry()]}
+        supportPhone={supportPhone}
+        supportEmail={supportEmail}
+      />,
+    );
+
+    const headerName = container.querySelector('h1');
+    expect(headerName?.textContent).toBe(storeName);
+    expect(headerName?.style.whiteSpace).toBe('nowrap');
+    expect(headerName?.style.fontSize).toBe(`${fitPdfHeaderNameFontSize(storeName, 440, 16)}px`);
+    expect(Number.parseFloat(headerName?.style.fontSize ?? '')).toBeLessThan(16);
+
+    const presentationTables = container.querySelectorAll<HTMLTableElement>('table[role="presentation"]');
+    const footer = presentationTables[presentationTables.length - 1];
+    const supportCell = footer.rows[0].cells[1];
+    const supportLinks = Array.from(supportCell.querySelectorAll<HTMLAnchorElement>('a'));
+    const terms = supportCell.lastElementChild as HTMLElement;
+
+    expect(supportLinks.map((link) => link.getAttribute('href'))).toEqual([
+      'tel:+88017123456789876543210',
+      `mailto:${supportEmail}`,
+    ]);
+    expect(supportLinks.every((link) => link.style.overflowWrap === 'anywhere')).toBe(true);
+    expect(supportLinks.every((link) => link.style.wordBreak === 'break-word')).toBe(true);
+    expect(terms.textContent).toContain('নিয়ম ও শর্তাবলী প্রযোজ্য');
+    expect(terms.contains(supportLinks[0])).toBe(false);
+    expect(terms.contains(supportLinks[1])).toBe(false);
   });
 });

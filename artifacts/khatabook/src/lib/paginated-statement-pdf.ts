@@ -178,7 +178,12 @@ function pageFits(page: StatementPage): boolean {
 
 function waitForFrame(doc: Document): Promise<void> {
   return new Promise((resolve) => {
-    doc.defaultView?.requestAnimationFrame(() => resolve());
+    const view = doc.defaultView;
+    if (view?.requestAnimationFrame) {
+      view.requestAnimationFrame(() => resolve());
+      return;
+    }
+    setTimeout(resolve, 0);
   });
 }
 
@@ -241,16 +246,18 @@ async function renderPdfPages(sourceDoc: Document, renderDoc: Document): Promise
         new Promise((resolve) => setTimeout(resolve, 4000)),
       ]);
     }
-    const fontLoads = Promise.allSettled([
-      renderDoc.fonts.load('400 16px "Noto Sans Bengali"'),
-      renderDoc.fonts.load('600 16px "Noto Sans Bengali"'),
-      renderDoc.fonts.load('700 16px "Noto Sans Bengali"'),
-      renderDoc.fonts.load('900 16px "Noto Sans Bengali"'),
-    ]);
-    await Promise.race([
-      Promise.all([renderDoc.fonts.ready, fontLoads]),
-      new Promise((resolve) => setTimeout(resolve, 4000)),
-    ]);
+    if (renderDoc.fonts) {
+      const fontLoads = Promise.allSettled([
+        renderDoc.fonts.load('400 16px "Noto Sans Bengali"'),
+        renderDoc.fonts.load('600 16px "Noto Sans Bengali"'),
+        renderDoc.fonts.load('700 16px "Noto Sans Bengali"'),
+        renderDoc.fonts.load('900 16px "Noto Sans Bengali"'),
+      ]);
+      await Promise.race([
+        Promise.all([renderDoc.fonts.ready, fontLoads]),
+        new Promise((resolve) => setTimeout(resolve, 4000)),
+      ]);
+    }
 
     const units = groupStatementRowsForPagination(Array.from(tableBody.rows));
     let currentPage = createPage(
