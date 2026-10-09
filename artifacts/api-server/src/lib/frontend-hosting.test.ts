@@ -65,9 +65,11 @@ describe("combined Hostinger frontend hosting", () => {
 
     const websiteRoute = await request(app).get("/party/party-123").expect(200);
     const adminRoute = await request(app).get("/admin/users/user-123").expect(200);
+    const adminDashboard = await request(app).get("/admin/dashboard").expect(200);
 
     expect(websiteRoute.text).toContain("shop website");
     expect(adminRoute.text).toContain("admin panel");
+    expect(adminDashboard.text).toContain("admin panel");
   });
 
   it("does not turn missing assets or API routes into HTML", async () => {

@@ -16,7 +16,9 @@ if (!isBuild && (Number.isNaN(port) || port <= 0)) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-const basePath = process.env.BASE_PATH;
+// A production build should remain correctly rooted at /admin/ even when
+// invoked directly rather than through the Hostinger build script.
+const basePath = process.env.BASE_PATH || (isBuild ? '/admin/' : undefined);
 if (!basePath && !isBuild) {
   throw new Error('BASE_PATH environment variable is required but was not provided.');
 }

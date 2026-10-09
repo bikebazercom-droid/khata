@@ -9,7 +9,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { Redirect, Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
-import { Component, useEffect, type ReactNode } from 'react';
+import { Component, useEffect, type ErrorInfo, type ReactNode } from 'react';
 import { setAuthTokenGetter } from '@workspace/api-client-react';
 import {
   ADMIN_AUTH_CHANGED_EVENT,
@@ -121,6 +121,10 @@ class SettingsErrorBoundary extends Component<
 
   static getDerivedStateFromError() {
     return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[BanglaKhata Admin] Settings page render error', error, info.componentStack);
   }
 
   render() {
