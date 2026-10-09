@@ -94,9 +94,8 @@ function requestNativeContacts(bridge: ReactNativeWebViewBridge): Promise<Device
 }
 
 /**
- * Reads contacts only after the user taps the contact-import action. Expo
- * WebView reads them through its origin-checked native bridge; supported
- * browsers use the browser Contact Picker API.
+ * Reads contacts through the native bridge in Expo WebView, or through the
+ * browser Contact Picker API when explicitly requested by the user.
  */
 export async function selectDeviceContacts(): Promise<DeviceContact[]> {
   const bridge = getNativeBridge();
@@ -111,6 +110,10 @@ export async function selectDeviceContacts(): Promise<DeviceContact[]> {
   return mapBrowserContacts(selected);
 }
 
+export function hasNativeDeviceContacts(): boolean {
+  return getNativeBridge() !== null;
+}
+
 export function canSelectDeviceContacts(): boolean {
-  return Boolean(getNativeBridge() || getBrowserContactsManager());
+  return hasNativeDeviceContacts() || Boolean(getBrowserContactsManager());
 }

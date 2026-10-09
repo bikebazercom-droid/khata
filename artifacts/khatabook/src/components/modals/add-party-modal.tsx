@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -6,10 +6,19 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useBusinessContext } from '@/lib/businessContext';
 import { businessScopedQueryKey } from '@/lib/businessQueryKey';
-import { queuePartyOperation } from '@/lib/partyOutbox';
+import {
+  optimisticallyAddPartyToListCaches,
+  queuePartyOperation,
+  restorePartyListCaches,
+} from '@/lib/partyOutbox';
 import { readOfflineIdentity } from '@/lib/offlineSession';
 import { isTransientNetworkError } from '@/lib/offlineErrors';
-import { canSelectDeviceContacts, selectDeviceContacts, type DeviceContact } from '@/lib/device-contacts';
+import {
+  canSelectDeviceContacts,
+  hasNativeDeviceContacts,
+  selectDeviceContacts,
+  type DeviceContact,
+} from '@/lib/device-contacts';
 import { formatBangladeshPhoneForInput, normalizeBangladeshPhone } from '@/lib/bangladesh-phone';
 import {
   useCreateParty,
@@ -76,14 +85,15 @@ export function AddPartyModal({
   if (!open) return null;
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-white text-[#1c3049]">
-      {step === 'contacts' ? (
+      <div className={cn('flex min-h-0 flex-1 flex-col', step !== 'contacts' && 'hidden')}>
         <ContactDirectoryScreen
           role={defaultRole}
           onClose={() => onOpenChange(false)}
           onManualAdd={() => { setPrefill(undefined); setStep('form'); }}
           onPickContact={(contact) => { setPrefill(contact); setStep('form'); }}
         />
-      ) : (
+      </div>
+      {step === 'form' && (
         <AddPartyForm
           defaultRole={defaultRole}
           prefill={prefill}
@@ -108,6 +118,7 @@ function ContactDirectoryScreen({
   const [importing, setImporting] = useState(false);
   const [importMessage, setImportMessage] = useState('');
   const [importFailed, setImportFailed] = useState(false);
+  const autoImportRequested = useRef(false);
   const filtered = useMemo(() => (contacts ?? []).filter((contact) =>
     contact.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()) || contact.phone.includes(search)
   ), [contacts, search]);
@@ -124,7 +135,7 @@ function ContactDirectoryScreen({
   }, [filtered]);
   const indexLetters = useMemo(() => [...grouped.keys()], [grouped]);
 
-  const importContacts = async () => {
+  const importContacts = useCallback(async () => {
     setImportMessage('');
     setImportFailed(false);
     if (!canSelectDeviceContacts()) {
@@ -143,12 +154,19 @@ function ContactDirectoryScreen({
     } finally {
       setImporting(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!hasNativeDeviceContacts() || autoImportRequested.current) return;
+    autoImportRequested.current = true;
+    void importContacts();
+  }, [importContacts]);
 
   const jumpTo = (letter: string) => {
     document.getElementById(`party-letter-${letter}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   };
   const roleName = role === PartyRole.CUSTOMER ? 'গ্রাহক' : 'সাপ্লায়ার';
+  const isNativeContactBridge = hasNativeDeviceContacts();
   const hasContacts = contacts !== null && contacts.length > 0;
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
   const additionalLetters = indexLetters.filter((letter) => !/^[A-Z]$/.test(letter) && letter !== '#');
@@ -180,9 +198,11 @@ function ContactDirectoryScreen({
               <Search className="absolute right-4 top-1/2 h-[19px] w-[19px] -translate-y-1/2 text-[#17202a]" />
               {search && <button type="button" onClick={() => setSearch('')} aria-label="খোঁজা মুছুন" className="absolute right-11 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-[#8294a7] hover:bg-[#f0f4f8]"><X className="h-4 w-4" /></button>}
             </label>
-            <button type="button" onClick={importContacts} disabled={importing} aria-label="ফোনের কন্টাক্ট থেকে বেছে নিন" title="ফোনের কন্টাক্ট থেকে বেছে নিন" data-testid="button-import-device-contacts" className="grid h-[54px] w-[48px] shrink-0 place-items-center rounded-[12px] border border-[#d8dce1] bg-white text-[#0b57d0] transition hover:bg-[#f5f8fc] active:scale-95 disabled:opacity-60">
-              {importing ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#9bb9d6] border-t-[#0b57d0]" /> : <ContactIcon className="h-5 w-5" />}
-            </button>
+            {(!isNativeContactBridge || importFailed) && (
+              <button type="button" onClick={importContacts} disabled={importing} aria-label={isNativeContactBridge ? 'আবার ফোনের কন্টাক্ট লোড করুন' : 'ফোনের কন্টাক্ট থেকে বেছে নিন'} title={isNativeContactBridge ? 'আবার ফোনের কন্টাক্ট লোড করুন' : 'ফোনের কন্টাক্ট থেকে বেছে নিন'} data-testid="button-import-device-contacts" className="grid h-[54px] w-[48px] shrink-0 place-items-center rounded-[12px] border border-[#d8dce1] bg-white text-[#0b57d0] transition hover:bg-[#f5f8fc] active:scale-95 disabled:opacity-60">
+                {importing ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#9bb9d6] border-t-[#0b57d0]" /> : <ContactIcon className="h-5 w-5" />}
+              </button>
+            )}
           </div>
 
           <button type="button" onClick={onManualAdd} data-testid="button-party-add" className="mt-4 flex min-h-[64px] w-full items-center gap-4 rounded-xl px-1 text-left text-[#0b4d8f] transition hover:bg-[#f5f8fc] active:scale-[.99]">
@@ -194,6 +214,7 @@ function ContactDirectoryScreen({
             <div role="status" data-testid="status-contact-import" className={cn('mt-1 flex items-start gap-2 rounded-lg px-3 py-2 text-xs leading-5', importFailed ? 'bg-[#fff4ed] text-[#8b4d22]' : 'bg-[#f1f6fb] text-[#55718d]')}>
               {importFailed && <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />}
               <span>{importMessage}</span>
+              {importFailed && isNativeContactBridge && <button type="button" onClick={importContacts} className="ml-auto shrink-0 font-bold text-[#1758a8] underline underline-offset-2">আবার চেষ্টা</button>}
               {importFailed && <button type="button" onClick={onManualAdd} className="ml-auto shrink-0 font-bold text-[#1758a8] underline underline-offset-2">ম্যানুয়ালি যোগ</button>}
             </div>
           )}
@@ -202,10 +223,15 @@ function ContactDirectoryScreen({
 
       <section className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain" aria-label="কন্টাক্ট তালিকা">
         <div className="mx-auto min-h-full max-w-xl px-3 pb-[calc(1.5rem+var(--safe-bottom))]">
-          {contacts === null ? (
+          {contacts === null && importing ? (
+            <div role="status" data-testid="status-contact-loading" className="flex min-h-[240px] flex-col items-center justify-center px-8 text-center">
+              <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#c4d5e7] border-t-[#0b57d0]" />
+              <p className="mt-3 text-sm font-medium text-[#7f8993]">ফোনের কন্টাক্ট আনা হচ্ছে...</p>
+            </div>
+          ) : contacts === null ? (
             <div className="flex min-h-[240px] flex-col items-center justify-center px-8 text-center">
               <ContactIcon className="h-8 w-8 text-[#aab4bf]" />
-              <p className="mt-3 text-sm font-medium text-[#7f8993]">কন্টাক্ট বেছে নিলে এখানে দেখা যাবে</p>
+              <p className="mt-3 text-sm font-medium text-[#7f8993]">ফোনের কন্টাক্ট এখানে দেখা যাবে</p>
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex min-h-[220px] flex-col items-center justify-center px-8 text-center">
@@ -259,9 +285,7 @@ function AddPartyForm({
     mutation: {
       networkMode: 'always',
       onMutate: async ({ data }) => {
-        const partiesKey = businessScopedQueryKey(getListPartiesQueryKey(), selectedBusinessId);
         const summaryKey = businessScopedQueryKey(getGetDashboardSummaryQueryKey(), selectedBusinessId);
-        const previousParties = queryClient.getQueryData<Party[]>(partiesKey);
         const previousSummary = queryClient.getQueryData<DashboardSummary>(summaryKey);
         const openingBalance = data.openingBalance ?? 0;
         const optimisticParty: Party = {
@@ -272,7 +296,11 @@ function AddPartyForm({
           lastTransactionAt: openingBalance > 0 ? new Date().toISOString() : null,
           createdAt: new Date().toISOString(),
         };
-        queryClient.setQueryData<Party[]>(partiesKey, (old) => [optimisticParty, ...(old ?? [])]);
+        const previousPartyLists = await optimisticallyAddPartyToListCaches(
+          queryClient,
+          selectedBusinessId,
+          optimisticParty,
+        );
         if (previousSummary) {
           const contribution = summaryContribution(optimisticParty);
           queryClient.setQueryData<DashboardSummary>(summaryKey, {
@@ -283,7 +311,7 @@ function AddPartyForm({
             supplierCount: previousSummary.supplierCount + (data.role === PartyRole.SUPPLIER ? 1 : 0),
           });
         }
-        return { partiesKey, summaryKey, previousParties, previousSummary, optimisticParty };
+        return { summaryKey, previousPartyLists, previousSummary, optimisticParty };
       },
       onError: async (err, vars, context) => {
         const identity = readOfflineIdentity();
@@ -305,7 +333,7 @@ function AddPartyForm({
         console.error('কাস্টমার/সাপ্লায়ার যুক্ত করা ব্যর্থ হয়েছে, পরিবর্তন ফিরিয়ে নেওয়া হচ্ছে:', err);
         toast.error('যোগ করা যায়নি। আবার চেষ্টা করুন।');
         if (!context) return;
-        queryClient.setQueryData(context.partiesKey, context.previousParties);
+        restorePartyListCaches(queryClient, context.previousPartyLists);
         queryClient.setQueryData(context.summaryKey, context.previousSummary);
       },
       onSettled: () => {

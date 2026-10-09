@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   canSelectDeviceContacts,
+  hasNativeDeviceContacts,
   selectDeviceContacts,
 } from './device-contacts';
 
@@ -38,6 +39,7 @@ describe('device contact selection', () => {
       value: { postMessage },
     });
 
+    expect(hasNativeDeviceContacts()).toBe(true);
     expect(canSelectDeviceContacts()).toBe(true);
     await expect(selectDeviceContacts()).resolves.toEqual([
       { id: '1', name: 'Abul', phone: '01710000000' },
@@ -47,6 +49,7 @@ describe('device contact selection', () => {
   });
 
   it('explains when a browser has no supported contact picker', async () => {
+    expect(hasNativeDeviceContacts()).toBe(false);
     expect(canSelectDeviceContacts()).toBe(false);
     await expect(selectDeviceContacts()).rejects.toThrow('নাম দিয়ে ম্যানুয়ালি যোগ করুন');
   });

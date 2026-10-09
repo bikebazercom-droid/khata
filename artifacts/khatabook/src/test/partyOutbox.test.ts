@@ -74,6 +74,46 @@ beforeEach(() => {
 });
 
 describe('offline customer changes', () => {
+  it('updates only matching cached party searches immediately and can restore them on rejection', async () => {
+    const outbox = await import('../lib/partyOutbox');
+    const queryClient = new QueryClient();
+    const scope = { activeBusinessId: 'business-A' };
+    const matchingSearchKey = ['listParties', { role: 'CUSTOMER', search: 'new', dueFilter: 'ALL' }, scope];
+    const nonMatchingSearchKey = ['listParties', { role: 'CUSTOMER', search: 'old', dueFilter: 'ALL' }, scope];
+    const supplierKey = ['listParties', { role: 'SUPPLIER', search: 'new', dueFilter: 'ALL' }, scope];
+    const otherBusinessKey = [
+      'listParties',
+      { role: 'CUSTOMER', search: 'new', dueFilter: 'ALL' },
+      { activeBusinessId: 'business-B' },
+    ];
+    queryClient.setQueryData(matchingSearchKey, []);
+    queryClient.setQueryData(nonMatchingSearchKey, []);
+    queryClient.setQueryData(supplierKey, []);
+    queryClient.setQueryData(otherBusinessKey, []);
+
+    const newParty = {
+      ...customer('New customer'),
+      id: 'party-new',
+      currentBalance: 0,
+      lastTransactionAt: null,
+    };
+    const snapshots = await outbox.optimisticallyAddPartyToListCaches(
+      queryClient,
+      'business-A',
+      newParty,
+    );
+
+    expect(queryClient.getQueryData<Party[]>(matchingSearchKey)?.map((party) => party.id))
+      .toEqual(['party-new']);
+    expect(queryClient.getQueryData<Party[]>(nonMatchingSearchKey)).toEqual([]);
+    expect(queryClient.getQueryData<Party[]>(supplierKey)).toEqual([]);
+    expect(queryClient.getQueryData<Party[]>(otherBusinessKey)).toEqual([]);
+
+    outbox.restorePartyListCaches(queryClient, snapshots);
+    expect(queryClient.getQueryData<Party[]>(matchingSearchKey)).toEqual([]);
+    queryClient.clear();
+  });
+
   it('coalesces edits into the queued create and restores the latest customer locally', async () => {
     const outbox = await import('../lib/partyOutbox');
     const queryClient = new QueryClient();

@@ -5,6 +5,7 @@ import { PartyRole } from '@workspace/api-client-react';
 
 const mocks = vi.hoisted(() => ({
   canSelectDeviceContacts: vi.fn(),
+  hasNativeDeviceContacts: vi.fn(),
   selectDeviceContacts: vi.fn(),
   useCreateParty: vi.fn(),
   createParty: vi.fn(),
@@ -12,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/lib/device-contacts', () => ({
   canSelectDeviceContacts: mocks.canSelectDeviceContacts,
+  hasNativeDeviceContacts: mocks.hasNativeDeviceContacts,
   selectDeviceContacts: mocks.selectDeviceContacts,
 }));
 
@@ -61,6 +63,7 @@ async function importContacts() {
 describe('AddPartyModal contact picker', () => {
   beforeEach(() => {
     mocks.canSelectDeviceContacts.mockReset().mockReturnValue(true);
+    mocks.hasNativeDeviceContacts.mockReset().mockReturnValue(false);
     mocks.selectDeviceContacts.mockReset().mockResolvedValue(contacts);
     mocks.createParty.mockReset();
     mocks.useCreateParty.mockReset().mockReturnValue({
@@ -80,9 +83,10 @@ describe('AddPartyModal contact picker', () => {
     Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
   });
 
-  it('waits for an explicit tap before importing, then searches and selects a named contact', async () => {
+  it('keeps browser contact import behind a tap, then searches and selects a named contact', async () => {
     renderPicker(PartyRole.SUPPLIER);
 
+    expect(mocks.hasNativeDeviceContacts).toHaveBeenCalled();
     expect(mocks.canSelectDeviceContacts).not.toHaveBeenCalled();
     expect(mocks.selectDeviceContacts).not.toHaveBeenCalled();
 
@@ -111,6 +115,21 @@ describe('AddPartyModal contact picker', () => {
         role: PartyRole.SUPPLIER,
       }),
     });
+  });
+
+  it('automatically requests native contacts when the picker opens and keeps them when returning from the form', async () => {
+    mocks.hasNativeDeviceContacts.mockReturnValue(true);
+    renderPicker();
+
+    await waitFor(() => expect(mocks.selectDeviceContacts).toHaveBeenCalledOnce());
+    expect(await screen.findByTestId('button-select-contact-abdul')).toBeInTheDocument();
+    expect(screen.queryByTestId('button-import-device-contacts')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('button-select-contact-abdul'));
+    fireEvent.click(screen.getByTestId('button-back-party-form'));
+
+    expect(screen.getByTestId('button-select-contact-abdul')).toBeInTheDocument();
+    expect(mocks.selectDeviceContacts).toHaveBeenCalledOnce();
   });
 
   it('shows and selects a phone-only contact with its number as the form name', async () => {

@@ -179,6 +179,56 @@ function applyParty(queryClient: QueryClient, businessId: string, kind: PartyOpe
   for (const query of detailQueries) queryClient.setQueryData(query.queryKey, party);
 }
 
+export interface PartyListCacheSnapshot {
+  queryKey: readonly unknown[];
+  data: Party[] | undefined;
+}
+
+export async function optimisticallyAddPartyToListCaches(
+  queryClient: QueryClient,
+  businessId: string | null,
+  party: Party,
+): Promise<PartyListCacheSnapshot[]> {
+  const belongsToBusiness = (query: Query) =>
+    query.queryKey[0] === 'listParties' &&
+    hasBusinessScope(query, businessId ?? '__default_business__');
+  const matchingQueries = queryClient.getQueryCache().findAll({ predicate: belongsToBusiness });
+  await Promise.all(
+    matchingQueries.map((query) =>
+      queryClient.cancelQueries({ queryKey: query.queryKey, exact: true }),
+    ),
+  );
+
+  const snapshots: PartyListCacheSnapshot[] = [];
+  for (const query of queryClient.getQueryCache().findAll({ predicate: belongsToBusiness })) {
+    const previous = queryClient.getQueryData<Party[]>(query.queryKey);
+    const matches = matchesListParams(party, query);
+    if (!Array.isArray(previous) && !matches) continue;
+
+    snapshots.push({ queryKey: query.queryKey, data: previous });
+    const withoutParty = (Array.isArray(previous) ? previous : [])
+      .filter((item) => item.id !== party.id);
+    queryClient.setQueryData<Party[]>(
+      query.queryKey,
+      matches ? [party, ...withoutParty] : withoutParty,
+    );
+  }
+  return snapshots;
+}
+
+export function restorePartyListCaches(
+  queryClient: QueryClient,
+  snapshots: PartyListCacheSnapshot[] | undefined,
+): void {
+  for (const snapshot of snapshots ?? []) {
+    if (snapshot.data === undefined) {
+      queryClient.removeQueries({ queryKey: snapshot.queryKey, exact: true });
+    } else {
+      queryClient.setQueryData(snapshot.queryKey, snapshot.data);
+    }
+  }
+}
+
 export async function applyQueuedPartyOperations(
   queryClient: QueryClient,
   actorId: string,
