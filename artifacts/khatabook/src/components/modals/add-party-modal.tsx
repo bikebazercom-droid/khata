@@ -369,6 +369,7 @@ function AddPartyForm({
               </div>
               <Input id="party-phone" {...register('phone')} inputMode="tel" autoComplete="tel-national" placeholder="মোবাইল নম্বর" data-testid="input-party-phone" className="h-[72px] min-w-0 flex-1 rounded-[5px] border border-[#d8dce1] bg-white px-4 text-lg placeholder:text-[#8c9299] focus-visible:border-[#0b57d0] focus-visible:ring-2 focus-visible:ring-[#0b57d0]/15" />
             </div>
+            <p className="mt-2 text-xs text-[#89929a]">ঐচ্ছিক</p>
             {errors.phone && <p role="alert" className="mt-1.5 text-xs font-semibold text-[#b84d38]">{errors.phone.message}</p>}
           </div>
 
@@ -380,7 +381,7 @@ function AddPartyForm({
                 { value: PartyRole.SUPPLIER, label: 'সাপ্লায়ার' },
               ].map((option) => (
                 <label key={option.value} className="inline-flex cursor-pointer items-center gap-2.5 text-[15px] text-[#343a40]">
-                  <input type="radio" className="peer sr-only" checked={currentRole === option.value} onChange={() => setValue('role', option.value)} data-testid={`radio-party-role-${option.value.toLowerCase()}`} />
+                  <input type="radio" name="party-role" value={option.value} className="peer sr-only" checked={currentRole === option.value} onChange={() => setValue('role', option.value, { shouldDirty: true, shouldValidate: true })} data-testid={`radio-party-role-${option.value.toLowerCase()}`} />
                   <span aria-hidden className={cn('grid h-[22px] w-[22px] place-items-center rounded-full border-2 transition-colors', currentRole === option.value ? 'border-[#0b57d0]' : 'border-[#0b57d0]')}>
                     {currentRole === option.value && <span className="h-[11px] w-[11px] rounded-full bg-[#0b57d0]" />}
                   </span>
