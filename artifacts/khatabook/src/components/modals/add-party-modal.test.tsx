@@ -183,4 +183,60 @@ describe('AddPartyModal contact picker', () => {
     expect(screen.getByTestId('input-party-name')).toBeInTheDocument();
     expect(screen.getByTestId('input-party-phone')).toBeInTheDocument();
   });
+
+  it('creates a customer with only a name and omits the empty phone from the request', async () => {
+    renderPicker(PartyRole.CUSTOMER);
+    fireEvent.click(screen.getByTestId('button-party-add'));
+
+    const submitButton = screen.getByTestId('button-submit-party');
+    expect(submitButton).toBeDisabled();
+    expect(screen.getByRole('img', { name: 'বাংলাদেশের পতাকা' })).toBeInTheDocument();
+    expect(screen.getByText('+880')).toBeInTheDocument();
+    expect(screen.getByTestId('input-party-phone')).toHaveValue('');
+
+    fireEvent.change(screen.getByTestId('input-party-name'), {
+      target: { value: 'Name only customer' },
+    });
+    expect(submitButton).toBeEnabled();
+
+    fireEvent.click(submitButton);
+    await waitFor(() => expect(mocks.createParty).toHaveBeenCalledOnce());
+
+    const request = mocks.createParty.mock.calls[0]?.[0] as {
+      data: Record<string, unknown>;
+    };
+    expect(request.data).toEqual({
+      id: expect.any(String),
+      name: 'Name only customer',
+      role: PartyRole.CUSTOMER,
+    });
+    expect(Object.hasOwn(request.data, 'phone')).toBe(false);
+  });
+
+  it('allows switching to supplier and creates a name-only supplier with no phone property', async () => {
+    renderPicker(PartyRole.CUSTOMER);
+    fireEvent.click(screen.getByTestId('button-party-add'));
+
+    fireEvent.click(screen.getByTestId('radio-party-role-supplier'));
+    expect(screen.getByTestId('button-submit-party')).toHaveTextContent('সাপ্লায়ার যোগ করুন');
+    expect(screen.getByText('+880')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('input-party-name'), {
+      target: { value: 'Name only supplier' },
+    });
+    expect(screen.getByTestId('button-submit-party')).toBeEnabled();
+
+    fireEvent.click(screen.getByTestId('button-submit-party'));
+    await waitFor(() => expect(mocks.createParty).toHaveBeenCalledOnce());
+
+    const request = mocks.createParty.mock.calls[0]?.[0] as {
+      data: Record<string, unknown>;
+    };
+    expect(request.data).toEqual({
+      id: expect.any(String),
+      name: 'Name only supplier',
+      role: PartyRole.SUPPLIER,
+    });
+    expect(Object.hasOwn(request.data, 'phone')).toBe(false);
+  });
 });
