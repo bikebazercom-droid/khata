@@ -135,7 +135,12 @@ describe("phone worker invitation and verified first sign-in", () => {
     const identity = await request(app).get("/auth/me")
       .set("Authorization", `Bearer ${verified.body.token}`);
     expect(identity.status).toBe(200);
-    expect(identity.body).toMatchObject({ role: "staff", businessId, phone: normalized });
+    expect(identity.body).toMatchObject({
+      role: "staff",
+      businessId,
+      phone: normalized,
+      needsBookName: false,
+    });
     await request(app).get("/auth/me").set("Authorization", `Bearer ${verified.body.token}`);
     expect(await db.select().from(userLoginEventsTable).where(eq(userLoginEventsTable.userId, staff!.id))).toHaveLength(1);
     const [recorded] = await db.select().from(userLoginEventsTable).where(eq(userLoginEventsTable.userId, staff!.id));
