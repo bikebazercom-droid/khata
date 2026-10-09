@@ -18,8 +18,9 @@ import {
   type Party,
 } from '@workspace/api-client-react';
 import { useMemo } from 'react';
-import { Search, Plus, Settings, User, ChevronRight, UserPlus2, SlidersHorizontal, FileText, Users, Pencil, FolderOpen, X, ScanLine } from 'lucide-react';
+import { Search, Plus, Settings, User, ChevronRight, UserPlus2, SlidersHorizontal, FileText, Users, FolderOpen, X, ScanLine } from 'lucide-react';
 import { cn, escapeHtml } from '@/lib/utils';
+import { LedgerBookHeader } from '@/components/ledger-book-header';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -612,34 +613,12 @@ export function HomeView() {
       {/* Fixed deep-blue top header */}
       <div className="shrink-0 bg-[#1B3A6B] pb-9 z-10">
         <div className="flex items-center justify-between gap-1 px-2 pb-3 pt-[calc(1rem+var(--safe-top))] sm:gap-2 sm:px-4">
-          <div className="flex min-w-0 flex-1 items-center gap-1 sm:gap-2">
-            <img
-              src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/logo-icon.svg`}
-              alt="Banglakhata"
-              className="h-8 w-8 shrink-0 sm:h-9 sm:w-9"
-            />
-            <button
-              type="button"
-              onClick={userRole === 'owner' ? openSwitcher : undefined}
-              className={cn("flex min-w-0 flex-1 flex-row items-center gap-1 overflow-hidden transition-opacity sm:gap-1.5", userRole === 'owner' ? "active:opacity-75" : "")}
-              aria-label={activeBookName || 'বাংলা খাতা'}
-              title={activeBookName || undefined}
-            >
-              <h1 className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left font-extrabold leading-tight tracking-tight text-[12px] text-white sm:text-[15px]">
-                {activeBookName || t('loading')}
-              </h1>
-              {userRole === 'owner' && <ChevronRight className="h-3 w-3 shrink-0 rotate-90 text-white/60 sm:h-3.5 sm:w-3.5" />}
-            </button>
-            {userRole === 'owner' && (
-              <button
-                onClick={() => setIsRenameStoreOpen(true)}
-                aria-label="দোকানের নাম সম্পাদনা করুন"
-                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-white/60 transition-all active:bg-white/15 active:text-white sm:h-6 sm:w-6"
-              >
-                <Pencil className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-              </button>
-            )}
-          </div>
+          <LedgerBookHeader
+            bookName={activeBookName || t('loading')}
+            isOwner={userRole === 'owner'}
+            onOpenSwitcher={openSwitcher}
+            onRename={() => setIsRenameStoreOpen(true)}
+          />
 
           <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             {userRole === 'owner' ? (

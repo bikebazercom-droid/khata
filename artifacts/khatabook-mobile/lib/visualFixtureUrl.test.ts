@@ -13,6 +13,20 @@ describe('resolveVisualFixtureUrl', () => {
     ).toBe('https://banglakhata.example/src/visual-fixtures/index.html?screen=party-ledger');
   });
 
+  it.each(['short', 'long'] as const)(
+    'passes the %s book selection to the active-header preview fixture',
+    (book) => {
+      expect(
+        resolveVisualFixtureUrl(
+          'https://banglakhata.example/',
+          `?visualFixture=active-book-header&book=${book}`,
+          'web',
+          true,
+        ),
+      ).toBe(`https://banglakhata.example/src/visual-fixtures/index.html?screen=active-book-header&book=${book}`);
+    },
+  );
+
   it('does not alter normal browser URLs or native and production app URLs', () => {
     const baseUrl = 'https://banglakhata.example/';
     expect(resolveVisualFixtureUrl(baseUrl, '', 'web', true)).toBe(baseUrl);

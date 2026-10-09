@@ -1,4 +1,4 @@
-const visualFixtures = new Set(['party-ledger', 'transaction-report']);
+const visualFixtures = new Set(['party-ledger', 'transaction-report', 'active-book-header']);
 
 /**
  * Selects an isolated, fake-data fixture only for explicit Expo Web development
@@ -18,5 +18,9 @@ export function resolveVisualFixtureUrl(
 
   const url = new URL('/src/visual-fixtures/index.html', webAppUrl);
   url.searchParams.set('screen', fixture);
+  if (fixture === 'active-book-header') {
+    const book = new URLSearchParams(search).get('book');
+    if (book === 'short' || book === 'long') url.searchParams.set('book', book);
+  }
   return url.toString();
 }

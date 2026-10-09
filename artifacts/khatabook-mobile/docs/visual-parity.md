@@ -20,8 +20,8 @@ pnpm --filter @workspace/khatabook-mobile test:visual-parity -- \
 The Replit runner must provide `chromium` and ImageMagick's `magick` command.
 `playwright-core` is a development dependency; it does not download a browser.
 Use `--output-dir <path>` to keep captures, `--capture-timeout-ms 60000` to
-allow slower previews to load, or `--max-diff-percent 1.5` to adjust the
-default pixel-difference threshold.
+allow slower previews to load, `--route active-book-header` to check one route,
+or `--max-diff-percent 1.5` to adjust the default pixel-difference threshold.
 
 ## Screens covered
 
@@ -38,6 +38,9 @@ default pixel-difference threshold.
   development-only query parameter. They do not bypass authentication, make API
   calls, or use production/customer data. They compare wrapper and viewport
   parity, not backend behavior or the authenticated production pages.
+- **Active book header:** a shared production header component rendered with a
+  40-character mixed Bangla/English book name. Component tests separately cover
+  switching between short and long names.
 
 The public landing page was previously visually compared at both target sizes.
 The screenshot runner rechecks all four routes at both sizes and reports

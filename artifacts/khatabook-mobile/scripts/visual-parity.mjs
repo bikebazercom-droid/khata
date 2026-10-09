@@ -34,6 +34,12 @@ const routes = [
     expoPath: '/?visualFixture=transaction-report',
     fixtureTestId: 'fixture-transaction-report',
   },
+  {
+    name: 'active-book-header',
+    webPath: '/src/visual-fixtures/index.html?screen=active-book-header&book=long',
+    expoPath: '/?visualFixture=active-book-header&book=long',
+    fixtureTestId: 'fixture-active-book-header',
+  },
 ];
 
 function parseArgs(argv) {
@@ -145,10 +151,16 @@ async function main() {
   const magick = options.magick || 'magick';
   const timeoutMs = Number(options['capture-timeout-ms'] || 45000);
   const maxDiffPercent = Number(options['max-diff-percent'] || 1.5);
+  const selectedRoutes = options.route
+    ? routes.filter((route) => route.name === options.route)
+    : routes;
   const outputDir = resolve(
     options['output-dir'] || mkdtempSync(join(tmpdir(), 'banglakhata-visual-parity-')),
   );
 
+  if (selectedRoutes.length === 0) {
+    throw new Error(`Unknown route "${options.route}". Known routes: ${routes.map((route) => route.name).join(', ')}.`);
+  }
   if (!Number.isFinite(timeoutMs) || timeoutMs < 1000) {
     throw new Error('--capture-timeout-ms must be at least 1000.');
   }
@@ -167,7 +179,7 @@ async function main() {
   try {
     console.log(`Saving screenshots and difference images to ${outputDir}`);
     for (const viewport of sizes) {
-      for (const route of routes) {
+      for (const route of selectedRoutes) {
         const webImage = join(outputDir, `${route.name}-${viewport.width}x${viewport.height}-web.png`);
         const expoImage = join(outputDir, `${route.name}-${viewport.width}x${viewport.height}-expo.png`);
         const diffImage = join(outputDir, `${route.name}-${viewport.width}x${viewport.height}-diff.png`);

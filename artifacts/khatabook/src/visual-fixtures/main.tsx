@@ -1,6 +1,11 @@
 import { createRoot } from 'react-dom/client';
+import { useState } from 'react';
 import '../index.css';
 import './fixtures.css';
+import { LedgerBookHeader } from '../components/ledger-book-header';
+
+const shortBookName = 'আমার খাতা';
+const longBookName = 'আমার খাতা Shakil Traders'.padEnd(40, 'X');
 
 const entries = [
   { date: '৪ অক্টোবর ২০২৬', title: 'পণ্য সরবরাহ', note: 'পরীক্ষার ডেটা', amount: '৳ ২,৫০০', balance: '৳ ৪,৭০০' },
@@ -132,10 +137,88 @@ function TransactionReportFixture() {
   );
 }
 
+function ActiveBookHeaderFixture() {
+  const [bookName, setBookName] = useState(
+    new URLSearchParams(window.location.search).get('book') === 'long'
+      ? longBookName
+      : shortBookName,
+  );
+
+  return (
+    <main className="min-h-dvh bg-white" data-testid="fixture-active-book-header">
+      <header className="bg-[#1B3A6B] pb-9">
+        <div className="flex items-center justify-between gap-1 px-2 pb-3 pt-[calc(1rem+var(--safe-top))] sm:gap-2 sm:px-4">
+          <LedgerBookHeader
+            bookName={bookName}
+            isOwner
+            onOpenSwitcher={() => setBookName((current) => (
+              current === shortBookName ? longBookName : shortBookName
+            ))}
+            onRename={() => undefined}
+          />
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+            <button
+              type="button"
+              aria-label="Notifications"
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 text-white"
+            >
+              ♧
+            </button>
+            <button
+              type="button"
+              aria-label="Access"
+              className="flex items-center gap-1 rounded-lg bg-white/15 px-2 py-2 text-[10px] font-bold text-white sm:px-3 sm:text-xs"
+            >
+              অ্যাক্সেস
+            </button>
+            <button
+              type="button"
+              aria-label="Duty folder"
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 text-white"
+            >
+              ▱
+            </button>
+          </div>
+        </div>
+        <div className="px-4">
+          <div className="flex items-stretch gap-6 border-b border-white/15">
+            <button className="border-b-2 border-white pb-2.5 pt-1 text-sm font-bold text-white">
+              গ্রাহক
+            </button>
+            <button className="border-b-2 border-transparent pb-2.5 pt-1 text-sm font-bold text-white/60">
+              সরবরাহকারী
+            </button>
+          </div>
+        </div>
+      </header>
+      <section className="flex gap-2 p-4">
+        <button
+          type="button"
+          data-testid="fixture-short-book"
+          onClick={() => setBookName(shortBookName)}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+        >
+          Short book
+        </button>
+        <button
+          type="button"
+          data-testid="fixture-long-book"
+          onClick={() => setBookName(longBookName)}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+        >
+          40-character book
+        </button>
+      </section>
+      <p className="px-4 text-xs text-slate-500">Phone-width header layout preview</p>
+    </main>
+  );
+}
+
 function App() {
   const screen = new URLSearchParams(window.location.search).get('screen');
   if (screen === 'party-ledger') return <PartyLedgerFixture />;
   if (screen === 'transaction-report') return <TransactionReportFixture />;
+  if (screen === 'active-book-header') return <ActiveBookHeaderFixture />;
   return <main className="vf-page" data-testid="fixture-unknown">Unknown visual fixture.</main>;
 }
 
