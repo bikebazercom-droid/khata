@@ -31,6 +31,27 @@ function asciiPhoneNumber(value: string): string {
   return value.replace(/[০-৯]/g, (digit) => String(bengaliDigits.indexOf(digit)));
 }
 
+export function fitPdfHeaderNameFontSize(
+  name: string,
+  availableWidthPx: number,
+  maxFontSizePx: number,
+): number {
+  const estimatedWidthEm = Array.from(name).reduce((width, character) => {
+    if (/\s/.test(character)) return width + 0.32;
+    if (/[\u0980-\u09ff]/.test(character)) return width + 0.92;
+    if (/[ilI1.,'`!:;|]/.test(character)) return width + 0.34;
+    if (/[MW@%&]/.test(character)) return width + 0.88;
+    if (/[A-Z]/.test(character)) return width + 0.68;
+    return width + 0.56;
+  }, 0);
+
+  if (!estimatedWidthEm || !Number.isFinite(availableWidthPx) || availableWidthPx <= 0) {
+    return maxFontSizePx;
+  }
+
+  return Math.max(5, Math.min(maxFontSizePx, availableWidthPx / estimatedWidthEm));
+}
+
 export function renderPdfBrandLogo(websiteUrl?: string | null): string {
   const label = '<span style="letter-spacing:0.5px;">📘 বাংলা খাতা</span>';
   const href = validHttpsUrl(websiteUrl);
@@ -46,30 +67,39 @@ export function renderPdfInstallButton(playStoreUrl?: string | null): string {
     : `<span style="${style}">ইনস্টল করুন</span>`;
 }
 
-export function renderPdfSupportContacts(
+export interface PdfSupportContactLink {
+  href: string;
+  label: string;
+}
+
+export function getPdfSupportContactLinks(
   supportPhone?: string | null,
   supportEmail?: string | null,
-): string {
+): PdfSupportContactLink[] {
   const phone = supportPhone?.trim() ?? "";
   const email = supportEmail?.trim() ?? "";
   const normalizedPhone = asciiPhoneNumber(phone);
   const safePhoneDigits = normalizedPhone.replace(/[^\d]/g, "");
-  const contacts: string[] = [];
+  const contacts: PdfSupportContactLink[] = [];
 
   if (safePhoneDigits) {
     const telTarget = normalizedPhone.startsWith("+")
       ? `+${safePhoneDigits}`
       : safePhoneDigits;
-    contacts.push(
-      `<a href="tel:${escapePdfHtml(telTarget)}" style="color:#dbeafe;text-decoration:none;overflow-wrap:anywhere;">☎ ${escapePdfHtml(phone)}</a>`,
-    );
+    contacts.push({ href: `tel:${telTarget}`, label: `☎ ${phone}` });
   }
   if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    contacts.push(
-      `<a href="mailto:${escapePdfHtml(email)}" style="color:#dbeafe;text-decoration:none;overflow-wrap:anywhere;">✉ ${escapePdfHtml(email)}</a>`,
-    );
+    contacts.push({ href: `mailto:${email}`, label: `✉ ${email}` });
   }
+  return contacts;
+}
+
+export function renderPdfSupportContacts(
+  supportPhone?: string | null,
+  supportEmail?: string | null,
+): string {
+  const contacts = getPdfSupportContactLinks(supportPhone, supportEmail);
   if (!contacts.length) return "";
 
-  return `<div style="display:flex;flex-wrap:wrap;justify-content:flex-end;column-gap:10px;row-gap:1px;max-width:80mm;color:#dbeafe;font-size:9px;line-height:1.3;text-align:right;">${contacts.join("")}</div>`;
+  return `<table role="presentation" style="width:100%;max-width:80mm;margin-left:auto;border-collapse:collapse;border-spacing:0;color:#dbeafe;font-size:9px;line-height:1.4;text-align:right;"><tbody>${contacts.map(({ href, label }) => `<tr><td style="padding:0 0 2px;text-align:right;vertical-align:top;overflow-wrap:anywhere;"><a href="${escapePdfHtml(href)}" style="display:inline-block;max-width:100%;color:#dbeafe;text-decoration:none;overflow-wrap:anywhere;word-break:break-word;line-height:1.4;">${escapePdfHtml(label)}</a></td></tr>`).join("")}</tbody></table>`;
 }

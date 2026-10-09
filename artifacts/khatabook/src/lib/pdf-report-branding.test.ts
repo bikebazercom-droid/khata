@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  fitPdfHeaderNameFontSize,
   renderPdfBrandLogo,
   renderPdfInstallButton,
   renderPdfSupportContacts,
@@ -28,9 +29,17 @@ describe("PDF report branding", () => {
     expect(support).toContain("color:#dbeafe");
     expect(support).toContain('href="tel:+8801712345678"');
     expect(support).toContain('href="mailto:support@example.com"');
+    expect(support.match(/<tr>/g)).toHaveLength(2);
+    expect(support).not.toContain("display:flex");
     expect(renderPdfSupportContacts("", "")).toBe("");
     expect(renderPdfSupportContacts("+৮৮০ ১৭১২-৩৪৫৬৭৮", ""))
       .toContain('href="tel:+8801712345678"');
+  });
+
+  it("reduces long ledger header names without forcing them to wrap", () => {
+    expect(fitPdfHeaderNameFontSize("Hazari gold llc", 510, 20)).toBe(20);
+    expect(fitPdfHeaderNameFontSize("হাজারি গোল্ড লিমিটেড".repeat(4), 510, 20))
+      .toBeLessThan(20);
   });
 
   it("escapes setting values before placing them in PDF markup", () => {
