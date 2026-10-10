@@ -15,7 +15,8 @@
   },
   "private": true,
   "dependencies": {
-    "@replit/connectors-sdk": "^0.4.1"
+    "@replit/connectors-sdk": "^0.4.1",
+    "expo": "^57.0.27"
   },
   "devDependencies": {
     "prettier": "^3.9.5",
