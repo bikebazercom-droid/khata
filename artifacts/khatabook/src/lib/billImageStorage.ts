@@ -117,6 +117,13 @@ export async function prefetchImagesForPdf(container: HTMLElement): Promise<{
         const res = await fetch(originalSrc, { credentials: 'include' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const blob = await res.blob();
+        if (!blob.type.startsWith('image/')) {
+          const label = blob.type === 'application/pdf' ? 'PDF' : 'FILE';
+          const tileSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><rect x="1" y="1" width="46" height="46" rx="5" fill="#eff6ff" stroke="#bfdbfe"/><path d="M15 9h13l7 7v23H15z" fill="#fff" stroke="#2563eb" stroke-width="2"/><path d="M28 9v8h7" fill="none" stroke="#2563eb" stroke-width="2"/><text x="24" y="31" text-anchor="middle" font-family="Arial,sans-serif" font-size="8" font-weight="700" fill="#1d4ed8">${label}</text></svg>`;
+          img.alt = label;
+          img.src = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(tileSvg)}`;
+          return;
+        }
         // Decode and scale down so html2canvas never holds a large bitmap in
         // memory (low-memory devices silently drop oversized images).
         const imgEl = await blobToImage(blob);

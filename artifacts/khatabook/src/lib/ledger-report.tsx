@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
 import { billImageSrc } from '@/lib/billImageStorage';
+import { BillAttachmentPreview } from '@/components/bill-attachment-preview';
 import { getLedgerEntryDateKey } from './date-time';
 import { splitAdjustmentDescription } from './adjustment-display';
 import { fitPdfHeaderNameFontSize, getPdfSupportContactLinks } from './pdf-report-branding';
@@ -226,19 +227,13 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                         <td style={{ padding: '7px 10px', border: GRID_BORDER, color: '#334155' }}>
                           {entryDetails(entry)}
                           {imgSrc && (
-                            <img
+                            <BillAttachmentPreview
                               src={imgSrc}
                               alt="বিল"
-                              style={{
-                                display: 'block',
-                                marginTop: '4px',
-                                width: '48px',
-                                height: '48px',
-                                objectFit: 'contain',
-                                backgroundColor: '#f1f5f9',
-                                borderRadius: '4px',
-                                border: '1px solid #e2e8f0',
-                              }}
+                              className="block"
+                              imageClassName="h-full w-full object-contain"
+                              imageStyle={{ width: '48px', height: '48px', objectFit: 'contain' }}
+                              style={{ display: 'block', marginTop: '4px', width: '48px', height: '48px' }}
                             />
                           )}
                         </td>

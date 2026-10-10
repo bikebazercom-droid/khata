@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
 import { billImageSrc } from '@/lib/billImageStorage';
+import { BillAttachmentPreview } from '@/components/bill-attachment-preview';
 import { getLedgerEntryDateKey } from './date-time';
 import { sortGlobalLedgerEntriesChronologically } from './global-ledger-report-order';
 import { splitAdjustmentDescription } from './adjustment-display';
@@ -216,11 +217,12 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
                         </td>
                         <td style={{ padding: '4px 6px', border: GRID_BORDER, textAlign: 'center', width: '52px' }}>
                           {imgSrc ? (
-                            <img
+                            <BillAttachmentPreview
                               src={imgSrc}
                               alt="বিল"
-                              crossOrigin="anonymous"
-                              style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '3px', display: 'inline-block' }}
+                              className="inline-flex"
+                              imageClassName="h-full w-full object-cover"
+                              style={{ width: '40px', height: '40px', borderRadius: '3px', display: 'inline-flex' }}
                             />
                           ) : null}
                         </td>

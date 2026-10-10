@@ -34,7 +34,7 @@ import {
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
 import { billImageSrc } from '@/lib/billImageStorage';
-import { BillImageLightbox } from '@/components/modals/bill-image-lightbox';
+import { BillAttachmentPreview } from '@/components/bill-attachment-preview';
 import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic';
 import { toast } from 'sonner';
 import { useConnectionState } from '@/context/connection-state';
@@ -77,7 +77,6 @@ export function TransactionDetailPage() {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   // Ref for the shareable receipt card
   const receiptCardRef = useRef<HTMLDivElement>(null);
@@ -328,20 +327,17 @@ export function TransactionDetailPage() {
             >
               সংযুক্ত বিলের ছবি
             </p>
-            <button
-              type="button"
-              onClick={() => setLightboxImage(imageSrc)}
-              className="block w-full px-4 pb-3 active:scale-[0.98] transition-transform"
-            >
-              <img
+            <div className="px-4 pb-3">
+              <BillAttachmentPreview
                 src={imageSrc}
                 alt="সংযুক্ত বিল"
-                className="w-full max-h-56 object-contain rounded-lg border border-slate-100 bg-slate-50"
+                className="min-h-24 w-full max-h-56 active:scale-[0.98] transition-transform"
+                imageClassName="max-h-56 w-full object-contain"
               />
               <p className="text-[11px] text-slate-400 font-medium mt-1.5 text-center">
-                ছবি বড় করতে ট্যাপ করুন
+                সংযুক্ত ফাইল খুলতে ট্যাপ করুন
               </p>
-            </button>
+            </div>
           </div>
         )}
 
@@ -465,11 +461,6 @@ export function TransactionDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* ── Lightbox ─────────────────────────────────────────────── */}
-      {lightboxImage && (
-        <BillImageLightbox src={lightboxImage} onClose={() => setLightboxImage(null)} />
-      )}
 
       {/* ── Edit overlay ─────────────────────────────────────────── */}
       {isEditOpen && entry && (

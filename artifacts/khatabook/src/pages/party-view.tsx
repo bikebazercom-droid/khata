@@ -31,7 +31,7 @@ import { resolveLedgerBookName } from '@/lib/ledger-book-name';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { TransactionEntryScreen } from '@/components/modals/transaction-entry-screen';
-import { BillImageLightbox } from '@/components/modals/bill-image-lightbox';
+import { BillAttachmentPreview } from '@/components/bill-attachment-preview';
 import {
   LedgerReportDocument,
   buildReportFilename,
@@ -171,7 +171,6 @@ export function PartyView() {
   const [copiedSms, setCopiedSms] = useState(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [isGeneratingReminder, setIsGeneratingReminder] = useState(false);
-  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
   const activeBusinessName = businesses.find((business) => business.id === selectedBusinessId)?.name;
   const storeName = resolveLedgerBookName(activeBusinessName, settings?.storeName) ?? 'Banglakhata';
@@ -617,21 +616,14 @@ export function PartyView() {
                             </span>
                           )}
                           {imgSrc && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setLightboxImage(imgSrc);
-                              }}
-                              aria-label="বিলের ছবি দেখুন"
-                              className="block mt-1.5 active:scale-95 transition-transform"
-                            >
-                              <img
+                            <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
+                              <BillAttachmentPreview
                                 src={imgSrc}
                                 alt="সংযুক্ত বিল"
-                                className="w-10 h-10 rounded-md object-cover border border-slate-200"
+                                className="h-10 w-10 active:scale-95 transition-transform"
+                                imageClassName="h-full w-full object-cover"
                               />
-                            </button>
+                            </div>
                           )}
                         </div>
                         {/* You-gave amounts occupy the debit column; tint it only when populated. */}
@@ -699,8 +691,6 @@ export function PartyView() {
           onClose={() => setTransactionType(null)}
         />
       )}
-
-      {lightboxImage && <BillImageLightbox src={lightboxImage} onClose={() => setLightboxImage(null)} />}
 
       {/* Off-screen printable ledger report used to render the actual PDF via html2pdf */}
       <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -1 }} aria-hidden="true">

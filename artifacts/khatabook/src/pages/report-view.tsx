@@ -26,7 +26,7 @@ import { Input } from '@/components/ui/input';
 import { BengaliCalendarModal } from '@/components/modals/bengali-calendar-modal';
 import { formatBengaliDateInput } from '@/lib/bengali-date';
 import { ReportPeriodDrawer, type ReportPeriod } from '@/components/modals/report-period-drawer';
-import { BillImageLightbox } from '@/components/modals/bill-image-lightbox';
+import { BillAttachmentPreview } from '@/components/bill-attachment-preview';
 import { billImageSrc } from '@/lib/billImageStorage';
 import { loadShopProfile } from '@/components/modals/settings-drawer';
 import { buildGlobalLedgerReportCsv } from '@/lib/global-ledger-report-csv';
@@ -135,7 +135,6 @@ export function ReportView() {
   const [calendarFor, setCalendarFor] = useState<'start' | 'end' | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExportingCsv, setIsExportingCsv] = useState(false);
-  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const params = useMemo(
     () => ({
@@ -563,14 +562,12 @@ export function ReportView() {
                       </p>
                     )}
                     {imgSrc && (
-                      <button
-                        type="button"
-                        onClick={() => setLightboxSrc(imgSrc)}
-                        className="mt-1.5 block active:opacity-70 transition-opacity"
-                        aria-label="বিলের ছবি দেখুন"
-                      >
-                        <img src={imgSrc} alt="বিল" className="w-10 h-10 rounded-md object-cover border border-slate-200" />
-                      </button>
+                      <BillAttachmentPreview
+                        src={imgSrc}
+                        alt="বিল"
+                        className="mt-1.5 h-10 w-10 active:opacity-70 transition-opacity"
+                        imageClassName="h-full w-full object-cover"
+                      />
                     )}
                   </div>
                   <div
@@ -667,7 +664,6 @@ export function ReportView() {
           }}
         />
       )}
-      {lightboxSrc && <BillImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
     </div>
   );
 }

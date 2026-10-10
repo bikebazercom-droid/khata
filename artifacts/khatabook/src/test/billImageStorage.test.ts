@@ -152,6 +152,21 @@ describe('prefetchImagesForPdf', () => {
     );
   });
 
+  it('renders non-image attachments as PDF/file tiles without counting them as failed bill photos', async () => {
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      blob: () => Promise.resolve(new Blob(['pdf-content'], { type: 'application/pdf' })),
+    });
+    const container = makeContainer(['/api/storage/objects/uploads/document']);
+    const img = container.querySelector('img')!;
+
+    const { failedCount } = await prefetchImagesForPdf(container);
+
+    expect(failedCount).toBe(0);
+    expect(img.alt).toBe('PDF');
+    expect(decodeURIComponent(img.src)).toContain('>PDF</text>');
+  });
+
   it('does NOT touch non-storage images (base64, external URLs)', async () => {
     const dataUrl = 'data:image/jpeg;base64,existing';
     const external = 'https://example.com/photo.jpg';
