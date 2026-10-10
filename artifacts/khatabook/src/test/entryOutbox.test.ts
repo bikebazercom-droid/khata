@@ -2,6 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LedgerEntryType } from '@workspace/api-client-react';
 
 const send = vi.fn();
+class MockBroadcastChannel {
+  static instances: MockBroadcastChannel[] = [];
+  onmessage: ((event: MessageEvent<{ type?: string }>) => void) | null = null;
+  readonly messages: unknown[] = [];
+  constructor(readonly name: string) {
+    MockBroadcastChannel.instances.push(this);
+  }
+  postMessage(message: unknown) { this.messages.push(message); }
+}
+
 vi.mock('@workspace/api-client-react', async (importOriginal) => {
   const original = await importOriginal<typeof import('@workspace/api-client-react')>();
   return { ...original, createLedgerEntry: (...args: unknown[]) => send(...args) };
@@ -36,6 +46,7 @@ const storage = {
 
 beforeEach(() => {
   records.clear();
+  MockBroadcastChannel.instances = [];
   send.mockReset();
   vi.resetModules();
   vi.stubGlobal('indexedDB', {
@@ -45,6 +56,7 @@ beforeEach(() => {
       return req;
     },
   });
+  vi.stubGlobal('BroadcastChannel', MockBroadcastChannel);
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
 });
 
@@ -55,6 +67,23 @@ const draft = (id: string, actorId = 'staff-A', businessId: string | null = 'bus
 });
 
 describe('persistent entry outbox', () => {
+  it('broadcasts entry changes so another open tab refreshes its scoped outbox view', async () => {
+    const outbox = await import('@/lib/entryOutbox');
+    const changed = vi.fn();
+    window.addEventListener(outbox.ENTRY_OUTBOX_CHANGED, changed);
+    await outbox.listEntries('staff-A', 'business-A');
+    const channel = MockBroadcastChannel.instances.find((item) => item.name === 'banglakhata-entry-outbox-changes');
+
+    expect(channel).toBeDefined();
+    await outbox.queueEntry(draft('cross-tab-entry'));
+    expect(channel?.messages).toEqual([{ type: 'changed' }]);
+    expect(changed).toHaveBeenCalledTimes(1);
+
+    channel?.onmessage?.({ data: { type: 'changed' } } as MessageEvent<{ type?: string }>);
+    expect(changed).toHaveBeenCalledTimes(2);
+    window.removeEventListener(outbox.ENTRY_OUTBOX_CHANGED, changed);
+  });
+
   it('keeps the same request id after reload and ambiguous response loss, and never replays another actor or business', async () => {
     const first = await import('@/lib/entryOutbox');
     await first.queueEntry(draft('request-1'));

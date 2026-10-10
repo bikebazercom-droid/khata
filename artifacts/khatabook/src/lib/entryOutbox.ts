@@ -19,7 +19,38 @@ export interface QueuedEntry {
 const DB_NAME = 'banglakhata-entry-outbox';
 const STORE = 'entries';
 export const ENTRY_OUTBOX_CHANGED = 'banglakhata-entry-outbox-changed';
+const OUTBOX_CHANNEL_NAME = 'banglakhata-entry-outbox-changes';
+const OUTBOX_STORAGE_PULSE = 'banglakhata-entry-outbox-change-pulse';
 let dbPromise: Promise<IDBDatabase> | undefined;
+let changeChannel: BroadcastChannel | null = null;
+let storageListenerAttached = false;
+
+function receiveRemoteChange() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(ENTRY_OUTBOX_CHANGED));
+  }
+}
+
+function listenForCrossTabChanges() {
+  if (typeof window === 'undefined' || changeChannel || storageListenerAttached) return;
+
+  if (typeof BroadcastChannel !== 'undefined') {
+    try {
+      changeChannel = new BroadcastChannel(OUTBOX_CHANNEL_NAME);
+      changeChannel.onmessage = (message: MessageEvent<{ type?: string }>) => {
+        if (message.data?.type === 'changed') receiveRemoteChange();
+      };
+      return;
+    } catch {
+      changeChannel = null;
+    }
+  }
+
+  window.addEventListener('storage', (event) => {
+    if (event.key === OUTBOX_STORAGE_PULSE && event.newValue) receiveRemoteChange();
+  });
+  storageListenerAttached = true;
+}
 
 function db(): Promise<IDBDatabase> {
   if (!dbPromise) {
@@ -52,6 +83,16 @@ async function transaction<T>(mode: IDBTransactionMode, action: (store: IDBObjec
 
 function changed() {
   window.dispatchEvent(new Event(ENTRY_OUTBOX_CHANGED));
+  listenForCrossTabChanges();
+  if (changeChannel) {
+    changeChannel.postMessage({ type: 'changed' });
+    return;
+  }
+  try {
+    localStorage.setItem(OUTBOX_STORAGE_PULSE, `${Date.now()}-${Math.random()}`);
+  } catch {
+    // Same-tab notification still works when browser storage is unavailable.
+  }
 }
 
 export async function queueEntry(entry: QueuedEntry): Promise<void> {
@@ -60,6 +101,7 @@ export async function queueEntry(entry: QueuedEntry): Promise<void> {
 }
 
 export async function listEntries(actorId: string, businessId: string | null): Promise<QueuedEntry[]> {
+  listenForCrossTabChanges();
   const all = await transaction<QueuedEntry[]>('readonly', (store) => store.getAll());
   return all.filter((entry) => entry.actorId === actorId && entry.businessId === businessId);
 }
