@@ -88,6 +88,7 @@ export function renderPdfStoreBadges(
 export interface PdfSupportContactLink {
   href: string;
   label: string;
+  kind: "phone" | "whatsapp" | "email";
 }
 
 export function getPdfSupportContactLinks(
@@ -104,10 +105,18 @@ export function getPdfSupportContactLinks(
     const telTarget = normalizedPhone.startsWith("+")
       ? `+${safePhoneDigits}`
       : safePhoneDigits;
-    contacts.push({ href: `tel:${telTarget}`, label: `☎ ${phone}` });
+    contacts.push({ href: `tel:${telTarget}`, label: `☎ ${phone}`, kind: "phone" });
+    const whatsappDigits = safePhoneDigits.startsWith("0")
+      ? `880${safePhoneDigits.slice(1)}`
+      : safePhoneDigits;
+    contacts.push({
+      href: `https://wa.me/${whatsappDigits}`,
+      label: "WhatsApp",
+      kind: "whatsapp",
+    });
   }
   if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    contacts.push({ href: `mailto:${email}`, label: `✉ ${email}` });
+    contacts.push({ href: `mailto:${email}`, label: `✉ ${email}`, kind: "email" });
   }
   return contacts;
 }
@@ -119,5 +128,9 @@ export function renderPdfSupportContacts(
   const contacts = getPdfSupportContactLinks(supportPhone, supportEmail);
   if (!contacts.length) return "";
 
-  return `<table role="presentation" style="width:100%;max-width:80mm;margin-left:auto;border-collapse:collapse;border-spacing:0;color:#dbeafe;font-size:9px;line-height:1.4;text-align:right;"><tbody>${contacts.map(({ href, label }) => `<tr><td style="padding:0 0 2px;text-align:right;vertical-align:top;overflow-wrap:anywhere;"><a href="${escapePdfHtml(href)}" style="display:inline-block;max-width:100%;color:#dbeafe;text-decoration:none;overflow-wrap:anywhere;word-break:break-word;line-height:1.4;">${escapePdfHtml(label)}</a></td></tr>`).join("")}</tbody></table>`;
+  const phone = contacts.find(({ kind }) => kind === "phone");
+  const whatsapp = contacts.find(({ kind }) => kind === "whatsapp");
+  const email = contacts.find(({ kind }) => kind === "email");
+  const linkStyle = "color:#dbeafe;text-decoration:none;overflow-wrap:anywhere;word-break:break-word;";
+  return `<table role="presentation" style="width:100%;max-width:80mm;margin-left:auto;border-collapse:collapse;border-spacing:0;color:#dbeafe;font-size:8px;line-height:1.2;text-align:right;"><tbody>${phone ? `<tr><td style="padding:0;text-align:right;vertical-align:top;white-space:nowrap;"><a href="${escapePdfHtml(phone.href)}" style="${linkStyle}">${escapePdfHtml(phone.label)}</a>${whatsapp ? `&nbsp;&nbsp;<a href="${escapePdfHtml(whatsapp.href)}" style="${linkStyle}">${escapePdfHtml(whatsapp.label)}</a>` : ""}</td></tr>` : ""}${email ? `<tr><td style="padding:3px 0 0;text-align:right;vertical-align:top;overflow-wrap:anywhere;"><a href="${escapePdfHtml(email.href)}" style="${linkStyle}">${escapePdfHtml(email.label)}</a></td></tr>` : ""}</tbody></table>`;
 }

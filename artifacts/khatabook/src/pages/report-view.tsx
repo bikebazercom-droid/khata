@@ -281,14 +281,14 @@ export function ReportView() {
       </div>
 
       <!-- 5. Deep Navy Footer Strip -->
-      <table role="presentation" style="width:100%;table-layout:fixed;border-collapse:collapse;background:#003366;color:#fff;margin-top:40px;box-sizing:border-box;font-size:11px;line-height:1.4;">
+      <table role="presentation" style="width:100%;table-layout:fixed;border-collapse:collapse;background:#003366;color:#fff;margin-top:24px;box-sizing:border-box;font-size:9px;line-height:1.2;">
         <tr>
-          <td style="width:58%;padding:10px 12px;vertical-align:middle;">
+          <td style="width:58%;padding:4px 8px;vertical-align:middle;">
             ${renderPdfStoreBadges(reportBranding?.playStoreUrl, reportBranding?.appleStoreUrl)}
           </td>
-          <td style="width:42%;padding:8px 12px;vertical-align:middle;text-align:right;color:#dbeafe;">
+          <td style="width:42%;padding:4px 8px;vertical-align:middle;text-align:right;color:#dbeafe;">
             ${renderPdfSupportContacts(reportBranding?.supportPhone, reportBranding?.supportEmail)}
-            <div style="margin-top:3px;padding-top:3px;border-top:1px solid rgba(219,234,254,0.35);font-size:9px;line-height:1.4;white-space:nowrap;">নিয়ম ও শর্তাবলী প্রযোজ্য</div>
+            <div style="margin-top:3px;padding-top:3px;border-top:1px solid rgba(219,234,254,0.35);font-size:8px;line-height:1.2;white-space:nowrap;">নিয়ম ও শর্তাবলী প্রযোজ্য</div>
           </td>
         </tr>
       </table>

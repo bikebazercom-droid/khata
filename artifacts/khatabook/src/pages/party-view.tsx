@@ -48,6 +48,7 @@ import { useBusinessContext } from '@/lib/businessContext';
 import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import { ENTRY_OUTBOX_CHANGED, listEntries, type QueuedEntry } from '@/lib/entryOutbox';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
+import { addPdfLinkAnnotations } from '@/lib/pdf-link-annotations';
 import { splitAdjustmentDescription } from '@/lib/adjustment-display';
 
 /**
@@ -236,6 +237,7 @@ export function PartyView() {
       .get('pdf')
       .then((pdf) => {
         stampPageNumbers(pdf);
+        if (reportRef.current) addPdfLinkAnnotations(pdf, reportRef.current);
       }) as unknown as NonNullable<ReturnType<typeof buildReportPdf>>;
 
   const handleReport = async () => {
@@ -716,6 +718,8 @@ export function PartyView() {
           }))}
           supportPhone={reportBranding?.supportPhone}
           supportEmail={reportBranding?.supportEmail}
+          playStoreUrl={reportBranding?.playStoreUrl}
+          appleStoreUrl={reportBranding?.appleStoreUrl}
         />
       </div>
 

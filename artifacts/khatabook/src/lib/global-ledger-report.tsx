@@ -7,7 +7,7 @@ import { BillAttachmentPreview } from '@/components/bill-attachment-preview';
 import { getLedgerEntryDateKey } from './date-time';
 import { sortGlobalLedgerEntriesChronologically } from './global-ledger-report-order';
 import { splitAdjustmentDescription } from './adjustment-display';
-import { fitPdfHeaderNameFontSize, getPdfSupportContactLinks } from './pdf-report-branding';
+import { fitPdfHeaderNameFontSize, getPdfSupportContactLinks, renderPdfStoreBadges } from './pdf-report-branding';
 import { buildPortablePdfFilename } from './report-filename';
 
 export interface GlobalReportEntry {
@@ -33,6 +33,8 @@ interface GlobalReportDocumentProps {
   entries: GlobalReportEntry[];
   supportPhone?: string | null;
   supportEmail?: string | null;
+  playStoreUrl?: string | null;
+  appleStoreUrl?: string | null;
 }
 
 function entryDate(entry: GlobalReportEntry) {
@@ -92,7 +94,7 @@ const GRID_BORDER = '0.75px solid #000000';
  * column and every month closes with a debit/credit subtotal row.
  */
 export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocumentProps>(
-  ({ storeName, periodLabel, entries, supportPhone, supportEmail }, ref) => {
+  ({ storeName, periodLabel, entries, supportPhone, supportEmail, playStoreUrl, appleStoreUrl }, ref) => {
     const monthGroups = groupByMonth(entries);
     const totalDebit = entries.reduce((sum, e) => (e.type === 'YOU_GAVE' ? sum + e.amount : sum), 0);
     const totalCredit = entries.reduce((sum, e) => (e.type === 'YOU_GOT' ? sum + e.amount : sum), 0);
@@ -291,18 +293,23 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
             single tall canvas into pages, so a bar pinned here cannot repeat on
             every physical page the way "Page X of Y" (stamped separately via
             jsPDF, per page) does. */}
-        <table role="presentation" style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', backgroundColor: COLOR_BRAND, marginTop: '28px', fontSize: '10px', lineHeight: 1.4 }}>
+        <table role="presentation" style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', backgroundColor: COLOR_BRAND, marginTop: '24px', fontSize: '9px', lineHeight: 1.2 }}>
           <tbody><tr>
-            <td style={{ width: '58%', padding: '10px 14px', verticalAlign: 'middle', color: '#ffffff', fontWeight: 700 }}>
-              {storeName} থেকে স্বয়ংক্রিয়ভাবে তৈরি করা এই রিপোর্টটি Banglakhata ব্যবহার করে তৈরি।
+            <td style={{ width: '58%', padding: '4px 8px', verticalAlign: 'middle' }}>
+              <span dangerouslySetInnerHTML={{ __html: renderPdfStoreBadges(playStoreUrl, appleStoreUrl) }} />
             </td>
-            <td style={{ width: '42%', padding: '8px 14px', verticalAlign: 'middle', textAlign: 'right', color: '#dbeafe', fontSize: '9px' }}>
-              {supportContacts.map((contact) => (
-                <div key={contact.href} style={{ margin: '0 0 2px', lineHeight: 1.4, overflowWrap: 'anywhere' }}>
+            <td style={{ width: '42%', padding: '4px 8px', verticalAlign: 'middle', textAlign: 'right', color: '#dbeafe', fontSize: '8px' }}>
+              <div style={{ whiteSpace: 'nowrap' }}>
+                {supportContacts.filter(({ kind }) => kind === 'phone' || kind === 'whatsapp').map((contact) => (
+                  <a key={contact.href} href={contact.href} style={{ color: '#dbeafe', textDecoration: 'none', marginLeft: contact.kind === 'whatsapp' ? 8 : 0 }}>{contact.label}</a>
+                ))}
+              </div>
+              {supportContacts.filter(({ kind }) => kind === 'email').map((contact) => (
+                <div key={contact.href} style={{ marginTop: 3, lineHeight: 1.2, overflowWrap: 'anywhere' }}>
                   <a href={contact.href} style={{ color: '#dbeafe', textDecoration: 'none', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{contact.label}</a>
                 </div>
               ))}
-              <div style={{ marginTop: '3px', paddingTop: '3px', borderTop: '1px solid rgba(219,234,254,0.35)', lineHeight: 1.4, whiteSpace: 'nowrap' }}>
+              <div style={{ marginTop: 3, paddingTop: 3, borderTop: '1px solid rgba(219,234,254,0.35)', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
                 নিয়ম ও শর্তাবলী প্রযোজ্য
               </div>
             </td>

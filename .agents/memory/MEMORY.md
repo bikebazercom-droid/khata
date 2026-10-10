@@ -35,3 +35,4 @@
 - [Expo Router Stack children](expo-router-stack-children.md) — register Stack.Screen elements directly or in arrays; nested fragments can crash the route mapper.
 - [Public npm lockfiles for EAS](public-npm-lockfile-eas.md) — EAS cannot resolve absolute Replit firewall tarball URLs; verify lockfile `resolved` entries even after npm regenerates it.
 - [Portable report filenames](portable-report-filenames.md) — use ASCII-only PDF filenames for generated reports; keep Bengali in the PDF content and share title, not file metadata.
+- [Interactive PDF support contacts](pdf-support-links.md) — PDFs cannot run a custom contact-choice popup; provide direct `tel:`, WhatsApp, and `mailto:` links as separate actions.
