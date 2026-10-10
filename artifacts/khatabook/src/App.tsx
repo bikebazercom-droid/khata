@@ -472,8 +472,10 @@ function AuthCacheInvalidator() {
  * phone-OTP path. Phone auth is confirmed by a successful /api/auth/me fetch
  * (the server reads the httpOnly `phone_session` cookie).
  *
- * Authentication and business permissions come from the live /api/auth/me
- * response; no browser-cached identity is used to authorize ledger access.
+ * Online authentication and business permissions come from /api/auth/me.
+ * When that service cannot be reached, a previously verified local identity
+ * is used only to open cached data and queue local changes; a server 401/403
+ * always disables that fallback.
  */
 export function useAppAuth() {
   const { isLoaded, isSignedIn: clerkSignedIn, userId: clerkUserId } = useAuth();
@@ -500,8 +502,10 @@ export function useAppAuth() {
     : null;
   const resolvedAuthData = authData ?? offlineIdentity ?? undefined;
 
-  // Whether we have a definitive answer from auth paths.
-  // We need authData to settle for the role.
+  // A previously authenticated local identity lets the already-cached app
+  // open immediately while offline or while Clerk's CDN is unreachable. A
+  // definitive 401/403 above always overrides it; server APIs remain the
+  // authority whenever the device is connected.
   const authSettled = isLoaded && (!enabled || !authLoading || !!offlineIdentity);
 
   const networkFallback = !!offlineIdentity && status !== 401 && status !== 403;
@@ -510,8 +514,8 @@ export function useAppAuth() {
     (networkFallback && !!offlineIdentity.userId)
   );
 
-  // We MUST gate rendering on authoritative /auth/me to avoid cross-account leak
-  const isAuthenticated = authSettled ? realAuth : false;
+  // Do not grant the offline fallback after an authoritative rejection.
+  const isAuthenticated = authSettled ? realAuth : !!offlineIdentity;
 
   // Block rendering until auth has settled authoritatively
   const isLoading = !authSettled && !offlineIdentity;

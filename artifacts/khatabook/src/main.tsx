@@ -12,3 +12,6 @@ createRoot(document.getElementById('root')!).render(
   </AppErrorBoundary>,
 );
 window.addEventListener('load', registerServiceWorker, { once: true });
+// A first launch without connectivity cannot install the worker. Retry once a
+// connection returns so subsequent launches can use the complete cached shell.
+window.addEventListener('online', registerServiceWorker);

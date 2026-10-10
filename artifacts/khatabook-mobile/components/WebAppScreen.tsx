@@ -139,6 +139,14 @@ export function WebAppScreen() {
     };
   }, [nativeAuth?.ready, nativeAuth?.hasSession, nativeAuth?.getApiToken]);
 
+  useEffect(() => {
+    if (!loading || loadFailed) return;
+    // Keep the WebView alive for its service-worker/cache fallback, but never
+    // leave a full-screen spinner covering cached ledger data indefinitely.
+    const timer = setTimeout(() => setLoading(false), 4000);
+    return () => clearTimeout(timer);
+  }, [loading, loadFailed, retryKey]);
+
   const retryNativeAuth = useCallback(async () => {
     setNativeAuthReady(false);
     setNativeAuthError(false);
@@ -544,6 +552,8 @@ export function WebAppScreen() {
         javaScriptEnabled
         javaScriptCanOpenWindowsAutomatically
         domStorageEnabled
+        cacheEnabled
+        cacheMode={Platform.OS === 'android' ? 'LOAD_CACHE_ELSE_NETWORK' : undefined}
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         injectedJavaScriptBeforeContentLoaded={nativeAuthToken
