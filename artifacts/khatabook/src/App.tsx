@@ -228,9 +228,7 @@ function RealtimeSyncManager() {
             void qc.invalidateQueries({ queryKey: getListPartiesQueryKey() });
           }
         }, 'deletes');
-      })().catch(() => {
-        toast.error('অফলাইন খসড়া পড়া যাচ্ছে না', { description: 'স্টোরেজ অনুমতি পরীক্ষা করুন; পরে আবার সিঙ্ক হবে।' });
-      });
+        })().catch(() => {});
     };
     const onRejected = (event: Event) => {
       const detail = (event as CustomEvent<{ message?: string }>).detail;

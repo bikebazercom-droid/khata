@@ -9,17 +9,17 @@ Retain idempotency receipts even after deleting a posted entry; a replay key mus
 
 **How to apply:** Any retention or cleanup policy must preserve replay protection. On permanent entry deletion, redact the receipt's transaction payload but retain its business, actor, request ID and fingerprint, then reject matching retries. Check the current actor, business and permissions before returning an old result. Do not transfer pending drafts across accounts.
 
-Pending drafts do not contribute to confirmed balances.
+Queued entries remain distinct in storage from server-confirmed records, but the party ledger projects them into the ordinary entry list and local running balance without a pending marker.
 
-**Why:** An offline write can be rejected after permission revocation. Showing it as confirmed would misrepresent the ledger before the server has accepted it.
+**Why:** The user explicitly wants offline-created entries to look and behave like normal entries, update the displayed balance immediately, and sync silently; the server's stored balance still remains authoritative.
 
-**How to apply:** Keep pending/rejected drafts visible separately and leave them recoverable on failed synchronization.
+**How to apply:** Derive the local display balance from the server balance plus actor/business-scoped queued deltas. Do not mutate the confirmed query response. Keep rejected items recoverable in local storage without adding a warning banner to the ordinary ledger.
 
-Online entry creation is also queued locally before the background API replay.
+All entry creation is queued locally before background API replay, with the ordinary ledger rendering the local projection immediately.
 
-**Why:** Waiting for a network round trip made the save interaction feel blocked; showing a pending draft is immediate without claiming the server has confirmed its balance effect.
+**Why:** The user explicitly requested the same visible ledger experience online and offline, with immediate local balance changes and silent background sync.
 
-**How to apply:** Persist the idempotent request before closing the entry form, keep the draft visibly pending, and update confirmed ledger/balance queries only after replay succeeds.
+**How to apply:** Persist the idempotent request before closing the form; merge the scoped outbox into ledger rows and project its deltas for display. Replay the same request ID and let server responses refresh confirmed cache data.
 
 When evicting persisted query data, clear matching entries from both the saved snapshot and the debounced dirty-write buffer; compare generated query-key prefixes so appended business scopes are included.
 

@@ -47,6 +47,7 @@ import { useAppAuth } from '@/App';
 import { useBusinessContext } from '@/lib/businessContext';
 import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import { ENTRY_OUTBOX_CHANGED, listEntries, type QueuedEntry } from '@/lib/entryOutbox';
+import { mergeLedgerEntries, projectPartyBalance } from '@/lib/offline-ledger-projection';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
 import { addPdfLinkAnnotations } from '@/lib/pdf-link-annotations';
 import { splitAdjustmentDescription } from '@/lib/adjustment-display';
@@ -131,18 +132,14 @@ export function PartyView() {
   const { role: userRole, userId } = useAppAuth();
   const { selectedBusinessId, businesses } = useBusinessContext();
   const [pendingEntries, setPendingEntries] = useState<QueuedEntry[]>([]);
-  const [outboxError, setOutboxError] = useState('');
   useEffect(() => {
     setPendingEntries([]);
-    setOutboxError('');
     if (!userId || !id) return;
     let active = true;
     const refresh = () => {
       void listEntries(userId, selectedBusinessId).then((items) => {
         if (active) setPendingEntries(items.filter((item) => item.partyId === id));
-      }).catch(() => {
-        if (active) setOutboxError('অপেক্ষমাণ এন্ট্রি পড়া যাচ্ছে না। স্টোরেজ পরীক্ষা করুন।');
-      });
+      }).catch(() => {});
     };
     refresh();
     window.addEventListener(ENTRY_OUTBOX_CHANGED, refresh);
@@ -153,7 +150,7 @@ export function PartyView() {
   }, [userId, selectedBusinessId, id]);
 
   const { data: party, isLoading: partyLoading } = useGetParty(id || '', { query: { enabled: !!id, queryKey: businessScopedQueryKey(getGetPartyQueryKey(id || ''), selectedBusinessId) } });
-  const { data: entries = [], isLoading: entriesLoading } = useListLedgerEntries(id || '', { query: { enabled: !!id, queryKey: businessScopedQueryKey(getListLedgerEntriesQueryKey(id || ''), selectedBusinessId) } });
+  const { data: serverEntries = [], isLoading: entriesLoading } = useListLedgerEntries(id || '', { query: { enabled: !!id, queryKey: businessScopedQueryKey(getListLedgerEntriesQueryKey(id || ''), selectedBusinessId) } });
   const { data: settings } = useGetBusinessSettings({ query: { enabled: userRole === 'owner', queryKey: businessScopedQueryKey(getGetBusinessSettingsQueryKey(), selectedBusinessId) } });
   const { data: reportBranding } = useGetPublicReportBranding({
     query: {
@@ -176,6 +173,18 @@ export function PartyView() {
   const reportRef = useRef<HTMLDivElement>(null);
   const activeBusinessName = businesses.find((business) => business.id === selectedBusinessId)?.name;
   const storeName = resolveLedgerBookName(activeBusinessName, settings?.storeName) ?? 'Banglakhata';
+  const entries = useMemo(
+    () => mergeLedgerEntries(serverEntries, pendingEntries),
+    [serverEntries, pendingEntries],
+  );
+  const queuedEntryIds = useMemo(
+    () => new Set(pendingEntries.map((entry) => entry.id)),
+    [pendingEntries],
+  );
+  const displayParty = useMemo(
+    () => party ? projectPartyBalance(party, pendingEntries) : undefined,
+    [party, pendingEntries],
+  );
 
   // Reconstruct balances chronologically, then show the live history and PDFs
   // newest-first. The PDF renderer keeps these per-entry balance snapshots.
@@ -190,9 +199,11 @@ export function PartyView() {
   // insertion date) yields the correct running balance at every point in
   // the actual timeline.
   const ascendingEntries = useMemo(() => {
-    if (!party) return [] as (typeof entries[number] & { balanceAfter: number })[];
+    if (!displayParty) return [] as (typeof entries[number] & { balanceAfter: number })[];
     const signedDelta = (entry: (typeof entries)[number]) => (entry.type === 'YOU_GAVE' ? entry.amount : -entry.amount);
-    const signedCurrent = party.balanceType === 'YOU_WILL_GET' ? party.currentBalance : -party.currentBalance;
+    const signedCurrent = displayParty.balanceType === 'YOU_WILL_GET'
+      ? displayParty.currentBalance
+      : -displayParty.currentBalance;
     const totalDelta = entries.reduce((sum, entry) => sum + signedDelta(entry), 0);
     let running = signedCurrent - totalDelta; // balance before the earliest entry
 
@@ -206,7 +217,7 @@ export function PartyView() {
       running += signedDelta(entry);
       return { ...entry, balanceAfter: running };
     });
-  }, [entries, party]);
+  }, [entries, displayParty]);
 
   const descendingEntries = useMemo(() => [...ascendingEntries].reverse(), [ascendingEntries]);
 
@@ -366,7 +377,7 @@ export function PartyView() {
     if (!party) return;
     const label = party.balanceType === 'YOU_WILL_GET' ? 'আপনি পাবেন' : 'আপনি দেবেন';
     setSmsMessage(
-      `প্রিয় ${party.name}, আপনার হিসাবে ${label} ${formatCurrency(party.currentBalance)}। ধন্যবাদান্তে, Banglakhata।`
+      `প্রিয় ${party.name}, আপনার হিসাবে ${label} ${formatCurrency(displayParty?.currentBalance ?? party.currentBalance)}। ধন্যবাদান্তে, Banglakhata।`
     );
     setCopiedSms(false);
   };
@@ -412,7 +423,7 @@ export function PartyView() {
     );
   }
 
-  const isGive = party.balanceType === 'YOU_WILL_GIVE';
+  const isGive = displayParty?.balanceType === 'YOU_WILL_GIVE';
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-[#f8fafc] w-full relative">
@@ -463,7 +474,7 @@ export function PartyView() {
             {isGive ? 'আপনি দেবেন' : 'আপনি পাবেন'}
           </p>
           <p className={cn('text-xl font-extrabold tracking-tight', isGive ? 'text-red-600' : 'text-emerald-600')}>
-            {formatCurrency(party.currentBalance)}
+            {formatCurrency(displayParty?.currentBalance ?? party.currentBalance)}
           </p>
         </div>
       </div>
@@ -505,22 +516,6 @@ export function PartyView() {
 
       {/* Scrollable ledger area */}
       <div className="flex-1 min-h-0 overflow-y-auto bg-[#F5F6F8] pb-4">
-        {outboxError && <p role="alert" className="m-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{outboxError}</p>}
-        {pendingEntries.length > 0 && (
-          <section className="m-3 rounded-xl border border-amber-200 bg-amber-50 p-3" aria-label="অপেক্ষমাণ এন্ট্রি">
-            <p className="text-xs font-bold text-amber-900 mb-2">অপেক্ষমাণ খসড়া · সার্ভারের ব্যালেন্সে এখনও যোগ হয়নি</p>
-            {pendingEntries.map((entry) => (
-              <div key={entry.id} className="py-2 border-t border-amber-200 text-sm">
-                <span className="font-bold">{entry.data.type === 'YOU_GAVE' ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন'}: {formatCurrency(entry.data.amount)}</span>
-                {entry.data.isTransfer && <span className="ml-2 text-xs">⇄ ট্রান্সফার</span>}
-                {entry.data.description && <span className="block text-xs">{entry.data.description}</span>}
-                {entry.status === 'rejected'
-                  ? <p role="alert" className="text-red-700 text-xs mt-1">সংরক্ষণ প্রত্যাখ্যাত: {entry.error} খসড়াটি এই ডিভাইসে রাখা হয়েছে।</p>
-                  : <span className="block text-amber-800 text-xs mt-1">সিঙ্কের অপেক্ষায় · নিশ্চিত হলে হিসাবে দেখাবে</span>}
-              </div>
-            ))}
-          </section>
-        )}
         {entriesLoading ? (
           <div className="flex justify-center p-12">
             <div className="animate-pulse w-8 h-8 rounded-full bg-slate-200"></div>
@@ -552,6 +547,7 @@ export function PartyView() {
                 <div className="space-y-2 px-1.5 min-[480px]:px-2.5">
                   {group.items.map((entry, i) => {
                     const isGave = entry.type === 'YOU_GAVE';
+                    const isQueuedLocally = queuedEntryIds.has(entry.id);
                     const imgSrc = billImageSrc(entry.billImage);
                     const transferPartyName = entry.transferPartyId
                       ? partyNameMap[entry.transferPartyId]
@@ -573,17 +569,17 @@ export function PartyView() {
                       <div
                         key={entry.id}
                         data-entry-card
-                        role={userRole === 'owner' ? "button" : undefined}
-                        tabIndex={userRole === 'owner' ? 0 : undefined}
+                        role={userRole === 'owner' && !isQueuedLocally ? "button" : undefined}
+                        tabIndex={userRole === 'owner' && !isQueuedLocally ? 0 : undefined}
                         onClick={() => {
-                          if (userRole === 'owner') navigate(`/party/${id}/entry/${entry.id}`);
+                          if (userRole === 'owner' && !isQueuedLocally) navigate(`/party/${id}/entry/${entry.id}`);
                         }}
                         onKeyDown={(e) => {
-                          if (userRole === 'owner' && e.key === 'Enter') navigate(`/party/${id}/entry/${entry.id}`);
+                          if (userRole === 'owner' && !isQueuedLocally && e.key === 'Enter') navigate(`/party/${id}/entry/${entry.id}`);
                         }}
                         className={cn(
                           "grid grid-cols-[minmax(0,1fr)_5rem_5rem] min-[380px]:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] min-[480px]:grid-cols-[minmax(0,1fr)_6rem_6rem] items-stretch gap-0 overflow-hidden rounded-xl border border-[#EBEBEB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.07)] animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both transition-colors",
-                          userRole === 'owner' ? "cursor-pointer active:bg-slate-50" : ""
+                           userRole === 'owner' && !isQueuedLocally ? "cursor-pointer active:bg-slate-50" : ""
                         )}
                         style={{ animationDelay: `${i * 30}ms` }}
                       >
@@ -711,7 +707,7 @@ export function PartyView() {
         <LedgerReportDocument
           ref={reportRef}
           storeName={storeName}
-          party={party}
+          party={displayParty ?? party}
           entries={ascendingEntries.map((entry) => ({
             ...entry,
             transferPartyName: entry.transferPartyId ? partyNameMap[entry.transferPartyId] ?? null : null,

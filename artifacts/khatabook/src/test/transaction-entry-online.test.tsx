@@ -192,7 +192,7 @@ describe('browser ledger entry submission', () => {
     });
   });
 
-  it('shows a large online entry immediately as a pending draft while background sync starts', async () => {
+  it('queues a large online entry immediately while background sync starts', async () => {
     const { onClose } = renderEntry();
     fireEvent.change(screen.getByRole('textbox', { name: 'পরিমাণ লিখুন' }), {
       target: { value: '20000000000' },

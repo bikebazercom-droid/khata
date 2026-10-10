@@ -897,16 +897,12 @@ export function TransactionEntryScreen({
           createdAt: new Date().toISOString(),
           status: 'pending',
         });
-      toast.success(
-        navigator.onLine
-          ? 'হিসাবটি সেভ হয়েছে; লেজারে যোগ হচ্ছে'
-          : 'হিসাবটি ডিভাইসে সেভ হয়েছে; সংযোগ ফিরলে সিঙ্ক হবে',
-      );
+      toast.success('হিসাবটি সেভ হয়েছে');
       };
 
-      // Persist first, then let the shared sync manager send it in the
-      // background. The party view renders this as a pending draft, never as
-      // a confirmed balance, so saving does not wait on network latency.
+      // Persist before closing so the party view can immediately merge this
+      // into its normal ledger list and projected balance. The shared sync
+      // manager replays the same idempotent request in the background.
       await saveOfflineDraft();
       createRequestRef.current = null;
       uploadedCreateImageRef.current = null;
