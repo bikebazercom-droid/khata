@@ -3,7 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BillAttachmentPreview } from '@/components/bill-attachment-preview';
 
 describe('BillAttachmentPreview document opening', () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
 
   it('fetches the PDF with the current session and opens an inline blob viewer without forcing a download', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
@@ -19,17 +22,45 @@ describe('BillAttachmentPreview document opening', () => {
 
     render(<BillAttachmentPreview src="/api/storage/objects/uploads/opaque-id" />);
     fireEvent.error(screen.getByRole('img'));
-    fireEvent.click(screen.getByRole('button', { name: 'ফাইল খুলুন বা ডাউনলোড করুন' }));
+    fireEvent.click(screen.getByRole('button', { name: 'ফাইল খুলুন' }));
 
     const viewer = await screen.findByRole('dialog', { name: 'PDF viewer' });
     expect(fetch).toHaveBeenCalledWith('/api/storage/objects/uploads/opaque-id', {
       credentials: 'include',
+      cache: 'no-store',
     });
     expect(viewer.querySelector('iframe')).toHaveAttribute('src', 'blob:authenticated-pdf');
     expect(viewer.querySelector('a[target="_blank"]')).toHaveAttribute('href', 'blob:authenticated-pdf');
     expect(viewer.querySelector('a[download]')).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: 'PDF বন্ধ করুন' }));
+    fireEvent.click(screen.getByRole('button', { name: 'ফাইল বন্ধ করুন' }));
     await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:authenticated-pdf'));
+  });
+
+  it('opens image attachments from an authenticated blob in the lightbox', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      headers: new Headers({ 'content-type': 'image/png' }),
+      blob: async () => new Blob(['png-data'], { type: 'image/png' }),
+    }));
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: vi.fn(() => 'blob:authenticated-image'),
+      revokeObjectURL: vi.fn(),
+    });
+
+    render(<BillAttachmentPreview src="/api/storage/objects/uploads/image-id" />);
+    const thumbnail = screen.getByRole('img');
+    fireEvent.load(thumbnail);
+    fireEvent.click(screen.getByRole('button', { name: 'বিলের ছবি দেখুন' }));
+
+    const viewer = await screen.findByRole('dialog', { name: 'সংযুক্ত ছবি' });
+    expect(fetch).toHaveBeenCalledWith('/api/storage/objects/uploads/image-id', {
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    expect(viewer.querySelector('img')).toHaveAttribute('src', 'blob:authenticated-image');
+    fireEvent.click(screen.getByRole('button', { name: 'ফাইল বন্ধ করুন' }));
+    await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:authenticated-image'));
   });
 });

@@ -145,9 +145,17 @@ router.get('/storage/objects/*path', async (req: Request, res: Response) => {
 
     res.status(response.status);
     response.headers.forEach((value, key) => res.setHeader(key, value));
-    if (response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() === 'application/pdf') {
-      res.setHeader('Content-Disposition', 'inline; filename="attachment.pdf"');
-    }
+    const contentType = response.headers.get('content-type')?.split(';')[0].trim().toLowerCase()
+      || 'application/octet-stream';
+    const extension = contentType === 'application/pdf' ? 'pdf'
+      : contentType === 'image/jpeg' ? 'jpg'
+      : contentType === 'image/png' ? 'png'
+      : contentType === 'image/webp' ? 'webp'
+      : contentType === 'image/gif' ? 'gif'
+      : 'file';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `inline; filename="attachment.${extension}"`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
 
     if (response.body) {
       const nodeStream = Readable.fromWeb(
