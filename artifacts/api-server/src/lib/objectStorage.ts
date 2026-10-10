@@ -19,7 +19,21 @@ const REPLIT_SIDECAR_ENDPOINT = 'http://127.0.0.1:1106';
 const LOCAL_DRIVER = process.env.OBJECT_STORAGE_DRIVER === 'local';
 const LOCAL_TICKET_TTL_SECONDS = 900;
 const MAX_LOCAL_UPLOAD_BYTES = 20 * 1024 * 1024;
-const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const BILL_ATTACHMENT_TYPES = new Set([
+  'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/rtf',
+  'text/plain',
+  'text/csv',
+  'application/zip',
+  'application/octet-stream',
+]);
 
 export const objectStorageClient = new Storage({
   credentials: {
@@ -161,15 +175,15 @@ export class ObjectStorageService {
   async getObjectEntityUploadURL(options?: {
     businessId?: string; size?: number; contentType?: string;
   }): Promise<string> {
+    const contentType = (options?.contentType ?? '').toLowerCase();
+    if (!BILL_ATTACHMENT_TYPES.has(contentType)) throw new Error('Unsupported attachment content type');
     if (LOCAL_DRIVER) {
       if (!this.localRoot) throw new Error('LOCAL_PRIVATE_OBJECT_DIR is not configured');
       const size = options?.size;
-      const contentType = options?.contentType ?? '';
       const businessId = options?.businessId ?? '';
       if (!Number.isSafeInteger(size) || !size || size < 1 || size > MAX_LOCAL_UPLOAD_BYTES) {
         throw new Error(`Upload size must be between 1 and ${MAX_LOCAL_UPLOAD_BYTES} bytes`);
       }
-      if (!IMAGE_TYPES.has(contentType)) throw new Error('Unsupported upload content type');
       if (!businessId) throw new Error('Business ID is required for local uploads');
       const objectPath = `/objects/uploads/${randomUUID()}`;
       const payload = {
@@ -385,7 +399,7 @@ export class ObjectStorageService {
     ) {
       throw new Error('Invalid upload ticket');
     }
-    if (!IMAGE_TYPES.has(payload.contentType) || headers.contentType !== payload.contentType) {
+    if (!BILL_ATTACHMENT_TYPES.has(payload.contentType) || headers.contentType !== payload.contentType) {
       throw new Error('Content-Type does not match upload ticket');
     }
     if (headers.contentLength !== undefined && Number(headers.contentLength) !== payload.size) {

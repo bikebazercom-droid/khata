@@ -1,10 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Image, Linking, Platform, Pressable, Text, View } from 'react-native';
+import { Alert, Animated, Image, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import { fetch as expoFetch } from 'expo/fetch';
+import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   getGetDashboardSummaryQueryKey,
   getGetPartyQueryKey,
@@ -44,9 +47,51 @@ type Props = {
   initialType?: EntryType;
 };
 type EntryType = 'YOU_GAVE' | 'YOU_GOT';
+type PickedAttachment = {
+  uri: string;
+  name: string;
+  size: number | null;
+  mimeType: string;
+  isImage: boolean;
+};
+
+const MIME_BY_EXTENSION: Record<string, string> = {
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  rtf: 'application/rtf',
+  txt: 'text/plain',
+  csv: 'text/csv',
+  zip: 'application/zip',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  heic: 'image/heic',
+  heif: 'image/heif',
+};
+
+function resolveAttachmentMimeType(name: string, mimeType?: string | null) {
+  if (mimeType && mimeType !== 'application/octet-stream') return mimeType.toLowerCase();
+  const extension = name.split('.').pop()?.toLowerCase() ?? '';
+  return MIME_BY_EXTENSION[extension] ?? mimeType ?? 'application/octet-stream';
+}
+
+function formatAttachmentSize(size: number | null) {
+  if (!size || size < 1) return 'ফাইল';
+  return size < 1024 * 1024
+    ? `${Math.max(1, Math.round(size / 1024))} KB`
+    : `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 export function LedgerEntryForm({ mode, partyId: initialPartyId, entry, initialType }: Props) {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const playSuccessSound = useTransactionSuccessSound();
   const { identity, token } = useAuth();
   const queryClient = useQueryClient();
@@ -66,9 +111,10 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry, initialT
     : todayIsoDate());
   const [isTransfer, setIsTransfer] = useState(false);
   const [transferPartyId, setTransferPartyId] = useState('');
-  const [pickedImage, setPickedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [pickedAttachment, setPickedAttachment] = useState<PickedAttachment | null>(null);
   const [existingImage, setExistingImage] = useState<string | null>(entry?.billImage ?? null);
   const [removeImage, setRemoveImage] = useState(false);
+  const [attachmentMenuVisible, setAttachmentMenuVisible] = useState(false);
   const [uploadedImagePath, setUploadedImagePath] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
@@ -124,7 +170,16 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry, initialT
         ? await ImagePicker.launchCameraAsync(options)
         : await ImagePicker.launchImageLibraryAsync(options);
       if (!result.canceled && result.assets[0]) {
-        setPickedImage(result.assets[0]);
+        const asset = result.assets[0];
+        const name = asset.fileName || `bill-${Date.now()}.jpg`;
+        const mimeType = resolveAttachmentMimeType(name, asset.mimeType);
+        setPickedAttachment({
+          uri: asset.uri,
+          name,
+          size: asset.fileSize ?? null,
+          mimeType,
+          isImage: mimeType.startsWith('image/'),
+        });
         setUploadedImagePath(null);
         setRemoveImage(false);
       }
@@ -133,22 +188,47 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry, initialT
     }
   };
 
-  const promptForImage = () => {
-    const actions: { text: string; style?: 'default' | 'cancel' | 'destructive'; onPress?: () => void }[] = [
-      { text: 'গ্যালারি থেকে নিন', onPress: () => { void chooseImage('library'); } },
-    ];
-    if (Platform.OS !== 'web') actions.unshift({ text: 'ক্যামেরা দিয়ে তুলুন', onPress: () => { void chooseImage('camera'); } });
-    actions.push({ text: 'বাতিল', style: 'cancel' as const, onPress: () => undefined });
-    Alert.alert('বিলের ছবি', 'ছবি কোথা থেকে নিতে চান?', actions);
+  const chooseDocument = async (pdfOnly = false) => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: pdfOnly ? 'application/pdf' : '*/*',
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (result.canceled || !result.assets[0]) return;
+      const asset = result.assets[0];
+      const mimeType = resolveAttachmentMimeType(asset.name, asset.mimeType);
+      setPickedAttachment({
+        uri: asset.uri,
+        name: asset.name,
+        size: asset.size ?? null,
+        mimeType,
+        isImage: mimeType.startsWith('image/'),
+      });
+      setUploadedImagePath(null);
+      setRemoveImage(false);
+    } catch (pickerError) {
+      setError(errorMessage(pickerError, 'ফাইল খোলা যায়নি।'));
+    }
   };
 
-  const uploadSelectedImage = async (): Promise<string | null> => {
-    if (!pickedImage) return removeImage ? null : existingImage;
+  const promptForImage = () => {
+    setError('');
+    setAttachmentMenuVisible(true);
+  };
+
+  const runAttachmentPicker = (picker: () => void) => {
+    setAttachmentMenuVisible(false);
+    setTimeout(picker, Platform.OS === 'web' ? 0 : 220);
+  };
+
+  const uploadSelectedAttachment = async (): Promise<string | null> => {
+    if (!pickedAttachment) return removeImage ? null : existingImage;
     if (uploadedImagePath) return uploadedImagePath;
-    const file = new File(pickedImage.uri);
-    const name = pickedImage.fileName || `bill-${Date.now()}.jpg`;
-    const contentType = pickedImage.mimeType || (name.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg');
-    const size = Math.max(1, pickedImage.fileSize ?? file.size);
+    const file = new File(pickedAttachment.uri);
+    const name = pickedAttachment.name || `bill-${Date.now()}`;
+    const contentType = pickedAttachment.mimeType;
+    const size = Math.max(1, pickedAttachment.size ?? file.size);
     const upload = await requestUploadUrl.mutateAsync({ data: { name, size, contentType } });
     const uploadUrl = /^https?:\/\//i.test(upload.uploadURL) ? upload.uploadURL : `${apiBaseUrl()}${upload.uploadURL}`;
     const response = await expoFetch(uploadUrl, {
@@ -159,7 +239,7 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry, initialT
       },
       body: file,
     });
-    if (!response.ok) throw new Error(`Photo upload failed (${response.status})`);
+    if (!response.ok) throw new Error(`Attachment upload failed (${response.status})`);
     setUploadedImagePath(upload.objectPath);
     return upload.objectPath;
   };
@@ -228,7 +308,7 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry, initialT
 
     setUploading(true);
     try {
-      const billImage = await uploadSelectedImage();
+      const billImage = await uploadSelectedAttachment();
       if (mode === 'create') {
         const payload = {
           type,
@@ -280,7 +360,8 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry, initialT
     const query = partySearch.toLocaleLowerCase();
     return party.name.toLocaleLowerCase().includes(query) || party.phone.includes(query);
   });
-  const imageUri = pickedImage?.uri ?? (removeImage ? null : existingImage);
+  const imageUri = pickedAttachment?.isImage ? pickedAttachment.uri : (removeImage ? null : existingImage);
+  const hasAttachment = !!pickedAttachment || (!removeImage && !!existingImage);
   const isBusy = uploading || createEntry.isPending || patchEntry.isPending || requestUploadUrl.isPending;
   const directionLabel = type === 'YOU_GOT' ? 'আপনি পেয়েছেন' : 'আপনি দিয়েছেন';
   const formTitle = mode === 'create' && initialType
@@ -380,17 +461,93 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry, initialT
                     <Text style={{ color: colors.foreground, fontWeight: '800' }}>বিল সংযুক্ত করুন</Text>
                     <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>ঐচ্ছিক · সেভ করার সময় নিরাপদে আপলোড হবে</Text>
                   </View>
-                  <AppButton title={imageUri ? 'ছবি বদলান' : 'বিল সংযুক্ত করুন'} icon="camera" compact variant="secondary" onPress={promptForImage} testID="entry-add-photo" />
+                   <AppButton title={hasAttachment ? 'ফাইল বদলান' : 'বিল সংযুক্ত করুন'} icon="paperclip" compact variant="secondary" onPress={promptForImage} testID="entry-add-photo" />
                 </View>
-                {imageUri ? (
+                 {hasAttachment ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    {pickedImage ? <Image source={{ uri: pickedImage.uri }} style={{ width: 84, height: 84, borderRadius: 12 }} /> : <BillPhoto path={existingImage} token={token} />}
-                    <Pressable onPress={() => { setPickedImage(null); setUploadedImagePath(null); setExistingImage(null); setRemoveImage(true); }} accessibilityRole="button" testID="entry-remove-photo">
-                      <Text style={{ color: colors.destructive, fontWeight: '700' }}>ছবি সরান</Text>
+                     {pickedAttachment?.isImage && imageUri ? (
+                       <Image source={{ uri: imageUri }} style={{ width: 84, height: 84, borderRadius: 12 }} />
+                     ) : pickedAttachment ? (
+                       <View style={{ width: 84, height: 84, borderRadius: 12, backgroundColor: colors.secondary, alignItems: 'center', justifyContent: 'center', gap: 4, padding: 6 }}>
+                         <Feather name={pickedAttachment.mimeType === 'application/pdf' ? 'file-text' : 'file'} size={27} color={colors.primary} />
+                         <Text numberOfLines={1} style={{ color: colors.primary, fontSize: 10, fontWeight: '700' }}>
+                           {pickedAttachment.mimeType === 'application/pdf' ? 'PDF' : 'Ֆայլ'}
+                         </Text>
+                       </View>
+                     ) : <BillPhoto path={existingImage} token={token} />}
+                     <View style={{ flex: 1, gap: 4 }}>
+                       <Text numberOfLines={1} style={{ color: colors.foreground, fontWeight: '700' }}>
+                         {pickedAttachment?.name ?? 'সংযুক্ত বিল'}
+                       </Text>
+                       {pickedAttachment ? <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{formatAttachmentSize(pickedAttachment.size)}</Text> : null}
+                     </View>
+                     <Pressable onPress={() => { setPickedAttachment(null); setUploadedImagePath(null); setExistingImage(null); setRemoveImage(true); }} accessibilityRole="button" testID="entry-remove-photo">
+                       <Text style={{ color: colors.destructive, fontWeight: '700' }}>সরান</Text>
                     </Pressable>
                   </View>
                 ) : null}
               </Card>
+
+               <Modal
+                 visible={attachmentMenuVisible}
+                 transparent
+                 animationType="fade"
+                 onRequestClose={() => setAttachmentMenuVisible(false)}
+               >
+                 <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+                   <Pressable
+                     accessibilityRole="button"
+                     accessibilityLabel="মেনু বন্ধ করুন"
+                     onPress={() => setAttachmentMenuVisible(false)}
+                     style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(10, 24, 42, 0.42)' }]}
+                   />
+                   <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 10, paddingBottom: Math.max(insets.bottom, 16) + 12, gap: 10 }}>
+                     <View style={{ width: 38, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 4 }} />
+                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                       <View>
+                         <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: '800' }}>বিল সংযুক্ত করুন</Text>
+                         <Text style={{ color: colors.mutedForeground, fontSize: 13, marginTop: 3 }}>কোথা থেকে ফাইলটি নেবেন?</Text>
+                       </View>
+                       <Pressable onPress={() => setAttachmentMenuVisible(false)} accessibilityRole="button" accessibilityLabel="বন্ধ করুন" hitSlop={10}>
+                         <Feather name="x" size={22} color={colors.mutedForeground} />
+                       </Pressable>
+                     </View>
+                     {[
+                       { key: 'gallery', title: 'গ্যালারি / ফটো', subtitle: 'ফোনের ছবি বেছে নিন', icon: 'image' as const, action: () => chooseImage('library') },
+                       ...(Platform.OS !== 'web' ? [{ key: 'camera', title: 'ক্যামেরা', subtitle: 'এখনই ছবি তুলুন', icon: 'camera' as const, action: () => chooseImage('camera') }] : []),
+                       { key: 'pdf', title: 'PDF', subtitle: 'একটি PDF ডকুমেন্ট বেছে নিন', icon: 'file-text' as const, action: () => chooseDocument(true) },
+                       { key: 'files', title: 'ফাইল ম্যানেজার', subtitle: 'ডকুমেন্ট বা অন্য ফাইল বেছে নিন', icon: 'folder' as const, action: () => chooseDocument() },
+                     ].map((option) => (
+                       <Pressable
+                         key={option.key}
+                         onPress={() => runAttachmentPicker(() => { void option.action(); })}
+                         accessibilityRole="button"
+                         testID={`entry-bill-source-${option.key}`}
+                         style={({ pressed }) => ({
+                           minHeight: 62,
+                           flexDirection: 'row',
+                           alignItems: 'center',
+                           gap: 14,
+                           paddingHorizontal: 14,
+                           paddingVertical: 10,
+                           borderRadius: 14,
+                           backgroundColor: pressed ? colors.muted : colors.secondary,
+                         })}
+                       >
+                         <Feather name={option.icon} size={21} color={colors.primary} />
+                         <View style={{ flex: 1 }}>
+                           <Text style={{ color: colors.foreground, fontWeight: '700' }}>{option.title}</Text>
+                           <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 2 }}>{option.subtitle}</Text>
+                         </View>
+                         <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+                       </Pressable>
+                     ))}
+                     <Pressable onPress={() => setAttachmentMenuVisible(false)} accessibilityRole="button" style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
+                       <Text style={{ color: colors.mutedForeground, fontWeight: '700' }}>বাতিল</Text>
+                     </Pressable>
+                   </View>
+                 </View>
+               </Modal>
 
               {mode === 'create' && canTransfer ? (
                 <Card>
