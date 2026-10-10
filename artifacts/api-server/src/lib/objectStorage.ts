@@ -424,7 +424,9 @@ export class ObjectStorageService {
       await new Promise<void>((resolve, reject) => { output.end(() => resolve()); output.on('error', reject); });
       if (bytes !== payload.size) throw new Error('Upload size does not match ticket');
       const signature = await readFile(temp, { encoding: null }).then(buffer => buffer.subarray(0, 16));
-      if (!validImageSignature(payload.contentType, signature)) throw new Error('Uploaded bytes are not a valid image');
+      if (!validAttachmentSignature(payload.contentType, signature)) {
+        throw new Error('Uploaded bytes do not match the declared attachment type');
+      }
       await rename(temp, destination);
       await writeMetadata(destination, { contentType: payload.contentType, size: bytes });
       return { objectPath: payload.objectPath, size: bytes };
@@ -509,7 +511,7 @@ function verifyLocalTicket(token: string): LocalTicket {
 function onceDrain(stream: NodeJS.WritableStream): Promise<void> {
   return new Promise(resolve => stream.once('drain', resolve));
 }
-function validImageSignature(contentType: string, bytes: Uint8Array): boolean {
+function validAttachmentSignature(contentType: string, bytes: Uint8Array): boolean {
   if (contentType === 'image/jpeg') return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
   if (contentType === 'image/png') return bytes.length >= 8 &&
     Buffer.from(bytes.subarray(0, 8)).equals(Buffer.from([137,80,78,71,13,10,26,10]));
@@ -517,6 +519,32 @@ function validImageSignature(contentType: string, bytes: Uint8Array): boolean {
     Buffer.from(bytes.subarray(0, 6)).toString() === 'GIF89a';
   if (contentType === 'image/webp') return Buffer.from(bytes.subarray(0, 4)).toString() === 'RIFF' &&
     Buffer.from(bytes.subarray(8, 12)).toString() === 'WEBP';
+  if (contentType === 'image/heic' || contentType === 'image/heif') {
+    if (Buffer.from(bytes.subarray(4, 8)).toString() !== 'ftyp') return false;
+    const brand = Buffer.from(bytes.subarray(8, 12)).toString();
+    return ['heic', 'heix', 'hevc', 'hevx', 'mif1', 'msf1'].includes(brand);
+  }
+  if (contentType === 'application/pdf') return Buffer.from(bytes.subarray(0, 5)).toString() === '%PDF-';
+  if (contentType === 'application/msword') {
+    return Buffer.from(bytes.subarray(0, 8)).equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]));
+  }
+  if (
+    contentType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    contentType === 'application/vnd.ms-excel' ||
+    contentType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    contentType === 'application/vnd.ms-powerpoint' ||
+    contentType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+    contentType === 'application/zip'
+  ) {
+    return Buffer.from(bytes.subarray(0, 4)).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
+  }
+  if (contentType === 'application/rtf') return Buffer.from(bytes.subarray(0, 5)).toString() === '{\\rtf';
+  if (contentType === 'text/plain' || contentType === 'text/csv') {
+    return bytes.length > 0 && !bytes.includes(0);
+  }
+  // The file manager intentionally permits unknown binary documents. They do
+  // not have a reliable shared magic number, but must still contain data.
+  if (contentType === 'application/octet-stream') return bytes.length > 0;
   return false;
 }
 

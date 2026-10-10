@@ -40,13 +40,41 @@ describe('local object storage driver', () => {
     expect(Buffer.from(await response.arrayBuffer())).toHaveLength(8);
   });
 
+  it('stores and serves PDFs and Office documents with their original MIME types', async () => {
+    const service = new ObjectStorageService();
+    const fixtures = [
+      { contentType: 'application/pdf', bytes: Buffer.from('%PDF-1.7\nsample') },
+      {
+        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        bytes: Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00]),
+      },
+    ];
+
+    for (const fixture of fixtures) {
+      const url = await service.getObjectEntityUploadURL({
+        businessId: 'business-a',
+        size: fixture.bytes.length,
+        contentType: fixture.contentType,
+      });
+      const result = await service.putLocalTicket(
+        new URL(url).searchParams.get('ticket')!,
+        Readable.from([fixture.bytes]),
+        { contentType: fixture.contentType, contentLength: String(fixture.bytes.length) },
+      );
+      const file = await service.getObjectEntityFile(result.objectPath);
+      const response = await service.downloadObject(file);
+      expect(response.headers.get('content-type')).toBe(fixture.contentType);
+      expect(Buffer.from(await response.arrayBuffer())).toEqual(fixture.bytes);
+    }
+  });
+
   it('rejects mismatched size, MIME/signature, and path traversal tickets', async () => {
     const service = new ObjectStorageService();
     const url = await service.getObjectEntityUploadURL({ businessId: 'business-a', size: 3, contentType: 'image/png' });
     const token = new URL(url).searchParams.get('ticket')!;
     await expect(service.putLocalTicket(token, Readable.from([Buffer.from('bad')]), {
       contentType: 'image/png', contentLength: '3',
-    })).rejects.toThrow(/valid image/);
+    })).rejects.toThrow(/declared attachment type/);
     await expect(service.getObjectEntityFile('/objects/../outside.txt')).rejects.toBeInstanceOf(ObjectNotFoundError);
   });
 
