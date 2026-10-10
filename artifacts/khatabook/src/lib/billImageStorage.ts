@@ -173,10 +173,8 @@ export type BillImageUploadResult =
  * The PUT step (step 2) is retried once after a short delay before giving up,
  * so a momentary network hiccup does not permanently lose the image.
  */
-export async function uploadBillImage(base64DataUrl: string): Promise<BillImageUploadResult> {
+async function uploadBillBlob(blob: Blob, name: string): Promise<BillImageUploadResult> {
   try {
-    const blob = dataUrlToBlob(base64DataUrl);
-
     // Step 1: request a presigned upload URL from our API.
     let metaRes: Response;
     try {
@@ -185,7 +183,7 @@ export async function uploadBillImage(base64DataUrl: string): Promise<BillImageU
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: 'bill.jpg',
+          name,
           size: blob.size,
           contentType: blob.type,
         }),
@@ -259,4 +257,29 @@ export async function uploadBillImage(base64DataUrl: string): Promise<BillImageU
     console.error('বিল ছবি আপলোড ব্যর্থ হয়েছে:', err);
     return { ok: false, reason: 'upload-failed' };
   }
+}
+
+/** Upload a selected PDF or document file directly to private object storage. */
+export function uploadBillFile(file: File): Promise<BillImageUploadResult> {
+  const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
+  const inferredType = ({
+    pdf: 'application/pdf',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ppt: 'application/vnd.ms-powerpoint',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    txt: 'text/plain',
+    csv: 'text/csv',
+  } as Record<string, string>)[extension] ?? 'application/octet-stream';
+  const blob = file.type ? file : new Blob([file], { type: inferredType });
+  return uploadBillBlob(blob, file.name || 'bill-attachment');
+}
+
+/** Upload a scanned bill image (given as a base64 data URL) to cloud storage. */
+export function uploadBillImage(base64DataUrl: string): Promise<BillImageUploadResult> {
+  const blob = dataUrlToBlob(base64DataUrl);
+  const extension = blob.type === 'image/png' ? 'png' : 'jpg';
+  return uploadBillBlob(blob, `bill.${extension}`);
 }

@@ -23,7 +23,7 @@ import {
   type Party,
   type DashboardSummary,
 } from '@workspace/api-client-react';
-import { ChevronLeft, Camera, X, ArrowLeftRight } from 'lucide-react';
+import { ChevronLeft, Camera, X, ArrowLeftRight, FileText, FolderOpen, Image as ImageIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { cn, evaluateCalculatorExpression, formatCurrency, formatExpressionForDisplay, toBengaliDigits, trimNumberForExpression } from '@/lib/utils';
@@ -31,7 +31,7 @@ import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic'
 import { CameraCaptureModal } from '@/components/modals/camera-capture-modal';
 import { scanDocument } from '@/lib/document-scan';
 import { useAppAuth } from '@/App';
-import { uploadBillImage, billImageSrc, type BillImageUploadResult } from '@/lib/billImageStorage';
+import { uploadBillFile, uploadBillImage, billImageSrc, type BillImageUploadResult } from '@/lib/billImageStorage';
 import { savePendingUpload } from '@/lib/pendingUploads';
 import { useBusinessContext } from '@/lib/businessContext';
 import { businessScopedQueryKey } from '@/lib/businessQueryKey';
@@ -262,7 +262,9 @@ export function TransactionEntryScreen({
   });
   const [showError, setShowError] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isAttachOptionsOpen, setIsAttachOptionsOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [selectedBillFile, setSelectedBillFile] = useState<File | null>(null);
   // Local display copy of the bill image (base64 while uploading, then objectPath after save).
   // In edit mode, start with the existing entry's image so the user sees it immediately.
   const [billImage, setBillImage] = useState<string | null>(() =>
@@ -279,6 +281,9 @@ export function TransactionEntryScreen({
   // perceptible delay.
   const uploadPromiseRef = useRef<Promise<BillImageUploadResult> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+  const documentInputRef = useRef<HTMLInputElement>(null);
   // Once the user presses any numeric/operator key, the metadata panel
   // (details/bill/date/camera) locks open and never collapses again for the
   // rest of this session — even if the formula is later cleared or edited
@@ -362,6 +367,7 @@ export function TransactionEntryScreen({
   // Must live after `liveResult` and `formulaPreviewText` which it depends on.
   const isDirty = useMemo(() => {
     if (!isEditMode || !initialEntry) return false;
+    if (selectedBillFile) return true;
 
     // Amount: compare the live evaluated result against the stored amount.
     const currentAmount =
@@ -392,7 +398,7 @@ export function TransactionEntryScreen({
   }, [
     isEditMode, initialEntry,
     memoryHistory.length, memoryValue, liveResult,
-    description, dueDate, billImage, isTransferMode, transferPartyId,
+    description, dueDate, billImage, selectedBillFile, isTransferMode, transferPartyId,
   ]);
 
   // The authoritative amount used for saving and the header title — always
@@ -406,6 +412,7 @@ export function TransactionEntryScreen({
   const showMetadata = hasInteracted;
 
   const processCapturedImage = useCallback(async (dataUrl: string) => {
+    setSelectedBillFile(null);
     uploadedCreateImageRef.current = null;
     setIsScanning(true);
     try {
@@ -429,11 +436,7 @@ export function TransactionEntryScreen({
   }, [isEditMode]);
 
   const handleAttachClick = useCallback(() => {
-    if (typeof navigator !== 'undefined' && typeof navigator.mediaDevices?.getUserMedia === 'function') {
-      setIsCameraOpen(true);
-    } else {
-      fileInputRef.current?.click();
-    }
+    setIsAttachOptionsOpen(true);
   }, []);
 
   const handleCameraCapture = useCallback(
@@ -446,8 +449,32 @@ export function TransactionEntryScreen({
 
   const handleCameraError = useCallback(() => {
     setIsCameraOpen(false);
-    fileInputRef.current?.click();
+    cameraInputRef.current?.click();
   }, []);
+
+  const handleDocumentFileChange = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === 'string') void processCapturedImage(reader.result);
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+      setSelectedBillFile(file);
+      // Keep a non-null local marker so edit mode treats this as a replacement
+      // attachment and waits for the selected file's upload promise.
+      setBillImage(`selected-file:${file.name}`);
+      pendingBase64Ref.current = null;
+      uploadedCreateImageRef.current = null;
+      uploadPromiseRef.current = isEditMode ? uploadBillFile(file) : null;
+    },
+    [isEditMode, processCapturedImage]
+  );
 
   const handleFileChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -807,12 +834,25 @@ export function TransactionEntryScreen({
       toast.error('পরিচয় যাচাই করা যায়নি। আবার লগইন করুন।');
       return;
     }
+    if (selectedBillFile && !navigator.onLine) {
+      toast.error('ফাইল সংযুক্ত করতে ইন্টারনেট সংযোগ প্রয়োজন');
+      return;
+    }
     const capturedBase64 = pendingBase64Ref.current;
     savingRef.current = true;
     try {
       let billImage: string | undefined;
       let uploadUnavailable = false;
-      if (capturedBase64 && navigator.onLine) {
+      if (selectedBillFile) {
+        const uploaded = await uploadBillFile(selectedBillFile);
+        if (!uploaded.ok) {
+          toast.error('ফাইল আপলোড করা যায়নি', {
+            description: 'আবার চেষ্টা করুন। লেনদেনটি সংরক্ষণ হয়নি।',
+          });
+          return;
+        }
+        billImage = uploaded.objectPath;
+      } else if (capturedBase64 && navigator.onLine) {
         const cachedUpload = uploadedCreateImageRef.current;
         if (cachedUpload?.source === capturedBase64) {
           billImage = cachedUpload.objectPath;
@@ -902,7 +942,7 @@ export function TransactionEntryScreen({
     } finally {
       savingRef.current = false;
     }
-  }, [memoryHistory.length, memoryValue, expression, partyId, partyRole, partyRoleLabel, transferPartyList, type, description, dueDate, clearMemory, onClose, isTransferMode, transferPartyId, canAdjustSource, userRole, adjustmentPartyIds, userId, selectedBusinessId, queryClient]);
+  }, [memoryHistory.length, memoryValue, expression, partyId, partyRole, partyRoleLabel, transferPartyList, type, description, dueDate, clearMemory, onClose, isTransferMode, transferPartyId, canAdjustSource, userRole, adjustmentPartyIds, userId, selectedBusinessId, queryClient, selectedBillFile]);
 
   return (
     <div className="absolute inset-0 z-50 bg-[#f8fafc] flex flex-col">
@@ -1007,7 +1047,92 @@ export function TransactionEntryScreen({
         </div>
       </div>
 
-      <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
+      <input ref={pdfInputRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={handleDocumentFileChange} />
+      <input ref={documentInputRef} type="file" accept="*/*" className="hidden" onChange={handleDocumentFileChange} />
+
+      {isAttachOptionsOpen && (
+        <div
+          className="fixed inset-0 z-[75] flex items-end justify-center bg-slate-950/45 p-3"
+          onClick={() => setIsAttachOptionsOpen(false)}
+          data-testid="bill-attachment-source-menu"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bill-attachment-source-title"
+            className="w-full max-w-md rounded-2xl bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-slate-200" />
+            <h2 id="bill-attachment-source-title" className="mb-3 text-base font-extrabold text-slate-900">
+              বিল কোথা থেকে নেবেন?
+            </h2>
+            <div className="space-y-2">
+              <button
+                type="button"
+                data-testid="bill-source-gallery"
+                onClick={() => {
+                  setIsAttachOptionsOpen(false);
+                  fileInputRef.current?.click();
+                }}
+                className="flex min-h-12 w-full items-center gap-3 rounded-xl bg-slate-50 px-4 text-left font-semibold text-slate-800 active:bg-slate-100"
+              >
+                <ImageIcon className="h-5 w-5 text-blue-700" />
+                <span>Gallery (গ্যালারি)</span>
+              </button>
+              <button
+                type="button"
+                data-testid="bill-source-camera"
+                onClick={() => {
+                  setIsAttachOptionsOpen(false);
+                  if (typeof navigator !== 'undefined' && typeof navigator.mediaDevices?.getUserMedia === 'function') {
+                    setIsCameraOpen(true);
+                  } else {
+                    cameraInputRef.current?.click();
+                  }
+                }}
+                className="flex min-h-12 w-full items-center gap-3 rounded-xl bg-slate-50 px-4 text-left font-semibold text-slate-800 active:bg-slate-100"
+              >
+                <Camera className="h-5 w-5 text-blue-700" />
+                <span>Camera (ক্যামেরা)</span>
+              </button>
+              <button
+                type="button"
+                data-testid="bill-source-pdf"
+                onClick={() => {
+                  setIsAttachOptionsOpen(false);
+                  pdfInputRef.current?.click();
+                }}
+                className="flex min-h-12 w-full items-center gap-3 rounded-xl bg-slate-50 px-4 text-left font-semibold text-slate-800 active:bg-slate-100"
+              >
+                <FileText className="h-5 w-5 text-blue-700" />
+                <span>PDF (পিডিএফ)</span>
+              </button>
+              <button
+                type="button"
+                data-testid="bill-source-files"
+                onClick={() => {
+                  setIsAttachOptionsOpen(false);
+                  documentInputRef.current?.click();
+                }}
+                className="flex min-h-12 w-full items-center gap-3 rounded-xl bg-slate-50 px-4 text-left font-semibold text-slate-800 active:bg-slate-100"
+              >
+                <FolderOpen className="h-5 w-5 text-blue-700" />
+                <span>File Manager (ফাইল ম্যানেজার)</span>
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsAttachOptionsOpen(false)}
+              className="mt-3 min-h-11 w-full rounded-xl font-bold text-slate-500 active:bg-slate-50"
+            >
+              বাতিল
+            </button>
+          </div>
+        </div>
+      )}
 
       {isCameraOpen && (
         <CameraCaptureModal onCapture={handleCameraCapture} onClose={() => setIsCameraOpen(false)} onError={handleCameraError} />
@@ -1032,14 +1157,24 @@ export function TransactionEntryScreen({
             className="h-11 px-3 rounded-xl bg-white border border-slate-200 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
           {userRole === 'owner' && (
-            billImage ? (
+            billImage || selectedBillFile ? (
               <div className="h-11 flex items-center justify-end gap-2">
                 <div className="relative h-11 w-11 shrink-0">
-                  <img src={billImage} alt="সংযুক্ত বিল" className="w-full h-full rounded-xl object-cover border border-slate-200" />
+                  {selectedBillFile ? (
+                    <div className="flex h-full w-full flex-col items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-800">
+                      <FileText className="h-5 w-5" />
+                      <span className="max-w-10 truncate text-[8px] font-extrabold">
+                        {selectedBillFile.type === 'application/pdf' || selectedBillFile.name.toLowerCase().endsWith('.pdf') ? 'PDF' : 'ফাইল'}
+                      </span>
+                    </div>
+                  ) : (
+                    <img src={billImage ?? undefined} alt="সংযুক্ত বিল" className="w-full h-full rounded-xl object-cover border border-slate-200" />
+                  )}
                   <button
                     type="button"
                     onClick={() => {
                       setBillImage(null);
+                      setSelectedBillFile(null);
                       pendingBase64Ref.current = null;
                       uploadedCreateImageRef.current = null;
                       uploadPromiseRef.current = null;
@@ -1049,6 +1184,11 @@ export function TransactionEntryScreen({
                     <X className="w-3 h-3" />
                   </button>
                 </div>
+                {selectedBillFile && (
+                  <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-600">
+                    {selectedBillFile.name}
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={handleAttachClick}
