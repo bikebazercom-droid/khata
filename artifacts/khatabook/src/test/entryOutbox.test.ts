@@ -45,6 +45,8 @@ const storage = {
 };
 
 beforeEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   records.clear();
   MockBroadcastChannel.instances = [];
   send.mockReset();
@@ -67,6 +69,64 @@ const draft = (id: string, actorId = 'staff-A', businessId: string | null = 'bus
 });
 
 describe('persistent entry outbox', () => {
+  it('uses storage pulses for queue, rejection, and removal when BroadcastChannel is unavailable', async () => {
+    vi.stubGlobal('BroadcastChannel', undefined);
+    localStorage.removeItem('banglakhata-entry-outbox-change-pulse');
+    const outbox = await import('@/lib/entryOutbox');
+    await outbox.queueEntry(draft('other-tab-scope', 'staff-B'));
+    const setItem = vi.spyOn(Storage.prototype, 'setItem');
+    const changes = vi.fn();
+    let lastScopedIds: string[] = [];
+    const refreshScope = () => {
+      void outbox.listEntries('staff-A', 'business-A').then((entries) => {
+        lastScopedIds = entries.map((entry) => entry.id);
+      });
+    };
+    window.addEventListener(outbox.ENTRY_OUTBOX_CHANGED, changes);
+    window.addEventListener(outbox.ENTRY_OUTBOX_CHANGED, refreshScope);
+    await outbox.listEntries('staff-A', 'business-A');
+
+    await outbox.queueEntry(draft('fallback-rejection'));
+    expect(setItem).toHaveBeenCalledWith(
+      'banglakhata-entry-outbox-change-pulse',
+      expect.any(String),
+    );
+    expect(changes).toHaveBeenCalledTimes(1);
+
+    send.mockRejectedValue({ status: 403, data: { error: 'not allowed' } });
+    await outbox.drainEntries('staff-A', 'business-A', () => true, () => {});
+    expect(changes).toHaveBeenCalledTimes(2);
+    const pulse = localStorage.getItem('banglakhata-entry-outbox-change-pulse');
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'banglakhata-entry-outbox-change-pulse',
+      newValue: `${pulse}-remote`,
+    }));
+    expect(changes).toHaveBeenCalledTimes(3);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(lastScopedIds).toEqual(['fallback-rejection']);
+
+    expect(await outbox.discardRejectedEntry('fallback-rejection', 'staff-A', 'business-A')).toBe(true);
+    expect(changes).toHaveBeenCalledTimes(4);
+    expect(setItem).toHaveBeenCalledTimes(3);
+    window.removeEventListener(outbox.ENTRY_OUTBOX_CHANGED, changes);
+    window.removeEventListener(outbox.ENTRY_OUTBOX_CHANGED, refreshScope);
+  });
+
+  it('keeps same-tab outbox updates working when storage access is blocked', async () => {
+    vi.stubGlobal('BroadcastChannel', undefined);
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Storage is blocked', 'SecurityError');
+    });
+    const outbox = await import('@/lib/entryOutbox');
+    const changes = vi.fn();
+    window.addEventListener(outbox.ENTRY_OUTBOX_CHANGED, changes);
+    await outbox.queueEntry(draft('storage-blocked'));
+
+    expect(changes).toHaveBeenCalledTimes(1);
+    expect(await outbox.listEntries('staff-A', 'business-A')).toHaveLength(1);
+    window.removeEventListener(outbox.ENTRY_OUTBOX_CHANGED, changes);
+  });
+
   it('broadcasts entry changes so another open tab refreshes its scoped outbox view', async () => {
     const outbox = await import('@/lib/entryOutbox');
     const changed = vi.fn();
