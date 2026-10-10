@@ -145,6 +145,9 @@ router.get('/storage/objects/*path', async (req: Request, res: Response) => {
 
     res.status(response.status);
     response.headers.forEach((value, key) => res.setHeader(key, value));
+    if (response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() === 'application/pdf') {
+      res.setHeader('Content-Disposition', 'inline; filename="attachment.pdf"');
+    }
 
     if (response.body) {
       const nodeStream = Readable.fromWeb(
