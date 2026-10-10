@@ -36,6 +36,12 @@ export interface PartyStatementRow {
   transferPartyId: string | null;
 }
 
+/** Short date label for the PDF table; unlike dateTime, this never includes a clock value. */
+export function formatPartyStatementPdfDate(dayKey: string): string {
+  const [year, month, day] = dayKey.split('-').map(Number);
+  return format(new Date(year!, month! - 1, day!), 'd MMM yy', { locale: bn });
+}
+
 type BalanceType = 'YOU_WILL_GET' | 'YOU_WILL_GIVE';
 
 export function resolvePartyStatementDateRange(

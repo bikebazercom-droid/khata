@@ -50,6 +50,7 @@ import {
   buildPartyStatementRows,
   calculatePartyStatementSummary,
   filterPartyStatementEntriesByRange,
+  formatPartyStatementPdfDate,
   resolvePartyStatementDateRange,
 } from '@/lib/party-statement';
 import { generatePaginatedStatementPdf } from '@/lib/paginated-statement-pdf';
@@ -336,6 +337,7 @@ export function PartyReportView() {
 
       const details = escapeHtml(row.details);
       const adjustment = escapeHtml(row.adjustment ?? '');
+      const dateOnly = escapeHtml(formatPartyStatementPdfDate(row.dayKey));
       const debitText = row.debit !== null ? fmtAmt(row.debit) : '';
       const creditText = row.credit !== null ? fmtAmt(row.credit) : '';
       const balanceText = fmtBal(row.balanceAfter);
@@ -347,7 +349,7 @@ export function PartyReportView() {
         : '<td style="padding:7px 10px;border:1px solid #e2e8f0;background:#f0fdf4;"></td>';
 
       tableRows += `<tr data-pdf-kind="entry">
-        <td style="padding:5px;border:1px solid #e2e8f0;font-size:10px;overflow-wrap:anywhere;word-break:break-word;">${row.dateTime}</td>
+        <td style="padding:5px;border:1px solid #e2e8f0;font-size:10px;overflow-wrap:anywhere;word-break:break-word;">${dateOnly}</td>
         <td style="padding:5px;border:1px solid #e2e8f0;font-size:10px;overflow-wrap:anywhere;word-break:break-word;">${details}</td>
         <td style="padding:5px;border:1px solid #e2e8f0;font-size:10px;overflow-wrap:anywhere;word-break:break-word;color:#1d4ed8;">${adjustment}</td>
         ${debitCell}

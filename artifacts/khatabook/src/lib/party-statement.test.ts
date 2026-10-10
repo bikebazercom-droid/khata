@@ -3,6 +3,7 @@ import {
   buildPartyStatementRows,
   calculatePartyStatementSummary,
   filterPartyStatementEntriesByRange,
+  formatPartyStatementPdfDate,
   type PartyStatementEntry,
 } from './party-statement';
 import { formatLocalTime, getLedgerEntryDateKey } from './date-time';
@@ -12,6 +13,15 @@ const allEntries: PartyStatementEntry[] = [
   { id: 'credit', type: 'YOU_GOT', amount: 40, createdAt: '2026-05-02T12:00:00.000Z', description: 'পুরোনো বাকি পরিশোধ' },
   { id: 'debit', type: 'YOU_GAVE', amount: 20, createdAt: '2026-05-03T12:00:00.000Z', billReference: 'B-17' },
 ];
+
+describe('party statement PDF dates', () => {
+  it('formats only the day and date without a transaction time', () => {
+    const date = formatPartyStatementPdfDate('2026-10-10');
+
+    expect(date).toContain('অক্টো');
+    expect(date).not.toMatch(/•|AM|PM|\d{1,2}:\d{2}/);
+  });
+});
 
 describe('party statement calculations', () => {
   it('calculates opening, debit, credit, and closing balances for a date range', () => {
