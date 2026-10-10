@@ -30,12 +30,16 @@ import { EntrySavedFeedbackHost } from '@/components/ui/entry-saved-feedback';
 import { lazyWithChunkRecovery } from '@/lib/lazyWithChunkRecovery';
 import {
   getGetDashboardSummaryQueryKey,
+  getGetPartyQueryKey,
+  getListGlobalLedgerEntriesQueryKey,
+  getListLedgerEntriesQueryKey,
   getListPartiesQueryKey,
   getListNotificationsQueryKey,
   useMarkNotificationRead,
   useRemoveOwnerPushToken,
   useRegisterOwnerPushToken,
 } from '@workspace/api-client-react';
+import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import {
   NATIVE_PUSH_STATUS_EVENT,
   NATIVE_PUSH_TOKEN_EVENT,
@@ -199,8 +203,24 @@ function RealtimeSyncManager() {
             void qc.invalidateQueries({ queryKey: getListPartiesQueryKey() });
           }
         }, 'upserts');
-        await drainEntries(userId, activeBusinessId, stillCurrent, () => {
-          if (activeScope.current === scope) void qc.invalidateQueries();
+        await drainEntries(userId, activeBusinessId, stillCurrent, (entry) => {
+          if (activeScope.current !== scope) return;
+          const affectedPartyIds = new Set([
+            entry.partyId,
+            ...(entry.data.transferPartyId ? [entry.data.transferPartyId] : []),
+          ]);
+          for (const partyId of affectedPartyIds) {
+            void qc.invalidateQueries({
+              queryKey: businessScopedQueryKey(getListLedgerEntriesQueryKey(partyId), activeBusinessId),
+            });
+            void qc.invalidateQueries({
+              queryKey: businessScopedQueryKey(getGetPartyQueryKey(partyId), activeBusinessId),
+            });
+          }
+          void qc.invalidateQueries({ queryKey: getListGlobalLedgerEntriesQueryKey() });
+          void qc.invalidateQueries({ queryKey: getListPartiesQueryKey() });
+          void qc.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+          void qc.invalidateQueries({ queryKey: getListNotificationsQueryKey() });
         });
         await drainPartyOperations(userId, activeBusinessId, stillCurrent, () => {
           if (activeScope.current === scope) {

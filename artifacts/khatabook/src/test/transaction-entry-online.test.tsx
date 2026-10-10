@@ -2,14 +2,9 @@ import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import {
   LedgerEntryType,
   PartyRole,
-  getGetDashboardSummaryQueryKey,
-  getGetPartyQueryKey,
-  getListLedgerEntriesQueryKey,
-  getListPartiesQueryKey,
 } from '@workspace/api-client-react';
 
 const mocks = vi.hoisted(() => ({
@@ -197,7 +192,7 @@ describe('browser ledger entry submission', () => {
     });
   });
 
-  it('submits a twenty-billion amount online instead of misclassifying it as an offline draft', async () => {
+  it('shows a large online entry immediately as a pending draft while background sync starts', async () => {
     const { onClose } = renderEntry();
     fireEvent.change(screen.getByRole('textbox', { name: 'পরিমাণ লিখুন' }), {
       target: { value: '20000000000' },
@@ -206,12 +201,12 @@ describe('browser ledger entry submission', () => {
     saveEntry();
 
     await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
-    expect(mocks.createLedgerEntry).toHaveBeenCalledWith(
-      PARTY_ID,
-      expect.objectContaining({ amount: 20_000_000_000 }),
-      expect.anything(),
-    );
-    expect(mocks.queueEntry).not.toHaveBeenCalled();
+    expect(mocks.createLedgerEntry).not.toHaveBeenCalled();
+    expect(mocks.queueEntry).toHaveBeenCalledWith(expect.objectContaining({
+      partyId: PARTY_ID,
+      status: 'pending',
+      data: expect.objectContaining({ amount: 20_000_000_000 }),
+    }));
   });
 
   it('supports manual typing, cursor insertion, selection replacement, and one-character keypad backspace', () => {
@@ -463,7 +458,7 @@ describe('browser ledger entry submission', () => {
     });
   });
 
-  it('POSTs the transfer and uploaded bill object path directly, then closes and invalidates ledger views', async () => {
+  it('queues the transfer and uploaded bill path immediately for background sync', async () => {
     const { onClose, invalidateQueries } = renderEntry();
     enterAmount();
     await attachBillImage();
@@ -475,10 +470,12 @@ describe('browser ledger entry submission', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
     expect(mocks.playTransactionSuccessSound).toHaveBeenCalledOnce();
     expect(mocks.uploadBillImage).toHaveBeenCalledWith('data:image/jpeg;base64,captured-bill');
-    expect(mocks.createLedgerEntry).toHaveBeenCalledOnce();
-    expect(mocks.createLedgerEntry).toHaveBeenCalledWith(
-      PARTY_ID,
-      expect.objectContaining({
+    expect(mocks.createLedgerEntry).not.toHaveBeenCalled();
+    expect(mocks.queueEntry).toHaveBeenCalledOnce();
+    expect(mocks.queueEntry.mock.calls[0][0]).toMatchObject({
+      partyId: PARTY_ID,
+      status: 'pending',
+      data: expect.objectContaining({
         type: LedgerEntryType.YOU_GAVE,
         amount: 1,
         isTransfer: true,
@@ -486,19 +483,8 @@ describe('browser ledger entry submission', () => {
         billImage: '/objects/uploads/bill-1',
         clientRequestId: expect.any(String),
       }),
-      { headers: { 'x-business-id': 'business-1' } },
-    );
-    expect(mocks.createLedgerEntry.mock.calls[0][1]).not.toHaveProperty('imageBase64');
-    expect(mocks.queueEntry).not.toHaveBeenCalled();
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: getListLedgerEntriesQueryKey(PARTY_ID),
     });
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: getGetPartyQueryKey(PARTY_ID) });
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: getListPartiesQueryKey() });
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: getGetDashboardSummaryQueryKey(),
-    });
-    expect(invalidateQueries).toHaveBeenCalledTimes(4);
+    expect(invalidateQueries).not.toHaveBeenCalled();
   });
 
   it('keeps supplier context in the target query and excludes customer destinations', async () => {
@@ -522,22 +508,18 @@ describe('browser ledger entry submission', () => {
     saveEntry();
 
     await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
-    expect(mocks.createLedgerEntry).toHaveBeenCalledWith(
-      PARTY_ID,
-      expect.objectContaining({ isTransfer: true, transferPartyId: 'supplier-target' }),
-      expect.anything(),
-    );
+    expect(mocks.queueEntry.mock.calls[0][0]).toMatchObject({
+      data: expect.objectContaining({ isTransfer: true, transferPartyId: 'supplier-target' }),
+    });
   });
 
-  it('keeps the form open on a server validation failure and reuses the same request ID for retry', async () => {
-    mocks.createLedgerEntry
-      .mockRejectedValueOnce(Object.assign(new Error('invalid entry'), { status: 400 }))
-      .mockResolvedValueOnce({ id: 'entry-1' });
+  it('keeps the form open if local draft persistence fails and reuses the request ID for retry', async () => {
+    mocks.queueEntry.mockRejectedValueOnce(new Error('storage failure')).mockResolvedValueOnce(undefined);
     const { onClose } = renderEntry();
     enterAmount();
 
     saveEntry();
-    await waitFor(() => expect(mocks.createLedgerEntry).toHaveBeenCalledOnce());
+    await waitFor(() => expect(mocks.queueEntry).toHaveBeenCalledOnce());
     expect(onClose).not.toHaveBeenCalled();
     expect(mocks.playTransactionSuccessSound).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'এন্ট্রি নিশ্চিত করুন' })).toBeInTheDocument();
@@ -546,44 +528,9 @@ describe('browser ledger entry submission', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
     expect(mocks.playTransactionSuccessSound).toHaveBeenCalledOnce();
 
-    const firstRequest = mocks.createLedgerEntry.mock.calls[0][1];
-    const retryRequest = mocks.createLedgerEntry.mock.calls[1][1];
+    const firstRequest = mocks.queueEntry.mock.calls[0][0].data;
+    const retryRequest = mocks.queueEntry.mock.calls[1][0].data;
     expect(retryRequest.clientRequestId).toBe(firstRequest.clientRequestId);
-    expect(mocks.queueEntry).not.toHaveBeenCalled();
-  });
-
-  it('shows an amount-limit toast for a server rejection and does not queue it offline', async () => {
-    const errorToast = vi.spyOn(toast, 'error').mockImplementation(() => '' as never);
-    mocks.createLedgerEntry.mockRejectedValueOnce(Object.assign(
-      new Error('HTTP 400'),
-      { status: 400, data: { error: 'Amount exceeds the supported limit' } },
-    ));
-    const { onClose } = renderEntry();
-    enterAmount();
-
-    saveEntry();
-
-    await waitFor(() => expect(errorToast).toHaveBeenCalledWith(
-      'লেনদেনের পরিমাণ সীমা ছাড়িয়েছে',
-      expect.objectContaining({ description: expect.stringContaining('পরিমাণ কমিয়ে') }),
-    ));
-    expect(mocks.queueEntry).not.toHaveBeenCalled();
-    expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'এন্ট্রি নিশ্চিত করুন' })).toBeInTheDocument();
-  });
-
-  it('does not treat an HTTP 500 response as a connectivity failure', async () => {
-    mocks.createLedgerEntry.mockImplementationOnce(async () => {
-      setBrowserOnline(false);
-      throw Object.assign(new Error('HTTP 500'), { status: 500 });
-    });
-    renderEntry();
-    enterAmount();
-
-    saveEntry();
-
-    await waitFor(() => expect(mocks.createLedgerEntry).toHaveBeenCalledOnce());
-    expect(mocks.queueEntry).not.toHaveBeenCalled();
   });
 
   it('saves the entry and bill photo locally when the image upload fails', async () => {

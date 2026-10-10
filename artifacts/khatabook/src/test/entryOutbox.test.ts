@@ -77,7 +77,7 @@ describe('persistent entry outbox', () => {
     expect(await restored.listEntries('staff-B', 'business-A')).toHaveLength(1);
   });
 
-  it.each([400, 403, 404, 409])('retains the server reason for rejected status %i and does not retry it', async (status) => {
+  it.each([400, 403, 404, 409, 422, 500, 503])('retains the server reason for rejected status %i and does not retry it', async (status) => {
     const outbox = await import('@/lib/entryOutbox');
     await outbox.queueEntry(draft('request-denied'));
     send.mockRejectedValue({ status, data: { error: 'স্টাফের এই হিসাবে প্রবেশাধিকার নেই।' } });
@@ -121,5 +121,26 @@ describe('persistent entry outbox', () => {
     expect(send.mock.calls[0][1].billImage).toBe('/objects/uploads/test');
     expect(JSON.stringify(send.mock.calls[0][1])).not.toContain('base64');
     expect(await restored.listEntries('staff-A', 'business-A')).toEqual([]);
+  });
+
+  it('runs a queued replay request that arrives while another entry is syncing', async () => {
+    const outbox = await import('@/lib/entryOutbox');
+    await outbox.queueEntry(draft('request-first'));
+    await outbox.queueEntry(draft('request-second'));
+    let releaseFirst: ((value: { id: string }) => void) | undefined;
+    send
+      .mockImplementationOnce(() => new Promise((resolve) => { releaseFirst = resolve; }))
+      .mockResolvedValue({ id: 'saved' });
+
+    const firstDrain = outbox.drainEntries('staff-A', 'business-A', () => true, () => {});
+    await vi.waitFor(() => expect(send).toHaveBeenCalledOnce());
+    await outbox.drainEntries('staff-A', 'business-A', () => true, () => {});
+    releaseFirst?.({ id: 'saved-first' });
+    await firstDrain;
+
+    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+    await vi.waitFor(async () => {
+      expect(await outbox.listEntries('staff-A', 'business-A')).toEqual([]);
+    });
   });
 });

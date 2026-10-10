@@ -1,5 +1,6 @@
 import {
   pgTable,
+  index,
   text,
   uuid,
   numeric,
@@ -18,32 +19,40 @@ export const ledgerEntryTypeEnum = pgEnum("ledger_entry_type", [
   "YOU_GOT",
 ]);
 
-export const ledgerEntriesTable = pgTable("ledger_entries", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  partyId: uuid("party_id")
-    .notNull()
-    .references(() => partiesTable.id, { onDelete: "cascade" }),
-  createdByUserId: uuid("created_by_user_id"),
-  type: ledgerEntryTypeEnum("type").notNull(),
-  amount: numeric("amount", { precision: 20, scale: 2 }).notNull(),
-  description: text("description").notNull().default(""),
-  billReference: text("bill_reference"),
-  billImage: text("bill_image"),
-  dueDate: date("due_date", { mode: "string" }),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  // Cross-customer transfer / adjustment fields
-  isTransfer: boolean("is_transfer").notNull().default(false),
-  transferPartyId: uuid("transfer_party_id").references(
-    () => partiesTable.id,
-    { onDelete: "set null" },
-  ),
-  linkedEntryId: uuid("linked_entry_id").references(
-    (): AnyPgColumn => ledgerEntriesTable.id,
-    { onDelete: "set null" },
-  ),
-});
+export const ledgerEntriesTable = pgTable(
+  "ledger_entries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    partyId: uuid("party_id")
+      .notNull()
+      .references(() => partiesTable.id, { onDelete: "cascade" }),
+    createdByUserId: uuid("created_by_user_id"),
+    type: ledgerEntryTypeEnum("type").notNull(),
+    amount: numeric("amount", { precision: 20, scale: 2 }).notNull(),
+    description: text("description").notNull().default(""),
+    billReference: text("bill_reference"),
+    billImage: text("bill_image"),
+    dueDate: date("due_date", { mode: "string" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    // Cross-customer transfer / adjustment fields
+    isTransfer: boolean("is_transfer").notNull().default(false),
+    transferPartyId: uuid("transfer_party_id").references(
+      () => partiesTable.id,
+      { onDelete: "set null" },
+    ),
+    linkedEntryId: uuid("linked_entry_id").references(
+      (): AnyPgColumn => ledgerEntriesTable.id,
+      { onDelete: "set null" },
+    ),
+  },
+  (table) => [
+    index("ledger_entries_party_created_idx").on(table.partyId, table.createdAt),
+    index("ledger_entries_transfer_party_idx").on(table.transferPartyId),
+    index("ledger_entries_linked_entry_idx").on(table.linkedEntryId),
+  ],
+);
 
 export const insertLedgerEntrySchema = createInsertSchema(
   ledgerEntriesTable,

@@ -15,6 +15,12 @@ Pending drafts do not contribute to confirmed balances.
 
 **How to apply:** Keep pending/rejected drafts visible separately and leave them recoverable on failed synchronization.
 
+Online entry creation is also queued locally before the background API replay.
+
+**Why:** Waiting for a network round trip made the save interaction feel blocked; showing a pending draft is immediate without claiming the server has confirmed its balance effect.
+
+**How to apply:** Persist the idempotent request before closing the entry form, keep the draft visibly pending, and update confirmed ledger/balance queries only after replay succeeds.
+
 When evicting persisted query data, clear matching entries from both the saved snapshot and the debounced dirty-write buffer; compare generated query-key prefixes so appended business scopes are included.
 
 **Why:** A pending persistence timer can restore stale ledger data after an entry is deleted or its cache is invalidated.

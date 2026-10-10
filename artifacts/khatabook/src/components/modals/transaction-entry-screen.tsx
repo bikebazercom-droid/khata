@@ -10,7 +10,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  createLedgerEntry,
   useListParties,
   useListAdjustmentTargets,
   getListAdjustmentTargetsQueryKey,
@@ -38,7 +37,6 @@ import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import { useConnectionState } from '@/context/connection-state';
 import { notifyEntrySaved } from '@/components/ui/entry-saved-feedback';
 import { queueEntry } from '@/lib/entryOutbox';
-import { isTransientNetworkError } from '@/lib/offlineErrors';
 import { isLedgerAmountLimitError } from '@/lib/ledgerSaveError';
 import { readOfflineIdentity } from '@/lib/offlineSession';
 
@@ -842,7 +840,6 @@ export function TransactionEntryScreen({
     savingRef.current = true;
     try {
       let billImage: string | undefined;
-      let uploadUnavailable = false;
       if (selectedBillFile) {
         const uploaded = await uploadBillFile(selectedBillFile);
         if (!uploaded.ok) {
@@ -858,9 +855,7 @@ export function TransactionEntryScreen({
           billImage = cachedUpload.objectPath;
         } else {
           const uploaded = await uploadBillImage(capturedBase64);
-          if (!uploaded.ok) {
-            uploadUnavailable = true;
-          } else {
+            if (uploaded.ok) {
             billImage = uploaded.objectPath;
             uploadedCreateImageRef.current = { source: capturedBase64, objectPath: uploaded.objectPath };
           }
@@ -902,26 +897,17 @@ export function TransactionEntryScreen({
           createdAt: new Date().toISOString(),
           status: 'pending',
         });
-        toast.success('হিসাবটি ডিভাইসে সেভ হয়েছে; সংযোগ ফিরলে সিঙ্ক হবে');
+      toast.success(
+        navigator.onLine
+          ? 'হিসাবটি সেভ হয়েছে; লেজারে যোগ হচ্ছে'
+          : 'হিসাবটি ডিভাইসে সেভ হয়েছে; সংযোগ ফিরলে সিঙ্ক হবে',
+      );
       };
 
-      if (!navigator.onLine || uploadUnavailable) {
-        await saveOfflineDraft();
-      } else {
-        try {
-          await createLedgerEntry(partyId, requestData, {
-            headers: { 'x-business-id': activeBusinessId ?? '' },
-          });
-        } catch (error) {
-          if (!isTransientNetworkError(error)) throw error;
-          await saveOfflineDraft();
-        }
-      }
-
-      queryClient.invalidateQueries({ queryKey: getListLedgerEntriesQueryKey(partyId) });
-      queryClient.invalidateQueries({ queryKey: getGetPartyQueryKey(partyId) });
-      queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
-      queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+      // Persist first, then let the shared sync manager send it in the
+      // background. The party view renders this as a pending draft, never as
+      // a confirmed balance, so saving does not wait on network latency.
+      await saveOfflineDraft();
       createRequestRef.current = null;
       uploadedCreateImageRef.current = null;
       pendingBase64Ref.current = null;

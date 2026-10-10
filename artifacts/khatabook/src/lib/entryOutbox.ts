@@ -135,6 +135,12 @@ async function removeEntry(id: string) {
 }
 
 let draining = false;
+let pendingDrain: {
+  actorId: string;
+  businessId: string | null;
+  stillCurrent: () => boolean;
+  onConfirmed: (entry: QueuedEntry) => void;
+} | null = null;
 
 /** Only this authenticated actor and this business may replay these drafts. */
 export async function drainEntries(
@@ -143,7 +149,11 @@ export async function drainEntries(
   stillCurrent: () => boolean,
   onConfirmed: (entry: QueuedEntry) => void,
 ): Promise<void> {
-  if (draining || !navigator.onLine) return;
+  if (!navigator.onLine) return;
+  if (draining) {
+    pendingDrain = { actorId, businessId, stillCurrent, onConfirmed };
+    return;
+  }
   draining = true;
   try {
     const replay = async () => {
@@ -176,7 +186,19 @@ export async function drainEntries(
           // visible for review; never retry it with a different user's credentials.
           const status = (error as { status?: number })?.status;
           if (status === 401) break;
-          if (status === 403 || status === 404 || status === 400 || status === 409) {
+          // The draft is already visible because creates are local-first, but
+          // an HTTP response is still a server decision—not an offline signal.
+          // Preserve and surface all non-retryable 4xx/5xx responses instead
+          // of leaving them looking as though they are merely waiting for
+          // connectivity. Keep standard throttling/timeout responses retryable.
+          if (
+            typeof status === 'number' &&
+            status >= 400 &&
+            status <= 599 &&
+            status !== 408 &&
+            status !== 425 &&
+            status !== 429
+          ) {
             entry.status = 'rejected';
             entry.error = rejectionReason(error);
             await updateEntry(entry);
@@ -193,5 +215,15 @@ export async function drainEntries(
     else await replay();
   } finally {
     draining = false;
+    const queuedDrain = pendingDrain;
+    pendingDrain = null;
+    if (queuedDrain) {
+      void drainEntries(
+        queuedDrain.actorId,
+        queuedDrain.businessId,
+        queuedDrain.stillCurrent,
+        queuedDrain.onConfirmed,
+      );
+    }
   }
 }
