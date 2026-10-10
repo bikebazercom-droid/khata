@@ -1,6 +1,7 @@
 import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
 import { formatLedgerEntryDateTime, getLedgerEntryDateKey } from './date-time';
+import { splitAdjustmentDescription } from './adjustment-display';
 
 export interface PartyStatementEntry {
   id: string;
@@ -10,6 +11,8 @@ export interface PartyStatementEntry {
   dueDate?: string | null;
   description?: string | null;
   billReference?: string | null;
+  isTransfer?: boolean;
+  transferPartyId?: string | null;
 }
 
 export interface PartyStatementSummary {
@@ -25,9 +28,12 @@ export interface PartyStatementRow {
   dayLabel: string;
   dateTime: string;
   details: string;
+  adjustment: string | null;
   debit: number | null;
   credit: number | null;
   balanceAfter: number;
+  isTransfer: boolean;
+  transferPartyId: string | null;
 }
 
 type BalanceType = 'YOU_WILL_GET' | 'YOU_WILL_GIVE';
@@ -114,6 +120,7 @@ export function calculatePartyStatementSummary({
 export function buildPartyStatementRows(
   entries: readonly PartyStatementEntry[],
   openingBalance: number,
+  partyNames: ReadonlyMap<string, string> = new Map(),
 ): PartyStatementRow[] {
   const chronologicalEntries = entries
     .map((entry, index) => ({
@@ -132,10 +139,16 @@ export function buildPartyStatementRows(
     const isDebit = entry.type === 'YOU_GAVE';
     balance += signedDelta(entry);
     const date = new Date(`${dayKey}T00:00:00`);
-    const description = entry.description?.trim() || (isDebit ? 'নগদ প্রদান' : 'নগদ গ্রহণ');
-    const details = entry.billReference
-      ? `${description} (বিল: ${entry.billReference})`
-      : description;
+    const display = splitAdjustmentDescription(
+      entry.description?.trim() || (entry.isTransfer ? '' : isDebit ? 'নগদ প্রদান' : 'নগদ গ্রহণ'),
+      entry.isTransfer,
+      entry.transferPartyId ? partyNames.get(entry.transferPartyId) : null,
+    );
+    const details = display.details
+      ? entry.billReference
+        ? `${display.details} (বিল: ${entry.billReference})`
+        : display.details
+      : '';
 
     return {
       id: entry.id,
@@ -143,9 +156,12 @@ export function buildPartyStatementRows(
       dayLabel: format(date, 'd MMMM yyyy', { locale: bn }),
       dateTime: formatLedgerEntryDateTime(entry.dueDate, entry.createdAt),
       details,
+      adjustment: display.adjustment,
       debit: isDebit ? entry.amount : null,
       credit: isDebit ? null : entry.amount,
       balanceAfter: balance,
+      isTransfer: !!entry.isTransfer,
+      transferPartyId: entry.transferPartyId ?? null,
     };
   });
 

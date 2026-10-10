@@ -652,7 +652,9 @@ export const ListGlobalLedgerEntriesResponseItem = zod.object({
   "billReference": zod.string().nullable(),
   "billImage": zod.string().nullable().describe('Cloud storage object path for the scanned bill\/receipt image (e.g. \/objects\/uploads\/uuid).'),
   "dueDate": zod.coerce.date().nullable(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "isTransfer": zod.boolean(),
+  "transferPartyId": zod.string().nullable()
 })
 export const ListGlobalLedgerEntriesResponse = zod.array(ListGlobalLedgerEntriesResponseItem)
 

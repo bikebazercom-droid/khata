@@ -232,4 +232,20 @@ describe('party statement calculations', () => {
       '2025-05-01T10:55:00.000Z',
     )).toBe('2025-04-30');
   });
+
+  it('puts transfer labels in the adjustment column and keeps user remarks in details', () => {
+    const [row] = buildPartyStatementRows([{
+      id: 'adjustment',
+      type: 'YOU_GAVE',
+      amount: 500,
+      createdAt: '2026-10-02T10:00:00.000Z',
+      dueDate: '2026-10-02',
+      description: 'শাকিল থেকে টাকা — অ্যাডজাস্ট করা হয়েছে melon-এর সাথে',
+      isTransfer: true,
+      transferPartyId: 'melon-id',
+    }], 0, new Map([['melon-id', 'melon']]));
+
+    expect(row.details).toBe('শাকিল থেকে টাকা');
+    expect(row.adjustment).toBe('অন্য খাতায়: melon');
+  });
 });

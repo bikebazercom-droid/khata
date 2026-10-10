@@ -1721,6 +1721,8 @@ components:
         - billImage
         - dueDate
         - createdAt
+        - isTransfer
+        - transferPartyId
       properties:
         id:
           type: string
@@ -1749,6 +1751,10 @@ components:
         createdAt:
           type: string
           format: date-time
+        isTransfer:
+          type: boolean
+        transferPartyId:
+          type: ["string", "null"]
     DeletePartyResult:
       type: object
       required:

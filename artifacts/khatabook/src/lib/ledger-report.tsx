@@ -4,6 +4,7 @@ import { bn } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
 import { billImageSrc } from '@/lib/billImageStorage';
 import { getLedgerEntryDateKey } from './date-time';
+import { splitAdjustmentDescription } from './adjustment-display';
 import { fitPdfHeaderNameFontSize, getPdfSupportContactLinks } from './pdf-report-branding';
 
 export interface ReportEntry {
@@ -16,6 +17,8 @@ export interface ReportEntry {
   dueDate: string | null;
   createdAt: string | Date;
   balanceAfter: number;
+  isTransfer?: boolean;
+  transferPartyName?: string | null;
 }
 
 export interface ReportParty {
@@ -45,8 +48,17 @@ function entryDate(entry: ReportEntry) {
 
 /** Human-readable details cell: description, falling back to a generic label, plus bill reference if present. */
 function entryDetails(entry: ReportEntry) {
-  const base = entry.description?.trim() || (entry.type === 'YOU_GAVE' ? 'নগদ প্রদান' : 'নগদ গ্রহণ');
+  const { details } = splitAdjustmentDescription(
+    entry.description || (entry.isTransfer ? '' : entry.type === 'YOU_GAVE' ? 'নগদ প্রদান' : 'নগদ গ্রহণ'),
+    entry.isTransfer,
+    entry.transferPartyName,
+  );
+  const base = details;
   return entry.billReference ? `${base} (বিল: ${entry.billReference})` : base;
+}
+
+function entryAdjustment(entry: ReportEntry) {
+  return splitAdjustmentDescription(entry.description, entry.isTransfer, entry.transferPartyName).adjustment;
 }
 
 interface MonthGroup {
@@ -169,6 +181,7 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
               <tr style={{ backgroundColor: '#ffffff' }}>
                 <th style={{ textAlign: 'left', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>তারিখ</th>
                 <th style={{ textAlign: 'left', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ডিটেলস</th>
+                <th style={{ textAlign: 'left', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>অ্যাডজাস্টমেন্ট</th>
                 <th style={{ textAlign: 'right', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ডেবিট (-)</th>
                 <th style={{ textAlign: 'right', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ক্রেডিট (+)</th>
                 <th style={{ textAlign: 'right', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ব্যালেন্স</th>
@@ -177,7 +190,7 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
             <tbody>
               {monthGroups.length === 0 && (
                 <tr>
-                  <td colSpan={5} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', border: GRID_BORDER }}>
+                  <td colSpan={6} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', border: GRID_BORDER }}>
                     এখনো কোনো লেনদেন নেই
                   </td>
                 </tr>
@@ -189,7 +202,7 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                       where every month renders as its own boxed mini-table. */}
                   <tr key={`${group.key}-header`} data-month-key={group.key}>
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       style={{
                         padding: groupIndex === 0 ? '4px 2px 8px' : '18px 2px 8px',
                         color: '#0f172a',
@@ -228,6 +241,9 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                               }}
                             />
                           )}
+                        </td>
+                        <td style={{ padding: '7px 10px', border: GRID_BORDER, color: '#1d4ed8' }}>
+                          {entryAdjustment(entry)}
                         </td>
                         <td
                           style={{
@@ -268,7 +284,7 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                     );
                   })}
                   <tr key={`${group.key}-total`} style={{ backgroundColor: '#f8fafc' }}>
-                    <td colSpan={2} style={{ padding: '8px 10px', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
+                    <td colSpan={3} style={{ padding: '8px 10px', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
                       {group.label.split(' ')[0]} মোট
                     </td>
                     <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>

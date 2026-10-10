@@ -1,6 +1,7 @@
 - [Mobile single-page layout height](mobile-fixed-height-layout.md) — outer app shell must use fixed `h-[100dvh]`, not `min-h-[100dvh]`, or absolutely-positioned full-screen overlays inherit unbounded height and cause page scroll.
 - [Collapsible panel animation](collapsible-panel-css-trick.md) — prefer `max-height` transition over CSS Grid `0fr`/`1fr` trick for animating a section to/from zero height; the grid trick was unreliable here.
 - [Orval date query-param coercion bug](orval-date-query-param-coercion.md) — generated zod schemas use bare `zod.date()` for `format: date` query params, always failing req.query parsing.
+- [Orval codegen recovery](orval-codegen-recovery.md) — codegen cleans generated folders before input validation, so rerun it successfully before any checks that depend on generated imports.
 - [Orval and Zod format compatibility](orval-zod-format-compat.md) — OpenAPI UUID/email formats generate Zod 4 methods in this Zod 3 setup; omit them unless codegen is fixed.
 - [Khatabook auth & multi-tenancy](khatabook-auth-multitenancy.md) — seed-business rules, session revocation, Expo Clerk SSO, and DB setup gotchas.
 - [First-book name onboarding](first-book-name-onboarding.md) — an empty business/settings name marks a new owner’s first book as needing a custom name.

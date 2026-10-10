@@ -141,6 +141,28 @@ describe('LedgerReportDocument — bill image thumbnails', () => {
 });
 
 describe('LedgerReportDocument — statement ordering', () => {
+  it('renders adjustment metadata in its own column, separate from the remark', () => {
+    const { container } = render(
+      <LedgerReportDocument
+        storeName="টেস্ট স্টোর"
+        party={PARTY}
+        entries={[makeEntry({
+          id: 'transfer',
+          description: 'মালের টাকা — অ্যাডজাস্ট করা হয়েছে melon-এর সাথে',
+          isTransfer: true,
+          transferPartyName: 'melon',
+        })]}
+      />,
+    );
+
+    const row = container.querySelector<HTMLTableRowElement>('tr[data-entry-id="transfer"]');
+    expect(Array.from(container.querySelectorAll('th')).map((header) => header.textContent?.trim()))
+      .toContain('অ্যাডজাস্টমেন্ট');
+    expect(row?.cells[1].textContent).toContain('মালের টাকা');
+    expect(row?.cells[1].textContent).not.toContain('অ্যাডজাস্ট করা হয়েছে');
+    expect(row?.cells[2].textContent).toContain('melon');
+  });
+
   it('renders month groups and entries newest-first by business date while retaining each balance', () => {
     const entries: ReportEntry[] = [
       makeEntry({
@@ -199,7 +221,7 @@ describe('LedgerReportDocument — statement ordering', () => {
       'January entry',
       'May entry',
     ]);
-    expect(entryRows.map((row) => row.cells[4].textContent?.trim())).toEqual([
+    expect(entryRows.map((row) => row.cells[5].textContent?.trim())).toEqual([
       `${formatCurrency(987)} Dr`,
       `${formatCurrency(432)} Dr`,
       `${formatCurrency(121)} Cr`,

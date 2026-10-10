@@ -708,7 +708,10 @@ export function PartyView() {
           ref={reportRef}
           storeName={storeName}
           party={party}
-          entries={ascendingEntries}
+          entries={ascendingEntries.map((entry) => ({
+            ...entry,
+            transferPartyName: entry.transferPartyId ? partyNameMap[entry.transferPartyId] ?? null : null,
+          }))}
           supportPhone={reportBranding?.supportPhone}
           supportEmail={reportBranding?.supportEmail}
         />

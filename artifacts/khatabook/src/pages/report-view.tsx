@@ -39,6 +39,7 @@ import { getLedgerEntryDateKey } from '@/lib/date-time';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
 import { resolveLedgerBookName } from '@/lib/ledger-book-name';
 import { addPdfLinkAnnotations } from '@/lib/pdf-link-annotations';
+import { splitAdjustmentDescription } from '@/lib/adjustment-display';
 import {
   fitPdfHeaderNameFontSize,
   renderPdfBrandLogo,
@@ -188,6 +189,10 @@ export function ReportView() {
     const rowsHtml = pdfEntries.map(e => {
       const isGave   = e.type === 'YOU_GAVE';
       const dateCell = formatReportEntryTimestamp(e.dueDate, e.createdAt);
+      const adjustment = splitAdjustmentDescription(
+        e.description,
+        e.isTransfer,
+      );
       const debitCell  = isGave
         ? `<td style="padding:10px;border:1px solid #000;text-align:right;background:#FEF2F2;color:#000;font-weight:500;">${formatCurrency(e.amount)}</td>`
         : `<td style="padding:10px;border:1px solid #000;background:#FEF2F2;"></td>`;
@@ -198,7 +203,8 @@ export function ReportView() {
         <tr style="vertical-align:top;">
           <td style="padding:10px;border:1px solid #000;color:#000;">${dateCell}</td>
           <td style="padding:10px;border:1px solid #000;font-weight:500;word-break:break-word;">${e.partyName || '—'}</td>
-          <td style="padding:10px;border:1px solid #000;word-break:break-word;">${e.description || '—'}</td>
+          <td style="padding:10px;border:1px solid #000;word-break:break-word;">${escapeHtml(adjustment.details) || '—'}</td>
+          <td style="padding:10px;border:1px solid #000;word-break:break-word;color:#1d4ed8;">${escapeHtml(adjustment.adjustment ?? '')}</td>
           ${debitCell}
           ${creditCell}
         </tr>`;
@@ -263,12 +269,13 @@ export function ReportView() {
               <th style="padding:10px;border:1px solid #000;width:18%;text-align:left;">তারিখ</th>
               <th style="padding:10px;border:1px solid #000;width:26%;text-align:left;">${isSupplier ? 'সরবরাহকারীর নাম' : 'গ্রাহকের নাম'}</th>
               <th style="padding:10px;border:1px solid #000;text-align:left;">বিবরণ</th>
+              <th style="padding:10px;border:1px solid #000;width:15%;text-align:left;">অ্যাডজাস্টমেন্ট</th>
               <th style="padding:10px;border:1px solid #000;width:15%;text-align:right;background:#FEF2F2;">আপনি দিয়েছেন</th>
               <th style="padding:10px;border:1px solid #000;width:15%;text-align:right;background:#F0FDF4;">আপনি পেয়েছেন</th>
             </tr>
           </thead>
           <tbody>
-            ${rowsHtml || `<tr><td colspan="5" style="padding:16px;text-align:center;color:#94A3B8;border:1px solid #000;">কোনো এন্ট্রি নেই</td></tr>`}
+            ${rowsHtml || `<tr><td colspan="6" style="padding:16px;text-align:center;color:#94A3B8;border:1px solid #000;">কোনো এন্ট্রি নেই</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -528,6 +535,10 @@ export function ReportView() {
               const isGave = entry.type === 'YOU_GAVE';
               const imgSrc = billImageSrc(entry.billImage);
               const formattedAmount = formatCurrency(entry.amount);
+              const adjustment = splitAdjustmentDescription(
+                entry.description,
+                entry.isTransfer,
+              );
               const amountFontSize = reportAmountFontSize(
                 formattedAmount,
                 reportAmountColumnWidth(window.innerWidth),
@@ -542,8 +553,14 @@ export function ReportView() {
                     <p className="text-[11px] font-medium text-slate-400 mt-0.5">
                       {formatReportTimestamp(entry.createdAt)}
                     </p>
-                    {entry.description && (
-                      <p className="text-[11px] text-slate-500 mt-0.5 truncate">{entry.description}</p>
+                    {adjustment.details && (
+                      <p className="text-[11px] text-slate-500 mt-0.5 truncate">{adjustment.details}</p>
+                    )}
+                    {adjustment.adjustment && (
+                      <p className="mt-1 inline-flex max-w-full rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
+                        <span className="shrink-0">অ্যাডজাস্টমেন্ট:</span>
+                        <span className="ml-1 truncate">{adjustment.adjustment.replace(/^অন্য খাতায়:\s*/, '')}</span>
+                      </p>
                     )}
                     {imgSrc && (
                       <button

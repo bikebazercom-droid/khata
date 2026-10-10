@@ -27,4 +27,7 @@ export interface GlobalLedgerEntry {
   /** @nullable */
   dueDate: Date | null;
   createdAt: Date;
+  isTransfer: boolean;
+  /** @nullable */
+  transferPartyId: string | null;
 }

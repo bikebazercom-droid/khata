@@ -464,6 +464,9 @@ export interface GlobalLedgerEntry {
   /** @nullable */
   dueDate: string | null;
   createdAt: string;
+  isTransfer: boolean;
+  /** @nullable */
+  transferPartyId: string | null;
 }
 
 export interface DeletePartyResult {

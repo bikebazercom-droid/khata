@@ -312,7 +312,7 @@ export function PartyReportView() {
           ? `<td style="border:0;text-align:right;font-weight:400;color:#64748b;font-size:11px;white-space:nowrap;">(ওপেনিং ব্যালেন্স: ${fmtBal(openingBalance)})</td>`
           : '<td style="border:0;"></td>';
         tableRows += `<tr data-pdf-kind="day" style="background:#f1f5f9;">
-          <td colspan="5" style="padding:0;border:1px solid #cbd5e1;">
+          <td colspan="6" style="padding:0;border:1px solid #cbd5e1;">
             <table style="width:100%;border-collapse:collapse;"><tr>
               <td style="border:0;padding:7px 10px;font-weight:700;font-size:12px;">${row.dayLabel}</td>
               ${openNote}
@@ -323,6 +323,7 @@ export function PartyReportView() {
       }
 
       const details = escapeHtml(row.details);
+      const adjustment = escapeHtml(row.adjustment ?? '');
       const debitCell  = row.debit !== null
         ? `<td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:right;background:#fef2f2;font-size:12px;">${fmtAmt(row.debit)}</td>`
         : '<td style="padding:7px 10px;border:1px solid #e2e8f0;background:#fef2f2;"></td>';
@@ -333,6 +334,7 @@ export function PartyReportView() {
       tableRows += `<tr data-pdf-kind="entry">
         <td style="padding:7px 10px;border:1px solid #e2e8f0;font-size:11px;white-space:nowrap;">${row.dateTime}</td>
         <td style="padding:7px 10px;border:1px solid #e2e8f0;font-size:11px;word-break:break-word;">${details}</td>
+        <td style="padding:7px 10px;border:1px solid #e2e8f0;font-size:11px;word-break:break-word;color:#1d4ed8;">${adjustment}</td>
         ${debitCell}
         ${creditCell}
         <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:right;font-size:12px;font-weight:600;color:${balClr(row.balanceAfter)};white-space:nowrap;">${fmtBal(row.balanceAfter)}</td>
@@ -340,12 +342,12 @@ export function PartyReportView() {
     }
 
     if (!tableRows) {
-      tableRows = `<tr data-pdf-kind="empty"><td colspan="5" style="padding:16px;text-align:center;color:#94a3b8;border:1px solid #e2e8f0;">কোনো লেনদেন নেই</td></tr>`;
+      tableRows = `<tr data-pdf-kind="empty"><td colspan="6" style="padding:16px;text-align:center;color:#94a3b8;border:1px solid #e2e8f0;">কোনো লেনদেন নেই</td></tr>`;
     }
 
     // YOU_GAVE entries are debits; YOU_GOT entries are credits.
     tableRows += `<tr data-pdf-kind="total" style="background:#f8fafc;font-weight:700;">
-      <td colspan="2" style="padding:8px 10px;border:1px solid #cbd5e1;font-size:12px;">সর্বমোট</td>
+      <td colspan="3" style="padding:8px 10px;border:1px solid #cbd5e1;font-size:12px;">সর্বমোট</td>
       <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;background:#fef2f2;font-size:12px;">${fmtAmt(totalDebit)}</td>
       <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;background:#f0fdf4;font-size:12px;">${fmtAmt(totalCredit)}</td>
       <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:${balClr(closingBalance)};">${fmtBal(closingBalance)}</td>
@@ -440,11 +442,12 @@ export function PartyReportView() {
   <table class="statement-pdf-table" style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;">
       <thead>
         <tr style="background:#f8fafc;">
-          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:left;font-size:12px;color:#374151;font-weight:700;width:24%;">তারিখ</th>
-          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:left;font-size:12px;color:#374151;font-weight:700;width:26%;">ডিটেইলস</th>
-          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:#374151;font-weight:700;background:#fef2f2;width:16%;">ডেবিট / খরচ (-)</th>
-          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:#374151;font-weight:700;background:#f0fdf4;width:16%;">ক্রেডিট / জমা (+)</th>
-          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:#374151;font-weight:700;width:18%;">ব্যালেন্স (Dr/Cr)</th>
+          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:left;font-size:12px;color:#374151;font-weight:700;width:19%;">তারিখ</th>
+          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:left;font-size:12px;color:#374151;font-weight:700;width:23%;">ডিটেইলস</th>
+          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:left;font-size:12px;color:#374151;font-weight:700;width:16%;">অ্যাডজাস্টমেন্ট</th>
+          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:#374151;font-weight:700;background:#fef2f2;width:14%;">ডেবিট / খরচ (-)</th>
+          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:#374151;font-weight:700;background:#f0fdf4;width:14%;">ক্রেডিট / জমা (+)</th>
+          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:#374151;font-weight:700;width:14%;">ব্যালেন্স (Dr/Cr)</th>
         </tr>
       </thead>
       <tbody>${tableRows}</tbody>

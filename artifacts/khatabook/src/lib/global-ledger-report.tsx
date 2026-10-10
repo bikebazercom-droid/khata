@@ -5,6 +5,7 @@ import { formatCurrency } from '@/lib/utils';
 import { billImageSrc } from '@/lib/billImageStorage';
 import { getLedgerEntryDateKey } from './date-time';
 import { sortGlobalLedgerEntriesChronologically } from './global-ledger-report-order';
+import { splitAdjustmentDescription } from './adjustment-display';
 import { fitPdfHeaderNameFontSize, getPdfSupportContactLinks } from './pdf-report-branding';
 
 export interface GlobalReportEntry {
@@ -19,6 +20,8 @@ export interface GlobalReportEntry {
   billImage: string | null;
   dueDate: string | null;
   createdAt: string | Date;
+  isTransfer?: boolean;
+  transferPartyName?: string | null;
 }
 
 interface GlobalReportDocumentProps {
@@ -36,7 +39,8 @@ function entryDate(entry: GlobalReportEntry) {
 }
 
 function entryDetails(entry: GlobalReportEntry) {
-  const base = entry.description?.trim() || (entry.type === 'YOU_GAVE' ? 'নগদ প্রদান' : 'নগদ গ্রহণ');
+  const display = splitAdjustmentDescription(entry.description, entry.isTransfer, entry.transferPartyName);
+  const base = display.details || (entry.isTransfer ? '' : entry.type === 'YOU_GAVE' ? 'নগদ প্রদান' : 'নগদ গ্রহণ');
   return entry.billReference ? `${base} (বিল: ${entry.billReference})` : base;
 }
 
@@ -157,6 +161,7 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
                 <th style={{ textAlign: 'left', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>তারিখ</th>
                 <th style={{ textAlign: 'left', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>কাস্টমার/সাপ্লায়ার</th>
                 <th style={{ textAlign: 'left', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ডিটেলস</th>
+                <th style={{ textAlign: 'left', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>অ্যাডজাস্টমেন্ট</th>
                 <th style={{ textAlign: 'center', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER, width: '52px' }}>বিল</th>
                 <th style={{ textAlign: 'right', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ডেবিট (-)</th>
                 <th style={{ textAlign: 'right', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ক্রেডিট (+)</th>
@@ -165,7 +170,7 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
             <tbody>
               {monthGroups.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', border: GRID_BORDER }}>
+                  <td colSpan={7} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', border: GRID_BORDER }}>
                     এই সময়কালে কোনো লেনদেন নেই
                   </td>
                 </tr>
@@ -174,7 +179,7 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
                 <Fragment key={group.key}>
                   <tr key={`${group.key}-header`}>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       style={{
                         padding: groupIndex === 0 ? '4px 2px 8px' : '18px 2px 8px',
                         color: '#0f172a',
@@ -202,6 +207,13 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
                           ) : null}
                         </td>
                         <td style={{ padding: '7px 10px', border: GRID_BORDER, color: '#334155' }}>{entryDetails(entry)}</td>
+                        <td style={{ padding: '7px 10px', border: GRID_BORDER, color: '#1d4ed8' }}>
+                          {splitAdjustmentDescription(
+                            entry.description,
+                            entry.isTransfer,
+                            entry.transferPartyName,
+                          ).adjustment}
+                        </td>
                         <td style={{ padding: '4px 6px', border: GRID_BORDER, textAlign: 'center', width: '52px' }}>
                           {imgSrc ? (
                             <img
@@ -240,7 +252,7 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
                     );
                   })}
                   <tr key={`${group.key}-total`} style={{ backgroundColor: '#f8fafc' }}>
-                    <td colSpan={4} style={{ padding: '8px 10px', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
+                    <td colSpan={5} style={{ padding: '8px 10px', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
                       {group.label.split(' ')[0]} মোট
                     </td>
                     <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>

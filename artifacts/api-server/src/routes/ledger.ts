@@ -75,6 +75,8 @@ router.get("/ledger-entries", async (req, res): Promise<void> => {
       billImage: ledgerEntriesTable.billImage,
       dueDate: ledgerEntriesTable.dueDate,
       createdAt: ledgerEntriesTable.createdAt,
+      isTransfer: ledgerEntriesTable.isTransfer,
+      transferPartyId: ledgerEntriesTable.transferPartyId,
     })
     .from(ledgerEntriesTable)
     .innerJoin(partiesTable, eq(ledgerEntriesTable.partyId, partiesTable.id))
