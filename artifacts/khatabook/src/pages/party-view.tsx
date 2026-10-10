@@ -48,6 +48,7 @@ import { useBusinessContext } from '@/lib/businessContext';
 import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import { ENTRY_OUTBOX_CHANGED, listEntries, type QueuedEntry } from '@/lib/entryOutbox';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
+import { splitAdjustmentDescription } from '@/lib/adjustment-display';
 
 /**
  * The entry's real transaction date. Users can backdate/forward-date an
@@ -550,6 +551,14 @@ export function PartyView() {
                   {group.items.map((entry, i) => {
                     const isGave = entry.type === 'YOU_GAVE';
                     const imgSrc = billImageSrc(entry.billImage);
+                    const transferPartyName = entry.transferPartyId
+                      ? partyNameMap[entry.transferPartyId]
+                      : '';
+                    const entryDisplay = splitAdjustmentDescription(
+                      entry.description,
+                      entry.isTransfer,
+                      transferPartyName,
+                    );
                     const formattedAmount = formatCurrency(entry.amount);
                     const amountFontSize = currencyAmountFontSize(formattedAmount, amountColumnWidth);
                     const formattedBalance = formatCurrency(Math.abs(entry.balanceAfter));
@@ -596,20 +605,23 @@ export function PartyView() {
                               {formattedBalance}
                             </span>
                           </span>
-                          {entry.isTransfer ? (
-                            <p className={cn('text-[11px] font-bold mt-0.5 truncate', isGave ? 'text-red-500' : 'text-emerald-500')}>
-                              {(() => {
-                                const name = entry.transferPartyId ? partyNameMap[entry.transferPartyId] : '';
-                                return isGave
-                                  ? `আমি দিয়েছি${name ? ` — ${name}` : ''}`
-                                  : `আমি পেয়েছি${name ? ` — ${name}` : ''}`;
-                              })()}
+                          {entryDisplay.details && (
+                            <p className="mt-1 whitespace-pre-wrap break-words text-[10px] font-semibold leading-snug text-slate-500 min-[480px]:text-[11px]">
+                              {entryDisplay.details}
                             </p>
-                          ) : entry.description ? (
-                            <p className="text-[11px] font-semibold text-slate-400 mt-0.5 truncate">
-                              {entry.description}
+                          )}
+                          {entry.isTransfer && (
+                            <p className={cn(
+                              'mt-1 flex min-w-0 items-start gap-1 whitespace-normal break-words text-[10px] font-bold leading-snug min-[480px]:text-[11px]',
+                              isGave ? 'text-red-500' : 'text-emerald-500',
+                            )}>
+                              <ArrowLeftRight className="mt-0.5 h-3 w-3 shrink-0" />
+                              <span className="min-w-0">
+                                {isGave ? 'আমি দিয়েছি' : 'আমি পেয়েছি'}
+                                {transferPartyName ? ` — ${transferPartyName}` : ''}
+                              </span>
                             </p>
-                          ) : null}
+                          )}
                           {entry.billReference && (
                             <span className="inline-block mt-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200 uppercase tracking-wider">
                               বিল: {entry.billReference}
