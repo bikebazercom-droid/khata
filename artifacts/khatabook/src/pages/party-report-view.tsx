@@ -61,6 +61,7 @@ import {
   renderPdfSupportContacts,
 } from '@/lib/pdf-report-branding';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
+import { buildPortablePdfFilename } from '@/lib/report-filename';
 
 function statementAmountFontSize(value: string, viewportWidth: number): string {
   const availableWidth = Math.max(30, (viewportWidth - 32) * 0.3 - 16);
@@ -491,8 +492,7 @@ export function PartyReportView() {
   const generatePdfBlob = (): Promise<Blob> =>
     generatePaginatedStatementPdf(buildPdfHtml());
 
-  const pdfFilename = () =>
-    `Banglakhata_${(party?.name ?? 'Report').replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+  const pdfFilename = () => buildPortablePdfFilename('statement');
 
   const triggerDownload = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob);

@@ -46,6 +46,7 @@ import {
   renderPdfSupportContacts,
 } from '@/lib/pdf-report-branding';
 import { addPdfLinkAnnotations } from '@/lib/pdf-link-annotations';
+import { buildPortablePdfFilename } from '@/lib/report-filename';
 
 function partyBalanceFontSize(value: string): string {
   const widthInEm = Array.from(value).reduce((width, character) => {
@@ -578,8 +579,10 @@ export function HomeView() {
       addPdfLinkAnnotations(pdf, container);
       document.body.removeChild(container);
 
-      const roleTag  = role === PartyRole.CUSTOMER ? 'Customer' : 'Supplier';
-      const filename = `Banglakhata_${roleTag}_${new Date().toISOString().split('T')[0]}.pdf`;
+      const filename = buildPortablePdfFilename(
+        'report',
+        role === PartyRole.CUSTOMER ? 'customer' : 'supplier',
+      );
       const pdfBlob  = pdf.output('blob');
       const nativeShare = await shareGeneratedFileWithNative(pdfBlob, {
         fileName: filename,

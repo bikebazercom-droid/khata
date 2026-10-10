@@ -7,6 +7,7 @@ import { BillAttachmentPreview } from '@/components/bill-attachment-preview';
 import { getLedgerEntryDateKey } from './date-time';
 import { splitAdjustmentDescription } from './adjustment-display';
 import { fitPdfHeaderNameFontSize, getPdfSupportContactLinks } from './pdf-report-branding';
+import { buildPortablePdfFilename } from './report-filename';
 
 export interface ReportEntry {
   id: string;
@@ -325,10 +326,9 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
 );
 LedgerReportDocument.displayName = 'LedgerReportDocument';
 
-/** Builds a safe filename for the generated ledger PDF from a customer name. */
-export function buildReportFilename(partyName: string) {
-  const safeName = partyName.trim().replace(/\s+/g, '_');
-  return `${safeName}_Banglakhata_Ledger.pdf`;
+/** Builds a portable filename independent of the party's display encoding. */
+export function buildReportFilename(_partyName: string) {
+  return buildPortablePdfFilename('statement');
 }
 
 /**

@@ -8,6 +8,7 @@ import { getLedgerEntryDateKey } from './date-time';
 import { sortGlobalLedgerEntriesChronologically } from './global-ledger-report-order';
 import { splitAdjustmentDescription } from './adjustment-display';
 import { fitPdfHeaderNameFontSize, getPdfSupportContactLinks } from './pdf-report-branding';
+import { buildPortablePdfFilename } from './report-filename';
 
 export interface GlobalReportEntry {
   id: string;
@@ -314,7 +315,6 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
 GlobalReportDocument.displayName = 'GlobalReportDocument';
 
 /** Builds a safe filename for the generated global transaction report PDF. */
-export function buildGlobalReportFilename(storeName: string) {
-  const safeName = storeName.trim().replace(/\s+/g, '_');
-  return `${safeName}_ট্রানজেকশন_রিপোর্ট.pdf`;
+export function buildGlobalReportFilename(_storeName: string) {
+  return buildPortablePdfFilename('report');
 }

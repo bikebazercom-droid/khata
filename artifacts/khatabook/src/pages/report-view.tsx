@@ -40,6 +40,7 @@ import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
 import { resolveLedgerBookName } from '@/lib/ledger-book-name';
 import { addPdfLinkAnnotations } from '@/lib/pdf-link-annotations';
 import { splitAdjustmentDescription } from '@/lib/adjustment-display';
+import { buildPortablePdfFilename } from '@/lib/report-filename';
 import {
   fitPdfHeaderNameFontSize,
   renderPdfBrandLogo,
@@ -315,9 +316,10 @@ export function ReportView() {
       addPdfLinkAnnotations(pdf, container);
       document.body.removeChild(container);
 
-      const tag      = isSupplier ? 'সরবরাহকারী' : 'গ্রাহক';
-      const fileDate = toBengaliDigits(new Date().toISOString().split('T')[0]);
-      const filename = `বাংলাখাতা_${tag}_হিসাব_${fileDate}.pdf`;
+      const filename = buildPortablePdfFilename(
+        'report',
+        isSupplier ? 'supplier' : 'customer',
+      );
       const pdfBlob  = pdf.output('blob');
       const nativeShare = await shareGeneratedFileWithNative(pdfBlob, {
         fileName: filename,

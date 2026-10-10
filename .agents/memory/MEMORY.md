@@ -34,3 +34,4 @@
 - [Expo Audio component tests](expo-audio-component-tests.md) — mock `expo-audio` in mobile Vitest tests; importing its Expo runtime bootstrap fails under the jsdom setup.
 - [Expo Router Stack children](expo-router-stack-children.md) — register Stack.Screen elements directly or in arrays; nested fragments can crash the route mapper.
 - [Public npm lockfiles for EAS](public-npm-lockfile-eas.md) — EAS cannot resolve absolute Replit firewall tarball URLs; verify lockfile `resolved` entries even after npm regenerates it.
+- [Portable report filenames](portable-report-filenames.md) — use ASCII-only PDF filenames for generated reports; keep Bengali in the PDF content and share title, not file metadata.
