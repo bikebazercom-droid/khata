@@ -4,7 +4,7 @@ import { bn } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
 import { billImageSrc } from '@/lib/billImageStorage';
 import { BillAttachmentPreview } from '@/components/bill-attachment-preview';
-import { getLedgerEntryDateKey } from './date-time';
+import { formatLedgerEntryDate, getLedgerEntryDateKey } from './date-time';
 import { splitAdjustmentDescription } from './adjustment-display';
 import { fitPdfCellFontSize, fitPdfHeaderNameFontSize, getPdfSupportContactLinks, renderPdfStoreBadges } from './pdf-report-branding';
 import { buildPortablePdfFilename } from './report-filename';
@@ -229,7 +229,7 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                     return (
                       <tr key={entry.id} data-entry-id={entry.id} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#fafafa' }}>
                         <td style={{ padding: '6px 5px', border: GRID_BORDER, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
-                          {format(entryDate(entry), 'dd/MM')}
+                          {formatLedgerEntryDate(entry.dueDate, entry.createdAt)}
                         </td>
                         <td style={{ padding: '6px 5px', border: GRID_BORDER, color: '#334155', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                           {entryDetails(entry)}

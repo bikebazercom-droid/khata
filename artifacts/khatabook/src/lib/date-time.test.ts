@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { formatLocalTime } from './date-time';
+import { formatLedgerEntryDate, formatLocalTime } from './date-time';
+
+describe('formatLedgerEntryDate', () => {
+  it('renders the business date without the creation time', () => {
+    const date = formatLedgerEntryDate('2026-10-10', '2026-10-10T15:22:00.000Z');
+
+    expect(date).toContain('অক্টোবর');
+    expect(date).not.toMatch(/•|AM|PM|\d{1,2}:\d{2}/);
+  });
+});
 
 describe('formatLocalTime', () => {
   const transactionTime = '2026-10-02T14:52:00.000Z';

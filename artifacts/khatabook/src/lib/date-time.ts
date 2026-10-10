@@ -7,6 +7,16 @@ import {
 
 export { formatLocalTime, getLedgerEntryDateKey };
 
+/** Date-only label for printable statements; it deliberately omits creation time. */
+export function formatLedgerEntryDate(
+  dueDate: string | null | undefined,
+  createdAt: string | Date,
+): string {
+  const dateKey = getLedgerEntryDateKey(dueDate, createdAt);
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return format(new Date(year, month - 1, day), 'd MMMM yy', { locale: bn });
+}
+
 /**
 /** Matches the party history row: business date plus local 12-hour creation time. */
 export function formatLedgerEntryDateTime(

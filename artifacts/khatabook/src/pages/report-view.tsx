@@ -35,7 +35,7 @@ import {
   sortGlobalLedgerEntriesNewestFirst,
 } from '@/lib/global-ledger-report-order';
 import { filterGlobalLedgerEntriesByRole } from '@/lib/global-ledger-report-role';
-import { getLedgerEntryDateKey } from '@/lib/date-time';
+import { formatLedgerEntryDate } from '@/lib/date-time';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
 import { resolveLedgerBookName } from '@/lib/ledger-book-name';
 import { addPdfLinkAnnotations } from '@/lib/pdf-link-annotations';
@@ -92,13 +92,11 @@ function formatReportTimestamp(value: string | Date): string {
   return `${formatReportDate(date)} • ${formatReportTime(date)}`;
 }
 
-function formatReportEntryTimestamp(
+function formatReportEntryDate(
   dueDate: string | null | undefined,
   createdAt: string | Date,
 ): string {
-  const [year, month, day] = getLedgerEntryDateKey(dueDate, createdAt).split('-').map(Number);
-  const businessDate = new Date(year, month - 1, day);
-  return `${formatReportDate(businessDate)} • ${formatReportTime(createdAt)}`;
+  return toBengaliDigits(formatLedgerEntryDate(dueDate, createdAt));
 }
 
 export function ReportView() {
@@ -189,7 +187,7 @@ export function ReportView() {
     const pdfEntries = sortGlobalLedgerEntriesChronologically(entries);
     const rowsHtml = pdfEntries.map(e => {
       const isGave   = e.type === 'YOU_GAVE';
-      const dateCell = formatReportEntryTimestamp(e.dueDate, e.createdAt);
+      const dateCell = formatReportEntryDate(e.dueDate, e.createdAt);
       const adjustment = splitAdjustmentDescription(
         e.description,
         e.isTransfer,
