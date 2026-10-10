@@ -30,7 +30,7 @@ export type NativeFileShareResult = {
 
 export type GeneratedFileOptions = {
   fileName: string;
-  mimeType: 'application/pdf' | 'text/csv';
+  mimeType: string;
   title: string;
   shareText?: string;
 };
@@ -94,9 +94,8 @@ function postRequestAndWait(
 }
 
 /**
- * Sends a generated PDF or CSV to the Expo app's file system and system share
- * sheet. Returns null in a regular browser so callers can preserve their
- * existing browser share/download behavior.
+ * Sends a file to the Expo app's file system and native share sheet.
+ * Returns null in a regular browser.
  */
 export async function shareGeneratedFileWithNative(
   blob: Blob,

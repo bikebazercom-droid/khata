@@ -6,6 +6,7 @@ describe('BillAttachmentPreview document opening', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    delete (window as Window & { ReactNativeWebView?: unknown }).ReactNativeWebView;
   });
 
   it('fetches the PDF with the current session and opens an inline blob viewer without forcing a download', async () => {
@@ -62,5 +63,36 @@ describe('BillAttachmentPreview document opening', () => {
     expect(viewer.querySelector('img')).toHaveAttribute('src', 'blob:authenticated-image');
     fireEvent.click(screen.getByRole('button', { name: 'ফাইল বন্ধ করুন' }));
     await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:authenticated-image'));
+  });
+
+  it('sends the authenticated attachment to the Expo native share sheet', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      headers: new Headers({ 'content-type': 'image/png' }),
+      blob: async () => new Blob(['png-data'], { type: 'image/png' }),
+    }));
+    const bridge = {
+      postMessage: vi.fn((raw: string) => {
+        const request = JSON.parse(raw) as { requestId: string };
+        window.dispatchEvent(new CustomEvent('banglakhata-file-export-result', {
+          detail: {
+            type: 'banglakhata:file-export',
+            requestId: request.requestId,
+            ok: true,
+          },
+        }));
+      }),
+    };
+    Object.defineProperty(window, 'ReactNativeWebView', { configurable: true, value: bridge });
+    render(<BillAttachmentPreview src="/api/storage/objects/uploads/image-id" />);
+    fireEvent.error(screen.getByRole('img'));
+    fireEvent.click(screen.getByRole('button', { name: 'শেয়ার করুন' }));
+
+    await waitFor(() => expect(bridge.postMessage).toHaveBeenCalledOnce());
+    expect(JSON.parse(bridge.postMessage.mock.calls[0][0])).toMatchObject({
+      fileName: 'attachment.png',
+      mimeType: 'image/png',
+      base64: window.btoa('png-data'),
+    });
   });
 });

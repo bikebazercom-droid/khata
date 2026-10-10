@@ -24,7 +24,34 @@ export type NativeFileExportResult = {
   error?: string;
 };
 
-const ALLOWED_MIME_TYPES = new Set(['application/pdf', 'text/csv']);
+const MIME_EXTENSIONS: Record<string, string> = {
+  'application/pdf': 'pdf',
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+  'image/heic': 'heic',
+  'image/heif': 'heif',
+  'text/csv': 'csv',
+  'text/plain': 'txt',
+  'application/msword': 'doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.ms-excel': 'xls',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+  'application/vnd.ms-powerpoint': 'ppt',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+  'application/rtf': 'rtf',
+  'application/zip': 'zip',
+  'application/octet-stream': 'bin',
+};
+const ALLOWED_MIME_TYPES = new Set(Object.keys(MIME_EXTENSIONS));
+const IOS_UTI_BY_MIME: Record<string, string> = {
+  'application/pdf': 'com.adobe.pdf',
+  'image/jpeg': 'public.jpeg',
+  'image/png': 'public.png',
+  'image/gif': 'com.compuserve.gif',
+  'image/webp': 'org.webmproject.webp',
+};
 
 export function parseNativeFileExportRequest(rawMessage: string): NativeFileExportRequest | null {
   let parsed: unknown;
@@ -50,7 +77,7 @@ export function parseNativeFileExportRequest(rawMessage: string): NativeFileExpo
 }
 
 function safeFileName(fileName: string, mimeType: string): string {
-  const extension = mimeType === 'application/pdf' ? '.pdf' : '.csv';
+  const extension = `.${MIME_EXTENSIONS[mimeType]}`;
   const safeBase = fileName
     .replace(/[<>:"/\\|?*\u0000-\u001f\u007f]/g, '_')
     .trim()
@@ -98,7 +125,7 @@ export async function shareNativeWebViewFile(
 
   await Sharing.shareAsync(file.uri, {
     mimeType: request.mimeType,
-    ...(request.mimeType === 'application/pdf' ? { UTI: 'com.adobe.pdf' } : {}),
+    ...(IOS_UTI_BY_MIME[request.mimeType] ? { UTI: IOS_UTI_BY_MIME[request.mimeType] } : {}),
     dialogTitle: request.title,
   });
 

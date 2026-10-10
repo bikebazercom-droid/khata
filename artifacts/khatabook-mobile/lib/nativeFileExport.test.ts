@@ -71,6 +71,23 @@ describe('native WebView file export', () => {
     );
   });
 
+  it('shares an attached image with its image MIME type and extension', async () => {
+    await expect(shareNativeWebViewFile({
+      type: NATIVE_FILE_EXPORT_MESSAGE,
+      requestId: 'attachment-1',
+      fileName: 'attachment.jpg',
+      mimeType: 'image/jpeg',
+      title: 'সংযুক্ত ফাইল শেয়ার করুন',
+      base64: 'AQID',
+    })).resolves.toEqual({ copiedText: false });
+
+    expect(mocks.write).toHaveBeenCalledWith('AQID', { encoding: 'base64' });
+    expect(vi.mocked(Sharing.shareAsync)).toHaveBeenCalledWith(
+      'file:///cache/attachment.jpg',
+      { mimeType: 'image/jpeg', UTI: 'public.jpeg', dialogTitle: 'সংযুক্ত ফাইল শেয়ার করুন' },
+    );
+  });
+
   it('rejects unsupported file types before writing or sharing', async () => {
     await expect(shareNativeWebViewFile({
       type: NATIVE_FILE_EXPORT_MESSAGE,
