@@ -500,7 +500,7 @@ export function ReportView() {
             <div className="min-w-0 border-l border-slate-200 bg-[#FFF8F8] px-2 py-3">
               <p className="text-[9px] font-bold leading-tight text-red-700">আপনি দিয়েছেন</p>
               <p
-                className="mt-1 whitespace-nowrap text-right font-extrabold leading-none text-red-600"
+                className="mt-1 block max-w-full overflow-hidden whitespace-nowrap text-right font-extrabold leading-none text-red-600"
                 style={{ fontSize: reportAmountFontSize(formatCurrency(totalDebit), reportAmountColumnWidth(window.innerWidth)) }}
               >
                 {formatCurrency(totalDebit)}
@@ -509,7 +509,7 @@ export function ReportView() {
             <div className="min-w-0 border-l border-slate-200 bg-[#F3FCF5] px-2 py-3 text-right">
               <p className="text-[9px] font-bold leading-tight text-emerald-700">আপনি পেয়েছেন</p>
               <p
-                className="mt-1 whitespace-nowrap text-right font-extrabold leading-none text-emerald-600"
+                className="mt-1 block max-w-full overflow-hidden whitespace-nowrap text-right font-extrabold leading-none text-emerald-600"
                 style={{ fontSize: reportAmountFontSize(formatCurrency(totalCredit), reportAmountColumnWidth(window.innerWidth)) }}
               >
                 {formatCurrency(totalCredit)}
@@ -572,11 +572,11 @@ export function ReportView() {
                   <div
                     role="group"
                     aria-label="আপনি দিয়েছেন"
-                    className="flex min-w-0 items-center justify-end border-l border-slate-100 bg-[#FFF5F5] px-1.5 py-2.5"
+                    className="flex min-w-0 items-center justify-end overflow-hidden border-l border-slate-100 bg-[#FFF5F5] px-1.5 py-2.5"
                   >
                     {isGave && (
                       <span
-                        className="whitespace-nowrap text-right font-extrabold leading-none text-red-700"
+                        className="block max-w-full overflow-hidden whitespace-nowrap text-right font-extrabold leading-none text-red-700"
                         style={{ fontSize: amountFontSize }}
                       >
                         {formattedAmount}
@@ -586,11 +586,11 @@ export function ReportView() {
                   <div
                     role="group"
                     aria-label="আপনি পেয়েছেন"
-                    className="flex min-w-0 items-center justify-end border-l border-slate-100 bg-[#F0FDF4] px-1.5 py-2.5"
+                    className="flex min-w-0 items-center justify-end overflow-hidden border-l border-slate-100 bg-[#F0FDF4] px-1.5 py-2.5"
                   >
                     {!isGave && (
                       <span
-                        className="whitespace-nowrap text-right font-extrabold leading-none text-emerald-600"
+                        className="block max-w-full overflow-hidden whitespace-nowrap text-right font-extrabold leading-none text-emerald-600"
                         style={{ fontSize: amountFontSize }}
                       >
                         {formattedAmount}

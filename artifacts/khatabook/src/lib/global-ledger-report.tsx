@@ -156,7 +156,16 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
             </div>
           </div>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
+          <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: '11.5px' }}>
+            <colgroup>
+              <col style={{ width: '9%' }} />
+              <col style={{ width: '17%' }} />
+              <col style={{ width: '22%' }} />
+              <col style={{ width: '18%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '13.5%' }} />
+              <col style={{ width: '13.5%' }} />
+            </colgroup>
             <thead>
               <tr style={{ backgroundColor: '#ffffff' }}>
                 <th style={{ textAlign: 'left', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>তারিখ</th>
@@ -164,8 +173,8 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
                 <th style={{ textAlign: 'left', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ডিটেলস</th>
                 <th style={{ textAlign: 'left', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>অ্যাডজাস্টমেন্ট</th>
                 <th style={{ textAlign: 'center', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER, width: '52px' }}>বিল</th>
-                <th style={{ textAlign: 'right', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ডেবিট (-)</th>
-                <th style={{ textAlign: 'right', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ক্রেডিট (+)</th>
+                <th style={{ textAlign: 'right', padding: '8px 5px', color: COLOR_DEBIT_TEXT, fontWeight: 800, border: GRID_BORDER, backgroundColor: COLOR_DEBIT_BG }}>ডেবিট (-)</th>
+                <th style={{ textAlign: 'right', padding: '8px 5px', color: COLOR_CREDIT_TEXT, fontWeight: 800, border: GRID_BORDER, backgroundColor: COLOR_CREDIT_BG }}>ক্রেডিট (+)</th>
               </tr>
             </thead>
             <tbody>
@@ -207,8 +216,8 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
                             <span style={{ display: 'block', fontSize: '10px', color: '#64748b', fontWeight: 500 }}>{entry.partyPhone}</span>
                           ) : null}
                         </td>
-                        <td style={{ padding: '7px 10px', border: GRID_BORDER, color: '#334155' }}>{entryDetails(entry)}</td>
-                        <td style={{ padding: '7px 10px', border: GRID_BORDER, color: '#1d4ed8' }}>
+                        <td style={{ padding: '7px 6px', border: GRID_BORDER, color: '#334155', overflow: 'hidden', overflowWrap: 'anywhere' }}>{entryDetails(entry)}</td>
+                        <td style={{ padding: '7px 6px', border: GRID_BORDER, color: '#1d4ed8', overflow: 'hidden', overflowWrap: 'anywhere' }}>
                           {splitAdjustmentDescription(
                             entry.description,
                             entry.isTransfer,
@@ -228,24 +237,30 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
                         </td>
                         <td
                           style={{
-                            padding: '7px 10px',
+                            padding: '5px 4px',
                             border: GRID_BORDER,
                             textAlign: 'right',
                             fontWeight: 700,
                             backgroundColor: COLOR_DEBIT_BG,
-                            color: isGave ? COLOR_DEBIT_TEXT : '#cbd5e1',
+                            color: COLOR_DEBIT_TEXT,
+                            fontSize: '9px',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
                           }}
                         >
                           {isGave ? formatCurrency(entry.amount) : ''}
                         </td>
                         <td
                           style={{
-                            padding: '7px 10px',
+                            padding: '5px 4px',
                             border: GRID_BORDER,
                             textAlign: 'right',
                             fontWeight: 700,
                             backgroundColor: COLOR_CREDIT_BG,
-                            color: !isGave ? COLOR_CREDIT_TEXT : '#cbd5e1',
+                            color: COLOR_CREDIT_TEXT,
+                            fontSize: '9px',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
                           }}
                         >
                           {!isGave ? formatCurrency(entry.amount) : ''}

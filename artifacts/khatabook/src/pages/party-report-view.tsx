@@ -62,6 +62,16 @@ import {
 } from '@/lib/pdf-report-branding';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
 
+function statementAmountFontSize(value: string, viewportWidth: number): string {
+  const availableWidth = Math.max(30, (viewportWidth - 32) * 0.3 - 16);
+  const estimatedEm = Array.from(value).reduce((width, character) => {
+    if (character === '৳') return width + 0.9;
+    if (character === ',' || character === '.') return width + 0.35;
+    return width + 0.68;
+  }, 0);
+  return `${Math.max(6, Math.min(13, availableWidth / (estimatedEm * 1.12)))}px`;
+}
+
 // ─── Report Options Bottom Sheet ──────────────────────────────────────────────
 
 function ReportOptionsSheet({
@@ -325,10 +335,10 @@ export function PartyReportView() {
       const details = escapeHtml(row.details);
       const adjustment = escapeHtml(row.adjustment ?? '');
       const debitCell  = row.debit !== null
-        ? `<td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:right;background:#fef2f2;font-size:12px;">${fmtAmt(row.debit)}</td>`
+        ? `<td style="padding:4px 5px;border:1px solid #e2e8f0;text-align:right;background:#fef2f2;color:#b91c1c;font-size:9px;white-space:nowrap;overflow:hidden;">${fmtAmt(row.debit)}</td>`
         : '<td style="padding:7px 10px;border:1px solid #e2e8f0;background:#fef2f2;"></td>';
       const creditCell = row.credit !== null
-        ? `<td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:right;background:#f0fdf4;font-size:12px;">${fmtAmt(row.credit)}</td>`
+        ? `<td style="padding:4px 5px;border:1px solid #e2e8f0;text-align:right;background:#f0fdf4;color:#047857;font-size:9px;white-space:nowrap;overflow:hidden;">${fmtAmt(row.credit)}</td>`
         : '<td style="padding:7px 10px;border:1px solid #e2e8f0;background:#f0fdf4;"></td>';
 
       tableRows += `<tr data-pdf-kind="entry">
@@ -348,8 +358,8 @@ export function PartyReportView() {
     // YOU_GAVE entries are debits; YOU_GOT entries are credits.
     tableRows += `<tr data-pdf-kind="total" style="background:#f8fafc;font-weight:700;">
       <td colspan="3" style="padding:8px 10px;border:1px solid #cbd5e1;font-size:12px;">সর্বমোট</td>
-      <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;background:#fef2f2;font-size:12px;">${fmtAmt(totalDebit)}</td>
-      <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;background:#f0fdf4;font-size:12px;">${fmtAmt(totalCredit)}</td>
+      <td style="padding:5px;border:1px solid #cbd5e1;text-align:right;background:#fef2f2;color:#b91c1c;font-size:9px;white-space:nowrap;overflow:hidden;">${fmtAmt(totalDebit)}</td>
+      <td style="padding:5px;border:1px solid #cbd5e1;text-align:right;background:#f0fdf4;color:#047857;font-size:9px;white-space:nowrap;overflow:hidden;">${fmtAmt(totalCredit)}</td>
       <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:${balClr(closingBalance)};">${fmtBal(closingBalance)}</td>
     </tr>`;
 
@@ -417,11 +427,11 @@ export function PartyReportView() {
         </td>
         <td style="padding:12px 14px;border-right:1px solid #cbd5e1;width:25%;vertical-align:top;">
           <div style="font-size:11px;color:#64748b;margin-bottom:5px;">মোট ডেবিট / খরচ (-)</div>
-          <div style="font-size:15px;font-weight:700;color:#1e293b;">৳${fmtAmt(totalDebit)}</div>
+          <div style="font-size:15px;font-weight:700;color:#b91c1c;">৳${fmtAmt(totalDebit)}</div>
         </td>
         <td style="padding:12px 14px;border-right:1px solid #cbd5e1;width:25%;vertical-align:top;">
           <div style="font-size:11px;color:#64748b;margin-bottom:5px;">মোট ক্রেডিট / জমা (+)</div>
-          <div style="font-size:15px;font-weight:700;color:#1e293b;">৳${fmtAmt(totalCredit)}</div>
+          <div style="font-size:15px;font-weight:700;color:#047857;">৳${fmtAmt(totalCredit)}</div>
         </td>
         <td style="padding:12px 14px;width:25%;vertical-align:top;">
           <div style="font-size:11px;color:#64748b;margin-bottom:5px;">মোট ব্যালেন্স</div>
@@ -652,18 +662,28 @@ export function PartyReportView() {
                 </p>
               </div>
               <div className="h-px bg-slate-200 mb-3" />
-              <div className="grid grid-cols-3 gap-1">
-                <div>
+              <div className="grid grid-cols-[40%_30%_30%]">
+                <div className="min-w-0">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">মোট</p>
                   <p className="text-[13px] font-extrabold text-slate-800 mt-0.5">{filtered.length} এন্ট্রিগুলো</p>
                 </div>
-                <div className="text-center">
+                <div className="min-w-0 text-center">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">আপনি দিয়েছেন</p>
-                  <p className="text-[13px] font-extrabold text-red-600 mt-0.5">{formatCurrency(totalDebit)}</p>
+                  <p
+                    className="mt-0.5 overflow-hidden whitespace-nowrap text-[13px] font-extrabold text-red-600"
+                    style={{ fontSize: statementAmountFontSize(formatCurrency(totalDebit), window.innerWidth) }}
+                  >
+                    {formatCurrency(totalDebit)}
+                  </p>
                 </div>
-                <div className="text-right">
+                <div className="min-w-0 text-right">
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">আপনি পেয়েছেন</p>
-                  <p className="text-[13px] font-extrabold text-emerald-600 mt-0.5">{formatCurrency(totalCredit)}</p>
+                  <p
+                    className="mt-0.5 overflow-hidden whitespace-nowrap text-right text-[13px] font-extrabold text-emerald-600"
+                    style={{ fontSize: statementAmountFontSize(formatCurrency(totalCredit), window.innerWidth) }}
+                  >
+                    {formatCurrency(totalCredit)}
+                  </p>
                 </div>
               </div>
             </div>
@@ -689,34 +709,40 @@ export function PartyReportView() {
                       <div
                         key={entry.id}
                         className={cn('grid', !isLast && 'border-b border-slate-100')}
-                        style={{ gridTemplateColumns: '1fr 5.5rem 5.5rem' }}
+                        style={{ gridTemplateColumns: 'minmax(0, 40%) minmax(0, 30%) minmax(0, 30%)' }}
                       >
                         {/* Col 1: date + running balance — always white */}
-                        <div className="bg-white px-3 py-3">
+                        <div className="min-w-0 bg-white px-3 py-3">
                           <p className="text-[13px] font-bold text-slate-800">
                             {format(businessDate, 'd MMM yy')}
                           </p>
                           <p className={cn(
-                            'text-[11px] font-semibold mt-0.5',
+                            'mt-0.5 overflow-hidden whitespace-nowrap text-[11px] font-semibold',
                             bal >= 0 ? 'text-emerald-600' : 'text-red-500',
-                          )}>
+                          )} title={`ব্যালেন্স: ${formatCurrency(Math.abs(bal))}`}>
                             ব্যালেন্স: {formatCurrency(Math.abs(bal))}
                           </p>
                         </div>
 
                         {/* Col 2: debit amount — always pink bg, amount shown only for YOU_GAVE */}
-                        <div className="bg-[#FEF2F2] flex items-center justify-end px-3 py-3">
+                        <div className="min-w-0 border-l border-slate-100 bg-[#FEF2F2] flex items-center justify-end overflow-hidden px-1.5 py-3">
                           {isDebit && (
-                            <span className="text-[13px] font-extrabold text-red-600">
+                            <span
+                              className="block max-w-full overflow-hidden whitespace-nowrap text-right font-extrabold text-red-600"
+                              style={{ fontSize: statementAmountFontSize(formatCurrency(entry.amount), window.innerWidth) }}
+                            >
                               {formatCurrency(entry.amount)}
                             </span>
                           )}
                         </div>
 
                         {/* Col 3: credit amount — always white bg, amount shown only for YOU_GOT */}
-                        <div className="bg-white flex items-center justify-end px-3 py-3">
+                        <div className="min-w-0 border-l border-slate-100 bg-[#F0FDF4] flex items-center justify-end overflow-hidden px-1.5 py-3">
                           {!isDebit && (
-                            <span className="text-[13px] font-extrabold text-emerald-600">
+                            <span
+                              className="block max-w-full overflow-hidden whitespace-nowrap text-right font-extrabold text-emerald-700"
+                              style={{ fontSize: statementAmountFontSize(formatCurrency(entry.amount), window.innerWidth) }}
+                            >
                               {formatCurrency(entry.amount)}
                             </span>
                           )}
