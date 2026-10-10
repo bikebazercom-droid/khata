@@ -1,6 +1,7 @@
 {
   "build": {
     "preview": {
+      "node": "22.16.0",
       "distribution": "internal",
       "environment": "preview",
       "android": {
@@ -8,6 +9,7 @@
       }
     },
     "production": {
+      "node": "22.16.0",
       "distribution": "store",
       "android": {
         "buildType": "app-bundle"

@@ -33,3 +33,4 @@
 - [Expo WebView contact access](expo-webview-contact-access.md) — request contacts when the user opens the party picker; never at app startup, and pass only names and phone numbers.
 - [Expo Audio component tests](expo-audio-component-tests.md) — mock `expo-audio` in mobile Vitest tests; importing its Expo runtime bootstrap fails under the jsdom setup.
 - [Expo Router Stack children](expo-router-stack-children.md) — register Stack.Screen elements directly or in arrays; nested fragments can crash the route mapper.
+- [Public npm lockfiles for EAS](public-npm-lockfile-eas.md) — EAS cannot resolve absolute Replit firewall tarball URLs; verify lockfile `resolved` entries even after npm regenerates it.
