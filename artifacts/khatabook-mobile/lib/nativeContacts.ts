@@ -1,4 +1,6 @@
-import * as Contacts from 'expo-contacts';
+// SDK 57 keeps getContactsAsync in the explicit legacy entrypoint. Importing
+// that method from the package root now throws at runtime by design.
+import * as Contacts from 'expo-contacts/legacy';
 
 export const NATIVE_CONTACTS_REQUEST_TYPE = 'banglakhata:select-device-contacts';
 export const NATIVE_CONTACTS_RESULT_EVENT = 'banglakhata-native-contacts-result';
