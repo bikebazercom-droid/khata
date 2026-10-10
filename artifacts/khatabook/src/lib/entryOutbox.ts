@@ -21,6 +21,7 @@ const STORE = 'entries';
 export const ENTRY_OUTBOX_CHANGED = 'banglakhata-entry-outbox-changed';
 const OUTBOX_CHANNEL_NAME = 'banglakhata-entry-outbox-changes';
 const OUTBOX_STORAGE_PULSE = 'banglakhata-entry-outbox-change-pulse';
+const ENTRY_REPLAY_LOCK = 'banglakhata-entry-replay';
 let dbPromise: Promise<IDBDatabase> | undefined;
 let changeChannel: BroadcastChannel | null = null;
 let storageListenerAttached = false;
@@ -98,6 +99,71 @@ function changed() {
 export async function queueEntry(entry: QueuedEntry): Promise<void> {
   await transaction('readwrite', (store) => store.add(entry));
   changed();
+}
+
+async function mutatePendingEntry(
+  id: string,
+  actorId: string,
+  businessId: string | null,
+  mutate: (entry: QueuedEntry) => QueuedEntry | null,
+): Promise<boolean> {
+  const mutateInTransaction = async (): Promise<boolean> => {
+    const database = await db();
+    return new Promise<boolean>((resolve, reject) => {
+      const tx = database.transaction(STORE, 'readwrite');
+      const store = tx.objectStore(STORE);
+      let didChange = false;
+      const request = store.get(id);
+      request.onsuccess = () => {
+        const entry = request.result as QueuedEntry | undefined;
+        if (
+          !entry ||
+          entry.actorId !== actorId ||
+          entry.businessId !== businessId ||
+          entry.status !== 'pending'
+        ) return;
+
+        const updated = mutate(entry);
+        if (updated) store.put(updated);
+        else store.delete(id);
+        didChange = true;
+      };
+      tx.oncomplete = () => {
+        if (didChange) changed();
+        resolve(didChange);
+      };
+      tx.onerror = () => reject(tx.error ?? new Error('Could not update offline entry'));
+      tx.onabort = () => reject(tx.error ?? new Error('Offline entry update aborted'));
+    });
+  };
+  if (navigator.locks?.request) {
+    return navigator.locks.request(ENTRY_REPLAY_LOCK, mutateInTransaction);
+  }
+  return mutateInTransaction();
+}
+
+/** Update a not-yet-synced entry only within its original actor/business scope. */
+export function updatePendingEntry(
+  id: string,
+  actorId: string,
+  businessId: string | null,
+  data: LedgerEntryInput,
+  imageBase64?: string,
+): Promise<boolean> {
+  return mutatePendingEntry(id, actorId, businessId, (entry) => ({
+    ...entry,
+    data,
+    ...(imageBase64 ? { imageBase64 } : { imageBase64: undefined }),
+  }));
+}
+
+/** Delete a not-yet-synced entry; removing a transfer removes both projections. */
+export function removePendingEntry(
+  id: string,
+  actorId: string,
+  businessId: string | null,
+): Promise<boolean> {
+  return mutatePendingEntry(id, actorId, businessId, () => null);
 }
 
 export async function listEntries(actorId: string, businessId: string | null): Promise<QueuedEntry[]> {
@@ -258,7 +324,7 @@ export async function drainEntries(
     // A single browser may have several open tabs with independent JS modules.
     // Serialize photo upload + receipt submission across those tabs. PostgreSQL
     // still enforces uniqueness if the browser lacks the Web Locks API.
-    if (navigator.locks?.request) await navigator.locks.request('banglakhata-entry-replay', replay);
+    if (navigator.locks?.request) await navigator.locks.request(ENTRY_REPLAY_LOCK, replay);
     else await replay();
   } finally {
     draining = false;

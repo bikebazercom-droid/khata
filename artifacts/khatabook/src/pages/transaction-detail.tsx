@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { useBusinessContext } from '@/lib/businessContext';
@@ -38,6 +38,9 @@ import { BillAttachmentPreview } from '@/components/bill-attachment-preview';
 import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic';
 import { toast } from 'sonner';
 import { useConnectionState } from '@/context/connection-state';
+import { useAppAuth } from '@/App';
+import { ENTRY_OUTBOX_CHANGED, listEntries, removePendingEntry, type QueuedEntry } from '@/lib/entryOutbox';
+import { mergeLedgerEntries, projectPartyBalance, queuedEntriesForParty } from '@/lib/offline-ledger-projection';
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -52,7 +55,34 @@ export function TransactionDetailPage() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const { selectedBusinessId } = useBusinessContext();
+  const { userId, businessId } = useAppAuth();
+  const activeBusinessId = selectedBusinessId ?? businessId ?? null;
   const { isOnline } = useConnectionState();
+  const [pendingEntries, setPendingEntries] = useState<QueuedEntry[]>([]);
+  const [outboxLoaded, setOutboxLoaded] = useState(false);
+  useEffect(() => {
+    setPendingEntries([]);
+    setOutboxLoaded(false);
+    if (!userId || !partyId) {
+      setOutboxLoaded(true);
+      return;
+    }
+    let active = true;
+    const refresh = () => {
+      void listEntries(userId, activeBusinessId).then((items) => {
+        if (active) {
+          setPendingEntries(queuedEntriesForParty(items, partyId));
+          setOutboxLoaded(true);
+        }
+      }).catch(() => { if (active) setOutboxLoaded(true); });
+    };
+    refresh();
+    window.addEventListener(ENTRY_OUTBOX_CHANGED, refresh);
+    return () => {
+      active = false;
+      window.removeEventListener(ENTRY_OUTBOX_CHANGED, refresh);
+    };
+  }, [userId, activeBusinessId, partyId]);
 
   const { data: party, isLoading: partyLoading } = useGetParty(partyId, {
     query: { enabled: !!partyId, queryKey: businessScopedQueryKey(getGetPartyQueryKey(partyId), selectedBusinessId) },
@@ -64,7 +94,17 @@ export function TransactionDetailPage() {
     query: { queryKey: businessScopedQueryKey(getGetBusinessSettingsQueryKey(), selectedBusinessId) },
   });
 
-  const entry = entries.find((e) => e.id === entryId);
+  const visibleEntries = useMemo(
+    () => mergeLedgerEntries(entries, pendingEntries, partyId),
+    [entries, pendingEntries, partyId],
+  );
+  const entry = visibleEntries.find((e) => e.id === entryId);
+  const queuedEntry = pendingEntries.find((candidate) =>
+    candidate.id === entryId ||
+    (candidate.data.isTransfer && `offline-transfer-counterpart:${candidate.id}` === entryId),
+  );
+  const queuedCounterparty = Boolean(queuedEntry && queuedEntry.partyId !== partyId);
+  const displayParty = party ? projectPartyBalance(party, pendingEntries) : undefined;
 
   // Eagerly resolve the transfer party name once we have the entry
   const transferPartyId = entry?.transferPartyId ?? '';
@@ -88,10 +128,10 @@ export function TransactionDetailPage() {
   const transactionDate = txDateKey ? format(new Date(`${txDateKey}T00:00:00`), 'd MMM yy') : '';
   const transactionTime = entry ? formatLocalTime(entry.createdAt as string) : '';
 
-  const balanceColor = party?.balanceType === 'YOU_WILL_GET' ? '#047857' : '#DC2626';
+  const balanceColor = displayParty?.balanceType === 'YOU_WILL_GET' ? '#047857' : '#DC2626';
   const amountColor = isGave ? '#DC2626' : '#047857';
   const amountLabel = isGave ? 'আপনি দিয়েছেন' : 'আপনি পেয়েছেন';
-  const smsText = `${amountLabel}: ৳ ${entry ? formatCurrency(entry.amount) : ''}\nব্যালেন্স: ৳ ${party ? formatCurrency(party.currentBalance) : ''}`;
+  const smsText = `${amountLabel}: ৳ ${entry ? formatCurrency(entry.amount) : ''}\nব্যালেন্স: ৳ ${displayParty ? formatCurrency(displayParty.currentBalance) : ''}`;
 
   // ── Share: capture receipt card as JPG, open native share sheet ────────
   const handleJpgShare = async () => {
@@ -134,6 +174,20 @@ export function TransactionDetailPage() {
   // ── Optimistic delete ──────────────────────────────────────────────────
   function handleDelete() {
     if (!partyId || !entryId || !party || !entry) return;
+    if (queuedEntry) {
+      void removePendingEntry(queuedEntry.id, queuedEntry.actorId, queuedEntry.businessId).then((removed) => {
+        if (!removed) {
+          toast.error('এন্ট্রিটি ইতিমধ্যে সিঙ্ক হয়েছে', { description: 'ইন্টারনেট থাকলে আবার খুলে মুছুন।' });
+          return;
+        }
+        setShowDeleteConfirm(false);
+        navigate(`/party/${partyId}`, { replace: true });
+      }).catch((error) => {
+        console.error('Could not remove queued entry:', error);
+        toast.error('এন্ট্রিটি মুছতে সমস্যা হয়েছে');
+      });
+      return;
+    }
     if (!navigator.onLine || !isOnline) {
       toast.error('অফলাইনে এন্ট্রি মুছতে পারবেন না', { description: 'ইন্টারনেট ফিরে এলে আবার চেষ্টা করুন।' });
       return;
@@ -194,7 +248,7 @@ export function TransactionDetailPage() {
   }
 
   // ── Loading skeleton ───────────────────────────────────────────────────
-  if (partyLoading || entriesLoading) {
+  if (partyLoading || entriesLoading || !outboxLoaded) {
     return (
       <div className="flex flex-col h-[100dvh] bg-[#F3F4F6]">
         <div className="h-14 bg-[#0052B4] animate-pulse" />
@@ -286,7 +340,7 @@ export function TransactionDetailPage() {
               বর্তমান ব্যালেন্স
             </p>
             <p className="text-[18px] font-bold" style={{ color: balanceColor }}>
-              ৳ {formatCurrency(party.currentBalance)}
+              ৳ {formatCurrency(displayParty?.currentBalance ?? party.currentBalance)}
             </p>
           </div>
 
@@ -302,7 +356,7 @@ export function TransactionDetailPage() {
           )}
 
           {/* Edit button — excluded from capture */}
-          <div
+          {!queuedCounterparty && <div
             data-html2canvas-ignore="true"
             onClick={() => setIsEditOpen(true)}
             role="button"
@@ -312,7 +366,7 @@ export function TransactionDetailPage() {
             style={{ borderTop: '1px solid #F3F4F6', color: '#2563EB', fontSize: 15, fontWeight: 700 }}
           >
             🖊️ এন্ট্রি এডিট করুন
-          </div>
+          </div>}
         </div>
 
         {/* Bill image (outside receipt card, not captured) */}
@@ -392,7 +446,7 @@ export function TransactionDetailPage() {
             {amountLabel}: ৳ {formatCurrency(entry.amount)}
           </p>
           <p className="text-[14px] mt-1" style={{ color: '#4B5563' }}>
-            ব্যালেন্স: ৳ {formatCurrency(party.currentBalance)}
+            ব্যালেন্স: ৳ {formatCurrency(displayParty?.currentBalance ?? party.currentBalance)}
           </p>
           <p
             className="text-[13px] mt-1.5 break-all"
@@ -470,6 +524,7 @@ export function TransactionDetailPage() {
           partyRole={party.role}
           type={entry.type as LedgerEntryType}
           initialEntry={entry}
+          queuedEntry={queuedEntry && !queuedCounterparty ? queuedEntry : undefined}
           onClose={() => setIsEditOpen(false)}
         />
       )}

@@ -36,13 +36,24 @@ import { useBusinessContext } from '@/lib/businessContext';
 import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import { useConnectionState } from '@/context/connection-state';
 import { notifyEntrySaved } from '@/components/ui/entry-saved-feedback';
-import { queueEntry } from '@/lib/entryOutbox';
+import { queueEntry, updatePendingEntry, type QueuedEntry } from '@/lib/entryOutbox';
 import { isLedgerAmountLimitError } from '@/lib/ledgerSaveError';
 import { readOfflineIdentity } from '@/lib/offlineSession';
 
 type KeyKind = 'digit' | 'muted' | 'accent';
 type KeyDef = { label: string; value: string; kind: KeyKind };
 type TextSelection = { start: number; end: number };
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => typeof reader.result === 'string'
+      ? resolve(reader.result)
+      : reject(new Error('ফাইলটি পড়া যায়নি'));
+    reader.onerror = () => reject(reader.error ?? new Error('ফাইলটি পড়া যায়নি'));
+    reader.readAsDataURL(file);
+  });
+}
 
 function normalizeCalculatorInput(raw: string): string {
   return raw
@@ -129,6 +140,7 @@ export function TransactionEntryScreen({
   type,
   onClose,
   initialEntry,
+  queuedEntry,
 }: {
   partyId: string;
   partyName: string;
@@ -138,6 +150,7 @@ export function TransactionEntryScreen({
   /** When provided the screen opens in edit mode, pre-populated with the
    *  existing entry's data. Saving issues a PATCH instead of a POST. */
   initialEntry?: LedgerEntry;
+  queuedEntry?: QueuedEntry;
 }) {
   const isEditMode = !!initialEntry;
   const { role: userRole, adjustmentPartyIds, userId } = useAppAuth();
@@ -420,18 +433,18 @@ export function TransactionEntryScreen({
       // New entries persist the image with their draft; upload only during
       // replay so a background pre-upload cannot orphan a duplicate object.
       pendingBase64Ref.current = scanned;
-      uploadPromiseRef.current = isEditMode ? uploadBillImage(scanned) : null;
+      uploadPromiseRef.current = isEditMode && !queuedEntry ? uploadBillImage(scanned) : null;
     } catch (err) {
       // Falls back to the raw captured photo rather than blocking the user
       // with an error toast — they can still attach it or retake it.
       console.error('বিল স্ক্যান করা যায়নি, মূল ছবি ব্যবহার করা হচ্ছে:', err);
       setBillImage(dataUrl);
       pendingBase64Ref.current = dataUrl;
-      uploadPromiseRef.current = isEditMode ? uploadBillImage(dataUrl) : null;
+      uploadPromiseRef.current = isEditMode && !queuedEntry ? uploadBillImage(dataUrl) : null;
     } finally {
       setIsScanning(false);
     }
-  }, [isEditMode]);
+  }, [isEditMode, queuedEntry]);
 
   const handleAttachClick = useCallback(() => {
     setIsAttachOptionsOpen(true);
@@ -469,9 +482,9 @@ export function TransactionEntryScreen({
       setBillImage(`selected-file:${file.name}`);
       pendingBase64Ref.current = null;
       uploadedCreateImageRef.current = null;
-      uploadPromiseRef.current = isEditMode ? uploadBillFile(file) : null;
+      uploadPromiseRef.current = isEditMode && !queuedEntry ? uploadBillFile(file) : null;
     },
-    [isEditMode, processCapturedImage]
+    [isEditMode, processCapturedImage, queuedEntry]
   );
 
   const handleFileChange = useCallback(
@@ -593,7 +606,7 @@ export function TransactionEntryScreen({
    */
   const handleUpdate = useCallback(() => {
     if (!initialEntry) return;
-    if (!navigator.onLine || !isOnline) {
+    if (!queuedEntry && (!navigator.onLine || !isOnline)) {
       toast.error('অফলাইনে এন্ট্রি পরিবর্তন করা যায় না', { description: 'ইন্টারনেট ফিরে এলে আবার চেষ্টা করুন। আপনার লেখা ফর্মে আছে।' });
       return;
     }
@@ -617,6 +630,54 @@ export function TransactionEntryScreen({
       toast.warning(`${partyRoleLabel} বেছে নিন`, {
         description: 'অ্যাডজাস্টমেন্ট সংরক্ষণ করতে একই ধরনের অন্য একটি পক্ষ বেছে নিন।',
       });
+      return;
+    }
+
+    if (queuedEntry) {
+      const capturedBase64 = pendingBase64Ref.current;
+      void (async () => {
+        try {
+          let imageBase64 = queuedEntry.imageBase64;
+          let billPath = queuedEntry.data.billImage;
+          if (billImage === null) {
+            imageBase64 = undefined;
+            billPath = null;
+          } else if (selectedBillFile) {
+            imageBase64 = await fileToDataUrl(selectedBillFile);
+            billPath = null;
+          } else if (capturedBase64) {
+            imageBase64 = capturedBase64;
+            billPath = null;
+          }
+
+          const updated = await updatePendingEntry(
+            queuedEntry.id,
+            queuedEntry.actorId,
+            queuedEntry.businessId,
+            {
+              ...queuedEntry.data,
+              amount: finalAmount,
+              type,
+              description,
+              dueDate: dueDate || undefined,
+              isTransfer: isTransferMode || undefined,
+              transferPartyId: isTransferMode ? transferPartyId : null,
+              billImage: billPath,
+            },
+            imageBase64,
+          );
+          if (!updated) {
+            toast.error('এন্ট্রিটি ইতিমধ্যে সিঙ্ক হয়েছে', { description: 'ইন্টারনেট থাকলে আবার খুলে পরিবর্তন করুন।' });
+            return;
+          }
+          clearMemory();
+          onClose();
+          toast.success('অফলাইন এন্ট্রি আপডেট হয়েছে');
+        } catch (error) {
+          console.error('Could not update offline entry:', error);
+          toast.error('অফলাইন এন্ট্রি আপডেট করা যায়নি');
+        }
+      })();
       return;
     }
 
@@ -790,8 +851,9 @@ export function TransactionEntryScreen({
       }
     })();
   }, [
-    initialEntry, memoryHistory.length, memoryValue, expression,
+    initialEntry, queuedEntry, memoryHistory.length, memoryValue, expression,
     partyId, type, description, dueDate, billImage,
+    selectedBillFile,
     queryClient, clearMemory, onClose, BASE, isOnline, selectedBusinessId,
     isTransferMode, transferPartyId, transferPartyList, canAdjustSource,
     partyRole, partyRoleLabel, userRole, adjustmentPartyIds,

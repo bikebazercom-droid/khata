@@ -174,6 +174,43 @@ describe('persistent entry outbox', () => {
     expect(await restored.listEntries('staff-B', 'business-A')).toHaveLength(1);
   });
 
+  it('updates a pending draft before replay and never replays a removed draft', async () => {
+    send.mockResolvedValue({ id: 'server-entry' });
+    const outbox = await import('@/lib/entryOutbox');
+    await outbox.queueEntry(draft('edit-before-sync'));
+    const updated = await outbox.updatePendingEntry(
+      'edit-before-sync',
+      'staff-A',
+      'business-A',
+      {
+        ...draft('edit-before-sync').data,
+        amount: 450,
+        description: 'updated offline note',
+      },
+    );
+    expect(updated).toBe(true);
+
+    const [savedDraft] = await outbox.listEntries('staff-A', 'business-A');
+    expect(savedDraft.data.amount).toBe(450);
+    expect(savedDraft.data.description).toBe('updated offline note');
+
+    await outbox.drainEntries('staff-A', 'business-A', () => true, () => {});
+    expect(send.mock.calls[0]?.[1]).toMatchObject({
+      amount: 450,
+      description: 'updated offline note',
+      clientRequestId: 'edit-before-sync',
+    });
+
+    await outbox.queueEntry(draft('remove-before-sync'));
+    expect(await outbox.removePendingEntry('remove-before-sync', 'staff-A', 'business-A')).toBe(true);
+    vi.resetModules();
+    const reloadedOutbox = await import('@/lib/entryOutbox');
+    send.mockClear();
+    await reloadedOutbox.drainEntries('staff-A', 'business-A', () => true, () => {});
+    expect(send).not.toHaveBeenCalled();
+    expect(await reloadedOutbox.listEntries('staff-A', 'business-A')).toEqual([]);
+  });
+
   it('restores an offline transfer after reload and settles to one server row on each ledger after reconnect', async () => {
     isOnline = false;
     const first = await import('@/lib/entryOutbox');

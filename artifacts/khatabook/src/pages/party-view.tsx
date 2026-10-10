@@ -178,7 +178,10 @@ export function PartyView() {
     [serverEntries, pendingEntries, id],
   );
   const queuedEntryIds = useMemo(
-    () => new Set(pendingEntries.map((entry) => entry.id)),
+    () => new Set(pendingEntries.flatMap((entry) => entry.status === 'pending' ? [
+      entry.id,
+      ...(entry.data.isTransfer ? [`offline-transfer-counterpart:${entry.id}`] : []),
+    ] : [])),
     [pendingEntries],
   );
   const displayParty = useMemo(
@@ -569,17 +572,17 @@ export function PartyView() {
                       <div
                         key={entry.id}
                         data-entry-card
-                        role={userRole === 'owner' && !isQueuedLocally ? "button" : undefined}
-                        tabIndex={userRole === 'owner' && !isQueuedLocally ? 0 : undefined}
+                        role={userRole === 'owner' ? "button" : undefined}
+                        tabIndex={userRole === 'owner' ? 0 : undefined}
                         onClick={() => {
-                          if (userRole === 'owner' && !isQueuedLocally) navigate(`/party/${id}/entry/${entry.id}`);
+                          if (userRole === 'owner') navigate(`/party/${id}/entry/${entry.id}`);
                         }}
                         onKeyDown={(e) => {
-                          if (userRole === 'owner' && !isQueuedLocally && e.key === 'Enter') navigate(`/party/${id}/entry/${entry.id}`);
+                          if (userRole === 'owner' && e.key === 'Enter') navigate(`/party/${id}/entry/${entry.id}`);
                         }}
                         className={cn(
                           "grid grid-cols-[minmax(0,1fr)_5rem_5rem] min-[380px]:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] min-[480px]:grid-cols-[minmax(0,1fr)_6rem_6rem] items-stretch gap-0 overflow-hidden rounded-xl border border-[#EBEBEB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.07)] animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both transition-colors",
-                           userRole === 'owner' && !isQueuedLocally ? "cursor-pointer active:bg-slate-50" : ""
+                            userRole === 'owner' ? "cursor-pointer active:bg-slate-50" : ""
                         )}
                         style={{ animationDelay: `${i * 30}ms` }}
                       >
