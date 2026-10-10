@@ -43,7 +43,7 @@ import { splitAdjustmentDescription } from '@/lib/adjustment-display';
 import {
   fitPdfHeaderNameFontSize,
   renderPdfBrandLogo,
-  renderPdfInstallButton,
+  renderPdfStoreBadges,
   renderPdfSupportContacts,
 } from '@/lib/pdf-report-branding';
 
@@ -283,8 +283,7 @@ export function ReportView() {
       <table role="presentation" style="width:100%;table-layout:fixed;border-collapse:collapse;background:#003366;color:#fff;margin-top:40px;box-sizing:border-box;font-size:11px;line-height:1.4;">
         <tr>
           <td style="width:58%;padding:10px 12px;vertical-align:middle;">
-            <span>এখনই বাংলা খাতা ব্যবহার শুরু করুন</span>
-            <span style="display:inline-block;vertical-align:middle;margin-left:8px;">${renderPdfInstallButton(reportBranding?.playStoreUrl)}</span>
+            ${renderPdfStoreBadges(reportBranding?.playStoreUrl, reportBranding?.appleStoreUrl)}
           </td>
           <td style="width:42%;padding:8px 12px;vertical-align:middle;text-align:right;color:#dbeafe;">
             ${renderPdfSupportContacts(reportBranding?.supportPhone, reportBranding?.supportEmail)}

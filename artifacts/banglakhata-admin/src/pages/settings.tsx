@@ -68,6 +68,7 @@ function useDownloadConfig() {
 interface ReportBrandingValues {
   websiteUrl: string;
   playStoreUrl: string;
+  appleStoreUrl: string;
   supportPhone: string;
   supportEmail: string;
   updatedAt: string | null;
@@ -99,6 +100,7 @@ function normalizeReportBranding(
   return {
     websiteUrl: typeof values.websiteUrl === "string" ? values.websiteUrl : fallback.websiteUrl ?? "",
     playStoreUrl: typeof values.playStoreUrl === "string" ? values.playStoreUrl : fallback.playStoreUrl ?? "",
+    appleStoreUrl: typeof values.appleStoreUrl === "string" ? values.appleStoreUrl : fallback.appleStoreUrl ?? "",
     supportPhone: typeof values.supportPhone === "string" ? values.supportPhone : fallback.supportPhone ?? "",
     supportEmail: typeof values.supportEmail === "string" ? values.supportEmail : fallback.supportEmail ?? "",
     updatedAt,
@@ -109,6 +111,7 @@ function useReportBranding() {
   const [values, setValues] = useState<ReportBrandingValues>({
     websiteUrl: "",
     playStoreUrl: "",
+    appleStoreUrl: "",
     supportPhone: "",
     supportEmail: "",
     updatedAt: null,
@@ -447,8 +450,8 @@ export default function SettingsPage() {
 
   const handleReportBrandingSave = (e: React.FormEvent) => {
     e.preventDefault();
-    const { websiteUrl, playStoreUrl, supportPhone, supportEmail } = reportBranding.values;
-    void reportBranding.save({ websiteUrl, playStoreUrl, supportPhone, supportEmail });
+    const { websiteUrl, playStoreUrl, appleStoreUrl, supportPhone, supportEmail } = reportBranding.values;
+    void reportBranding.save({ websiteUrl, playStoreUrl, appleStoreUrl, supportPhone, supportEmail });
   };
 
   // ── Binary file upload ──────────────────────────────────────────────────────
@@ -552,7 +555,7 @@ export default function SettingsPage() {
                 <div>
                   <CardTitle className="text-lg">রিপোর্ট ও স্টেটমেন্টের লিংক ও যোগাযোগ</CardTitle>
                   <CardDescription>
-                    PDF-এর বাংলা খাতা লোগো, ইনস্টল বাটন এবং সাপোর্ট তথ্য নিয়ন্ত্রণ করুন
+                    PDF-এর বাংলা খাতা লোগো, অ্যাপ ডাউনলোড ব্যাজ এবং সাপোর্ট তথ্য নিয়ন্ত্রণ করুন
                   </CardDescription>
                 </div>
               </div>
@@ -596,6 +599,20 @@ export default function SettingsPage() {
                   </span>
                 </label>
                 <label className="space-y-2 text-sm font-medium">
+                  Apple App Store Link (অ্যাপল স্টোর লিংক)
+                  <span className="relative block">
+                    <Apple className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      className="pl-9"
+                      type="url"
+                      maxLength={2048}
+                      placeholder="https://apps.apple.com/app/..."
+                      value={reportBranding.values.appleStoreUrl}
+                      onChange={e => reportBranding.setValues(v => ({ ...v, appleStoreUrl: e.target.value }))}
+                    />
+                  </span>
+                </label>
+                <label className="space-y-2 text-sm font-medium">
                   Support phone
                   <span className="relative block">
                     <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -625,7 +642,7 @@ export default function SettingsPage() {
                 </label>
               </div>
               <p className="text-xs text-muted-foreground">
-                ফাঁকা রাখলে সংশ্লিষ্ট লিংক বা সাপোর্ট তথ্য PDF-এ দেখানো হবে না। Website ও Play Store লিংকে HTTPS ব্যবহার করুন।
+                ফাঁকা রাখলে সংশ্লিষ্ট লিংক বা সাপোর্ট তথ্য PDF-এ দেখানো হবে না। Website ও অ্যাপ স্টোর লিংকে HTTPS ব্যবহার করুন।
               </p>
             </CardContent>
             <CardFooter className="bg-slate-50 border-t py-4 px-6 flex justify-between items-center rounded-b-xl">

@@ -873,6 +873,8 @@ export const getPublicReportBrandingResponseWebsiteUrlMax = 2048;
 
 export const getPublicReportBrandingResponsePlayStoreUrlMax = 2048;
 
+export const getPublicReportBrandingResponseAppleStoreUrlMax = 2048;
+
 export const getPublicReportBrandingResponseSupportPhoneMax = 80;
 
 export const getPublicReportBrandingResponseSupportEmailMax = 254;
@@ -882,6 +884,7 @@ export const getPublicReportBrandingResponseSupportEmailMax = 254;
 export const GetPublicReportBrandingResponse = zod.object({
   "websiteUrl": zod.string().max(getPublicReportBrandingResponseWebsiteUrlMax),
   "playStoreUrl": zod.string().max(getPublicReportBrandingResponsePlayStoreUrlMax),
+  "appleStoreUrl": zod.string().max(getPublicReportBrandingResponseAppleStoreUrlMax),
   "supportPhone": zod.string().max(getPublicReportBrandingResponseSupportPhoneMax),
   "supportEmail": zod.string().max(getPublicReportBrandingResponseSupportEmailMax)
 })
@@ -894,6 +897,8 @@ export const getAdminReportBrandingResponseWebsiteUrlMax = 2048;
 
 export const getAdminReportBrandingResponsePlayStoreUrlMax = 2048;
 
+export const getAdminReportBrandingResponseAppleStoreUrlMax = 2048;
+
 export const getAdminReportBrandingResponseSupportPhoneMax = 80;
 
 export const getAdminReportBrandingResponseSupportEmailMax = 254;
@@ -903,6 +908,7 @@ export const getAdminReportBrandingResponseSupportEmailMax = 254;
 export const GetAdminReportBrandingResponse = zod.object({
   "websiteUrl": zod.string().max(getAdminReportBrandingResponseWebsiteUrlMax),
   "playStoreUrl": zod.string().max(getAdminReportBrandingResponsePlayStoreUrlMax),
+  "appleStoreUrl": zod.string().max(getAdminReportBrandingResponseAppleStoreUrlMax),
   "supportPhone": zod.string().max(getAdminReportBrandingResponseSupportPhoneMax),
   "supportEmail": zod.string().max(getAdminReportBrandingResponseSupportEmailMax),
   "updatedAt": zod.coerce.date().nullable()
@@ -916,6 +922,8 @@ export const updateAdminReportBrandingBodyWebsiteUrlMax = 2048;
 
 export const updateAdminReportBrandingBodyPlayStoreUrlMax = 2048;
 
+export const updateAdminReportBrandingBodyAppleStoreUrlMax = 2048;
+
 export const updateAdminReportBrandingBodySupportPhoneMax = 80;
 
 export const updateAdminReportBrandingBodySupportEmailMax = 254;
@@ -925,6 +933,7 @@ export const updateAdminReportBrandingBodySupportEmailMax = 254;
 export const UpdateAdminReportBrandingBody = zod.object({
   "websiteUrl": zod.string().max(updateAdminReportBrandingBodyWebsiteUrlMax),
   "playStoreUrl": zod.string().max(updateAdminReportBrandingBodyPlayStoreUrlMax),
+  "appleStoreUrl": zod.string().max(updateAdminReportBrandingBodyAppleStoreUrlMax),
   "supportPhone": zod.string().max(updateAdminReportBrandingBodySupportPhoneMax),
   "supportEmail": zod.string().max(updateAdminReportBrandingBodySupportEmailMax)
 })
@@ -932,6 +941,8 @@ export const UpdateAdminReportBrandingBody = zod.object({
 export const updateAdminReportBrandingResponseWebsiteUrlMax = 2048;
 
 export const updateAdminReportBrandingResponsePlayStoreUrlMax = 2048;
+
+export const updateAdminReportBrandingResponseAppleStoreUrlMax = 2048;
 
 export const updateAdminReportBrandingResponseSupportPhoneMax = 80;
 
@@ -942,6 +953,7 @@ export const updateAdminReportBrandingResponseSupportEmailMax = 254;
 export const UpdateAdminReportBrandingResponse = zod.object({
   "websiteUrl": zod.string().max(updateAdminReportBrandingResponseWebsiteUrlMax),
   "playStoreUrl": zod.string().max(updateAdminReportBrandingResponsePlayStoreUrlMax),
+  "appleStoreUrl": zod.string().max(updateAdminReportBrandingResponseAppleStoreUrlMax),
   "supportPhone": zod.string().max(updateAdminReportBrandingResponseSupportPhoneMax),
   "supportEmail": zod.string().max(updateAdminReportBrandingResponseSupportEmailMax),
   "updatedAt": zod.coerce.date().nullable()

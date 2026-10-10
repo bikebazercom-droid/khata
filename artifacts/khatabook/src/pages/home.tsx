@@ -42,9 +42,10 @@ import { readOfflineIdentity } from '@/lib/offlineSession';
 import { isTransientNetworkError } from '@/lib/offlineErrors';
 import {
   fitPdfHeaderNameFontSize,
-  renderPdfInstallButton,
+  renderPdfStoreBadges,
   renderPdfSupportContacts,
 } from '@/lib/pdf-report-branding';
+import { addPdfLinkAnnotations } from '@/lib/pdf-link-annotations';
 
 function partyBalanceFontSize(value: string): string {
   const widthInEm = Array.from(value).reduce((width, character) => {
@@ -536,8 +537,7 @@ export function HomeView() {
       <table role="presentation" style="width:100%;table-layout:fixed;border-collapse:collapse;background:#003366;color:#fff;margin-top:40px;box-sizing:border-box;font-size:11px;line-height:1.4;">
         <tr>
           <td style="width:58%;padding:10px 12px;vertical-align:middle;">
-            <span>${t('pdfFooterCta')}</span>
-            <span style="display:inline-block;vertical-align:middle;margin-left:8px;">${renderPdfInstallButton(reportBranding?.playStoreUrl)}</span>
+            ${renderPdfStoreBadges(reportBranding?.playStoreUrl, reportBranding?.appleStoreUrl)}
           </td>
           <td style="width:42%;padding:8px 12px;vertical-align:middle;text-align:right;color:#dbeafe;">
             ${renderPdfSupportContacts(reportBranding?.supportPhone || footerPhone, reportBranding?.supportEmail)}
@@ -561,8 +561,6 @@ export function HomeView() {
         backgroundColor: '#ffffff',
       });
 
-      document.body.removeChild(container);
-
       const imgData   = canvas.toDataURL('image/jpeg', 0.95);
       const pdf       = new jsPDF('p', 'mm', 'a4');
       const pdfW      = 210;
@@ -577,6 +575,8 @@ export function HomeView() {
         yOffset   += pdfH;
         firstPage  = false;
       }
+      addPdfLinkAnnotations(pdf, container);
+      document.body.removeChild(container);
 
       const roleTag  = role === PartyRole.CUSTOMER ? 'Customer' : 'Supplier';
       const filename = `Banglakhata_${roleTag}_${new Date().toISOString().split('T')[0]}.pdf`;

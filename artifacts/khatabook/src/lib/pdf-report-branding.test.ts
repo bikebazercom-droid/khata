@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   fitPdfHeaderNameFontSize,
   renderPdfBrandLogo,
-  renderPdfInstallButton,
+  renderPdfStoreBadges,
   renderPdfSupportContacts,
 } from "./pdf-report-branding";
 
@@ -14,11 +14,25 @@ describe("PDF report branding", () => {
       .not.toContain("<a ");
   });
 
-  it("links the install button to the configured Play Store URL", () => {
-    expect(renderPdfInstallButton("https://play.google.com/store/apps/details?id=app"))
-      .toContain('href="https://play.google.com/store/apps/details?id=app"');
-    expect(renderPdfInstallButton(""))
-      .toContain("<span");
+  it("renders compact side-by-side store badges with their configured safe links", () => {
+    const badges = renderPdfStoreBadges(
+      "https://play.google.com/store/apps/details?id=app",
+      "https://apps.apple.com/app/banglakhata/id123",
+    );
+    expect(badges).toContain('href="https://play.google.com/store/apps/details?id=app"');
+    expect(badges).toContain('href="https://apps.apple.com/app/banglakhata/id123"');
+    expect(badges).toContain("Google Play");
+    expect(badges).toContain("App Store");
+    expect(badges.match(/<a /g)).toHaveLength(2);
+    expect(badges).toContain('width="112" height="34"');
+  });
+
+  it("keeps badges visible but non-clickable when links are not configured", () => {
+    const badges = renderPdfStoreBadges("", "javascript:alert(1)");
+    expect(badges).toContain("Google Play");
+    expect(badges).toContain("App Store");
+    expect(badges).not.toContain("<a ");
+    expect(badges).toContain("<span");
   });
 
   it("renders clickable phone and email as compact footer text without a separate box", () => {

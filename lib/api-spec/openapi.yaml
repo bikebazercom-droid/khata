@@ -1960,19 +1960,21 @@ components:
 
     PublicReportBranding:
       type: object
-      required: [websiteUrl, playStoreUrl, supportPhone, supportEmail]
+      required: [websiteUrl, playStoreUrl, appleStoreUrl, supportPhone, supportEmail]
       properties:
         websiteUrl: { type: string, maxLength: 2048 }
         playStoreUrl: { type: string, maxLength: 2048 }
+        appleStoreUrl: { type: string, maxLength: 2048 }
         supportPhone: { type: string, maxLength: 80 }
         supportEmail: { type: string, maxLength: 254 }
 
     AdminReportBranding:
       type: object
-      required: [websiteUrl, playStoreUrl, supportPhone, supportEmail, updatedAt]
+      required: [websiteUrl, playStoreUrl, appleStoreUrl, supportPhone, supportEmail, updatedAt]
       properties:
         websiteUrl: { type: string, maxLength: 2048 }
         playStoreUrl: { type: string, maxLength: 2048 }
+        appleStoreUrl: { type: string, maxLength: 2048 }
         supportPhone: { type: string, maxLength: 80 }
         supportEmail: { type: string, maxLength: 254 }
         updatedAt:
@@ -1981,11 +1983,12 @@ components:
 
     ReportBrandingInput:
       type: object
-      required: [websiteUrl, playStoreUrl, supportPhone, supportEmail]
+      required: [websiteUrl, playStoreUrl, appleStoreUrl, supportPhone, supportEmail]
       additionalProperties: false
       properties:
         websiteUrl: { type: string, maxLength: 2048 }
         playStoreUrl: { type: string, maxLength: 2048 }
+        appleStoreUrl: { type: string, maxLength: 2048 }
         supportPhone: { type: string, maxLength: 80 }
         supportEmail: { type: string, maxLength: 254 }
 

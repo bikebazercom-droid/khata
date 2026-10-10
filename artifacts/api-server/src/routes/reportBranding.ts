@@ -14,12 +14,13 @@ const REPORT_BRANDING_MIGRATION = "20261009_000001_add_report_branding_settings.
 
 type ReportBrandingRecord = Pick<
   typeof downloadConfigsTable.$inferSelect,
-  "websiteUrl" | "androidStoreUrl" | "supportPhone" | "supportEmail" | "updatedAt"
+  "websiteUrl" | "androidStoreUrl" | "iosStoreUrl" | "supportPhone" | "supportEmail" | "updatedAt"
 >;
 
 const reportBrandingColumns = {
   websiteUrl: downloadConfigsTable.websiteUrl,
   androidStoreUrl: downloadConfigsTable.androidStoreUrl,
+  iosStoreUrl: downloadConfigsTable.iosStoreUrl,
   supportPhone: downloadConfigsTable.supportPhone,
   supportEmail: downloadConfigsTable.supportEmail,
   updatedAt: downloadConfigsTable.updatedAt,
@@ -29,6 +30,7 @@ function reportBranding(row: ReportBrandingRecord | undefined) {
   return {
     websiteUrl: row?.websiteUrl ?? "",
     playStoreUrl: row?.androidStoreUrl ?? "",
+    appleStoreUrl: row?.iosStoreUrl ?? "",
     supportPhone: row?.supportPhone ?? "",
     supportEmail: row?.supportEmail ?? "",
   };
@@ -92,13 +94,14 @@ router.get("/admin/report-branding", requireAdmin as any, async (req, res): Prom
 router.put("/admin/report-branding", requireAdmin as any, async (req, res): Promise<void> => {
   const parsed = UpdateAdminReportBrandingBody.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Provide valid website, Play Store, phone, and email values." });
+    res.status(400).json({ error: "Provide valid website, app store, phone, and email values." });
     return;
   }
 
   const input = {
     websiteUrl: parsed.data.websiteUrl.trim(),
     playStoreUrl: parsed.data.playStoreUrl.trim(),
+    appleStoreUrl: parsed.data.appleStoreUrl.trim(),
     supportPhone: parsed.data.supportPhone.trim(),
     supportEmail: parsed.data.supportEmail.trim(),
   };
@@ -106,10 +109,11 @@ router.put("/admin/report-branding", requireAdmin as any, async (req, res): Prom
   if (
     !isHttpsUrlOrBlank(input.websiteUrl) ||
     !isHttpsUrlOrBlank(input.playStoreUrl) ||
+    !isHttpsUrlOrBlank(input.appleStoreUrl) ||
     !validSupportEmail(input.supportEmail)
   ) {
     res.status(400).json({
-      error: "Website and Play Store links must be secure HTTPS URLs; enter a valid support email.",
+      error: "Website and app store links must be secure HTTPS URLs; enter a valid support email.",
     });
     return;
   }
@@ -126,6 +130,7 @@ router.put("/admin/report-branding", requireAdmin as any, async (req, res): Prom
           .set({
             websiteUrl: input.websiteUrl,
             androidStoreUrl: input.playStoreUrl,
+            iosStoreUrl: input.appleStoreUrl,
             supportPhone: input.supportPhone,
             supportEmail: input.supportEmail,
             updatedAt,
@@ -137,6 +142,7 @@ router.put("/admin/report-branding", requireAdmin as any, async (req, res): Prom
           .values({
             websiteUrl: input.websiteUrl,
             androidStoreUrl: input.playStoreUrl,
+            iosStoreUrl: input.appleStoreUrl,
             supportPhone: input.supportPhone,
             supportEmail: input.supportEmail,
             updatedAt,

@@ -57,7 +57,7 @@ import { addPdfLinkAnnotations } from '@/lib/pdf-link-annotations';
 import {
   fitPdfHeaderNameFontSize,
   renderPdfBrandLogo,
-  renderPdfInstallButton,
+  renderPdfStoreBadges,
   renderPdfSupportContacts,
 } from '@/lib/pdf-report-branding';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
@@ -464,8 +464,7 @@ export function PartyReportView() {
   <table role="presentation" style="width:100%;table-layout:fixed;border-collapse:collapse;background:#003366;color:#fff;font-size:11px;line-height:1.4;">
     <tr>
       <td style="width:58%;padding:10px 12px;vertical-align:middle;">
-        <span>এখনই বাংলা খাতা ব্যবহার শুরু করুন</span>
-        <span style="display:inline-block;vertical-align:middle;margin-left:8px;">${renderPdfInstallButton(reportBranding?.playStoreUrl)}</span>
+        ${renderPdfStoreBadges(reportBranding?.playStoreUrl, reportBranding?.appleStoreUrl)}
       </td>
       <td style="width:42%;padding:8px 12px;vertical-align:middle;text-align:right;color:#dbeafe;">
         ${renderPdfSupportContacts(reportBranding?.supportPhone, reportBranding?.supportEmail)}

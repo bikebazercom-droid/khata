@@ -11,6 +11,8 @@ export interface AdminReportBranding {
   websiteUrl: string;
   /** @maxLength 2048 */
   playStoreUrl: string;
+  /** @maxLength 2048 */
+  appleStoreUrl: string;
   /** @maxLength 80 */
   supportPhone: string;
   /** @maxLength 254 */
