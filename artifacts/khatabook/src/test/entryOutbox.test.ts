@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LedgerEntryType } from '@workspace/api-client-react';
+import { mergeLedgerEntries, projectQueuedEntries } from '@/lib/offline-ledger-projection';
 
 const send = vi.fn();
 class MockBroadcastChannel {
@@ -22,6 +23,7 @@ vi.mock('@/lib/billImageStorage', () => ({
 
 // Tiny transactional IndexedDB stand-in: changes survive module re-import.
 const records = new Map<string, unknown>();
+let isOnline = true;
 const storage = {
   transaction: () => {
     const tx: { oncomplete?: () => void; onerror?: () => void; onabort?: () => void; error?: Error } = {};
@@ -48,6 +50,7 @@ beforeEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   records.clear();
+  isOnline = true;
   MockBroadcastChannel.instances = [];
   send.mockReset();
   vi.resetModules();
@@ -59,7 +62,7 @@ beforeEach(() => {
     },
   });
   vi.stubGlobal('BroadcastChannel', MockBroadcastChannel);
-  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+  vi.spyOn(navigator, 'onLine', 'get').mockImplementation(() => isOnline);
 });
 
 const draft = (id: string, actorId = 'staff-A', businessId: string | null = 'business-A') => ({
@@ -169,6 +172,76 @@ describe('persistent entry outbox', () => {
     }));
     expect(await restored.listEntries('staff-A', 'business-A')).toEqual([]);
     expect(await restored.listEntries('staff-B', 'business-A')).toHaveLength(1);
+  });
+
+  it('restores an offline transfer after reload and settles to one server row on each ledger after reconnect', async () => {
+    isOnline = false;
+    const first = await import('@/lib/entryOutbox');
+    const transfer = {
+      ...draft('offline-transfer-reload'),
+      createdAt: '2026-10-10T12:00:00.000Z',
+    };
+    await first.queueEntry(transfer);
+
+    expect(send).not.toHaveBeenCalled();
+
+    // A fresh module instance simulates the page being closed and reopened;
+    // the IndexedDB stand-in keeps the persisted record across that boundary.
+    vi.resetModules();
+    const restored = await import('@/lib/entryOutbox');
+    const [persisted] = await restored.listEntries('staff-A', 'business-A');
+    expect(persisted).toMatchObject({ id: transfer.id, status: 'pending' });
+    expect(mergeLedgerEntries([], [persisted], 'source')).toHaveLength(1);
+    expect(mergeLedgerEntries([], [persisted], 'target')).toHaveLength(1);
+
+    isOnline = true;
+    send.mockResolvedValue({ id: 'server-source', linkedEntryId: 'server-target' });
+    await restored.drainEntries('staff-A', 'business-A', () => true, () => {});
+
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0][1]).toMatchObject({
+      clientRequestId: transfer.id,
+      isTransfer: true,
+      transferPartyId: 'target',
+    });
+    expect(await restored.listEntries('staff-A', 'business-A')).toEqual([]);
+
+    const sourceServerRow = {
+      ...projectQueuedEntries([persisted], 'source')[0],
+      id: 'server-source',
+      linkedEntryId: 'server-target',
+    };
+    const targetServerRow = {
+      ...projectQueuedEntries([persisted], 'target')[0],
+      id: 'server-target',
+      linkedEntryId: 'server-source',
+    };
+    expect(mergeLedgerEntries([sourceServerRow], [], 'source')).toEqual([sourceServerRow]);
+    expect(mergeLedgerEntries([targetServerRow], [], 'target')).toEqual([targetServerRow]);
+  });
+
+  it('hides both sides of a rejected transfer after reconnect while retaining the draft for review', async () => {
+    isOnline = false;
+    const first = await import('@/lib/entryOutbox');
+    await first.queueEntry(draft('offline-transfer-rejected'));
+
+    vi.resetModules();
+    const restored = await import('@/lib/entryOutbox');
+    const [persisted] = await restored.listEntries('staff-A', 'business-A');
+    expect(mergeLedgerEntries([], [persisted], 'source')).toHaveLength(1);
+    expect(mergeLedgerEntries([], [persisted], 'target')).toHaveLength(1);
+
+    isOnline = true;
+    send.mockRejectedValue({ status: 403, data: { error: 'transfer denied' } });
+    await restored.drainEntries('staff-A', 'business-A', () => true, () => {});
+
+    const rejectedEntries = await restored.listEntries('staff-A', 'business-A');
+    expect(rejectedEntries).toMatchObject([{ id: 'offline-transfer-rejected', status: 'rejected' }]);
+    expect(mergeLedgerEntries([], rejectedEntries, 'source')).toEqual([]);
+    expect(mergeLedgerEntries([], rejectedEntries, 'target')).toEqual([]);
+    expect(await restored.listRejectedEntries('staff-A', 'business-A')).toMatchObject([
+      { id: 'offline-transfer-rejected', status: 'rejected', error: 'transfer denied' },
+    ]);
   });
 
   it.each([400, 403, 404, 409, 422, 500, 503])('retains the server reason for rejected status %i and does not retry it', async (status) => {
