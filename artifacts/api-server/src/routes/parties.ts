@@ -152,6 +152,23 @@ function withAdjustmentSuffix(description: string, partyName: string): string {
   return normalized ? `${normalized} — ${suffix}` : suffix;
 }
 
+function adjustmentRemark(description: string): string {
+  const match = description.trim().match(/(?:\s+—\s+)?অ্যাডজাস্ট করা হয়েছে\s+(.+?)-এর সাথে$/);
+  return match ? description.trim().slice(0, match.index).trim() : description.trim();
+}
+
+function restoreLinkedRemark(description: string, linkedDescription: string | null | undefined): string {
+  const current = description.trim();
+  const currentRemark = adjustmentRemark(current);
+  if (currentRemark || !linkedDescription) return current;
+
+  const linkedRemark = adjustmentRemark(linkedDescription);
+  if (!linkedRemark) return current;
+
+  const suffix = current.match(/(?:\s+—\s+)?অ্যাডজাস্ট করা হয়েছে\s+(.+?)-এর সাথে$/);
+  return suffix ? withAdjustmentSuffix(linkedRemark, suffix[1]!) : linkedRemark;
+}
+
 function isValidDateOnly(value: unknown): value is string {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00.000Z`);
@@ -431,10 +448,29 @@ router.get(
       .where(eq(ledgerEntriesTable.partyId, parsed.data.partyId))
       .orderBy(desc(ledgerEntriesTable.createdAt));
 
+    const linkedIds = entries.flatMap((entry) => entry.isTransfer && entry.linkedEntryId
+      ? [entry.linkedEntryId]
+      : []);
+    const linkedRows = linkedIds.length
+      ? await db.select({
+        id: ledgerEntriesTable.id,
+        description: ledgerEntriesTable.description,
+      }).from(ledgerEntriesTable)
+        .innerJoin(partiesTable, eq(ledgerEntriesTable.partyId, partiesTable.id))
+        .where(and(
+          inArray(ledgerEntriesTable.id, linkedIds),
+          eq(partiesTable.businessId, businessId),
+        ))
+      : [];
+    const linkedDescriptions = new Map(linkedRows.map((entry) => [entry.id, entry.description]));
+
     res.json(
       ListLedgerEntriesResponse.parse(
         entries.map((entry) => ({
           ...entry,
+          description: entry.isTransfer && entry.linkedEntryId
+            ? restoreLinkedRemark(entry.description, linkedDescriptions.get(entry.linkedEntryId))
+            : entry.description,
           linkedEntryId: role === "staff" && entry.isTransfer ? null : entry.linkedEntryId,
           amount: Number(entry.amount),
         })),
@@ -520,10 +556,9 @@ router.post(
       }
 
       const counterType: "YOU_GAVE" | "YOU_GOT" = type === "YOU_GAVE" ? "YOU_GOT" : "YOU_GAVE";
-      const primaryDesc = description?.trim()
-        ? `${description.trim()} — অ্যাডজাস্ট করা হয়েছে ${transferParty.name}-এর সাথে`
-        : `অ্যাডজাস্ট করা হয়েছে ${transferParty.name}-এর সাথে`;
-      const counterDesc = `অ্যাডজাস্ট করা হয়েছে ${party.name}-এর সাথে`;
+      const sharedDetails = description?.trim() ?? "";
+      const primaryDesc = withAdjustmentSuffix(sharedDetails, transferParty.name);
+      const counterDesc = withAdjustmentSuffix(sharedDetails, party.name);
 
       // eslint-disable-next-line prefer-const
       let primaryEntry!: typeof ledgerEntriesTable.$inferSelect;
@@ -918,6 +953,9 @@ router.patch(
       const nextBillReference = body.data.billReference !== undefined
         ? body.data.billReference
         : currentEntry.billReference;
+      const counterDescription = desiredIsTransfer && nextTarget
+        ? withAdjustmentSuffix(removeAdjustmentSuffix(description, nextTarget.name), currentParty.name)
+        : "";
 
       let counterId = currentCounter?.id ?? null;
       if (desiredIsTransfer && !currentEntry.isTransfer && nextTarget && desiredTransferPartyId) {
@@ -926,7 +964,7 @@ router.patch(
           createdByUserId: isUuid(userId) ? userId : null,
           type: counterType,
           amount: amountText,
-          description: `অ্যাডজাস্ট করা হয়েছে ${currentParty.name}-এর সাথে`,
+          description: counterDescription,
           createdAt,
           dueDate,
           isTransfer: true,
@@ -940,7 +978,7 @@ router.patch(
           partyId: desiredTransferPartyId,
           type: counterType,
           amount: amountText,
-          description: `অ্যাডজাস্ট করা হয়েছে ${currentParty.name}-এর সাথে`,
+          description: counterDescription,
           createdAt,
           dueDate,
           isTransfer: true,

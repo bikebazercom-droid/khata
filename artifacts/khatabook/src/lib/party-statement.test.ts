@@ -248,4 +248,20 @@ describe('party statement calculations', () => {
     expect(row.details).toBe('শাকিল থেকে টাকা');
     expect(row.adjustment).toBe('অন্য খাতায়: melon');
   });
+
+  it('shows the shared remark in the counter-party statement while keeping its adjustment separate', () => {
+    const [row] = buildPartyStatementRows([{
+      id: 'counter-adjustment',
+      type: 'YOU_GOT',
+      amount: 500,
+      createdAt: '2026-10-02T10:00:00.000Z',
+      dueDate: '2026-10-02',
+      description: 'শাকিল থেকে টাকা — অ্যাডজাস্ট করা হয়েছে joshim 22-এর সাথে',
+      isTransfer: true,
+      transferPartyId: 'source-id',
+    }], 0, new Map([['source-id', 'joshim 22']]));
+
+    expect(row.details).toBe('শাকিল থেকে টাকা');
+    expect(row.adjustment).toBe('অন্য খাতায়: joshim 22');
+  });
 });

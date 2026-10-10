@@ -306,15 +306,32 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
     const owner = () => request(app);
     const before = await db.select().from(partiesTable).where(inArray(partiesTable.id, [a, b]));
     const first = await owner().post(`/parties/${a}/ledger-entries`).set("Authorization", "Bearer owner")
-      .send({ type: "YOU_GAVE", amount: 13, isTransfer: true, transferPartyId: b });
+      .send({
+        type: "YOU_GAVE",
+        amount: 13,
+        description: "shared adjustment note",
+        isTransfer: true,
+        transferPartyId: b,
+      });
     expect(first.status).toBe(201);
+    const [createdCounter] = await db.select().from(ledgerEntriesTable)
+      .where(eq(ledgerEntriesTable.id, first.body.linkedEntryId));
+    expect(createdCounter?.description).toBe("shared adjustment note — অ্যাডজাস্ট করা হয়েছে A-এর সাথে");
     const edited = await owner().patch(`/parties/${a}/ledger-entries/${first.body.id}`)
-      .set("Authorization", "Bearer owner").send({ type: "YOU_GOT", amount: 19 });
+      .set("Authorization", "Bearer owner").send({
+        type: "YOU_GOT",
+        amount: 19,
+        description: "updated shared adjustment note",
+      });
     expect(edited.status).toBe(200);
     const [counter] = await db.select().from(ledgerEntriesTable)
       .where(eq(ledgerEntriesTable.id, first.body.linkedEntryId));
+    const [primary] = await db.select().from(ledgerEntriesTable)
+      .where(eq(ledgerEntriesTable.id, first.body.id));
     expect(counter?.type).toBe("YOU_GAVE");
     expect(Number(counter?.amount)).toBe(19);
+    expect(primary?.description).toBe("updated shared adjustment note — অ্যাডজাস্ট করা হয়েছে B-এর সাথে");
+    expect(counter?.description).toBe("updated shared adjustment note — অ্যাডজাস্ট করা হয়েছে A-এর সাথে");
     expect((await owner().delete(`/parties/${a}/entries/${first.body.id}`)
       .set("Authorization", "Bearer owner")).status).toBe(200);
     expect(await db.select().from(ledgerEntriesTable).where(inArray(ledgerEntriesTable.id,
@@ -324,6 +341,37 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
       const current = after.find((p) => p.id === old.id)!;
       expect(current.currentBalance).toBe(old.currentBalance);
       expect(current.balanceType).toBe(old.balanceType);
+    }
+  });
+
+  it("fills missing legacy counterparty remarks from the linked entry when loading a statement", async () => {
+    const [primary] = await db.insert(ledgerEntriesTable).values({
+      partyId: a,
+      type: "YOU_GAVE",
+      amount: "25.00",
+      description: "legacy shared note — অ্যাডজাস্ট করা হয়েছে B-এর সাথে",
+      isTransfer: true,
+      transferPartyId: b,
+    }).returning();
+    const [counter] = await db.insert(ledgerEntriesTable).values({
+      partyId: b,
+      type: "YOU_GOT",
+      amount: "25.00",
+      description: "অ্যাডজাস্ট করা হয়েছে A-এর সাথে",
+      isTransfer: true,
+      transferPartyId: a,
+      linkedEntryId: primary!.id,
+    }).returning();
+    await db.update(ledgerEntriesTable).set({ linkedEntryId: counter!.id })
+      .where(eq(ledgerEntriesTable.id, primary!.id));
+
+    try {
+      const response = await request(app).get(`/parties/${b}/ledger-entries`)
+        .set("Authorization", "Bearer owner").expect(200);
+      expect(response.body.find((entry: { id: string }) => entry.id === counter!.id).description)
+        .toBe("legacy shared note — অ্যাডজাস্ট করা হয়েছে A-এর সাথে");
+    } finally {
+      await db.delete(ledgerEntriesTable).where(inArray(ledgerEntriesTable.id, [primary!.id, counter!.id]));
     }
   });
 

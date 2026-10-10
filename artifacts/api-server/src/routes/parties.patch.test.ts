@@ -374,6 +374,7 @@ describe("PATCH ledger-entry — adjustment transitions", () => {
       partyId: target.id,
       type: "YOU_GOT",
       amount: "80.00",
+      description: "converted adjustment — অ্যাডজাস্ট করা হয়েছে Convert source-এর সাথে",
       transferPartyId: source.id,
       linkedEntryId: entry.id,
     });
@@ -404,6 +405,7 @@ describe("PATCH ledger-entry — adjustment transitions", () => {
       partyId: newTarget.id,
       amount: "80.00",
       type: "YOU_GOT",
+      description: "adjusted with target — অ্যাডজাস্ট করা হয়েছে Retarget source-এর সাথে",
       transferPartyId: source.id,
       linkedEntryId: primary.id,
     });
