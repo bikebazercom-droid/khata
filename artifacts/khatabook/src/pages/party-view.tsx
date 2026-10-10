@@ -47,7 +47,7 @@ import { useAppAuth } from '@/App';
 import { useBusinessContext } from '@/lib/businessContext';
 import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import { ENTRY_OUTBOX_CHANGED, listEntries, type QueuedEntry } from '@/lib/entryOutbox';
-import { mergeLedgerEntries, projectPartyBalance } from '@/lib/offline-ledger-projection';
+import { mergeLedgerEntries, projectPartyBalance, queuedEntriesForParty } from '@/lib/offline-ledger-projection';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
 import { addPdfLinkAnnotations } from '@/lib/pdf-link-annotations';
 import { splitAdjustmentDescription } from '@/lib/adjustment-display';
@@ -138,7 +138,7 @@ export function PartyView() {
     let active = true;
     const refresh = () => {
       void listEntries(userId, selectedBusinessId).then((items) => {
-        if (active) setPendingEntries(items.filter((item) => item.partyId === id));
+        if (active) setPendingEntries(queuedEntriesForParty(items, id));
       }).catch(() => {});
     };
     refresh();
@@ -174,8 +174,8 @@ export function PartyView() {
   const activeBusinessName = businesses.find((business) => business.id === selectedBusinessId)?.name;
   const storeName = resolveLedgerBookName(activeBusinessName, settings?.storeName) ?? 'Banglakhata';
   const entries = useMemo(
-    () => mergeLedgerEntries(serverEntries, pendingEntries),
-    [serverEntries, pendingEntries],
+    () => mergeLedgerEntries(serverEntries, pendingEntries, id ?? ''),
+    [serverEntries, pendingEntries, id],
   );
   const queuedEntryIds = useMemo(
     () => new Set(pendingEntries.map((entry) => entry.id)),

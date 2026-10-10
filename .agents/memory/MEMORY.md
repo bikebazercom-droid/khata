@@ -8,7 +8,7 @@
 - [Worker invitation identity](worker-invite-identity.md) — one pending invite per verified identity across businesses avoids arbitrary first-sign-in claims.
 - [Android export validation](android-export-validation.md) — verify the actual signed APK; Gradle configuration success alone misses SDK and JVM build failures.
 - [Expo export port conflicts](expo-export-port.md) — set `RCT_METRO_PORT` when another workflow occupies 8081; Expo export can bundle all platforms without stopping it.
-- [Offline ledger replay](offline-ledger-replay.md) — project queued entries into ordinary ledger rows and local balances while preserving scoped, idempotent server replay.
+- [Offline ledger replay](offline-ledger-replay.md) — project queued transfer pairs and balance deltas while preserving scoped, idempotent server replay.
 - [Shared offline data layer](browser-legacy-outbox.md) — queued entries appear as normal local ledger activity; keep server data authoritative and all replay scoped/idempotent.
 - [Offline shell validation](offline-shell-validation.md) — service-worker checks need compiled assets and a browser-reachable secure origin.
 - [API integration test concurrency](api-integration-test-concurrency.md) — database-backed suites can fail nondeterministically when Vitest runs test files in parallel.

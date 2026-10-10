@@ -13,7 +13,7 @@ Queued entries remain distinct in storage from server-confirmed records, but the
 
 **Why:** The user explicitly wants offline-created entries to look and behave like normal entries, update the displayed balance immediately, and sync silently; the server's stored balance still remains authoritative.
 
-**How to apply:** Derive the local display balance from the server balance plus actor/business-scoped queued deltas. Do not mutate the confirmed query response. Keep rejected items recoverable in local storage without adding a warning banner to the ordinary ledger.
+**How to apply:** Derive each party's local display balance from actor/business-scoped queued deltas. A transfer projects a second row to its destination with the opposite entry type and links both local IDs; hide both projections if replay rejects it. Do not mutate confirmed query data. Preserve idempotency and use server-returned pair IDs to avoid duplicate rows during replay.
 
 All entry creation is queued locally before background API replay, with the ordinary ledger rendering the local projection immediately.
 

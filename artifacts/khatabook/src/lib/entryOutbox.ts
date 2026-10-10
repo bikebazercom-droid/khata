@@ -9,6 +9,8 @@ export interface QueuedEntry {
   partyId: string;
   data: LedgerEntryInput;
   imageBase64?: string;
+  serverEntryId?: string;
+  linkedServerEntryId?: string;
   createdAt: string;
   status: 'pending' | 'rejected';
   error?: string;
@@ -173,12 +175,15 @@ export async function drainEntries(
             await updateEntry(entry);
           }
           if (!stillCurrent()) break;
-          await createLedgerEntry(entry.partyId, {
+          const serverEntry = await createLedgerEntry(entry.partyId, {
             ...entry.data,
             clientRequestId: entry.id,
           }, {
             headers: { 'x-business-id': businessId ?? '' },
           });
+          entry.serverEntryId = serverEntry.id;
+          entry.linkedServerEntryId = serverEntry.linkedEntryId ?? undefined;
+          await updateEntry(entry);
           await removeEntry(entry.id);
           onConfirmed(entry);
         } catch (error) {

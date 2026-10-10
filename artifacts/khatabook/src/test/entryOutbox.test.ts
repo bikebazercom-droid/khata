@@ -60,7 +60,8 @@ describe('persistent entry outbox', () => {
     await first.queueEntry(draft('request-1'));
     await first.queueEntry(draft('request-2', 'staff-B'));
     await first.queueEntry(draft('request-3', 'staff-A', 'business-B'));
-    send.mockRejectedValueOnce(new TypeError('connection reset after commit')).mockResolvedValue({ id: 'saved' });
+    send.mockRejectedValueOnce(new TypeError('connection reset after commit'))
+      .mockResolvedValue({ id: 'saved', linkedEntryId: 'saved-counterpart' });
     await first.drainEntries('staff-A', 'business-A', () => true, () => {});
     expect((await first.listEntries('staff-A', 'business-A')).map((item) => item.id)).toEqual(['request-1']);
     // A new module instance reads the same persistent storage, not a JS memory queue.
@@ -73,6 +74,10 @@ describe('persistent entry outbox', () => {
     expect(send.mock.calls[1][1].clientRequestId).toBe('request-1');
     expect(send.mock.calls[1][1].transferPartyId).toBe('target');
     expect(confirmed).toHaveBeenCalledTimes(1);
+    expect(confirmed).toHaveBeenCalledWith(expect.objectContaining({
+      serverEntryId: 'saved',
+      linkedServerEntryId: 'saved-counterpart',
+    }));
     expect(await restored.listEntries('staff-A', 'business-A')).toEqual([]);
     expect(await restored.listEntries('staff-B', 'business-A')).toHaveLength(1);
   });
