@@ -29,7 +29,7 @@ export function projectQueuedEntries(entries: QueuedEntry[], partyId: string): L
       amount: entry.data.amount,
       description: entry.data.description ?? '',
       billReference: isCounterparty ? null : entry.data.billReference ?? null,
-      billImage: isCounterparty ? null : entry.data.billImage ?? null,
+      billImage: isCounterparty ? null : entry.data.billImage ?? entry.imageBase64 ?? null,
       dueDate: entry.data.dueDate ?? null,
       createdAt: entry.createdAt,
       isTransfer: entry.data.isTransfer ?? false,

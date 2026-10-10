@@ -3,6 +3,9 @@ import { LedgerEntryType } from '@workspace/api-client-react';
 import { mergeLedgerEntries, projectQueuedEntries } from '@/lib/offline-ledger-projection';
 
 const send = vi.fn();
+const uploadBillImageMock = vi.hoisted(() =>
+  vi.fn(async (_dataUrl: string) => ({ ok: true as const, objectPath: '/objects/uploads/test' })),
+);
 class MockBroadcastChannel {
   static instances: MockBroadcastChannel[] = [];
   onmessage: ((event: MessageEvent<{ type?: string }>) => void) | null = null;
@@ -18,7 +21,7 @@ vi.mock('@workspace/api-client-react', async (importOriginal) => {
   return { ...original, createLedgerEntry: (...args: unknown[]) => send(...args) };
 });
 vi.mock('@/lib/billImageStorage', () => ({
-  uploadBillImage: vi.fn(async () => ({ ok: true, objectPath: '/objects/uploads/test' })),
+  uploadBillImage: (...args: [string]) => uploadBillImageMock(...args),
 }));
 
 // Tiny transactional IndexedDB stand-in: changes survive module re-import.
@@ -53,6 +56,7 @@ beforeEach(() => {
   isOnline = true;
   MockBroadcastChannel.instances = [];
   send.mockReset();
+  uploadBillImageMock.mockClear();
   vi.resetModules();
   vi.stubGlobal('indexedDB', {
     open: () => {
@@ -255,6 +259,58 @@ describe('persistent entry outbox', () => {
     };
     expect(mergeLedgerEntries([sourceServerRow], [], 'source')).toEqual([sourceServerRow]);
     expect(mergeLedgerEntries([targetServerRow], [], 'target')).toEqual([targetServerRow]);
+  });
+
+  it('keeps an offline transfer photo through an ambiguous retry without re-uploading or copying it to the counterparty', async () => {
+    isOnline = false;
+    const transfer = {
+      ...draft('offline-transfer-photo'),
+      data: {
+        ...draft('offline-transfer-photo').data,
+        billImage: undefined,
+      },
+      imageBase64: 'data:image/jpeg;base64,YWJj',
+    };
+    const first = await import('@/lib/entryOutbox');
+    await first.queueEntry(transfer);
+
+    vi.resetModules();
+    const afterReload = await import('@/lib/entryOutbox');
+    const [persistedBeforeSync] = await afterReload.listEntries('staff-A', 'business-A');
+    expect(persistedBeforeSync.imageBase64).toBe(transfer.imageBase64);
+    expect(mergeLedgerEntries([], [persistedBeforeSync], 'source')[0].billImage).toBe(transfer.imageBase64);
+    expect(mergeLedgerEntries([], [persistedBeforeSync], 'target')[0].billImage).toBeNull();
+
+    isOnline = true;
+    send.mockRejectedValueOnce(new TypeError('connection lost after server accepted transfer'))
+      .mockResolvedValue({ id: 'server-source', linkedEntryId: 'server-target' });
+    await afterReload.drainEntries('staff-A', 'business-A', () => true, () => {});
+    const [persistedAfterLostResponse] = await afterReload.listEntries('staff-A', 'business-A');
+    expect(persistedAfterLostResponse.data.billImage).toBe('/objects/uploads/test');
+    expect(mergeLedgerEntries([], [persistedAfterLostResponse], 'source')[0].billImage).toBe('/objects/uploads/test');
+    expect(mergeLedgerEntries([], [persistedAfterLostResponse], 'target')[0].billImage).toBeNull();
+
+    vi.resetModules();
+    const afterSecondReload = await import('@/lib/entryOutbox');
+    await afterSecondReload.drainEntries('staff-A', 'business-A', () => true, () => {});
+
+    expect(uploadBillImageMock).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls.map(([, data]) => data)).toEqual([
+      expect.objectContaining({
+        clientRequestId: 'offline-transfer-photo',
+        isTransfer: true,
+        transferPartyId: 'target',
+        billImage: '/objects/uploads/test',
+      }),
+      expect.objectContaining({
+        clientRequestId: 'offline-transfer-photo',
+        isTransfer: true,
+        transferPartyId: 'target',
+        billImage: '/objects/uploads/test',
+      }),
+    ]);
+    expect(await afterSecondReload.listEntries('staff-A', 'business-A')).toEqual([]);
   });
 
   it('hides both sides of a rejected transfer after reconnect while retaining the draft for review', async () => {
