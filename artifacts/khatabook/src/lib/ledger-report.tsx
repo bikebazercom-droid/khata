@@ -6,7 +6,7 @@ import { billImageSrc } from '@/lib/billImageStorage';
 import { BillAttachmentPreview } from '@/components/bill-attachment-preview';
 import { getLedgerEntryDateKey } from './date-time';
 import { splitAdjustmentDescription } from './adjustment-display';
-import { fitPdfHeaderNameFontSize, getPdfSupportContactLinks, renderPdfStoreBadges } from './pdf-report-branding';
+import { fitPdfCellFontSize, fitPdfHeaderNameFontSize, getPdfSupportContactLinks, renderPdfStoreBadges } from './pdf-report-branding';
 import { buildPortablePdfFilename } from './report-filename';
 
 export interface ReportEntry {
@@ -180,7 +180,11 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
             </div>
           </div>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
+          <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', fontSize: '11.5px' }}>
+            <colgroup>
+              <col style={{ width: '15%' }} /><col style={{ width: '24%' }} /><col style={{ width: '16%' }} />
+              <col style={{ width: '13%' }} /><col style={{ width: '13%' }} /><col style={{ width: '19%' }} />
+            </colgroup>
             <thead>
               <tr style={{ backgroundColor: '#ffffff' }}>
                 <th style={{ textAlign: 'left', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>তারিখ</th>
@@ -224,10 +228,10 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                     const imgSrc = billImageSrc(entry.billImage);
                     return (
                       <tr key={entry.id} data-entry-id={entry.id} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#fafafa' }}>
-                        <td style={{ padding: '7px 10px', border: GRID_BORDER, whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '6px 5px', border: GRID_BORDER, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                           {format(entryDate(entry), 'dd/MM')}
                         </td>
-                        <td style={{ padding: '7px 10px', border: GRID_BORDER, color: '#334155' }}>
+                        <td style={{ padding: '6px 5px', border: GRID_BORDER, color: '#334155', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                           {entryDetails(entry)}
                           {imgSrc && (
                             <BillAttachmentPreview
@@ -240,40 +244,49 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                             />
                           )}
                         </td>
-                        <td style={{ padding: '7px 10px', border: GRID_BORDER, color: '#1d4ed8' }}>
+                        <td style={{ padding: '6px 5px', border: GRID_BORDER, color: '#1d4ed8', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                           {entryAdjustment(entry)}
                         </td>
                         <td
                           style={{
-                            padding: '7px 10px',
+                            padding: '5px 4px',
                             border: GRID_BORDER,
                             textAlign: 'right',
                             fontWeight: 700,
                             backgroundColor: COLOR_DEBIT_BG,
                             color: isGave ? COLOR_DEBIT_TEXT : '#cbd5e1',
+                            fontSize: `${fitPdfCellFontSize(isGave ? formatCurrency(entry.amount) : '', 82)}px`,
+                            overflowWrap: 'anywhere',
+                            wordBreak: 'break-word',
                           }}
                         >
                           {isGave ? formatCurrency(entry.amount) : ''}
                         </td>
                         <td
                           style={{
-                            padding: '7px 10px',
+                            padding: '5px 4px',
                             border: GRID_BORDER,
                             textAlign: 'right',
                             fontWeight: 700,
                             backgroundColor: COLOR_CREDIT_BG,
                             color: !isGave ? COLOR_CREDIT_TEXT : '#cbd5e1',
+                            fontSize: `${fitPdfCellFontSize(!isGave ? formatCurrency(entry.amount) : '', 82)}px`,
+                            overflowWrap: 'anywhere',
+                            wordBreak: 'break-word',
                           }}
                         >
                           {!isGave ? formatCurrency(entry.amount) : ''}
                         </td>
                         <td
                           style={{
-                            padding: '7px 10px',
+                            padding: '5px 4px',
                             border: GRID_BORDER,
                             textAlign: 'right',
                             fontWeight: 700,
                             color: entry.balanceAfter >= 0 ? COLOR_DEBIT_TEXT : '#334155',
+                            fontSize: `${fitPdfCellFontSize(balanceCell(entry.balanceAfter), 122)}px`,
+                            overflowWrap: 'anywhere',
+                            wordBreak: 'break-word',
                           }}
                         >
                           {balanceCell(entry.balanceAfter)}
@@ -285,10 +298,10 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                     <td colSpan={3} style={{ padding: '8px 10px', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
                       {group.label.split(' ')[0]} মোট
                     </td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
+                    <td style={{ padding: '5px 4px', textAlign: 'right', fontWeight: 800, fontSize: `${fitPdfCellFontSize(formatCurrency(group.totalDebit), 82)}px`, overflowWrap: 'anywhere', wordBreak: 'break-word', color: '#0f172a', border: GRID_BORDER }}>
                       {formatCurrency(group.totalDebit)}
                     </td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
+                    <td style={{ padding: '5px 4px', textAlign: 'right', fontWeight: 800, fontSize: `${fitPdfCellFontSize(formatCurrency(group.totalCredit), 82)}px`, overflowWrap: 'anywhere', wordBreak: 'break-word', color: '#0f172a', border: GRID_BORDER }}>
                       {formatCurrency(group.totalCredit)}
                     </td>
                     <td style={{ padding: '8px 10px', border: GRID_BORDER }} />
@@ -313,7 +326,7 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
             <td style={{ width: '42%', padding: '4px 8px', verticalAlign: 'middle', textAlign: 'right', color: '#dbeafe', fontSize: '8px' }}>
               <div style={{ whiteSpace: 'nowrap' }}>
                 {supportContacts.filter(({ kind }) => kind === 'phone' || kind === 'whatsapp').map((contact) => (
-                  <a key={contact.href} href={contact.href} style={{ color: '#dbeafe', textDecoration: 'none', marginLeft: contact.kind === 'whatsapp' ? 8 : 0 }}>{contact.label}</a>
+                  <a key={contact.href} href={contact.href} style={{ color: '#dbeafe', textDecoration: 'none', overflowWrap: 'anywhere', wordBreak: 'break-word', marginLeft: contact.kind === 'whatsapp' ? 8 : 0 }}>{contact.label}</a>
                 ))}
               </div>
               {supportContacts.filter(({ kind }) => kind === 'email').map((contact) => (

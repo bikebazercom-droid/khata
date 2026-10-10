@@ -17,7 +17,7 @@ import React from 'react';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { render } from '@testing-library/react';
 import { LedgerReportDocument, type ReportEntry, type ReportParty } from '../lib/ledger-report';
-import { fitPdfHeaderNameFontSize } from '../lib/pdf-report-branding';
+import { fitPdfCellFontSize, fitPdfHeaderNameFontSize } from '../lib/pdf-report-branding';
 import { formatCurrency } from '../lib/utils';
 
 // ---------------------------------------------------------------------------
@@ -229,6 +229,32 @@ describe('LedgerReportDocument — statement ordering', () => {
       `${formatCurrency(321)} Dr`,
     ]);
   });
+
+  it('keeps very large amounts and balances inside fixed table columns', () => {
+    const { container } = render(
+      <LedgerReportDocument
+        storeName="টেস্ট স্টোর"
+        party={PARTY}
+        entries={[makeEntry({ amount: 20_000_000_000, balanceAfter: 9_999_999_999_999 })]}
+      />,
+    );
+    const table = container.querySelector<HTMLTableElement>('table:not([role="presentation"])');
+    const row = container.querySelector<HTMLTableRowElement>('tr[data-entry-id="e1"]');
+    expect(table?.style.tableLayout).toBe('fixed');
+    expect(table?.querySelectorAll('col')).toHaveLength(6);
+    expect(row?.cells[3].style.overflowWrap).toBe('anywhere');
+    expect(row?.cells[4].style.overflowWrap).toBe('anywhere');
+    expect(row?.cells[5].style.overflowWrap).toBe('anywhere');
+    expect(Number.parseFloat(row?.cells[5].style.fontSize ?? '')).toBeLessThan(11.5);
+  });
+});
+
+describe('PDF numeric cell sizing', () => {
+  it('reduces font size for exceptionally long formatted amounts', () => {
+    const largeAmount = formatCurrency(9_999_999_999_999_999);
+    expect(fitPdfCellFontSize(largeAmount, 88)).toBeLessThan(9);
+    expect(fitPdfCellFontSize(largeAmount, 88)).toBeGreaterThanOrEqual(6);
+  });
 });
 
 describe('LedgerReportDocument — long PDF branding', () => {
@@ -262,6 +288,7 @@ describe('LedgerReportDocument — long PDF branding', () => {
 
     expect(supportLinks.map((link) => link.getAttribute('href'))).toEqual([
       'tel:+88017123456789876543210',
+      'https://wa.me/88017123456789876543210',
       `mailto:${supportEmail}`,
     ]);
     expect(supportLinks.every((link) => link.style.overflowWrap === 'anywhere')).toBe(true);

@@ -53,6 +53,25 @@ export function fitPdfHeaderNameFontSize(
   return Math.max(5, Math.min(maxFontSizePx, availableWidthPx / estimatedWidthEm));
 }
 
+export function fitPdfCellFontSize(
+  value: string,
+  availableWidthPx: number,
+  maxFontSizePx = 9,
+  minFontSizePx = 6,
+): number {
+  const estimatedWidthEm = Array.from(value).reduce((width, character) => {
+    if (character === ',' || character === '.') return width + 0.34;
+    if (/\s/.test(character)) return width + 0.3;
+    if (/[0-9]/.test(character)) return width + 0.58;
+    if (/[\u0980-\u09ff]/.test(character)) return width + 0.72;
+    return width + 0.62;
+  }, 0);
+  if (!estimatedWidthEm || !Number.isFinite(availableWidthPx) || availableWidthPx <= 0) {
+    return maxFontSizePx;
+  }
+  return Math.max(minFontSizePx, Math.min(maxFontSizePx, availableWidthPx / estimatedWidthEm));
+}
+
 export function renderPdfBrandLogo(websiteUrl?: string | null): string {
   const label = '<span style="letter-spacing:0.5px;">📘 বাংলা খাতা</span>';
   const href = validHttpsUrl(websiteUrl);

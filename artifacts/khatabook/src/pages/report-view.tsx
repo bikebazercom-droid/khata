@@ -42,6 +42,7 @@ import { addPdfLinkAnnotations } from '@/lib/pdf-link-annotations';
 import { splitAdjustmentDescription } from '@/lib/adjustment-display';
 import { buildPortablePdfFilename } from '@/lib/report-filename';
 import {
+  fitPdfCellFontSize,
   fitPdfHeaderNameFontSize,
   renderPdfBrandLogo,
   renderPdfStoreBadges,
@@ -193,11 +194,13 @@ export function ReportView() {
         e.description,
         e.isTransfer,
       );
+      const debitText = isGave ? formatCurrency(e.amount) : '';
+      const creditText = !isGave ? formatCurrency(e.amount) : '';
       const debitCell  = isGave
-        ? `<td style="padding:10px;border:1px solid #000;text-align:right;background:#FEF2F2;color:#000;font-weight:500;">${formatCurrency(e.amount)}</td>`
+        ? `<td style="padding:5px;border:1px solid #000;text-align:right;background:#FEF2F2;color:#000;font-weight:500;font-size:${fitPdfCellFontSize(debitText, 105)}px;overflow-wrap:anywhere;word-break:break-word;">${debitText}</td>`
         : `<td style="padding:10px;border:1px solid #000;background:#FEF2F2;"></td>`;
       const creditCell = !isGave
-        ? `<td style="padding:10px;border:1px solid #000;text-align:right;background:#F0FDF4;color:#000;font-weight:500;">${formatCurrency(e.amount)}</td>`
+        ? `<td style="padding:5px;border:1px solid #000;text-align:right;background:#F0FDF4;color:#000;font-weight:500;font-size:${fitPdfCellFontSize(creditText, 105)}px;overflow-wrap:anywhere;word-break:break-word;">${creditText}</td>`
         : `<td style="padding:10px;border:1px solid #000;background:#F0FDF4;"></td>`;
       return `
         <tr style="vertical-align:top;">
@@ -263,7 +266,11 @@ export function ReportView() {
         </div>
 
         <!-- 4. Transaction Table -->
-        <table style="width:100%;border-collapse:collapse;font-size:14px;color:#000;">
+      <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:12px;color:#000;">
+          <colgroup>
+            <col style="width:12%"/><col style="width:20%"/><col style="width:22%"/>
+            <col style="width:16%"/><col style="width:15%"/><col style="width:15%"/>
+          </colgroup>
           <thead>
             <tr style="background:#F8FAFC;font-weight:bold;">
               <th style="padding:10px;border:1px solid #000;width:18%;text-align:left;">তারিখ</th>

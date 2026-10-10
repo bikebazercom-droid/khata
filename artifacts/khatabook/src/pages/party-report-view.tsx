@@ -55,6 +55,7 @@ import {
 import { generatePaginatedStatementPdf } from '@/lib/paginated-statement-pdf';
 import { addPdfLinkAnnotations } from '@/lib/pdf-link-annotations';
 import {
+  fitPdfCellFontSize,
   fitPdfHeaderNameFontSize,
   renderPdfBrandLogo,
   renderPdfStoreBadges,
@@ -335,20 +336,23 @@ export function PartyReportView() {
 
       const details = escapeHtml(row.details);
       const adjustment = escapeHtml(row.adjustment ?? '');
+      const debitText = row.debit !== null ? fmtAmt(row.debit) : '';
+      const creditText = row.credit !== null ? fmtAmt(row.credit) : '';
+      const balanceText = fmtBal(row.balanceAfter);
       const debitCell  = row.debit !== null
-        ? `<td style="padding:4px 5px;border:1px solid #e2e8f0;text-align:right;background:#fef2f2;color:#b91c1c;font-size:9px;white-space:nowrap;overflow:hidden;">${fmtAmt(row.debit)}</td>`
+        ? `<td style="padding:4px;border:1px solid #e2e8f0;text-align:right;background:#fef2f2;color:#b91c1c;font-size:${fitPdfCellFontSize(debitText, 92)}px;overflow-wrap:anywhere;word-break:break-word;">${debitText}</td>`
         : '<td style="padding:7px 10px;border:1px solid #e2e8f0;background:#fef2f2;"></td>';
       const creditCell = row.credit !== null
-        ? `<td style="padding:4px 5px;border:1px solid #e2e8f0;text-align:right;background:#f0fdf4;color:#047857;font-size:9px;white-space:nowrap;overflow:hidden;">${fmtAmt(row.credit)}</td>`
+        ? `<td style="padding:4px;border:1px solid #e2e8f0;text-align:right;background:#f0fdf4;color:#047857;font-size:${fitPdfCellFontSize(creditText, 92)}px;overflow-wrap:anywhere;word-break:break-word;">${creditText}</td>`
         : '<td style="padding:7px 10px;border:1px solid #e2e8f0;background:#f0fdf4;"></td>';
 
       tableRows += `<tr data-pdf-kind="entry">
-        <td style="padding:7px 10px;border:1px solid #e2e8f0;font-size:11px;white-space:nowrap;">${row.dateTime}</td>
-        <td style="padding:7px 10px;border:1px solid #e2e8f0;font-size:11px;word-break:break-word;">${details}</td>
-        <td style="padding:7px 10px;border:1px solid #e2e8f0;font-size:11px;word-break:break-word;color:#1d4ed8;">${adjustment}</td>
+        <td style="padding:5px;border:1px solid #e2e8f0;font-size:10px;overflow-wrap:anywhere;word-break:break-word;">${row.dateTime}</td>
+        <td style="padding:5px;border:1px solid #e2e8f0;font-size:10px;overflow-wrap:anywhere;word-break:break-word;">${details}</td>
+        <td style="padding:5px;border:1px solid #e2e8f0;font-size:10px;overflow-wrap:anywhere;word-break:break-word;color:#1d4ed8;">${adjustment}</td>
         ${debitCell}
         ${creditCell}
-        <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:right;font-size:12px;font-weight:600;color:${balClr(row.balanceAfter)};white-space:nowrap;">${fmtBal(row.balanceAfter)}</td>
+        <td style="padding:4px;border:1px solid #e2e8f0;text-align:right;font-size:${fitPdfCellFontSize(balanceText, 112)}px;font-weight:600;color:${balClr(row.balanceAfter)};overflow-wrap:anywhere;word-break:break-word;">${balanceText}</td>
       </tr>`;
     }
 
@@ -359,9 +363,9 @@ export function PartyReportView() {
     // YOU_GAVE entries are debits; YOU_GOT entries are credits.
     tableRows += `<tr data-pdf-kind="total" style="background:#f8fafc;font-weight:700;">
       <td colspan="3" style="padding:8px 10px;border:1px solid #cbd5e1;font-size:12px;">সর্বমোট</td>
-      <td style="padding:5px;border:1px solid #cbd5e1;text-align:right;background:#fef2f2;color:#b91c1c;font-size:9px;white-space:nowrap;overflow:hidden;">${fmtAmt(totalDebit)}</td>
-      <td style="padding:5px;border:1px solid #cbd5e1;text-align:right;background:#f0fdf4;color:#047857;font-size:9px;white-space:nowrap;overflow:hidden;">${fmtAmt(totalCredit)}</td>
-      <td style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:${balClr(closingBalance)};">${fmtBal(closingBalance)}</td>
+      <td style="padding:4px;border:1px solid #cbd5e1;text-align:right;background:#fef2f2;color:#b91c1c;font-size:${fitPdfCellFontSize(fmtAmt(totalDebit), 92)}px;overflow-wrap:anywhere;word-break:break-word;">${fmtAmt(totalDebit)}</td>
+      <td style="padding:4px;border:1px solid #cbd5e1;text-align:right;background:#f0fdf4;color:#047857;font-size:${fitPdfCellFontSize(fmtAmt(totalCredit), 92)}px;overflow-wrap:anywhere;word-break:break-word;">${fmtAmt(totalCredit)}</td>
+      <td style="padding:4px;border:1px solid #cbd5e1;text-align:right;font-size:${fitPdfCellFontSize(fmtBal(closingBalance), 112)}px;color:${balClr(closingBalance)};overflow-wrap:anywhere;word-break:break-word;">${fmtBal(closingBalance)}</td>
     </tr>`;
 
     const timeStr  = format(now, 'h:mm a');
@@ -386,7 +390,7 @@ export function PartyReportView() {
   .statement-pdf-header{flex:0 0 13mm;width:100%}
   .statement-pdf-main{display:flex;flex:1 1 auto;flex-direction:column;min-height:0;overflow:hidden;padding-top:4mm}
   .statement-pdf-intro{flex:0 0 auto;margin-bottom:2mm}
-  .statement-pdf-table{width:100%;flex:0 0 auto;table-layout:fixed;border-collapse:collapse;font-size:12px;margin-top:3mm}
+   .statement-pdf-table{width:100%;flex:0 0 auto;table-layout:fixed;border-collapse:collapse;font-size:11px;margin-top:3mm;box-sizing:border-box}
   .statement-pdf-page thead{display:table-header-group}
   .statement-pdf-page tr{break-inside:avoid;page-break-inside:avoid}
   .statement-pdf-footer{flex:0 0 auto;margin-top:4mm}
@@ -450,15 +454,19 @@ export function PartyReportView() {
   </div>
 
   <!-- Transaction table -->
-  <table class="statement-pdf-table" style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;">
+   <table class="statement-pdf-table" style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:11px;margin-bottom:14px;box-sizing:border-box;">
+      <colgroup>
+        <col style="width:16%"/><col style="width:22%"/><col style="width:17%"/>
+        <col style="width:14%"/><col style="width:14%"/><col style="width:17%"/>
+      </colgroup>
       <thead>
         <tr style="background:#f8fafc;">
-          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:left;font-size:12px;color:#374151;font-weight:700;width:19%;">তারিখ</th>
-          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:left;font-size:12px;color:#374151;font-weight:700;width:23%;">ডিটেইলস</th>
-          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:left;font-size:12px;color:#374151;font-weight:700;width:16%;">অ্যাডজাস্টমেন্ট</th>
-          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:#374151;font-weight:700;background:#fef2f2;width:14%;">ডেবিট / খরচ (-)</th>
-          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:#374151;font-weight:700;background:#f0fdf4;width:14%;">ক্রেডিট / জমা (+)</th>
-          <th style="padding:8px 10px;border:1px solid #cbd5e1;text-align:right;font-size:12px;color:#374151;font-weight:700;width:14%;">ব্যালেন্স (Dr/Cr)</th>
+          <th style="padding:5px;border:1px solid #cbd5e1;text-align:left;font-size:11px;color:#374151;font-weight:700;width:16%;overflow-wrap:anywhere;">তারিখ</th>
+          <th style="padding:5px;border:1px solid #cbd5e1;text-align:left;font-size:11px;color:#374151;font-weight:700;width:22%;overflow-wrap:anywhere;">ডিটেইলস</th>
+          <th style="padding:5px;border:1px solid #cbd5e1;text-align:left;font-size:11px;color:#374151;font-weight:700;width:17%;overflow-wrap:anywhere;">অ্যাডজাস্টমেন্ট</th>
+          <th style="padding:5px;border:1px solid #cbd5e1;text-align:right;font-size:10px;color:#374151;font-weight:700;background:#fef2f2;width:14%;overflow-wrap:anywhere;">ডেবিট / খরচ (-)</th>
+          <th style="padding:5px;border:1px solid #cbd5e1;text-align:right;font-size:10px;color:#374151;font-weight:700;background:#f0fdf4;width:14%;overflow-wrap:anywhere;">ক্রেডিট / জমা (+)</th>
+          <th style="padding:5px;border:1px solid #cbd5e1;text-align:right;font-size:10px;color:#374151;font-weight:700;width:17%;overflow-wrap:anywhere;">ব্যালেন্স (Dr/Cr)</th>
         </tr>
       </thead>
       <tbody>${tableRows}</tbody>

@@ -7,7 +7,7 @@ import { BillAttachmentPreview } from '@/components/bill-attachment-preview';
 import { getLedgerEntryDateKey } from './date-time';
 import { sortGlobalLedgerEntriesChronologically } from './global-ledger-report-order';
 import { splitAdjustmentDescription } from './adjustment-display';
-import { fitPdfHeaderNameFontSize, getPdfSupportContactLinks, renderPdfStoreBadges } from './pdf-report-branding';
+import { fitPdfCellFontSize, fitPdfHeaderNameFontSize, getPdfSupportContactLinks, renderPdfStoreBadges } from './pdf-report-branding';
 import { buildPortablePdfFilename } from './report-filename';
 
 export interface GlobalReportEntry {
@@ -246,9 +246,10 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
                             fontWeight: 700,
                             backgroundColor: COLOR_DEBIT_BG,
                             color: COLOR_DEBIT_TEXT,
-                            fontSize: '9px',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
+                            fontSize: `${fitPdfCellFontSize(isGave ? formatCurrency(entry.amount) : '', 88)}px`,
+                            whiteSpace: 'normal',
+                            overflowWrap: 'anywhere',
+                            wordBreak: 'break-word',
                           }}
                         >
                           {isGave ? formatCurrency(entry.amount) : ''}
@@ -261,9 +262,10 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
                             fontWeight: 700,
                             backgroundColor: COLOR_CREDIT_BG,
                             color: COLOR_CREDIT_TEXT,
-                            fontSize: '9px',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
+                            fontSize: `${fitPdfCellFontSize(!isGave ? formatCurrency(entry.amount) : '', 88)}px`,
+                            whiteSpace: 'normal',
+                            overflowWrap: 'anywhere',
+                            wordBreak: 'break-word',
                           }}
                         >
                           {!isGave ? formatCurrency(entry.amount) : ''}
@@ -275,10 +277,10 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
                     <td colSpan={5} style={{ padding: '8px 10px', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
                       {group.label.split(' ')[0]} মোট
                     </td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
+                    <td style={{ padding: '5px 4px', textAlign: 'right', fontWeight: 800, fontSize: `${fitPdfCellFontSize(formatCurrency(group.totalDebit), 88)}px`, overflowWrap: 'anywhere', wordBreak: 'break-word', color: '#0f172a', border: GRID_BORDER }}>
                       {formatCurrency(group.totalDebit)}
                     </td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
+                    <td style={{ padding: '5px 4px', textAlign: 'right', fontWeight: 800, fontSize: `${fitPdfCellFontSize(formatCurrency(group.totalCredit), 88)}px`, overflowWrap: 'anywhere', wordBreak: 'break-word', color: '#0f172a', border: GRID_BORDER }}>
                       {formatCurrency(group.totalCredit)}
                     </td>
                   </tr>
