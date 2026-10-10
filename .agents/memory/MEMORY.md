@@ -33,6 +33,6 @@
 - [Expo WebView contact access](expo-webview-contact-access.md) — request contacts when the user opens the party picker; never at app startup, and pass only names and phone numbers.
 - [Expo Audio component tests](expo-audio-component-tests.md) — mock `expo-audio` in mobile Vitest tests; importing its Expo runtime bootstrap fails under the jsdom setup.
 - [Expo Router Stack children](expo-router-stack-children.md) — register Stack.Screen elements directly or in arrays; nested fragments can crash the route mapper.
-- [Public npm lockfiles for EAS](public-npm-lockfile-eas.md) — EAS cannot resolve absolute Replit firewall tarball URLs; verify lockfile `resolved` entries even after npm regenerates it.
+- [Expo monorepo build root](public-npm-lockfile-eas.md) — build the nested mobile Expo app, and let its pnpm workspace lockfile control installs rather than adding a root npm lock.
 - [Portable report filenames](portable-report-filenames.md) — use ASCII-only PDF filenames for generated reports; keep Bengali in the PDF content and share title, not file metadata.
 - [Interactive PDF support contacts](pdf-support-links.md) — PDFs cannot run a custom contact-choice popup; provide direct `tel:`, WhatsApp, and `mailto:` links as separate actions.
