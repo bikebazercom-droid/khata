@@ -523,7 +523,7 @@ export function useAppAuth() {
 
   // ── Development bypass — returned AFTER all hooks so hook order is stable ──
   if (devBypass) {
-    return { isAuthenticated: true, isLoading: false, authMethod: 'dev' as const, role: 'owner' as const, userId: 'dev-user', businessId: null, needsBookName: false, adjustmentPartyIds: [] as string[] };
+    return { isAuthenticated: true, isLoading: false, authMethod: 'dev' as const, role: 'owner' as const, userId: 'dev-user', businessId: null, phone: undefined, needsBookName: false, adjustmentPartyIds: [] as string[] };
   }
 
   return {
@@ -533,6 +533,7 @@ export function useAppAuth() {
     role,
     userId: resolvedAuthData?.userId,
     businessId: resolvedAuthData?.businessId ?? null,
+    phone: (resolvedAuthData as (typeof resolvedAuthData & { phone?: string }) | undefined)?.phone,
     needsBookName: resolvedAuthData?.needsBookName ?? false,
     adjustmentPartyIds: (resolvedAuthData as (typeof resolvedAuthData & { adjustmentPartyIds?: string[] }) | undefined)?.adjustmentPartyIds ?? [],
     authError: isError ? (error as Error).message : null,

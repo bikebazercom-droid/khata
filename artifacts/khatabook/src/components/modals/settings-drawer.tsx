@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
-import { useClerk, useAuth } from '@clerk/react';
+import { useClerk, useAuth, useUser } from '@clerk/react';
 import { useBusinessContext } from '@/lib/businessContext';
 import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import {
@@ -12,13 +12,7 @@ import {
   useRemoveOwnerPushToken,
   type BusinessSettings,
 } from '@workspace/api-client-react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-} from '@/components/ui/drawer';
+import { ChevronDown, ChevronUp, LogIn, LogOut, Mail, Phone, Settings, UserRound } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -27,6 +21,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
 } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { phoneLogout } from '@/lib/phoneAuth';
 import { clearOfflineIdentity, markLocalLogoutPending, readOfflineIdentity } from '@/lib/offlineSession';
 import { clearPersistedQueries } from '@/lib/queryPersister';
@@ -83,7 +78,8 @@ export function SettingsDrawer({
   const queryClient = useQueryClient();
   const { signOut } = useClerk();
   const { isSignedIn } = useAuth();
-  const { isAuthenticated, role } = useAppAuth();
+  const { isAuthenticated, role, phone, authMethod } = useAppAuth();
+  const { user: clerkUser } = useUser();
   const removeOwnerPushToken = useRemoveOwnerPushToken();
   const { selectedBusinessId } = useBusinessContext();
   const { data: settings } = useGetBusinessSettings({
@@ -99,6 +95,12 @@ export function SettingsDrawer({
     setActiveMenu(prev => (prev === menu ? null : menu));
 
   const [profile, setProfile] = useState<ShopProfile>(loadShopProfile);
+  const loginIdentity = authMethod === 'phone'
+    ? phone || readOfflineIdentity()?.phone
+    : clerkUser?.primaryEmailAddress?.emailAddress ||
+      clerkUser?.primaryPhoneNumber?.phoneNumber ||
+      clerkUser?.emailAddresses[0]?.emailAddress ||
+      clerkUser?.phoneNumbers[0]?.phoneNumber;
 
   useEffect(() => {
     if (open) {
@@ -272,50 +274,73 @@ export function SettingsDrawer({
   ];
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent>
-        <DrawerHeader className="text-left">
-          <DrawerTitle className="text-slate-800">{t('settingsTitle')}</DrawerTitle>
-        </DrawerHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="left-auto right-0 top-0 flex h-[100dvh] w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 border-l border-slate-200 bg-slate-50 p-0 shadow-2xl data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right sm:w-[420px] pt-[var(--safe-top)] pb-[var(--safe-bottom)]">
+        <DialogHeader className="shrink-0 border-b border-slate-200 bg-[#1B3A6B] px-5 py-5 pr-14 text-left">
+          <DialogTitle className="text-lg font-bold text-white">আরো</DialogTitle>
+          <p className="text-xs text-white/70">প্রোফাইল, সেটিংস ও অ্যাকাউন্ট</p>
+        </DialogHeader>
 
-        <div className="px-4 pb-10 space-y-2 overflow-y-auto max-h-[75vh]">
+        <div className="flex-1 space-y-4 overflow-y-auto px-5 pb-6 pt-5">
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Login status">
+            <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+              {authMethod === 'phone' ? <Phone className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
+              লগইন অবস্থা
+            </div>
+            <div className="text-sm font-semibold text-slate-800">
+              {isAuthenticated ? loginIdentity || (authMethod === 'phone' ? 'ফোন নম্বরে লগইন' : 'ইমেইলে লগইন') : 'লগইন করা নেই'}
+            </div>
+            <div className="mt-1 text-xs text-slate-500">
+              {isAuthenticated ? 'বর্তমানে সক্রিয় অ্যাকাউন্ট' : 'অ্যাকাউন্ট ব্যবহার করতে লগইন করুন'}
+            </div>
+          </section>
 
           {/* ── Row 1: Profile ──────────────────────────────────────────── */}
-          {role === 'owner' && (
-            <div>
-              <button type="button" onClick={() => toggleMenu('profile')} className={rowHeader('profile')}>
-                <span className="flex items-center gap-2">
-                  <span>👤</span>
-                  <span className={activeMenu === 'profile' ? 'text-white' : 'text-slate-700'}>
-                    {t('profileInfo')}
-                  </span>
+          <div>
+            <button type="button" onClick={() => toggleMenu('profile')} className={rowHeader('profile')}>
+              <span className="flex items-center gap-2">
+                <UserRound className="h-4 w-4" />
+                <span className={activeMenu === 'profile' ? 'text-white' : 'text-slate-700'}>
+                  প্রোফাইল
                 </span>
-                {activeMenu === 'profile'
-                  ? <ChevronUp className="w-4 h-4 shrink-0 text-white" />
-                  : <ChevronDown className="w-4 h-4 shrink-0 text-slate-400" />}
-              </button>
+              </span>
+              {activeMenu === 'profile'
+                ? <ChevronUp className="w-4 h-4 shrink-0 text-white" />
+                : <ChevronDown className="w-4 h-4 shrink-0 text-slate-400" />}
+            </button>
 
-              {activeMenu === 'profile' && (
-                <div className={rowBody}>
-                  {profileFields.map(({ field, label, placeholder, type }) => (
-                    <div key={field}>
-                      <label className="block text-[11px] font-semibold text-slate-500 mb-1">{label}</label>
-                      <input
-                        type={type}
-                        placeholder={placeholder}
-                        value={profile[field]}
-                        onChange={e => handleProfileField(field, e.target.value)}
-                        className="w-full px-3 py-2.5 text-[13px] border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]/30 focus:border-[#1B3A6B]"
-                      />
-                    </div>
-                  ))}
-                  <p className="text-[10px] text-slate-400 pt-1">
-                    {t('deviceOnly')}
-                  </p>
-                </div>
-              )}
+            {activeMenu === 'profile' && (
+              <div className={rowBody}>
+                {profileFields.map(({ field, label, placeholder, type }) => (
+                  <div key={field}>
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">{label}</label>
+                    <input
+                      type={type}
+                      placeholder={placeholder}
+                      value={profile[field]}
+                      onChange={e => handleProfileField(field, e.target.value)}
+                      className="w-full px-3 py-2.5 text-[13px] border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]/30 focus:border-[#1B3A6B]"
+                    />
+                  </div>
+                ))}
+                <p className="text-[10px] text-slate-400 pt-1">
+                  {t('deviceOnly')}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
+              <Settings className="h-4 w-4 text-[#1B3A6B]" />
+              সেটিংস
             </div>
-          )}
+            <div className="rounded-xl bg-slate-50 px-3 py-3">
+              <div className="text-[11px] font-medium text-slate-500">সক্রিয় খাতা</div>
+              <div className="mt-1 text-sm font-semibold text-slate-800">{settings?.storeName || profile.businessName || 'বাংলাখাতা'}</div>
+              <div className="mt-1 text-xs text-slate-500">{role === 'owner' ? 'মালিক অ্যাকাউন্ট' : 'স্টাফ অ্যাকাউন্ট'}</div>
+            </div>
+          </section>
 
           {role === 'owner' && (
             <button
@@ -332,9 +357,9 @@ export function SettingsDrawer({
           <div>
             <button type="button" onClick={() => toggleMenu('auth')} className={rowHeader('auth')}>
               <span className="flex items-center gap-2">
-                <span>🔐</span>
+                {isAuthenticated ? <LogOut className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}
                 <span className={activeMenu === 'auth' ? 'text-white' : 'text-slate-700'}>
-                  {t('loginLogout')}
+                  লগইন / লগআউট
                 </span>
               </span>
               {activeMenu === 'auth'
@@ -389,7 +414,7 @@ export function SettingsDrawer({
           )}
 
         </div>
-      </DrawerContent>
+      </DialogContent>
 
       {/* ── Confirmation dialog ──────────────────────────────────── */}
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
@@ -422,6 +447,6 @@ export function SettingsDrawer({
         </AlertDialogContent>
       </AlertDialog>
 
-    </Drawer>
+    </Dialog>
   );
 }

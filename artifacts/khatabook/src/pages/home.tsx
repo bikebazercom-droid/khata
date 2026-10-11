@@ -19,7 +19,7 @@ import {
   type Party,
 } from '@workspace/api-client-react';
 import { useMemo } from 'react';
-import { Search, Plus, Settings, User, ChevronRight, UserPlus2, SlidersHorizontal, FileText, Users, FolderOpen, X, ScanLine } from 'lucide-react';
+import { Search, Plus, MoreHorizontal, User, ChevronRight, UserPlus2, SlidersHorizontal, FileText, Users, FolderOpen, X, ScanLine } from 'lucide-react';
 import { cn, escapeHtml } from '@/lib/utils';
 import { LedgerBookHeader } from '@/components/ledger-book-header';
 import { Input } from '@/components/ui/input';
@@ -658,8 +658,8 @@ export function HomeView() {
                 onClick={() => setIsSettingsOpen(true)}
                 className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-2 rounded-xl active:scale-95 transition-all"
               >
-                <Settings className="w-3.5 h-3.5" />
-                সেটিংস
+                <MoreHorizontal className="w-3.5 h-3.5" />
+                অ্যারো
               </button>
             )}
           </div>
@@ -908,15 +908,14 @@ export function HomeView() {
           <Users className="w-5 h-5" />
           <span className="text-[10px] font-bold">{t('parties')}</span>
         </button>
-        {userRole === 'owner' && (
-          <button
-            onClick={() => setIsSettingsOpen(true)}
-            className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-slate-400 active:text-slate-600 transition-colors"
-          >
-            <Settings className="w-5 h-5" />
-            <span className="text-[10px] font-bold">{t('settings')}</span>
-          </button>
-        )}
+        <button
+          onClick={() => setIsSettingsOpen(true)}
+          aria-label="অ্যারো মেনু খুলুন"
+          className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-slate-400 active:text-slate-600 transition-colors"
+        >
+          <MoreHorizontal className="w-5 h-5" />
+          <span className="text-[10px] font-bold">অ্যারো</span>
+        </button>
       </div>
 
       <AddPartyModal open={isAddPartyOpen} onOpenChange={setIsAddPartyOpen} defaultRole={role} />
