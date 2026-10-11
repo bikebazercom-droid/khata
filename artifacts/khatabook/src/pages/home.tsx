@@ -815,7 +815,7 @@ export function HomeView() {
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {parties.map((party, i) => (
+            {parties.map((party) => (
               <div
                 key={party.id}
                 role="button"
@@ -825,9 +825,9 @@ export function HomeView() {
                 className={cn(
                   'flex items-center justify-between gap-3 p-4 active:bg-slate-50 transition-all w-full text-left relative cursor-pointer',
                   location === `/party/${party.id}` && 'bg-blue-50/40',
-                  'animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both'
+                  'motion-safe:transition-colors'
                 )}
-                style={{ animationDelay: `${i * 30}ms` }}
+                style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 84px' }}
               >
                 <div
                   className={cn(

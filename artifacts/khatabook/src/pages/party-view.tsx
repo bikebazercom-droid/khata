@@ -155,8 +155,7 @@ export function PartyView() {
   const { data: reportBranding } = useGetPublicReportBranding({
     query: {
       queryKey: getGetPublicReportBrandingQueryKey(),
-      staleTime: 0,
-      refetchOnMount: 'always',
+      staleTime: 5 * 60 * 1000,
     },
   });
   const partiesParams = {};
@@ -548,7 +547,7 @@ export function PartyView() {
                   </span>
                 </div>
                 <div className="space-y-2 px-1.5 min-[480px]:px-2.5">
-                  {group.items.map((entry, i) => {
+                  {group.items.map((entry) => {
                     const isGave = entry.type === 'YOU_GAVE';
                     const isQueuedLocally = queuedEntryIds.has(entry.id);
                     const imgSrc = billImageSrc(entry.billImage);
@@ -581,10 +580,10 @@ export function PartyView() {
                           if (userRole === 'owner' && e.key === 'Enter') navigate(`/party/${id}/entry/${entry.id}`);
                         }}
                         className={cn(
-                          "grid grid-cols-[minmax(0,1fr)_5rem_5rem] min-[380px]:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] min-[480px]:grid-cols-[minmax(0,1fr)_6rem_6rem] items-stretch gap-0 overflow-hidden rounded-xl border border-[#EBEBEB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.07)] animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both transition-colors",
+                          "grid grid-cols-[minmax(0,1fr)_5rem_5rem] min-[380px]:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] min-[480px]:grid-cols-[minmax(0,1fr)_6rem_6rem] items-stretch gap-0 overflow-hidden rounded-xl border border-[#EBEBEB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.07)] transition-colors",
                             userRole === 'owner' ? "cursor-pointer active:bg-slate-50" : ""
                         )}
-                        style={{ animationDelay: `${i * 30}ms` }}
+                        style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 120px' }}
                       >
                         <div className="min-w-0 py-2.5 pl-2 pr-1 min-[480px]:py-3 min-[480px]:pl-3 min-[480px]:pr-2">
                           <p className="flex flex-wrap items-center gap-1 text-[10px] font-bold text-slate-700 min-[480px]:gap-1.5 min-[480px]:text-[12px]">
