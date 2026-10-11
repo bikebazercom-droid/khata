@@ -4,6 +4,10 @@
       "node": "22.16.0",
       "distribution": "internal",
       "environment": "preview",
+      "env": {
+        "EXPO_PUBLIC_DOMAIN": "hazarikhata.replit.app",
+        "EXPO_PUBLIC_WEB_APP_URL": "https://hazarikhata.replit.app/"
+      },
       "android": {
         "buildType": "apk"
       }
@@ -11,6 +15,10 @@
     "production": {
       "node": "22.16.0",
       "distribution": "store",
+      "env": {
+        "EXPO_PUBLIC_DOMAIN": "hazarikhata.replit.app",
+        "EXPO_PUBLIC_WEB_APP_URL": "https://hazarikhata.replit.app/"
+      },
       "android": {
         "buildType": "app-bundle"
       }
