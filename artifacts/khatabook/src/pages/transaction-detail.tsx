@@ -295,7 +295,7 @@ export function TransactionDetailPage() {
       </header>
 
       {/* ── Scrollable body ─────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 pb-28 space-y-3">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-4 space-y-3">
 
         {/* ── 2. White receipt card (captured for share) ─────────── */}
         <div
@@ -471,15 +471,20 @@ export function TransactionDetailPage() {
         </div>
       </div>
 
-      {/* ── 4. Fixed footer: Delete (left) + Share (right) ──────── */}
+      {/* ── 4. Flex footer: remains below the scrolling details content ── */}
       <div
-        className="fixed bottom-0 inset-x-0 flex gap-3 px-4 py-3 z-20"
-        style={{ backgroundColor: '#ffffff', borderTop: '1px solid #E5E7EB', boxSizing: 'border-box' }}
+        className="shrink-0 flex gap-3 px-4 pt-3 pb-3 z-20"
+        style={{
+          backgroundColor: '#ffffff',
+          borderTop: '1px solid #E5E7EB',
+          boxSizing: 'border-box',
+          paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))',
+        }}
       >
         <button
           type="button"
           onClick={() => setShowDeleteConfirm(true)}
-          className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded font-bold text-[15px] active:scale-[0.97] transition-transform"
+          className="min-w-0 min-h-12 flex-1 flex items-center justify-center gap-1.5 rounded font-bold text-[15px] active:scale-[0.97] transition-transform"
           style={{ backgroundColor: '#ffffff', color: '#DC2626', border: '1px solid #DC2626' }}
         >
           🗑️ মুছে ফেলুন
@@ -487,7 +492,7 @@ export function TransactionDetailPage() {
         <button
           type="button"
           onClick={handleJpgShare}
-          className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded font-bold text-[15px] text-white active:scale-[0.97] transition-transform"
+          className="min-w-0 min-h-12 flex-1 flex items-center justify-center gap-1.5 rounded font-bold text-[15px] text-white active:scale-[0.97] transition-transform"
           style={{ backgroundColor: '#0A4384', border: 'none' }}
         >
           📢 শেয়ার করুন
