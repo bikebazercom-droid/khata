@@ -31,7 +31,9 @@ export function evaluateCalculatorExpression(raw: string): number | null {
   if (isOperator(tokens[0])) return null;
   const round2 = (value: number) => Math.round(value * 100) / 100;
   const first = tokens[0];
-  let total = first.endsWith('%') ? round2(parseFloat(first) / 100) : parseFloat(first);
+  // Keep percentage fractions precise until the enclosing operation finishes.
+  // Rounding 80.10% to 0.80 would make 1,000,000 ÷ 80.10% equal 1,250,000.
+  let total = first.endsWith('%') ? parseFloat(first) / 100 : parseFloat(first);
   if (!Number.isFinite(total)) return null;
 
   for (let index = 1; index < tokens.length; index += 2) {
@@ -44,7 +46,7 @@ export function evaluateCalculatorExpression(raw: string): number | null {
     const value = isPercent
       ? operator === '+' || operator === '-'
         ? round2(total * (number / 100))
-        : round2(number / 100)
+        : number / 100
       : number;
 
     switch (operator) {

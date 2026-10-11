@@ -141,7 +141,10 @@ export function evaluateCalculatorExpression(raw: string): number | null {
   const r2 = (n: number) => Math.round(n * 100) / 100;
 
   const firstToken = tokens[0];
-  let acc = firstToken.endsWith('%') ? r2(parseFloat(firstToken) / 100) : parseFloat(firstToken);
+  // Keep percentage fractions precise until the enclosing operation finishes.
+  // Rounding 80.10% to 0.80 here would make 1,000,000 ÷ 80.10% equal
+  // 1,250,000 instead of 1,248,439.45.
+  let acc = firstToken.endsWith('%') ? parseFloat(firstToken) / 100 : parseFloat(firstToken);
   if (!Number.isFinite(acc)) return null;
 
   for (let i = 1; i < tokens.length; i += 2) {
@@ -156,7 +159,7 @@ export function evaluateCalculatorExpression(raw: string): number | null {
     const value = isPercent
       ? op === '+' || op === '-'
         ? r2(acc * (rawNum / 100)) // percent of the running total for +/-
-        : r2(rawNum / 100)         // literal fraction for */÷
+        : rawNum / 100             // keep literal fraction precise for */÷
       : rawNum;
 
     switch (op) {
