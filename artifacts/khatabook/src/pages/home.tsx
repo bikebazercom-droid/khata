@@ -3,6 +3,7 @@ import { useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { useBusinessContext } from '@/lib/businessContext';
 import { businessScopedQueryKey } from '@/lib/businessQueryKey';
+import { sortPartiesByRecentActivity } from '@/lib/party-activity';
 import { isOfflineMode } from '@/lib/useAuthConnectivity';
 import {
   useListParties,
@@ -304,12 +305,9 @@ export function HomeView() {
       case 'highest': return [...result].sort((a, b) => b.currentBalance - a.currentBalance);
       case 'lowest':  return [...result].sort((a, b) => a.currentBalance - b.currentBalance);
       case 'name':    return [...result].sort((a, b) => a.name.localeCompare(b.name, 'bn'));
-      case 'oldest':  return [...result].sort((a, b) => {
-        const aT = a.lastTransactionAt ? new Date(a.lastTransactionAt).getTime() : 0;
-        const bT = b.lastTransactionAt ? new Date(b.lastTransactionAt).getTime() : 0;
-        return aT - bT;
-      });
-      default: return result;
+      case 'oldest':  return sortPartiesByRecentActivity(result, 'oldest');
+      case 'recent':
+      default: return sortPartiesByRecentActivity(result);
     }
   }, [rawParties, appliedFilter, appliedSort]);
 

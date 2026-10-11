@@ -224,7 +224,10 @@ router.get("/parties", async (req, res): Promise<void> => {
     .select()
     .from(partiesTable)
     .where(condition)
-    .orderBy(desc(partiesTable.lastTransactionAt), desc(partiesTable.createdAt));
+    .orderBy(
+      desc(sql`coalesce(${partiesTable.lastTransactionAt}, ${partiesTable.createdAt})`),
+      desc(partiesTable.createdAt),
+    );
 
   const today = toDateOnlyString(new Date())!;
 
@@ -1026,12 +1029,10 @@ router.patch(
       const now = new Date();
       for (const lockedParty of lockedParties) {
         const delta = balanceDeltas.get(lockedParty.id) ?? 0;
-        if (delta !== 0) {
-          await tx.update(partiesTable).set({
-            ...fromSignedBalance(toSignedBalance(lockedParty) + delta),
-            lastTransactionAt: now,
-          }).where(eq(partiesTable.id, lockedParty.id));
-        }
+        await tx.update(partiesTable).set({
+          ...fromSignedBalance(toSignedBalance(lockedParty) + delta),
+          lastTransactionAt: now,
+        }).where(eq(partiesTable.id, lockedParty.id));
       }
 
       return {

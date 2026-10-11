@@ -1,6 +1,7 @@
 import { createParty, deleteParty, getParty, updateParty, type Party, type PartyInput, type PartyUpdate } from '@workspace/api-client-react';
 import type { QueryClient, Query } from '@tanstack/react-query';
 import { listEntries } from './entryOutbox';
+import { sortPartiesByRecentActivity } from './party-activity';
 
 export type PartyOperationKind = 'create' | 'update' | 'delete';
 
@@ -156,7 +157,7 @@ function applyParty(queryClient: QueryClient, businessId: string, kind: PartyOpe
       if (!Array.isArray(old)) return old;
       const withoutParty = old.filter((item) => item.id !== party.id);
       if (kind === 'delete' || !matchesListParams(party, query)) return withoutParty;
-      return [party, ...withoutParty];
+      return sortPartiesByRecentActivity([party, ...withoutParty]);
     });
   }
 
@@ -210,7 +211,7 @@ export async function optimisticallyAddPartyToListCaches(
       .filter((item) => item.id !== party.id);
     queryClient.setQueryData<Party[]>(
       query.queryKey,
-      matches ? [party, ...withoutParty] : withoutParty,
+      matches ? sortPartiesByRecentActivity([party, ...withoutParty]) : withoutParty,
     );
   }
   return snapshots;
@@ -227,6 +228,31 @@ export function restorePartyListCaches(
       queryClient.setQueryData(snapshot.queryKey, snapshot.data);
     }
   }
+}
+
+export function touchPartyActivityInListCaches(
+  queryClient: QueryClient,
+  businessId: string | null,
+  partyIds: Iterable<string>,
+  activityAt = new Date().toISOString(),
+): PartyListCacheSnapshot[] {
+  const ids = new Set(partyIds);
+  const snapshots: PartyListCacheSnapshot[] = [];
+  const listQueries = queryClient.getQueryCache().findAll({
+    predicate: (query) =>
+      query.queryKey[0] === 'listParties' &&
+      hasBusinessScope(query, businessId ?? '__default_business__'),
+  });
+
+  for (const query of listQueries) {
+    const previous = queryClient.getQueryData<Party[]>(query.queryKey);
+    if (!Array.isArray(previous)) continue;
+    snapshots.push({ queryKey: query.queryKey, data: previous });
+    queryClient.setQueryData<Party[]>(query.queryKey, sortPartiesByRecentActivity(
+      previous.map((party) => ids.has(party.id) ? { ...party, lastTransactionAt: activityAt } : party),
+    ));
+  }
+  return snapshots;
 }
 
 export async function applyQueuedPartyOperations(

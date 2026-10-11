@@ -38,6 +38,7 @@ import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import { useConnectionState } from '@/context/connection-state';
 import { notifyEntrySaved } from '@/components/ui/entry-saved-feedback';
 import { queueEntry, updatePendingEntry, type QueuedEntry } from '@/lib/entryOutbox';
+import { restorePartyListCaches, touchPartyActivityInListCaches } from '@/lib/partyOutbox';
 import { isLedgerAmountLimitError } from '@/lib/ledgerSaveError';
 import { readOfflineIdentity } from '@/lib/offlineSession';
 
@@ -678,6 +679,13 @@ export function TransactionEntryScreen({
             toast.error('এন্ট্রিটি ইতিমধ্যে সিঙ্ক হয়েছে', { description: 'ইন্টারনেট থাকলে আবার খুলে পরিবর্তন করুন।' });
             return;
           }
+          touchPartyActivityInListCaches(
+            queryClient,
+            selectedBusinessId,
+            [partyId, queuedEntry.data.transferPartyId, isTransferMode ? transferPartyId : null].filter(
+              (id): id is string => Boolean(id),
+            ),
+          );
           clearMemory();
           onClose();
           toast.success('অফলাইন এন্ট্রি আপডেট হয়েছে');
@@ -704,6 +712,13 @@ export function TransactionEntryScreen({
     const previousParty   = queryClient.getQueryData<Party>(partyKey);
     const previousParties = queryClient.getQueryData<Party[]>(partiesKey);
     const previousSummary = queryClient.getQueryData<DashboardSummary>(summaryKey);
+    const activityAt = new Date().toISOString();
+    const previousActivityLists = touchPartyActivityInListCaches(
+      queryClient,
+      selectedBusinessId,
+      affectedPartyIds,
+      activityAt,
+    );
 
     // ── 2. Optimistic cache update ────────────────────────────────────────
     const updatedEntry: LedgerEntry = {
@@ -732,13 +747,15 @@ export function TransactionEntryScreen({
     const netDelta = newDelta - oldDelta;
 
     const updatedParty = previousParty
-      ? applyBalanceDelta(previousParty, netDelta)
+      ? { ...applyBalanceDelta(previousParty, netDelta), lastTransactionAt: activityAt }
       : undefined;
 
     if (updatedParty) {
       queryClient.setQueryData<Party>(partyKey, updatedParty);
       queryClient.setQueryData<Party[]>(partiesKey, (old) =>
-        (old ?? []).map((p) => (p.id === partyId ? applyBalanceDelta(p, netDelta) : p))
+        (old ?? []).map((p) => (p.id === partyId
+          ? { ...applyBalanceDelta(p, netDelta), lastTransactionAt: activityAt }
+          : p))
       );
     }
     if (previousSummary && previousParty && updatedParty) {
@@ -848,6 +865,7 @@ export function TransactionEntryScreen({
         queryClient.setQueryData(entriesKey, previousEntries);
         queryClient.setQueryData(partyKey,   previousParty);
         queryClient.setQueryData(partiesKey, previousParties);
+        restorePartyListCaches(queryClient, previousActivityLists);
         queryClient.setQueryData(summaryKey, previousSummary);
         if (isLedgerAmountLimitError(err)) {
           toast.error('লেনদেনের পরিমাণ সীমা ছাড়িয়েছে', {
@@ -974,6 +992,11 @@ export function TransactionEntryScreen({
       // into its normal ledger list and projected balance. The shared sync
       // manager replays the same idempotent request in the background.
       await saveOfflineDraft();
+      touchPartyActivityInListCaches(
+        queryClient,
+        activeBusinessId,
+        [partyId, isTransferMode ? transferPartyId : null].filter((id): id is string => Boolean(id)),
+      );
       createRequestRef.current = null;
       uploadedCreateImageRef.current = null;
       pendingBase64Ref.current = null;
