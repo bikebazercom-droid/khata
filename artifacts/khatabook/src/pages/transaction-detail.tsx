@@ -478,7 +478,7 @@ export function TransactionDetailPage() {
           backgroundColor: '#ffffff',
           borderTop: '1px solid #E5E7EB',
           boxSizing: 'border-box',
-          paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))',
+          paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom, 0px))',
         }}
       >
         <button
