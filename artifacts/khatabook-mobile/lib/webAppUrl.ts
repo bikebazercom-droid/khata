@@ -42,9 +42,8 @@ export function resolveWebAppStartUrl(
 ): string | null {
   try {
     const url = new URL(webAppUrl);
-    if (!hasNativeSession) return url.toString();
     const basePath = url.pathname.replace(/\/+$/, "");
-    url.pathname = `${basePath}/dashboard`;
+    url.pathname = `${basePath}${hasNativeSession ? "/dashboard" : "/sign-in"}`;
     return url.toString();
   } catch {
     return null;

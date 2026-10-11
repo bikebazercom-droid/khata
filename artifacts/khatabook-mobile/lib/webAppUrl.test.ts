@@ -32,8 +32,13 @@ describe('resolveWebAppStartUrl', () => {
       .toBe('https://ledger.example.com/mobile/dashboard');
   });
 
-  it('keeps the public root when the native shell has no session', () => {
+  it('opens the app sign-in route instead of the public marketing page without a session', () => {
     expect(resolveWebAppStartUrl('https://ledger.example.com/', false))
-      .toBe('https://ledger.example.com/');
+      .toBe('https://ledger.example.com/sign-in');
+  });
+
+  it('preserves a configured app base path when opening sign-in', () => {
+    expect(resolveWebAppStartUrl('https://ledger.example.com/mobile/', false))
+      .toBe('https://ledger.example.com/mobile/sign-in');
   });
 });

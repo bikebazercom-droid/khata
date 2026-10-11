@@ -528,7 +528,7 @@ export function WebAppScreen() {
   const websiteView = Platform.OS === 'web'
     ? createElement('iframe', {
       key: retryKey,
-      src: webAppUrl,
+      src: initialUrl ?? webAppUrl,
       title: 'BanglaKhata',
       allow: 'camera; clipboard-read; clipboard-write',
       onLoad: handleLoadComplete,
