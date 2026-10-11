@@ -342,19 +342,19 @@ export function PartyReportView() {
       const creditText = row.credit !== null ? fmtAmt(row.credit) : '';
       const balanceText = fmtBal(row.balanceAfter);
       const debitCell  = row.debit !== null
-        ? `<td style="padding:10px 6px;border:1px solid #e2e8f0;text-align:center;vertical-align:middle;background:#fef2f2;color:#b91c1c;font-size:${fitPdfCellFontSize(debitText, 92)}px;overflow-wrap:anywhere;word-break:break-word;">${debitText}</td>`
-        : '<td style="padding:10px 6px;border:1px solid #e2e8f0;text-align:center;vertical-align:middle;background:#fef2f2;"></td>';
+        ? `<td style="padding:12px 8px;border:1px solid #e2e8f0;text-align:center;vertical-align:middle;background:#fef2f2;color:#b91c1c;font-size:${fitPdfCellFontSize(debitText, 92)}px;overflow-wrap:anywhere;word-break:break-word;">${debitText}</td>`
+        : '<td style="padding:12px 8px;border:1px solid #e2e8f0;text-align:center;vertical-align:middle;background:#fef2f2;"></td>';
       const creditCell = row.credit !== null
-        ? `<td style="padding:10px 6px;border:1px solid #e2e8f0;text-align:center;vertical-align:middle;background:#f0fdf4;color:#047857;font-size:${fitPdfCellFontSize(creditText, 92)}px;overflow-wrap:anywhere;word-break:break-word;">${creditText}</td>`
-        : '<td style="padding:10px 6px;border:1px solid #e2e8f0;text-align:center;vertical-align:middle;background:#f0fdf4;"></td>';
+        ? `<td style="padding:12px 8px;border:1px solid #e2e8f0;text-align:center;vertical-align:middle;background:#f0fdf4;color:#047857;font-size:${fitPdfCellFontSize(creditText, 92)}px;overflow-wrap:anywhere;word-break:break-word;">${creditText}</td>`
+        : '<td style="padding:12px 8px;border:1px solid #e2e8f0;text-align:center;vertical-align:middle;background:#f0fdf4;"></td>';
 
       tableRows += `<tr data-pdf-kind="entry" style="vertical-align:middle;">
-        <td style="padding:10px 6px;border:1px solid #e2e8f0;text-align:center;vertical-align:middle;font-size:10px;overflow-wrap:anywhere;word-break:break-word;">${dateOnly}</td>
-        <td style="padding:10px 6px;border:1px solid #e2e8f0;text-align:center;vertical-align:middle;font-size:10px;overflow-wrap:anywhere;word-break:break-word;">${details}</td>
-        <td style="padding:10px 6px;border:1px solid #e2e8f0;text-align:center;vertical-align:middle;font-size:10px;overflow-wrap:anywhere;word-break:break-word;color:#1d4ed8;">${adjustment}</td>
+        <td style="padding:12px 8px;border:1px solid #e2e8f0;text-align:center;vertical-align:middle;font-size:10px;overflow-wrap:anywhere;word-break:break-word;">${dateOnly}</td>
+        <td style="padding:12px 8px;border:1px solid #e2e8f0;text-align:center;vertical-align:middle;font-size:10px;overflow-wrap:anywhere;word-break:break-word;">${details}</td>
+        <td style="padding:12px 8px;border:1px solid #e2e8f0;text-align:center;vertical-align:middle;font-size:10px;overflow-wrap:anywhere;word-break:break-word;color:#1d4ed8;">${adjustment}</td>
         ${debitCell}
         ${creditCell}
-        <td style="padding:10px 6px;border:1px solid #e2e8f0;text-align:center;vertical-align:middle;font-size:${fitPdfCellFontSize(balanceText, 112)}px;font-weight:600;color:${balClr(row.balanceAfter)};overflow-wrap:anywhere;word-break:break-word;">${balanceText}</td>
+        <td style="padding:12px 8px;border:1px solid #e2e8f0;text-align:center;vertical-align:middle;font-size:${fitPdfCellFontSize(balanceText, 112)}px;font-weight:600;color:${balClr(row.balanceAfter)};overflow-wrap:anywhere;word-break:break-word;">${balanceText}</td>
       </tr>`;
     }
 
@@ -364,10 +364,10 @@ export function PartyReportView() {
 
     // YOU_GAVE entries are debits; YOU_GOT entries are credits.
     tableRows += `<tr data-pdf-kind="total" style="background:#f8fafc;font-weight:700;vertical-align:middle;">
-      <td colspan="3" style="padding:10px 6px;border:1px solid #cbd5e1;text-align:center;vertical-align:middle;font-size:12px;">সর্বমোট</td>
-      <td style="padding:10px 6px;border:1px solid #cbd5e1;text-align:center;vertical-align:middle;background:#fef2f2;color:#b91c1c;font-size:${fitPdfCellFontSize(fmtAmt(totalDebit), 92)}px;overflow-wrap:anywhere;word-break:break-word;">${fmtAmt(totalDebit)}</td>
-      <td style="padding:10px 6px;border:1px solid #cbd5e1;text-align:center;vertical-align:middle;background:#f0fdf4;color:#047857;font-size:${fitPdfCellFontSize(fmtAmt(totalCredit), 92)}px;overflow-wrap:anywhere;word-break:break-word;">${fmtAmt(totalCredit)}</td>
-      <td style="padding:10px 6px;border:1px solid #cbd5e1;text-align:center;vertical-align:middle;font-size:${fitPdfCellFontSize(fmtBal(closingBalance), 112)}px;color:${balClr(closingBalance)};overflow-wrap:anywhere;word-break:break-word;">${fmtBal(closingBalance)}</td>
+      <td colspan="3" style="padding:12px 8px;border:1px solid #cbd5e1;text-align:center;vertical-align:middle;font-size:12px;">সর্বমোট</td>
+      <td style="padding:12px 8px;border:1px solid #cbd5e1;text-align:center;vertical-align:middle;background:#fef2f2;color:#b91c1c;font-size:${fitPdfCellFontSize(fmtAmt(totalDebit), 92)}px;overflow-wrap:anywhere;word-break:break-word;">${fmtAmt(totalDebit)}</td>
+      <td style="padding:12px 8px;border:1px solid #cbd5e1;text-align:center;vertical-align:middle;background:#f0fdf4;color:#047857;font-size:${fitPdfCellFontSize(fmtAmt(totalCredit), 92)}px;overflow-wrap:anywhere;word-break:break-word;">${fmtAmt(totalCredit)}</td>
+      <td style="padding:12px 8px;border:1px solid #cbd5e1;text-align:center;vertical-align:middle;font-size:${fitPdfCellFontSize(fmtBal(closingBalance), 112)}px;color:${balClr(closingBalance)};overflow-wrap:anywhere;word-break:break-word;">${fmtBal(closingBalance)}</td>
     </tr>`;
 
     const timeStr  = format(now, 'h:mm a');
@@ -395,7 +395,7 @@ export function PartyReportView() {
    .statement-pdf-table{width:100%;flex:0 0 auto;table-layout:fixed;border-collapse:collapse;font-size:11px;margin-top:3mm;box-sizing:border-box}
     .statement-pdf-table td,
     .statement-pdf-table th{
-      padding:10px 6px!important;
+      padding:12px 8px!important;
      text-align:center!important;
      vertical-align:middle!important;
      line-height:1.35;

@@ -171,13 +171,13 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
             </colgroup>
             <thead>
               <tr style={{ backgroundColor: '#ffffff' }}>
-                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '10px 6px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>তারিখ</th>
-                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '10px 6px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>কাস্টমার/সাপ্লায়ার</th>
-                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '10px 6px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ডিটেলস</th>
-                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '10px 6px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>অ্যাডজাস্টমেন্ট</th>
-                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '10px 6px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER, width: '52px' }}>বিল</th>
-                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '10px 4px', color: COLOR_DEBIT_TEXT, fontWeight: 800, border: GRID_BORDER, backgroundColor: COLOR_DEBIT_BG }}>ডেবিট (-)</th>
-                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '10px 4px', color: COLOR_CREDIT_TEXT, fontWeight: 800, border: GRID_BORDER, backgroundColor: COLOR_CREDIT_BG }}>ক্রেডিট (+)</th>
+                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '12px 8px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>তারিখ</th>
+                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '12px 8px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>কাস্টমার/সাপ্লায়ার</th>
+                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '12px 8px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ডিটেলস</th>
+                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '12px 8px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>অ্যাডজাস্টমেন্ট</th>
+                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '12px 8px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER, width: '52px' }}>বিল</th>
+                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '12px 8px', color: COLOR_DEBIT_TEXT, fontWeight: 800, border: GRID_BORDER, backgroundColor: COLOR_DEBIT_BG }}>ডেবিট (-)</th>
+                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '12px 8px', color: COLOR_CREDIT_TEXT, fontWeight: 800, border: GRID_BORDER, backgroundColor: COLOR_CREDIT_BG }}>ক্রেডিট (+)</th>
               </tr>
             </thead>
             <tbody>
@@ -211,24 +211,24 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
                     const imgSrc = billImageSrc(entry.billImage);
                     return (
                       <tr key={entry.id} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#fafafa' }}>
-                        <td style={{ padding: '10px 4px', border: GRID_BORDER, textAlign: 'center', verticalAlign: 'middle', lineHeight: 1.35, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+                        <td style={{ padding: '12px 8px', border: GRID_BORDER, textAlign: 'center', verticalAlign: 'middle', lineHeight: 1.35, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                           {format(entryDate(entry), 'dd/MM')}
                         </td>
-                        <td style={{ padding: '10px 4px', border: GRID_BORDER, textAlign: 'center', verticalAlign: 'middle', color: '#0f172a', fontWeight: 700, lineHeight: 1.35, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+                        <td style={{ padding: '12px 8px', border: GRID_BORDER, textAlign: 'center', verticalAlign: 'middle', color: '#0f172a', fontWeight: 700, lineHeight: 1.35, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                           {entry.partyName}
                           {entry.partyPhone ? (
                           <span style={{ display: 'block', fontSize: '10px', color: '#64748b', fontWeight: 500, lineHeight: 1.25 }}>{entry.partyPhone}</span>
                           ) : null}
                         </td>
-                        <td style={{ padding: '10px 4px', border: GRID_BORDER, textAlign: 'center', verticalAlign: 'middle', color: '#334155', lineHeight: 1.35, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{entryDetails(entry)}</td>
-                        <td style={{ padding: '10px 4px', border: GRID_BORDER, textAlign: 'center', verticalAlign: 'middle', color: '#1d4ed8', lineHeight: 1.35, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+                        <td style={{ padding: '12px 8px', border: GRID_BORDER, textAlign: 'center', verticalAlign: 'middle', color: '#334155', lineHeight: 1.35, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{entryDetails(entry)}</td>
+                        <td style={{ padding: '12px 8px', border: GRID_BORDER, textAlign: 'center', verticalAlign: 'middle', color: '#1d4ed8', lineHeight: 1.35, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                           {splitAdjustmentDescription(
                             entry.description,
                             entry.isTransfer,
                             entry.transferPartyName,
                           ).adjustment}
                         </td>
-                        <td style={{ padding: '10px 4px', border: GRID_BORDER, textAlign: 'center', verticalAlign: 'middle', width: '52px' }}>
+                        <td style={{ padding: '12px 8px', border: GRID_BORDER, textAlign: 'center', verticalAlign: 'middle', width: '52px' }}>
                           {imgSrc ? (
                             <BillAttachmentPreview
                               src={imgSrc}
@@ -241,7 +241,7 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
                         </td>
                         <td
                           style={{
-                            padding: '10px 4px',
+                            padding: '12px 8px',
                             border: GRID_BORDER,
                             textAlign: 'center',
                             verticalAlign: 'middle',
@@ -258,7 +258,7 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
                         </td>
                         <td
                           style={{
-                            padding: '10px 4px',
+                            padding: '12px 8px',
                             border: GRID_BORDER,
                             textAlign: 'center',
                             verticalAlign: 'middle',
@@ -277,13 +277,13 @@ export const GlobalReportDocument = forwardRef<HTMLDivElement, GlobalReportDocum
                     );
                   })}
                   <tr key={`${group.key}-total`} style={{ backgroundColor: '#f8fafc' }}>
-                    <td colSpan={5} style={{ padding: '10px 6px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
+                    <td colSpan={5} style={{ padding: '12px 8px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
                       {group.label.split(' ')[0]} মোট
                     </td>
-                    <td style={{ padding: '10px 4px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 800, fontSize: `${fitPdfCellFontSize(formatCurrency(group.totalDebit), 88)}px`, overflowWrap: 'anywhere', wordBreak: 'break-word', color: '#0f172a', border: GRID_BORDER }}>
+                    <td style={{ padding: '12px 8px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 800, fontSize: `${fitPdfCellFontSize(formatCurrency(group.totalDebit), 88)}px`, overflowWrap: 'anywhere', wordBreak: 'break-word', color: '#0f172a', border: GRID_BORDER }}>
                       {formatCurrency(group.totalDebit)}
                     </td>
-                    <td style={{ padding: '10px 4px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 800, fontSize: `${fitPdfCellFontSize(formatCurrency(group.totalCredit), 88)}px`, overflowWrap: 'anywhere', wordBreak: 'break-word', color: '#0f172a', border: GRID_BORDER }}>
+                    <td style={{ padding: '12px 8px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 800, fontSize: `${fitPdfCellFontSize(formatCurrency(group.totalCredit), 88)}px`, overflowWrap: 'anywhere', wordBreak: 'break-word', color: '#0f172a', border: GRID_BORDER }}>
                       {formatCurrency(group.totalCredit)}
                     </td>
                   </tr>
