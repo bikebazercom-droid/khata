@@ -393,14 +393,18 @@ export function PartyReportView() {
   .statement-pdf-main{display:flex;flex:1 1 auto;flex-direction:column;min-height:0;overflow:hidden;padding-top:4mm}
   .statement-pdf-intro{flex:0 0 auto;margin-bottom:2mm}
    .statement-pdf-table{width:100%;flex:0 0 auto;table-layout:fixed;border-collapse:collapse;font-size:11px;margin-top:3mm;box-sizing:border-box}
+   .statement-pdf-table td,
+   .statement-pdf-table th{
+     vertical-align:middle!important;
+   }
    .statement-pdf-table th,
    .statement-pdf-table tr[data-pdf-kind="entry"] td,
    .statement-pdf-table tr[data-pdf-kind="total"] td,
    .statement-pdf-table tr[data-pdf-kind="empty"] td{
-     padding:5px 6px!important;
+     padding:8px 6px!important;
      text-align:center!important;
      vertical-align:middle!important;
-     line-height:1.3;
+     line-height:1.35;
      overflow-wrap:anywhere;
      word-break:break-word;
    }

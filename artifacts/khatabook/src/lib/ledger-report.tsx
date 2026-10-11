@@ -187,12 +187,12 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
             </colgroup>
             <thead>
               <tr style={{ backgroundColor: '#ffffff' }}>
-                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '6px 5px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>তারিখ</th>
-                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '6px 5px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ডিটেলস</th>
-                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '6px 5px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>অ্যাডজাস্টমেন্ট</th>
-                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '6px 5px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ডেবিট (-)</th>
-                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '6px 5px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ক্রেডিট (+)</th>
-                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '6px 5px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ব্যালেন্স</th>
+                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '8px 6px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>তারিখ</th>
+                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '8px 6px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ডিটেলস</th>
+                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '8px 6px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>অ্যাডজাস্টমেন্ট</th>
+                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '8px 6px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ডেবিট (-)</th>
+                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '8px 6px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ক্রেডিট (+)</th>
+                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '8px 6px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ব্যালেন্স</th>
               </tr>
             </thead>
             <tbody>
@@ -212,7 +212,8 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                     <td
                       colSpan={6}
                       style={{
-                        padding: groupIndex === 0 ? '4px 2px 8px' : '18px 2px 8px',
+                         padding: groupIndex === 0 ? '4px 2px 8px' : '18px 2px 8px',
+                         verticalAlign: 'middle',
                         color: '#0f172a',
                         fontWeight: 800,
                         fontSize: '13px',
@@ -228,10 +229,10 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                     const imgSrc = billImageSrc(entry.billImage);
                     return (
                       <tr key={entry.id} data-entry-id={entry.id} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#fafafa' }}>
-                        <td style={{ padding: '5px 6px', border: GRID_BORDER, textAlign: 'center', verticalAlign: 'middle', lineHeight: 1.3, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+                        <td style={{ padding: '8px 6px', border: GRID_BORDER, textAlign: 'center', verticalAlign: 'middle', lineHeight: 1.35, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                           {formatLedgerEntryDate(entry.dueDate, entry.createdAt)}
                         </td>
-                        <td style={{ padding: '5px 6px', border: GRID_BORDER, textAlign: 'center', verticalAlign: 'middle', color: '#334155', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word', lineHeight: 1.3 }}>
+                        <td style={{ padding: '8px 6px', border: GRID_BORDER, textAlign: 'center', verticalAlign: 'middle', color: '#334155', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word', lineHeight: 1.35 }}>
                           {entryDetails(entry)}
                           {imgSrc && (
                             <BillAttachmentPreview
@@ -244,12 +245,12 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                             />
                           )}
                         </td>
-                        <td style={{ padding: '5px 6px', border: GRID_BORDER, textAlign: 'center', verticalAlign: 'middle', color: '#1d4ed8', lineHeight: 1.3, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+                        <td style={{ padding: '8px 6px', border: GRID_BORDER, textAlign: 'center', verticalAlign: 'middle', color: '#1d4ed8', lineHeight: 1.35, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                           {entryAdjustment(entry)}
                         </td>
                         <td
                           style={{
-                            padding: '5px 4px',
+                            padding: '8px 4px',
                             border: GRID_BORDER,
                             textAlign: 'center',
                             verticalAlign: 'middle',
@@ -265,7 +266,7 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                         </td>
                         <td
                           style={{
-                            padding: '5px 4px',
+                            padding: '8px 4px',
                             border: GRID_BORDER,
                             textAlign: 'center',
                             verticalAlign: 'middle',
@@ -281,7 +282,7 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                         </td>
                         <td
                           style={{
-                            padding: '5px 4px',
+                            padding: '8px 4px',
                             border: GRID_BORDER,
                             textAlign: 'center',
                             verticalAlign: 'middle',
@@ -298,16 +299,16 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                     );
                   })}
                   <tr key={`${group.key}-total`} style={{ backgroundColor: '#f8fafc' }}>
-                    <td colSpan={3} style={{ padding: '7px 6px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
+                    <td colSpan={3} style={{ padding: '8px 6px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
                       {group.label.split(' ')[0]} মোট
                     </td>
-                    <td style={{ padding: '5px 4px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 800, fontSize: `${fitPdfCellFontSize(formatCurrency(group.totalDebit), 82)}px`, overflowWrap: 'anywhere', wordBreak: 'break-word', color: '#0f172a', border: GRID_BORDER }}>
+                    <td style={{ padding: '8px 4px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 800, fontSize: `${fitPdfCellFontSize(formatCurrency(group.totalDebit), 82)}px`, overflowWrap: 'anywhere', wordBreak: 'break-word', color: '#0f172a', border: GRID_BORDER }}>
                       {formatCurrency(group.totalDebit)}
                     </td>
-                    <td style={{ padding: '5px 4px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 800, fontSize: `${fitPdfCellFontSize(formatCurrency(group.totalCredit), 82)}px`, overflowWrap: 'anywhere', wordBreak: 'break-word', color: '#0f172a', border: GRID_BORDER }}>
+                    <td style={{ padding: '8px 4px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 800, fontSize: `${fitPdfCellFontSize(formatCurrency(group.totalCredit), 82)}px`, overflowWrap: 'anywhere', wordBreak: 'break-word', color: '#0f172a', border: GRID_BORDER }}>
                       {formatCurrency(group.totalCredit)}
                     </td>
-                    <td style={{ padding: '7px 6px', textAlign: 'center', verticalAlign: 'middle', border: GRID_BORDER }} />
+                    <td style={{ padding: '8px 6px', textAlign: 'center', verticalAlign: 'middle', border: GRID_BORDER }} />
                   </tr>
                 </Fragment>
               ))}

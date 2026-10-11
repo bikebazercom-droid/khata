@@ -24,8 +24,16 @@ describe('LedgerReportDocument', () => {
     const headers = Array.from(container.querySelectorAll<HTMLTableCellElement>('table:not([role="presentation"]) thead th'));
     const row = container.querySelector<HTMLTableRowElement>('tr[data-entry-id="entry-1"]');
     expect(headers.length).toBeGreaterThan(0);
-    expect(headers.every((cell) => cell.style.textAlign === 'center' && cell.style.verticalAlign === 'middle')).toBe(true);
-    expect(Array.from(row?.cells ?? []).every((cell) => cell.style.textAlign === 'center' && cell.style.verticalAlign === 'middle')).toBe(true);
+    expect(headers.every((cell) =>
+      cell.style.textAlign === 'center'
+      && cell.style.verticalAlign === 'middle'
+      && cell.style.padding === '8px 6px',
+    )).toBe(true);
+    expect(Array.from(row?.cells ?? []).every((cell) =>
+      cell.style.textAlign === 'center'
+      && cell.style.verticalAlign === 'middle'
+      && cell.style.paddingTop === '8px',
+    )).toBe(true);
   });
 
   it('prints a date-only value in the statement Date column', () => {
