@@ -27,12 +27,12 @@ describe('LedgerReportDocument', () => {
     expect(headers.every((cell) =>
       cell.style.textAlign === 'center'
       && cell.style.verticalAlign === 'middle'
-      && cell.style.padding === '8px 6px',
+      && cell.style.padding === '10px 6px',
     )).toBe(true);
     expect(Array.from(row?.cells ?? []).every((cell) =>
       cell.style.textAlign === 'center'
       && cell.style.verticalAlign === 'middle'
-      && cell.style.paddingTop === '8px',
+      && cell.style.paddingTop === '10px',
     )).toBe(true);
   });
 
