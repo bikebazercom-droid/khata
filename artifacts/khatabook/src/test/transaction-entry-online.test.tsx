@@ -180,9 +180,17 @@ describe('browser ledger entry submission', () => {
 
     const details = screen.getByPlaceholderText('বিস্তারিত লিখুন (পণ্য, বিল নং, পরিমাণ ইত্যাদি)');
     expect(details.tagName).toBe('TEXTAREA');
+    const detailsTextarea = details as HTMLTextAreaElement;
+    expect(detailsTextarea.rows).toBe(1);
+    expect(detailsTextarea.style.height).toBe('50px');
+    Object.defineProperty(detailsTextarea, 'scrollHeight', {
+      configurable: true,
+      get: () => 48 + detailsTextarea.value.split('\n').length * 20,
+    });
     fireEvent.change(details, { target: { value: 'পণ্য: চাল\nবিল নং: ১২৩' } });
 
-    expect((details as HTMLTextAreaElement).value).toBe('পণ্য: চাল\nবিল নং: ১২৩');
+    expect(detailsTextarea.value).toBe('পণ্য: চাল\nবিল নং: ১২৩');
+    expect(detailsTextarea.style.height).toBe('88px');
     expect(mocks.createLedgerEntry).not.toHaveBeenCalled();
 
     saveEntry();

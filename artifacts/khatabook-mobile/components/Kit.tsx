@@ -207,6 +207,7 @@ export function Field({
   maxLength?: number;
 }) {
   const colors = useColors();
+  const [multilineHeight, setMultilineHeight] = useState(50);
   return (
     <View style={styles.fieldGroup}>
       <Text style={[styles.fieldLabel, { color: colors.foreground }]}>{label}</Text>
@@ -219,6 +220,9 @@ export function Field({
         multiline={multiline}
         returnKeyType={multiline ? 'default' : undefined}
         submitBehavior={multiline ? 'newline' : undefined}
+        onContentSizeChange={multiline ? ({ nativeEvent }) => {
+          setMultilineHeight(Math.max(50, Math.ceil(nativeEvent.contentSize.height + 24)));
+        } : undefined}
         editable={editable}
         maxLength={maxLength}
         autoCapitalize={autoCapitalize}
@@ -226,6 +230,7 @@ export function Field({
         style={[
           styles.input,
           multiline ? styles.multilineInput : null,
+          multiline ? { height: multilineHeight } : null,
           { color: colors.foreground, backgroundColor: colors.card, borderColor: colors.input, opacity: editable ? 1 : 0.55 },
         ]}
       />
@@ -388,7 +393,7 @@ const styles = StyleSheet.create({
   fieldGroup: { gap: 7 },
   fieldLabel: { fontSize: 14, fontWeight: '700' },
   input: { minHeight: 50, borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, fontSize: 16 },
-  multilineInput: { minHeight: 88, paddingTop: 12, textAlignVertical: 'top' },
+  multilineInput: { minHeight: 50, paddingTop: 12, textAlignVertical: 'top' },
   card: { borderWidth: 1, borderRadius: 16, padding: 16, gap: 12 },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   sectionTitle: { fontSize: 17, fontWeight: '800' },

@@ -263,6 +263,13 @@ export function TransactionEntryScreen({
     justRecalledRef.current = true;
   }, [clearMemory, setExpressionAtSelection]);
   const [description, setDescription] = useState(initialEntry?.description ?? '');
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const textarea = descriptionRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.max(textarea.scrollHeight, 50)}px`;
+  }, [description]);
   const [dueDate, setDueDate] = useState(() => {
     if (isEditMode) {
       // Use the stored transaction date (dueDate field) if present; otherwise
@@ -1082,12 +1089,14 @@ export function TransactionEntryScreen({
           <div className="flex flex-col gap-3 pt-0.5">
             {/* Description */}
             <Textarea
+              ref={descriptionRef}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               tabIndex={showMetadata ? 0 : -1}
               placeholder="বিস্তারিত লিখুন (পণ্য, বিল নং, পরিমাণ ইত্যাদি)"
-              rows={3}
-              className="w-full min-h-[76px] resize-y rounded-xl bg-white px-4 py-3 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20"
+              rows={1}
+              className="w-full resize-none overflow-hidden rounded-xl bg-white px-4 py-3 text-sm font-medium placeholder:text-slate-400 transition-[height] duration-150 ease-out focus:outline-none focus:ring-2 focus:ring-primary/20"
+              style={{ boxSizing: 'border-box', height: 50, minHeight: 50 }}
             />
           </div>
         </div>
