@@ -5,8 +5,8 @@
       "distribution": "internal",
       "environment": "preview",
       "env": {
-        "EXPO_PUBLIC_DOMAIN": "hazarikhata.replit.app",
-        "EXPO_PUBLIC_WEB_APP_URL": "https://hazarikhata.replit.app/"
+        "EXPO_PUBLIC_DOMAIN": "banglakhata.com",
+        "EXPO_PUBLIC_WEB_APP_URL": "https://banglakhata.com/"
       },
       "android": {
         "buildType": "apk"
@@ -16,8 +16,8 @@
       "node": "22.16.0",
       "distribution": "store",
       "env": {
-        "EXPO_PUBLIC_DOMAIN": "hazarikhata.replit.app",
-        "EXPO_PUBLIC_WEB_APP_URL": "https://hazarikhata.replit.app/"
+        "EXPO_PUBLIC_DOMAIN": "banglakhata.com",
+        "EXPO_PUBLIC_WEB_APP_URL": "https://banglakhata.com/"
       },
       "android": {
         "buildType": "app-bundle"
