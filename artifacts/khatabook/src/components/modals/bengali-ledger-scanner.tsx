@@ -134,7 +134,7 @@ export function BengaliLedgerScanner({ onClose, onSuccess }: Props) {
 
     setStep('saving');
     try {
-      const result = await bulkSaveMutation.mutateAsync({
+      await bulkSaveMutation.mutateAsync({
         data: {
           entries: toSave.map((i) => ({
             partyId: i.resolvedPartyId!,
@@ -148,7 +148,6 @@ export function BengaliLedgerScanner({ onClose, onSuccess }: Props) {
       await qc.invalidateQueries({ queryKey: ['/api/parties'] });
       await qc.invalidateQueries({ queryKey: ['/api/dashboard/summary'] });
       onSuccess?.();
-      toast.success(`${result.count}টি হিসাব সফলভাবে সেভ হয়েছে!`);
       onClose();
     } catch {
       toast.error('সেভ করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');

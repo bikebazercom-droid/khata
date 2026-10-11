@@ -2,6 +2,7 @@ import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   LedgerEntryType,
   PartyRole,
@@ -234,6 +235,16 @@ describe('browser ledger entry submission', () => {
       partyId: PARTY_ID,
       status: 'pending',
     });
+  });
+
+  it('does not show a success toast when a transaction is saved', async () => {
+    const successToast = vi.spyOn(toast, 'success');
+    renderEntry();
+    enterAmount();
+    saveEntry();
+
+    await waitFor(() => expect(mocks.queueEntry).toHaveBeenCalledOnce());
+    expect(successToast).not.toHaveBeenCalled();
   });
 
   it('queues a large online entry immediately while background sync starts', async () => {
@@ -512,7 +523,7 @@ describe('browser ledger entry submission', () => {
     saveEntry();
 
     await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
-    expect(mocks.playTransactionSuccessSound).toHaveBeenCalledOnce();
+    expect(mocks.playTransactionSuccessSound).not.toHaveBeenCalled();
     expect(mocks.uploadBillImage).toHaveBeenCalledWith('data:image/jpeg;base64,captured-bill');
     expect(mocks.createLedgerEntry).not.toHaveBeenCalled();
     expect(mocks.queueEntry).toHaveBeenCalledOnce();
@@ -570,7 +581,7 @@ describe('browser ledger entry submission', () => {
 
     saveEntry();
     await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
-    expect(mocks.playTransactionSuccessSound).toHaveBeenCalledOnce();
+    expect(mocks.playTransactionSuccessSound).not.toHaveBeenCalled();
 
     const firstRequest = mocks.queueEntry.mock.calls[0][0].data;
     const retryRequest = mocks.queueEntry.mock.calls[1][0].data;

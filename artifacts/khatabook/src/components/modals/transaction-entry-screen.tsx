@@ -36,7 +36,6 @@ import { savePendingUpload } from '@/lib/pendingUploads';
 import { useBusinessContext } from '@/lib/businessContext';
 import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import { useConnectionState } from '@/context/connection-state';
-import { notifyEntrySaved } from '@/components/ui/entry-saved-feedback';
 import { queueEntry, updatePendingEntry, type QueuedEntry } from '@/lib/entryOutbox';
 import { restorePartyListCaches, touchPartyActivityInListCaches } from '@/lib/partyOutbox';
 import { isLedgerAmountLimitError } from '@/lib/ledgerSaveError';
@@ -688,7 +687,6 @@ export function TransactionEntryScreen({
           );
           clearMemory();
           onClose();
-          toast.success('অফলাইন এন্ট্রি আপডেট হয়েছে');
         } catch (error) {
           console.error('Could not update offline entry:', error);
           toast.error('অফলাইন এন্ট্রি আপডেট করা যায়নি');
@@ -985,7 +983,6 @@ export function TransactionEntryScreen({
           createdAt: new Date().toISOString(),
           status: 'pending',
         });
-      toast.success('হিসাবটি সেভ হয়েছে');
       };
 
       // Persist before closing so the party view can immediately merge this
@@ -1001,7 +998,6 @@ export function TransactionEntryScreen({
       uploadedCreateImageRef.current = null;
       pendingBase64Ref.current = null;
       clearMemory();
-      notifyEntrySaved();
       onClose();
     } catch (error) {
       console.error('Online ledger entry save failed:', error);
