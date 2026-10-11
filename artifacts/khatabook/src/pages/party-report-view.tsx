@@ -393,6 +393,18 @@ export function PartyReportView() {
   .statement-pdf-main{display:flex;flex:1 1 auto;flex-direction:column;min-height:0;overflow:hidden;padding-top:4mm}
   .statement-pdf-intro{flex:0 0 auto;margin-bottom:2mm}
    .statement-pdf-table{width:100%;flex:0 0 auto;table-layout:fixed;border-collapse:collapse;font-size:11px;margin-top:3mm;box-sizing:border-box}
+   .statement-pdf-table th,
+   .statement-pdf-table tr[data-pdf-kind="entry"] td,
+   .statement-pdf-table tr[data-pdf-kind="total"] td,
+   .statement-pdf-table tr[data-pdf-kind="empty"] td{
+     padding:5px 6px!important;
+     text-align:center!important;
+     vertical-align:middle!important;
+     line-height:1.3;
+     overflow-wrap:anywhere;
+     word-break:break-word;
+   }
+   .statement-pdf-table th{border-color:#cbd5e1}
   .statement-pdf-page thead{display:table-header-group}
   .statement-pdf-page tr{break-inside:avoid;page-break-inside:avoid}
   .statement-pdf-footer{flex:0 0 auto;margin-top:4mm}
@@ -458,8 +470,8 @@ export function PartyReportView() {
   <!-- Transaction table -->
    <table class="statement-pdf-table" style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:11px;margin-bottom:14px;box-sizing:border-box;">
       <colgroup>
-        <col style="width:16%"/><col style="width:22%"/><col style="width:17%"/>
-        <col style="width:14%"/><col style="width:14%"/><col style="width:17%"/>
+         <col style="width:14%"/><col style="width:25%"/><col style="width:16%"/>
+         <col style="width:13%"/><col style="width:13%"/><col style="width:19%"/>
       </colgroup>
       <thead>
         <tr style="background:#f8fafc;">

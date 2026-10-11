@@ -187,18 +187,18 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
             </colgroup>
             <thead>
               <tr style={{ backgroundColor: '#ffffff' }}>
-                <th style={{ textAlign: 'left', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>তারিখ</th>
-                <th style={{ textAlign: 'left', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ডিটেলস</th>
-                <th style={{ textAlign: 'left', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>অ্যাডজাস্টমেন্ট</th>
-                <th style={{ textAlign: 'right', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ডেবিট (-)</th>
-                <th style={{ textAlign: 'right', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ক্রেডিট (+)</th>
-                <th style={{ textAlign: 'right', padding: '8px 10px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ব্যালেন্স</th>
+                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '6px 5px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>তারিখ</th>
+                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '6px 5px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ডিটেলস</th>
+                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '6px 5px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>অ্যাডজাস্টমেন্ট</th>
+                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '6px 5px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ডেবিট (-)</th>
+                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '6px 5px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ক্রেডিট (+)</th>
+                <th style={{ textAlign: 'center', verticalAlign: 'middle', padding: '6px 5px', color: '#0f172a', fontWeight: 800, border: GRID_BORDER }}>ব্যালেন্স</th>
               </tr>
             </thead>
             <tbody>
               {monthGroups.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', border: GRID_BORDER }}>
+                  <td colSpan={6} style={{ padding: '16px', textAlign: 'center', verticalAlign: 'middle', color: '#94a3b8', border: GRID_BORDER }}>
                     এখনো কোনো লেনদেন নেই
                   </td>
                 </tr>
@@ -228,10 +228,10 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                     const imgSrc = billImageSrc(entry.billImage);
                     return (
                       <tr key={entry.id} data-entry-id={entry.id} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#fafafa' }}>
-                        <td style={{ padding: '6px 5px', border: GRID_BORDER, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+                        <td style={{ padding: '5px 6px', border: GRID_BORDER, textAlign: 'center', verticalAlign: 'middle', lineHeight: 1.3, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                           {formatLedgerEntryDate(entry.dueDate, entry.createdAt)}
                         </td>
-                        <td style={{ padding: '6px 5px', border: GRID_BORDER, color: '#334155', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word', lineHeight: 1.35, verticalAlign: 'top' }}>
+                        <td style={{ padding: '5px 6px', border: GRID_BORDER, textAlign: 'center', verticalAlign: 'middle', color: '#334155', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word', lineHeight: 1.3 }}>
                           {entryDetails(entry)}
                           {imgSrc && (
                             <BillAttachmentPreview
@@ -240,18 +240,19 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                               className="block"
                               imageClassName="h-full w-full object-contain"
                               imageStyle={{ width: '48px', height: '48px', objectFit: 'contain' }}
-                              style={{ display: 'block', marginTop: '4px', width: '48px', height: '48px' }}
+                               style={{ display: 'block', margin: '4px auto 0', width: '48px', height: '48px' }}
                             />
                           )}
                         </td>
-                        <td style={{ padding: '6px 5px', border: GRID_BORDER, color: '#1d4ed8', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+                        <td style={{ padding: '5px 6px', border: GRID_BORDER, textAlign: 'center', verticalAlign: 'middle', color: '#1d4ed8', lineHeight: 1.3, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                           {entryAdjustment(entry)}
                         </td>
                         <td
                           style={{
                             padding: '5px 4px',
                             border: GRID_BORDER,
-                            textAlign: 'right',
+                            textAlign: 'center',
+                            verticalAlign: 'middle',
                             fontWeight: 700,
                             backgroundColor: COLOR_DEBIT_BG,
                             color: isGave ? COLOR_DEBIT_TEXT : '#cbd5e1',
@@ -266,7 +267,8 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                           style={{
                             padding: '5px 4px',
                             border: GRID_BORDER,
-                            textAlign: 'right',
+                            textAlign: 'center',
+                            verticalAlign: 'middle',
                             fontWeight: 700,
                             backgroundColor: COLOR_CREDIT_BG,
                             color: !isGave ? COLOR_CREDIT_TEXT : '#cbd5e1',
@@ -281,7 +283,8 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                           style={{
                             padding: '5px 4px',
                             border: GRID_BORDER,
-                            textAlign: 'right',
+                            textAlign: 'center',
+                            verticalAlign: 'middle',
                             fontWeight: 700,
                             color: entry.balanceAfter >= 0 ? COLOR_DEBIT_TEXT : '#334155',
                             fontSize: `${fitPdfCellFontSize(balanceCell(entry.balanceAfter), 122)}px`,
@@ -295,16 +298,16 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                     );
                   })}
                   <tr key={`${group.key}-total`} style={{ backgroundColor: '#f8fafc' }}>
-                    <td colSpan={3} style={{ padding: '8px 10px', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
+                    <td colSpan={3} style={{ padding: '7px 6px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 800, color: '#0f172a', border: GRID_BORDER }}>
                       {group.label.split(' ')[0]} মোট
                     </td>
-                    <td style={{ padding: '5px 4px', textAlign: 'right', fontWeight: 800, fontSize: `${fitPdfCellFontSize(formatCurrency(group.totalDebit), 82)}px`, overflowWrap: 'anywhere', wordBreak: 'break-word', color: '#0f172a', border: GRID_BORDER }}>
+                    <td style={{ padding: '5px 4px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 800, fontSize: `${fitPdfCellFontSize(formatCurrency(group.totalDebit), 82)}px`, overflowWrap: 'anywhere', wordBreak: 'break-word', color: '#0f172a', border: GRID_BORDER }}>
                       {formatCurrency(group.totalDebit)}
                     </td>
-                    <td style={{ padding: '5px 4px', textAlign: 'right', fontWeight: 800, fontSize: `${fitPdfCellFontSize(formatCurrency(group.totalCredit), 82)}px`, overflowWrap: 'anywhere', wordBreak: 'break-word', color: '#0f172a', border: GRID_BORDER }}>
+                    <td style={{ padding: '5px 4px', textAlign: 'center', verticalAlign: 'middle', fontWeight: 800, fontSize: `${fitPdfCellFontSize(formatCurrency(group.totalCredit), 82)}px`, overflowWrap: 'anywhere', wordBreak: 'break-word', color: '#0f172a', border: GRID_BORDER }}>
                       {formatCurrency(group.totalCredit)}
                     </td>
-                    <td style={{ padding: '8px 10px', border: GRID_BORDER }} />
+                    <td style={{ padding: '7px 6px', textAlign: 'center', verticalAlign: 'middle', border: GRID_BORDER }} />
                   </tr>
                 </Fragment>
               ))}
