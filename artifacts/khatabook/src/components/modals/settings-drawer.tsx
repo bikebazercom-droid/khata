@@ -12,7 +12,7 @@ import {
   useRemoveOwnerPushToken,
   type BusinessSettings,
 } from '@workspace/api-client-react';
-import { ChevronDown, ChevronUp, LogIn, LogOut, Mail, Phone, Settings, UserRound } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronUp, LogIn, LogOut, Mail, Phone, Settings } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -54,18 +54,11 @@ export function loadShopProfile(): ShopProfile {
   return { userName: '', businessName: '', address: '', phone: '', email: '' };
 }
 
-function saveShopProfile(profile: ShopProfile) {
-  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-  window.dispatchEvent(new Event('settingsUpdated'));
-}
-
-type ActiveMenu = 'profile' | 'language' | 'auth' | null;
+type ActiveMenu = 'auth' | null;
 
 /**
- * Settings drawer — three collapsible accordion rows (one open at a time):
- *   1. 👤 Profile info  — shop/user info stored in localStorage; feeds the PDF engine
- *   2. 🌐 Language      — system language saved to the server (optimistic)
- *   3. 🔐 Login/Logout  — full logout sequence (cache wipe → Clerk → cookie → /sign-in)
+ * More sidebar with the active login identity and account/settings actions.
+ * Logout clears local state and revokes the server session before redirecting.
  */
 export function SettingsDrawer({
   open,
@@ -108,12 +101,6 @@ export function SettingsDrawer({
       setActiveMenu(null);
     }
   }, [open]);
-
-  const handleProfileField = (field: keyof ShopProfile, value: string) => {
-    const updated = { ...profile, [field]: value };
-    setProfile(updated);
-    saveShopProfile(updated);
-  };
 
   const updateSettings = useUpdateBusinessSettings({
     mutation: {
@@ -265,20 +252,25 @@ export function SettingsDrawer({
 
   const rowBody = 'mt-1 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 space-y-3';
 
-  const profileFields = [
-    { field: 'userName'    as const, label: t('fieldUserName'),  placeholder: 'উদা: সাকিল আহমেদ',      type: 'text'  },
-    { field: 'businessName'as const, label: t('fieldShopName'),  placeholder: 'উদা: বাংলা খাতা স্টোর', type: 'text'  },
-    { field: 'phone'       as const, label: t('fieldPhone'),     placeholder: 'উদা: 017XXXXXXXX',       type: 'text'  },
-    { field: 'email'       as const, label: t('fieldEmail'),     placeholder: 'example@gmail.com',      type: 'email' },
-    { field: 'address'     as const, label: t('fieldAddress'),   placeholder: 'উদা: চকবাজার, ঢাকা',    type: 'text'  },
-  ];
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="left-auto right-0 top-0 flex h-[100dvh] w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 border-l border-slate-200 bg-slate-50 p-0 shadow-2xl data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right sm:w-[420px] pt-[var(--safe-top)] pb-[var(--safe-bottom)]">
-        <DialogHeader className="shrink-0 border-b border-slate-200 bg-[#1B3A6B] px-5 py-5 pr-14 text-left">
-          <DialogTitle className="text-lg font-bold text-white">আরো</DialogTitle>
-          <p className="text-xs text-white/70">প্রোফাইল, সেটিংস ও অ্যাকাউন্ট</p>
+      <DialogContent showCloseButton={false} className="left-auto right-0 top-0 flex h-[100dvh] w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 border-l border-slate-200 bg-slate-50 p-0 shadow-2xl data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right sm:w-[420px] pt-[var(--safe-top)] pb-[var(--safe-bottom)]">
+        <DialogHeader className="shrink-0 border-b border-slate-200 bg-[#1B3A6B] px-4 py-4 text-left">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              aria-label="ড্যাশবোর্ডে ফিরে যান"
+              className="flex h-10 shrink-0 items-center gap-2 rounded-xl bg-white/15 px-3 text-sm font-bold text-white transition-colors hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            >
+              <ArrowLeft className="h-5 w-5" />
+              <span>ফিরে যান</span>
+            </button>
+            <div className="min-w-0">
+              <DialogTitle className="text-lg font-bold text-white">আরো</DialogTitle>
+              <p className="text-xs text-white/70">সেটিংস ও অ্যাকাউন্ট</p>
+            </div>
+          </div>
         </DialogHeader>
 
         <div className="flex-1 space-y-4 overflow-y-auto px-5 pb-6 pt-5">
@@ -294,41 +286,6 @@ export function SettingsDrawer({
               {isAuthenticated ? 'বর্তমানে সক্রিয় অ্যাকাউন্ট' : 'অ্যাকাউন্ট ব্যবহার করতে লগইন করুন'}
             </div>
           </section>
-
-          {/* ── Row 1: Profile ──────────────────────────────────────────── */}
-          <div>
-            <button type="button" onClick={() => toggleMenu('profile')} className={rowHeader('profile')}>
-              <span className="flex items-center gap-2">
-                <UserRound className="h-4 w-4" />
-                <span className={activeMenu === 'profile' ? 'text-white' : 'text-slate-700'}>
-                  প্রোফাইল
-                </span>
-              </span>
-              {activeMenu === 'profile'
-                ? <ChevronUp className="w-4 h-4 shrink-0 text-white" />
-                : <ChevronDown className="w-4 h-4 shrink-0 text-slate-400" />}
-            </button>
-
-            {activeMenu === 'profile' && (
-              <div className={rowBody}>
-                {profileFields.map(({ field, label, placeholder, type }) => (
-                  <div key={field}>
-                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">{label}</label>
-                    <input
-                      type={type}
-                      placeholder={placeholder}
-                      value={profile[field]}
-                      onChange={e => handleProfileField(field, e.target.value)}
-                      className="w-full px-3 py-2.5 text-[13px] border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]/30 focus:border-[#1B3A6B]"
-                    />
-                  </div>
-                ))}
-                <p className="text-[10px] text-slate-400 pt-1">
-                  {t('deviceOnly')}
-                </p>
-              </div>
-            )}
-          </div>
 
           <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
