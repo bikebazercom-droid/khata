@@ -3,7 +3,7 @@ import { Image, Platform, Pressable, Text, TextInput, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
-import { useAuth as useClerkAuth, useSignIn, useSignUp } from '@clerk/expo';
+import { useAuth as useClerkAuth, useClerk, useSignIn, useSignUp } from '@clerk/expo';
 import { useSSO } from '@clerk/expo/experimental';
 import { router } from 'expo-router';
 import { useSendPhoneOtp, useVerifyPhoneOtp } from '@workspace/api-client-react';
@@ -169,6 +169,7 @@ export default function SignInScreen() {
   const insets = useSafeAreaInsets();
   const { acceptSession, acceptClerkSession } = useAuth();
   const clerkAuth = useClerkAuth();
+  const clerk = useClerk();
   const { signIn, fetchStatus: signInFetchStatus } = useSignIn();
   const { signUp, fetchStatus: signUpFetchStatus } = useSignUp();
   const { startSSOFlow } = useSSO();
@@ -308,10 +309,10 @@ export default function SignInScreen() {
         ...(redirectUrl ? { redirectUrl } : {}),
       });
       if (result.authSessionResult?.type === 'cancel') return;
-      const completed = !!result.createdSessionId
-        || result.signIn?.status === 'complete'
-        || result.signUp?.status === 'complete'
-        || !!clerkAuth.isSignedIn;
+      if (result.createdSessionId) {
+        await clerk.setActive({ session: result.createdSessionId });
+      }
+      const completed = !!result.createdSessionId || !!clerkAuth.isSignedIn;
       if (!completed) {
         setError('Google sign-in needs additional account details or verification. Try email sign-in or contact support.');
         return;

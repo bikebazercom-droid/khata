@@ -19,6 +19,7 @@ const flow = vi.hoisted(() => ({
   sendEmailCode: vi.fn(),
   verifyEmailCode: vi.fn(),
   startSSOFlow: vi.fn(),
+  setActive: vi.fn(),
 }));
 
 vi.mock('react-native', async () => {
@@ -90,6 +91,7 @@ vi.mock('expo-web-browser', () => ({
 
 vi.mock('@clerk/expo', () => ({
   useAuth: () => ({ isSignedIn: false }),
+  useClerk: () => ({ setActive: flow.setActive }),
   useSignIn: () => ({
     signIn: {
       get status() { return flow.signInStatus; },
@@ -217,8 +219,10 @@ describe('mobile phone-number sign-in', () => {
     flow.signUpFinalize.mockReset().mockResolvedValue({ error: null });
     flow.sendEmailCode.mockReset().mockResolvedValue({ error: null });
     flow.verifyEmailCode.mockReset().mockResolvedValue({ error: null });
+    flow.setActive.mockReset().mockResolvedValue(undefined);
     flow.startSSOFlow.mockReset().mockResolvedValue({
       createdSessionId: 'clerk-session',
+      setActive: flow.setActive,
       authSessionResult: { type: 'success' },
     });
   });
@@ -280,6 +284,7 @@ describe('mobile phone-number sign-in', () => {
 
     await waitFor(() => {
       expect(flow.startSSOFlow).toHaveBeenCalledWith({ strategy: 'oauth_google' });
+      expect(flow.setActive).toHaveBeenCalledWith({ session: 'clerk-session' });
       expect(flow.acceptClerkSession).toHaveBeenCalledOnce();
       expect(flow.replaceRoute).toHaveBeenCalledWith('/');
     });
@@ -288,6 +293,7 @@ describe('mobile phone-number sign-in', () => {
   it('does not route home when Google OAuth returns unfinished requirements', async () => {
     flow.startSSOFlow.mockResolvedValue({
       createdSessionId: null,
+      setActive: flow.setActive,
       authSessionResult: { type: 'success' },
       signUp: { status: 'missing_requirements' },
     });
@@ -296,6 +302,7 @@ describe('mobile phone-number sign-in', () => {
 
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('additional account details'));
     expect(flow.acceptClerkSession).not.toHaveBeenCalled();
+    expect(flow.setActive).not.toHaveBeenCalled();
     expect(flow.replaceRoute).not.toHaveBeenCalled();
   });
 
