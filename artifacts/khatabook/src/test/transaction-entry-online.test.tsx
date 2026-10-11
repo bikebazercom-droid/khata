@@ -174,6 +174,25 @@ describe('browser ledger entry submission', () => {
     vi.unstubAllGlobals();
   });
 
+  it('accepts multiline transaction details and saves the line breaks unchanged', async () => {
+    renderEntry();
+    enterAmount();
+
+    const details = screen.getByPlaceholderText('বিস্তারিত লিখুন (পণ্য, বিল নং, পরিমাণ ইত্যাদি)');
+    expect(details.tagName).toBe('TEXTAREA');
+    fireEvent.change(details, { target: { value: 'পণ্য: চাল\nবিল নং: ১২৩' } });
+
+    expect((details as HTMLTextAreaElement).value).toBe('পণ্য: চাল\nবিল নং: ১২৩');
+    expect(mocks.createLedgerEntry).not.toHaveBeenCalled();
+
+    saveEntry();
+    await waitFor(() => expect(mocks.queueEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ description: 'পণ্য: চাল\nবিল নং: ১২৩' }),
+      }),
+    ));
+  });
+
   it('queues a new entry locally while offline and closes the form', async () => {
     setBrowserOnline(false);
     const { onClose } = renderEntry();

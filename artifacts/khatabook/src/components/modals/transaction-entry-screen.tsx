@@ -28,6 +28,7 @@ import { toast } from 'sonner';
 import { cn, evaluateCalculatorExpression, formatCurrency, formatExpressionForDisplay, toBengaliDigits, trimNumberForExpression } from '@/lib/utils';
 import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic';
 import { CameraCaptureModal } from '@/components/modals/camera-capture-modal';
+import { Textarea } from '@/components/ui/textarea';
 import { scanDocument } from '@/lib/document-scan';
 import { useAppAuth } from '@/App';
 import { uploadBillFile, uploadBillImage, billImageSrc, type BillImageUploadResult } from '@/lib/billImageStorage';
@@ -1080,12 +1081,13 @@ export function TransactionEntryScreen({
         >
           <div className="flex flex-col gap-3 pt-0.5">
             {/* Description */}
-            <input
+            <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               tabIndex={showMetadata ? 0 : -1}
               placeholder="বিস্তারিত লিখুন (পণ্য, বিল নং, পরিমাণ ইত্যাদি)"
-              className="w-full h-11 px-4 rounded-xl bg-white border border-slate-200 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20"
+              rows={3}
+              className="w-full min-h-[76px] resize-y rounded-xl bg-white px-4 py-3 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
           </div>
         </div>

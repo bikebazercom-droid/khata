@@ -451,7 +451,7 @@ export function LedgerEntryForm({ mode, partyId: initialPartyId, entry, initialT
             }}
           >
             <View onLayout={(event) => setMetadataHeight(event.nativeEvent.layout.height)} style={{ gap: 16 }}>
-              <Field label="বিস্তারিত লিখুন" value={description} onChangeText={setDescription} placeholder="পণ্য, বিল নং, পরিমাণ ইত্যাদি" testID="entry-description" />
+              <Field label="বিস্তারিত লিখুন" value={description} onChangeText={setDescription} placeholder="পণ্য, বিল নং, পরিমাণ ইত্যাদি" multiline testID="entry-description" />
               <Field label="বিল/রেফারেন্স নম্বর" value={billReference} onChangeText={setBillReference} placeholder="ঐচ্ছিক" testID="entry-bill-reference" />
               <DatePickerField label="তারিখ" value={dueDate} onChange={setDueDate} testID="entry-date" />
 

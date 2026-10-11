@@ -217,6 +217,8 @@ export function Field({
         placeholderTextColor={colors.mutedForeground}
         keyboardType={keyboardType}
         multiline={multiline}
+        returnKeyType={multiline ? 'default' : undefined}
+        submitBehavior={multiline ? 'newline' : undefined}
         editable={editable}
         maxLength={maxLength}
         autoCapitalize={autoCapitalize}
