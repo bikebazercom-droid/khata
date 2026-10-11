@@ -249,6 +249,23 @@ describe('LedgerReportDocument — statement ordering', () => {
   });
 });
 
+describe('LedgerReportDocument — multiline details', () => {
+  it('preserves intentional line breaks in the PDF details cell and lets the row grow', () => {
+    const { container } = render(
+      <LedgerReportDocument
+        storeName="টেস্ট স্টোর"
+        party={PARTY}
+        entries={[makeEntry({ description: 'পণ্য: চাল\nবিল নং: ১২৩' })]}
+      />,
+    );
+
+    const detailsCell = container.querySelector<HTMLTableCellElement>('tr[data-entry-id="e1"] td:nth-child(2)');
+    expect(detailsCell?.textContent).toBe('পণ্য: চাল\nবিল নং: ১২৩');
+    expect(detailsCell?.style.whiteSpace).toBe('pre-wrap');
+    expect(detailsCell?.style.lineHeight).toBe('1.35');
+  });
+});
+
 describe('PDF numeric cell sizing', () => {
   it('reduces font size for exceptionally long formatted amounts', () => {
     const largeAmount = formatCurrency(9_999_999_999_999_999);

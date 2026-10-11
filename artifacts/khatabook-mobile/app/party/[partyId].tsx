@@ -255,7 +255,12 @@ export default function PartyDetailScreen() {
                     const row = (
                       <View style={{ flexDirection: 'row', gap: 6, paddingVertical: 8, paddingHorizontal: 6, borderBottomWidth: 1, borderBottomColor: colors.border }}>
                         <View style={{ flex: 1, minWidth: 0, justifyContent: 'center', gap: 3, paddingHorizontal: 4 }}>
-                          <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: '700' }} numberOfLines={2}>{title}</Text>
+                          <Text style={{ color: colors.foreground, fontSize: 12, fontWeight: '700' }}>{title}</Text>
+                          {entry.isTransfer && entry.description ? (
+                            <Text style={{ color: colors.mutedForeground, fontSize: 11, lineHeight: 16 }}>
+                              {entry.description}
+                            </Text>
+                          ) : null}
                           <Text style={{ color: colors.mutedForeground, fontSize: 10 }} numberOfLines={1}>
                             {formatPartyLedgerDay(entry.businessDate)} · {formatPartyLedgerEntryTime(entry.createdAt)}
                           </Text>

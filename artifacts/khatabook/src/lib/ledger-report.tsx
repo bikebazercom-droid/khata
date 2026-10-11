@@ -231,7 +231,7 @@ export const LedgerReportDocument = forwardRef<HTMLDivElement, LedgerReportDocum
                         <td style={{ padding: '6px 5px', border: GRID_BORDER, whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                           {formatLedgerEntryDate(entry.dueDate, entry.createdAt)}
                         </td>
-                        <td style={{ padding: '6px 5px', border: GRID_BORDER, color: '#334155', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+                        <td style={{ padding: '6px 5px', border: GRID_BORDER, color: '#334155', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word', lineHeight: 1.35, verticalAlign: 'top' }}>
                           {entryDetails(entry)}
                           {imgSrc && (
                             <BillAttachmentPreview
