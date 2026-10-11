@@ -201,6 +201,23 @@ describe('browser ledger entry submission', () => {
     ));
   });
 
+  it('keeps the date, bill, and adjustment controls in the details scrolling area', () => {
+    renderEntry();
+    enterAmount();
+
+    const details = screen.getByPlaceholderText('বিস্তারিত লিখুন (পণ্য, বিল নং, পরিমাণ ইত্যাদি)');
+    const scrollArea = details.closest('.overflow-y-auto');
+    const date = document.querySelector<HTMLInputElement>('input[type="date"]');
+    const billButton = screen.getByRole('button', { name: /বিল সংযুক্ত করুন/ });
+    const adjustmentButton = screen.getByTestId('button-toggle-adjustment');
+
+    expect(scrollArea).not.toBeNull();
+    expect(scrollArea).toContainElement(date);
+    expect(scrollArea).toContainElement(billButton);
+    expect(scrollArea).toContainElement(adjustmentButton);
+    expect(details.compareDocumentPosition(date!) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+  });
+
   it('queues a new entry locally while offline and closes the form', async () => {
     setBrowserOnline(false);
     const { onClose } = renderEntry();

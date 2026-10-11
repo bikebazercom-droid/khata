@@ -1014,8 +1014,10 @@ export function TransactionEntryScreen({
         </h2>
       </div>
 
-      {/* Content — no page scroll; metadata panel expands/collapses in place (STATE A <-> STATE B) */}
-      <div className="flex-1 min-h-0 flex flex-col justify-start px-3 py-3 gap-3 overflow-hidden">
+      {/* Scrollable form area keeps date, attachment, and adjustment controls close to the note. */}
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+      {/* Content — metadata panel expands/collapses in place (STATE A <-> STATE B) */}
+      <div className="shrink-0 flex flex-col justify-start px-3 pt-3 gap-2">
         {/* Amount card + live formula sub-bar */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden shrink-0">
           <div className="px-4 py-3 flex items-center gap-3">
@@ -1202,7 +1204,7 @@ export function TransactionEntryScreen({
 
       {/* ── Toolbar: date · bill · adjustment — shown after first key press ─── */}
       {showMetadata && (
-      <div className="px-3 pb-2 shrink-0 space-y-2">
+      <div className="px-3 pt-2 pb-2 shrink-0 space-y-2">
         {/* Row 1: date + bill */}
         <div className={cn("grid gap-2", userRole === 'owner' ? "grid-cols-2" : "grid-cols-1")}>
           <input
@@ -1351,6 +1353,7 @@ export function TransactionEntryScreen({
         )}
       </div>
       )}
+      </div>
 
       {/* SAVE button, fixed above keypad — disabled while the amount isn't a valid non-zero total */}
       <div className="px-3 pt-1 shrink-0">
