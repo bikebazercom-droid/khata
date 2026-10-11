@@ -383,6 +383,13 @@ export function HomeView() {
       for (let i = 0; i < byteStr.length; i++) ia[i] = byteStr.charCodeAt(i);
       const blob = new Blob([ab], { type: 'image/jpeg' });
       const file = new File([blob], filename, { type: 'image/jpeg', lastModified: Date.now() });
+      const nativeShare = await shareGeneratedFileWithNative(blob, {
+        fileName: filename,
+        mimeType: 'image/jpeg',
+        title: 'Balance Receipt',
+        shareText: `${party.name} — ${formatted}`,
+      });
+      if (nativeShare) return;
 
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
