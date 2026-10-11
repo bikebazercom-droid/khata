@@ -137,10 +137,16 @@ export function HomeView() {
   const summaryParams = { role };
   const partyParams = { role, search, dueFilter: apiDueFilter };
   const { data: summaryParties = [] } = useListParties(summaryParams, {
-    query: { queryKey: businessScopedQueryKey(getListPartiesQueryKey(summaryParams), selectedBusinessId) },
+    query: {
+      queryKey: businessScopedQueryKey(getListPartiesQueryKey(summaryParams), selectedBusinessId),
+      refetchOnMount: 'always',
+    },
   });
   const { data: queriedParties } = useListParties(partyParams, {
-    query: { queryKey: businessScopedQueryKey(getListPartiesQueryKey(partyParams), selectedBusinessId) },
+    query: {
+      queryKey: businessScopedQueryKey(getListPartiesQueryKey(partyParams), selectedBusinessId),
+      refetchOnMount: 'always',
+    },
   });
 
   const renamePartyMutation = useUpdateParty({

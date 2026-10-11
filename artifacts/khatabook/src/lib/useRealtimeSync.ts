@@ -112,6 +112,16 @@ export function useRealtimeSync(
 
     // ── Visibility tracking ───────────────────────────────────────────────
     let hiddenAt: number | null = null;
+    let lastForegroundRefreshAt = 0;
+
+    function refreshForegroundPartyData() {
+      if (document.visibilityState === 'hidden') return;
+      const now = Date.now();
+      if (now - lastForegroundRefreshAt < 2_000) return;
+      lastForegroundRefreshAt = now;
+      void qcRef.current.invalidateQueries({ queryKey: getListPartiesQueryKey() });
+      void qcRef.current.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+    }
 
     function handleVisibilityChange() {
       if (document.visibilityState === 'hidden') {
@@ -126,9 +136,14 @@ export function useRealtimeSync(
         // Potentially missed many events — full sweep.
         void qcRef.current.invalidateQueries();
       }
+      // WebViews may suspend SSE while backgrounded, even for a short time.
+      // Refresh party ordering immediately whenever the page returns to front.
+      refreshForegroundPartyData();
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', refreshForegroundPartyData);
+    window.addEventListener('pageshow', refreshForegroundPartyData);
 
     // ── Browser online event (backup sync trigger) ────────────────────────
     function handleBrowserOnline() {
@@ -217,6 +232,8 @@ export function useRealtimeSync(
         const { partyId } = JSON.parse(e.data as string) as { partyId: string };
         void qc.invalidateQueries({ queryKey: getListLedgerEntriesQueryKey(partyId) });
         void qc.invalidateQueries({ queryKey: getGetPartyQueryKey(partyId) });
+        void qc.invalidateQueries({ queryKey: getListPartiesQueryKey() });
+        void qc.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
         void qc.invalidateQueries({ queryKey: getListGlobalLedgerEntriesQueryKey() });
       } catch {
         void qc.invalidateQueries();
@@ -251,6 +268,8 @@ export function useRealtimeSync(
       es.close();
       if (offlineTimer !== null) clearTimeout(offlineTimer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', refreshForegroundPartyData);
+      window.removeEventListener('pageshow', refreshForegroundPartyData);
       window.removeEventListener('online', handleBrowserOnline);
     };
   }, [enabled, onConnectionChange, qc]);
