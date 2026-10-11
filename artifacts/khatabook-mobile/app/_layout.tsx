@@ -12,7 +12,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { BusinessScopeProvider } from '@/contexts/BusinessScopeContext';
 import { BusinessSwitcherModal } from '@/components/BusinessSwitcherModal';
 import { resolveMobileStartupConfig } from '@/lib/startupConfig';
-import { Stack } from 'expo-router';
+import { Redirect, Stack, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 
@@ -33,6 +33,15 @@ const queryClient = new QueryClient({
 });
 
 function RootLayoutNav({ nativeRuntimeReady }: { nativeRuntimeReady: boolean }) {
+  const pathname = usePathname();
+
+  // The website is the source of truth for mobile UI and behavior. Keep
+  // legacy native routes available in source, but route runtime navigation
+  // through the shared WebView instead of rendering a second product UI.
+  if (pathname !== '/') {
+    return <Redirect href="/" />;
+  }
+
   const nativeScreens = nativeRuntimeReady
     ? [
         <Stack.Screen key="sign-in" name="sign-in" options={{ gestureEnabled: false }} />,
