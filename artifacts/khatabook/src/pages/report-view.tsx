@@ -195,17 +195,17 @@ export function ReportView() {
       const debitText = isGave ? formatCurrency(e.amount) : '';
       const creditText = !isGave ? formatCurrency(e.amount) : '';
       const debitCell  = isGave
-        ? `<td style="padding:12px 8px;border:1px solid #000;text-align:center;vertical-align:middle;background:#FEF2F2;color:#000;font-weight:500;font-size:${fitPdfCellFontSize(debitText, 105)}px;overflow-wrap:anywhere;word-break:break-word;">${debitText}</td>`
-        : `<td style="padding:12px 8px;border:1px solid #000;text-align:center;vertical-align:middle;background:#FEF2F2;"></td>`;
+        ? `<td style="padding:14px 8px;border:1px solid #000;text-align:center;vertical-align:middle;background:#FEF2F2;color:#000;font-weight:500;font-size:${fitPdfCellFontSize(debitText, 105)}px;overflow-wrap:anywhere;word-break:break-word;">${debitText}</td>`
+        : `<td style="padding:14px 8px;border:1px solid #000;text-align:center;vertical-align:middle;background:#FEF2F2;"></td>`;
       const creditCell = !isGave
-        ? `<td style="padding:12px 8px;border:1px solid #000;text-align:center;vertical-align:middle;background:#F0FDF4;color:#000;font-weight:500;font-size:${fitPdfCellFontSize(creditText, 105)}px;overflow-wrap:anywhere;word-break:break-word;">${creditText}</td>`
-        : `<td style="padding:12px 8px;border:1px solid #000;text-align:center;vertical-align:middle;background:#F0FDF4;"></td>`;
+        ? `<td style="padding:14px 8px;border:1px solid #000;text-align:center;vertical-align:middle;background:#F0FDF4;color:#000;font-weight:500;font-size:${fitPdfCellFontSize(creditText, 105)}px;overflow-wrap:anywhere;word-break:break-word;">${creditText}</td>`
+        : `<td style="padding:14px 8px;border:1px solid #000;text-align:center;vertical-align:middle;background:#F0FDF4;"></td>`;
       return `
         <tr style="vertical-align:middle;">
-          <td style="padding:12px 8px;border:1px solid #000;text-align:center;vertical-align:middle;color:#000;">${dateCell}</td>
-          <td style="padding:12px 8px;border:1px solid #000;text-align:center;vertical-align:middle;font-weight:500;overflow-wrap:anywhere;word-break:break-word;">${e.partyName || '—'}</td>
-          <td style="padding:12px 8px;border:1px solid #000;text-align:center;vertical-align:middle;overflow-wrap:anywhere;word-break:break-word;">${escapeHtml(adjustment.details) || '—'}</td>
-          <td style="padding:12px 8px;border:1px solid #000;text-align:center;vertical-align:middle;overflow-wrap:anywhere;word-break:break-word;color:#1d4ed8;">${escapeHtml(adjustment.adjustment ?? '')}</td>
+          <td style="padding:14px 8px;border:1px solid #000;text-align:center;vertical-align:middle;color:#000;">${dateCell}</td>
+          <td style="padding:14px 8px;border:1px solid #000;text-align:center;vertical-align:middle;font-weight:500;overflow-wrap:anywhere;word-break:break-word;">${e.partyName || '—'}</td>
+          <td style="padding:14px 8px;border:1px solid #000;text-align:center;vertical-align:middle;overflow-wrap:anywhere;word-break:break-word;">${escapeHtml(adjustment.details) || '—'}</td>
+          <td style="padding:14px 8px;border:1px solid #000;text-align:center;vertical-align:middle;overflow-wrap:anywhere;word-break:break-word;color:#1d4ed8;">${escapeHtml(adjustment.adjustment ?? '')}</td>
           ${debitCell}
           ${creditCell}
         </tr>`;
@@ -271,12 +271,12 @@ export function ReportView() {
           </colgroup>
           <thead>
             <tr style="background:#F8FAFC;font-weight:bold;">
-              <th style="padding:12px 8px;border:1px solid #000;width:18%;text-align:center;vertical-align:middle;">তারিখ</th>
-              <th style="padding:12px 8px;border:1px solid #000;width:26%;text-align:center;vertical-align:middle;">${isSupplier ? 'সরবরাহকারীর নাম' : 'গ্রাহকের নাম'}</th>
-              <th style="padding:12px 8px;border:1px solid #000;text-align:center;vertical-align:middle;">বিবরণ</th>
-              <th style="padding:12px 8px;border:1px solid #000;width:15%;text-align:center;vertical-align:middle;">অ্যাডজাস্টমেন্ট</th>
-              <th style="padding:12px 8px;border:1px solid #000;width:15%;text-align:center;vertical-align:middle;background:#FEF2F2;">আপনি দিয়েছেন</th>
-              <th style="padding:12px 8px;border:1px solid #000;width:15%;text-align:center;vertical-align:middle;background:#F0FDF4;">আপনি পেয়েছেন</th>
+              <th style="padding:14px 8px;border:1px solid #000;width:18%;text-align:center;vertical-align:middle;">তারিখ</th>
+              <th style="padding:14px 8px;border:1px solid #000;width:26%;text-align:center;vertical-align:middle;">${isSupplier ? 'সরবরাহকারীর নাম' : 'গ্রাহকের নাম'}</th>
+              <th style="padding:14px 8px;border:1px solid #000;text-align:center;vertical-align:middle;">বিবরণ</th>
+              <th style="padding:14px 8px;border:1px solid #000;width:15%;text-align:center;vertical-align:middle;">অ্যাডজাস্টমেন্ট</th>
+              <th style="padding:14px 8px;border:1px solid #000;width:15%;text-align:center;vertical-align:middle;background:#FEF2F2;">আপনি দিয়েছেন</th>
+              <th style="padding:14px 8px;border:1px solid #000;width:15%;text-align:center;vertical-align:middle;background:#F0FDF4;">আপনি পেয়েছেন</th>
             </tr>
           </thead>
           <tbody>
