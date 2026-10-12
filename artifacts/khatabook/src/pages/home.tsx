@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useBusinessContext } from '@/lib/businessContext';
 import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import { sortPartiesByRecentActivity } from '@/lib/party-activity';
-import { isOfflineMode } from '@/lib/useAuthConnectivity';
+import { filterPartiesBySearch } from '@/lib/party-search';
 import {
   useListParties,
   getListPartiesQueryKey,
@@ -135,20 +135,12 @@ export function HomeView() {
   });
   const activeBookName = resolveLedgerBookName(activeBusiness?.name, settings?.storeName);
   const summaryParams = { role };
-  const partyParams = { role, search, dueFilter: apiDueFilter };
   // Party-list freshness is handled by React Query/offline persistence, not
   // the WebView HTTP cache; always let invalidation reach the API.
   const { data: summaryParties = [] } = useListParties(summaryParams, {
     request: { cache: 'no-store' },
     query: {
       queryKey: businessScopedQueryKey(getListPartiesQueryKey(summaryParams), selectedBusinessId),
-      refetchOnMount: 'always',
-    },
-  });
-  const { data: queriedParties } = useListParties(partyParams, {
-    request: { cache: 'no-store' },
-    query: {
-      queryKey: businessScopedQueryKey(getListPartiesQueryKey(partyParams), selectedBusinessId),
       refetchOnMount: 'always',
     },
   });
@@ -271,20 +263,18 @@ export function HomeView() {
     }
     renamePartyMutation.mutate({ partyId: renameTarget.id, data: { name: trimmedName } });
   };
-  const offlineParties = useMemo(() => {
-    const term = search.trim().toLocaleLowerCase();
+  const locallyFilteredParties = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
-    return summaryParties.filter((party) => {
-      if (term && !party.name.toLocaleLowerCase().includes(term) && !party.phone.toLocaleLowerCase().includes(term)) {
-        return false;
-      }
+    return filterPartiesBySearch(summaryParties, search).filter((party) => {
       if (apiDueFilter === DueFilter.DUE_TODAY && party.dueDate !== today) return false;
       if (apiDueFilter === DueFilter.UPCOMING && (!party.dueDate || party.dueDate <= today)) return false;
       if (apiDueFilter === DueFilter.NO_DUE_DATE && party.dueDate) return false;
       return true;
     });
   }, [summaryParties, search, apiDueFilter]);
-  const rawParties = isOfflineMode() ? offlineParties : (queriedParties ?? []);
+  // Search the already-loaded role list locally for immediate results online
+  // and offline; do not issue a network query for every keystroke.
+  const rawParties = locallyFilteredParties;
 
   useEffect(() => {
     if (userRole !== 'owner' || !userId || !selectedBusinessId) return;
