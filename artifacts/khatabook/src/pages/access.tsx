@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
-import { bn as bnLocale } from 'date-fns/locale';
+import { bn as bnLocale, enUS } from 'date-fns/locale';
 import { useLanguage } from '@/lib/i18n';
 
 type TabType = 'parties' | 'staff' | 'activity';
@@ -19,7 +19,7 @@ const isValidWorkerIdentity = (identity: string) =>
   /^(?:\+?88)?01[3-9]\d{8}$/.test(identity.trim());
 
 export function AccessPage() {
-  const { t } = useLanguage();
+  const { t, lang, formatNumber } = useLanguage();
   const [, navigate] = useLocation();
   const { data: workers = [], isLoading: workersLoading, isError: workersError } = useOwnerWorkers();
   const { data: parties = [], isLoading: partiesLoading, isFetching: partiesFetching, isError: partiesError, refetch: refetchParties } = useOwnerParties();
@@ -199,17 +199,17 @@ export function AccessPage() {
                 <div className="w-12 h-12 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-3">
                   <AlertCircle className="w-6 h-6" />
                 </div>
-                <p className="text-sm font-bold text-red-700">স্টাফ তালিকা লোড করতে সমস্যা হয়েছে</p>
+                <p className="text-sm font-bold text-red-700">{t('staffLoadError')}</p>
               </div>
             ) : workers.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-48 text-center bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
                 <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3">
                   <Shield className="w-6 h-6 text-slate-400" />
                 </div>
-                <p className="text-sm font-bold text-slate-700">কোনো স্টাফ যুক্ত নেই</p>
-                <p className="text-xs font-medium text-slate-500 mt-1">নতুন স্টাফ যুক্ত করে খাতার অ্যাক্সেস দিন</p>
+                <p className="text-sm font-bold text-slate-700">{t('noStaffAdded')}</p>
+                <p className="text-xs font-medium text-slate-500 mt-1">{t('addStaffToGrantAccess')}</p>
                 <Button onClick={() => setIsAddWorkerOpen(true)} className="mt-4 bg-[#1B3A6B] hover:bg-[#142d55]" size="sm">
-                  স্টাফ যোগ করুন
+                  {t('addStaff')}
                 </Button>
               </div>
             ) : (
@@ -232,7 +232,9 @@ export function AccessPage() {
                         <div className="min-w-0">
                           <p className="font-bold text-slate-900 truncate text-[15px]">{worker.identity}</p>
                           <p className="text-xs font-medium text-slate-500 mt-0.5">
-                            {worker.partyIds.length} টি খাতার অ্যাক্সেস
+                            {lang === 'en'
+                              ? `${formatNumber(worker.partyIds.length)} ${worker.partyIds.length === 1 ? 'ledger' : 'ledgers'} access`
+                              : `${formatNumber(worker.partyIds.length)} টি খাতার অ্যাক্সেস`}
                           </p>
                         </div>
                       </div>
@@ -243,20 +245,20 @@ export function AccessPage() {
                           worker.status === 'pending' ? "bg-amber-100 text-amber-700" :
                           "bg-red-100 text-red-700"
                         )}>
-                          {worker.status === 'active' ? 'সক্রিয়' : worker.status === 'pending' ? 'পেন্ডিং' : 'সাসপেন্ড'}
+                          {worker.status === 'active' ? t('statusActive') : worker.status === 'pending' ? t('statusPending') : t('statusSuspended')}
                         </span>
                       </div>
                     </div>
                     {/* Extra info for staff */}
                     <div className="flex flex-col gap-1 mt-1 pt-3 border-t border-slate-100 text-[11px] text-slate-500 font-medium">
                       {worker.lastLogin && (
-                        <p>সর্বশেষ লগইন: {new Date(worker.lastLogin).toLocaleString('bn-BD', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                        <p>{t('lastLoginLabel')} {new Date(worker.lastLogin).toLocaleString(lang === 'en' ? 'en-US' : 'bn-BD', { dateStyle: 'medium', timeStyle: 'short' })}</p>
                       )}
                       {worker.lastLogout && (
-                        <p>সর্বশেষ লগআউট: {new Date(worker.lastLogout).toLocaleString('bn-BD', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                        <p>{t('lastLogoutLabel')} {new Date(worker.lastLogout).toLocaleString(lang === 'en' ? 'en-US' : 'bn-BD', { dateStyle: 'medium', timeStyle: 'short' })}</p>
                       )}
                       {worker.invitedAt && worker.status === 'pending' && (
-                        <p>আমন্ত্রণ: {new Date(worker.invitedAt).toLocaleString('bn-BD', { dateStyle: 'medium' })}</p>
+                        <p>{t('inviteDateLabel')} {new Date(worker.invitedAt).toLocaleString(lang === 'en' ? 'en-US' : 'bn-BD', { dateStyle: 'medium' })}</p>
                       )}
                     </div>
                   </div>
@@ -277,14 +279,14 @@ export function AccessPage() {
                 <div className="w-12 h-12 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-3">
                   <AlertCircle className="w-6 h-6" />
                 </div>
-                <p className="text-sm font-bold text-red-700">অ্যাক্টিভিটি লোড করতে সমস্যা হয়েছে</p>
+                <p className="text-sm font-bold text-red-700">{t('activityLoadError')}</p>
               </div>
             ) : !activityData?.entries || activityData.entries.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-48 text-center bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
                 <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-3">
                   <History className="w-6 h-6 text-slate-400" />
                 </div>
-                <p className="text-sm font-bold text-slate-700">কোনো অ্যাক্টিভিটি নেই</p>
+                <p className="text-sm font-bold text-slate-700">{t('noActivity')}</p>
               </div>
             ) : (
               <div className="relative pl-4">
@@ -296,22 +298,22 @@ export function AccessPage() {
                       <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 p-3.5">
                         <div className="flex justify-between items-start mb-1">
                           <p className="text-sm font-bold text-slate-900">
-                            {entry.description || "অ্যাক্টিভিটি"}
+                            {entry.description || t('activityTab')}
                           </p>
                           <span className="text-[10px] font-medium text-slate-400 shrink-0 ml-2 whitespace-nowrap">
-                            {formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true, locale: bnLocale })}
+                            {formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true, locale: lang === 'en' ? enUS : bnLocale })}
                           </span>
                         </div>
                         <div className="flex flex-col gap-0.5 mt-2">
                           <p className="text-xs text-slate-600 font-medium">
-                            খাতা: <span className="font-bold text-slate-800">{entry.partyName}</span>
+                            {t('ledgerLabel')} <span className="font-bold text-slate-800">{entry.partyName}</span>
                           </p>
                           <p className="text-xs text-slate-600 font-medium">
-                            ব্যবহারকারী: <span className="font-bold text-slate-800">{entry.actorIdentity}</span>
+                            {t('activityUserLabel')} <span className="font-bold text-slate-800">{entry.actorIdentity}</span>
                           </p>
                           {entry.amount != null && (
                             <p className="text-xs text-slate-600 font-medium">
-                              অ্যামাউন্ট: <span className="font-bold text-slate-800">৳{entry.amount}</span>
+                              {t('amountLabel')} <span className="font-bold text-slate-800">৳{formatNumber(entry.amount)}</span>
                             </p>
                           )}
                         </div>

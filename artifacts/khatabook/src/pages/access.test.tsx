@@ -8,13 +8,14 @@ const owner = vi.hoisted(() => ({
   parties: [] as Array<{ id: string; name: string; role: 'CUSTOMER' | 'SUPPLIER' }>,
   mutate: vi.fn(),
   partiesError: false,
+  activity: [] as Array<{ id: string; description: string | null; createdAt: string; partyName: string; actorIdentity: string; amount: number | null }>,
 }));
 
 vi.mock('wouter', () => ({ useLocation: () => ['/', vi.fn()] }));
 vi.mock('@/hooks/use-owner', () => ({
   useOwnerWorkers: () => ({ data: owner.workers, isLoading: false, isError: false }),
   useOwnerParties: () => ({ data: owner.parties, isLoading: false, isFetching: false, isError: owner.partiesError, refetch: vi.fn() }),
-  useOwnerActivity: () => ({ data: { entries: [] }, isLoading: false, isError: false }),
+  useOwnerActivity: () => ({ data: { entries: owner.activity }, isLoading: false, isError: false }),
   useCreateWorker: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateWorker: () => ({ mutate: owner.mutate, isPending: false }),
   useDeleteWorker: () => ({ mutate: vi.fn(), isPending: false }),
@@ -36,6 +37,7 @@ describe('party access worker adjustment editor', () => {
       { id: b, name: 'Supplier B', role: 'SUPPLIER' },
     ];
     owner.partiesError = false;
+    owner.activity = [];
     owner.mutate.mockReset();
   });
   afterEach(() => {
@@ -55,6 +57,40 @@ describe('party access worker adjustment editor', () => {
     expect(screen.getByPlaceholderText('Search customers/suppliers...')).toBeInTheDocument();
     expect(screen.getByText(/Supplier •/)).toBeInTheDocument();
     expect(screen.getByText('No one has been given access')).toBeInTheDocument();
+  });
+
+  it('translates the empty staff state and its add button in English mode', () => {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, 'en');
+    owner.workers = [];
+    render(<LanguageProvider><AccessPage /></LanguageProvider>);
+    fireEvent.click(screen.getByText('Staff list'));
+
+    expect(screen.getByText('No staff added')).toBeInTheDocument();
+    expect(screen.getByText('Add new staff to give them ledger access')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add staff' })).toBeInTheDocument();
+  });
+
+  it('translates activity labels and relative time in English mode', () => {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, 'en');
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-12T12:00:00.000Z'));
+    owner.activity = [{
+      id: 'activity-1',
+      description: null,
+      createdAt: '2026-09-24T12:00:00.000Z',
+      partyName: 'melon',
+      actorIdentity: 'staff@example.com',
+      amount: 200,
+    }];
+    render(<LanguageProvider><AccessPage /></LanguageProvider>);
+    fireEvent.click(screen.getByText('Activity'));
+
+    expect(screen.getByText('18 days ago')).toBeInTheDocument();
+    expect(screen.getByText('Ledger:')).toBeInTheDocument();
+    expect(screen.getByText('User:')).toBeInTheDocument();
+    expect(screen.getByText('Amount:')).toBeInTheDocument();
+    expect(screen.getAllByText('Activity')).toHaveLength(2);
+    vi.useRealTimers();
   });
 
   const openParty = () => {
