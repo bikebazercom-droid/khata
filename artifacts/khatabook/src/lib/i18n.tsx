@@ -1,20 +1,21 @@
-/**
- * i18n — Global language context for BanglaKhata web app.
- *
- * Language is permanently locked to Bengali (bn).
- * The English option has been removed. isEnglish is always false.
- */
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { formatBengaliNumber } from './utils';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type Lang = 'bn';
+export type Lang = 'bn' | 'en';
+export const LANGUAGE_STORAGE_KEY = 'banglakhata-language';
 
 // ── Translation dictionary ─────────────────────────────────────────────────────
 
-const dict = {
+const bn = {
   parties: 'গ্রাহক',
+  moreTitle: 'বিস্তারিত',
+  access: 'অ্যাক্সেস',
+  staffDutyFolder: 'ডিউটি ফোল্ডার',
+  scanLedger: 'বাংলা খাতা স্ক্যান করুন',
+  scan: 'স্ক্যান',
+  moreMenu: 'অ্যারো মেনু খুলুন',
   settings: 'সেটিংস',
   customer: 'গ্রাহক',
   supplier: 'সরবরাহকারী',
@@ -54,6 +55,10 @@ const dict = {
   settingsTitle: 'সেটিংস',
   profileInfo: 'প্রোফাইল তথ্য ও নাম যোগ',
   changeLanguage: 'ভাষা পরিবর্তন',
+  loginIdentity: 'লগইন অবস্থা / পরিচয়',
+  noLogin: 'লগইন করা নেই',
+  phoneLoginFallback: 'ফোন নম্বরে লগইন',
+  emailLoginFallback: 'ইমেইলে লগইন',
   loginLogout: 'লগইন / লগআউট',
   fieldUserName: 'ব্যবহারকারীর নাম',
   fieldShopName: 'দোকান / বিজনেসের নাম (PDF হেডার)',
@@ -112,53 +117,107 @@ const dict = {
   pdfSupplierStatement: 'সরবরাহকারী তালিকার স্টেটমেন্ট',
 } as const;
 
-export type TKey = keyof typeof dict;
+const en: Record<keyof typeof bn, string> = {
+  parties: 'Customers', moreTitle: 'Details', access: 'Access', staffDutyFolder: 'Staff duty folder',
+  scanLedger: 'Scan ledger', scan: 'Scan', moreMenu: 'Open more menu',
+  settings: 'More', customer: 'Customer', supplier: 'Supplier',
+  youWillGive: 'You will give', youWillGet: 'You will receive', viewReport: 'View report',
+  searchCustomer: 'Search customers...', searchSupplier: 'Search suppliers...',
+  filter: 'Filter', filterAndSort: 'Filter and sort', filterBy: 'Filter by', sortBy: 'Sort by',
+  all: 'All', permanent: 'No due date', dueToday: 'Due today', upcoming: 'Upcoming',
+  noDate: 'No date', noSpecificDate: 'No specific date', mostRecent: 'Most recent',
+  highestAmount: 'Highest amount', byName: 'Name (A–Z)', oldest: 'Oldest',
+  lowestAmount: 'Lowest amount', showResults: 'Show results', reset: 'Reset',
+  addStaff: 'Add staff', loading: 'Loading...', get: 'Received', give: 'Paid',
+  addCustomer: 'Add customer', addSupplier: 'Add supplier',
+  emptyCustomer: 'Add a customer to start tracking balances',
+  emptySupplier: 'Add a supplier to keep your accounts organized',
+  receiptGot: 'You received', receiptGave: 'You paid', receiptBalance: 'Current balance',
+  settingsTitle: 'Settings', profileInfo: 'Profile information', changeLanguage: 'Language / ভাষা',
+  loginIdentity: 'Login status / identity', noLogin: 'Not logged in',
+  phoneLoginFallback: 'Signed in with phone', emailLoginFallback: 'Signed in with email',
+  loginLogout: 'Log in / Log out', fieldUserName: 'User name',
+  fieldShopName: 'Shop or business name (PDF header)', fieldPhone: 'Phone number (PDF footer)',
+  fieldEmail: 'Email address', fieldAddress: 'Address (PDF footer)',
+  deviceOnly: 'This information is stored only on this device',
+  langHint: 'Choose your preferred language for the app and reports',
+  logoutHint: 'Logging out will disconnect this device', loggingOut: 'Logging out…',
+  logoutBtn: 'Log out', loginBtn: 'Log in', deleteAccount: 'Delete account',
+  deleteAccountHint: 'All transactions and cached data will be removed. This cannot be undone.',
+  confirmDeleteTitle: 'Delete your entire account?',
+  confirmDeleteLine1: 'All your ledgers, customers, transactions, and data will be permanently deleted.',
+  confirmDeleteLine2: 'Signing in later with the same email or phone will create a new empty account.',
+  no: 'Cancel', yesDelete: 'Yes, delete', deleting: 'Deleting…',
+  deleteSuccess: 'Your BanglaKhata account was permanently deleted.',
+  deleteError: 'Could not delete the account. Please try again.', yourKhatas: 'Your ledgers',
+  khataCustomers: 'Customers', businessStamp: 'Create business stamp', deleteKhata: 'Delete',
+  confirmDeleteKhataTitle: 'Delete this ledger?',
+  confirmDeleteKhataBody: 'All customers and transaction data in this ledger will be permanently deleted.',
+  cannotUndo: 'This cannot be undone.', yesDelete2: 'Yes, delete',
+  khataDeleteSuccess: 'Your ledger was permanently deleted.',
+  khataDeleteError: 'Could not delete it. Please try again.', newKhataBtn: '+ New ledger',
+  creatingKhata: 'Creating…', addKhata: 'Add', cancelKhata: 'Cancel',
+  newKhataPlaceholder: 'Enter a new ledger or business name',
+  createFailed: 'Could not add the new business. Please try again.',
+  pdfAsOfToday: 'As of today', pdfTotalExpense: 'Total debit (-)',
+  pdfTotalCredit: 'Total credit (+)', pdfTotalBalance: 'Total balance', pdfPhone: 'Phone',
+  pdfName: 'Name', pdfDebit: 'Debit (-)', pdfCredit: 'Credit (+)',
+  pdfLastTx: 'Last transaction', pdfGrandTotal: 'Grand total',
+  pdfFooterCta: 'Start using BanglaKhata today', pdfInstall: 'Install',
+  pdfFooterSupport: 'Help: support@banglakhata.com', pdfFooterTerms: 'Terms and conditions apply',
+  pdfError: 'Could not create the PDF.', pdfSupplierNameCol: 'Supplier name',
+  pdfCustomerStatement: 'Customer statement', pdfSupplierStatement: 'Supplier statement',
+};
+
+export type TKey = keyof typeof bn;
 
 // ── Context ────────────────────────────────────────────────────────────────────
 
 export interface LanguageCtx {
   lang: Lang;
-  /** Always false — English has been removed. Kept for type compat. */
-  isEnglish: false;
+  isEnglish: boolean;
+  setLang: (lang: Lang) => void;
   t: (key: TKey) => string;
-  /** Bengali ৳ formatter with Bengali digits. */
+  /** Currency formatter uses the active language's digits and grouping. */
   formatCurrency: (amount: number) => string;
-  /** Bengali digit formatter (no ৳ prefix). */
+  /** Number formatter without a currency prefix. */
   formatNumber: (amount: number) => string;
 }
 
-// ── Formatters ─────────────────────────────────────────────────────────────────
-
-const t = (key: TKey): string => dict[key];
-
-const formatCurrency = (amount: number): string =>
-  `৳${formatBengaliNumber(amount)}`;
-
-const formatNumber = (amount: number): string =>
-  amount.toString().split('').map(d => (
-    ({ '0':'০','1':'১','2':'২','3':'৩','4':'৪','5':'৫','6':'৬','7':'৭','8':'৮','9':'৯' } as Record<string,string>)[d] ?? d
-  )).join('');
-
-// ── Singleton context (never changes) ─────────────────────────────────────────
-
-const CONTEXT_VALUE: LanguageCtx = {
+const LanguageContext = createContext<LanguageCtx>({
   lang: 'bn',
   isEnglish: false,
-  t,
-  formatCurrency,
-  formatNumber,
-};
-
-const LanguageContext = createContext<LanguageCtx>(CONTEXT_VALUE);
+  setLang: () => {},
+  t: (key) => bn[key],
+  formatCurrency: (amount) => `৳${formatBengaliNumber(amount)}`,
+  formatNumber: (amount) => formatBengaliNumber(amount),
+});
 
 export const useLanguage = () => useContext(LanguageContext);
 
-// ── Provider ───────────────────────────────────────────────────────────────────
-
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  // Language is permanently Bengali. No state, no server sync.
+  const [lang, setLang] = useState<Lang>(() => {
+    if (typeof window === 'undefined') return 'bn';
+    return window.localStorage.getItem(LANGUAGE_STORAGE_KEY) === 'en' ? 'en' : 'bn';
+  });
+  useEffect(() => {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
+    document.documentElement.lang = lang;
+  }, [lang]);
+  const value = useMemo<LanguageCtx>(() => ({
+    lang,
+    isEnglish: lang === 'en',
+    setLang,
+    t: (key) => lang === 'en' ? en[key] : bn[key],
+    formatCurrency: (amount) => `৳${lang === 'en'
+      ? new Intl.NumberFormat('en-BD', { maximumFractionDigits: 2 }).format(amount)
+      : formatBengaliNumber(amount)}`,
+    formatNumber: (amount) => lang === 'en'
+      ? new Intl.NumberFormat('en-BD', { maximumFractionDigits: 2 }).format(amount)
+      : formatBengaliNumber(amount),
+  }), [lang]);
   return (
-    <LanguageContext.Provider value={CONTEXT_VALUE}>
+    <LanguageContext.Provider value={value}>
       {children}
     </LanguageContext.Provider>
   );

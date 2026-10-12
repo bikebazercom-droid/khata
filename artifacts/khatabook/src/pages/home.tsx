@@ -637,11 +637,11 @@ export function HomeView() {
                   className="flex items-center gap-1 rounded-lg bg-white/15 px-2 py-2 text-[10px] font-bold text-white transition-all hover:bg-white/25 active:scale-95 sm:gap-1.5 sm:rounded-xl sm:px-3 sm:text-xs"
                 >
                   <UserPlus2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                  অ্যাক্সেস
+                  {t('access')}
                 </button>
                 <button
                   onClick={() => navigate('/staff-deployment')}
-                  aria-label="ডিউটি ফোল্ডার"
+                  aria-label={t('staffDutyFolder')}
                   className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 text-white transition-all active:scale-95 active:bg-white/25 sm:h-9 sm:w-9 sm:rounded-xl"
                 >
                   <FolderOpen className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
@@ -653,7 +653,7 @@ export function HomeView() {
                 className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-2 rounded-xl active:scale-95 transition-all"
               >
                 <MoreHorizontal className="w-3.5 h-3.5" />
-                অ্যারো
+                {t('settings')}
               </button>
             )}
           </div>
@@ -686,10 +686,10 @@ export function HomeView() {
                 type="button"
                 onClick={() => setIsScannerOpen(true)}
                 className="flex items-center gap-1.5 text-white/80 hover:text-white text-[12px] font-bold pb-2.5 pt-1 transition-all active:scale-95"
-                aria-label="বাংলা খাতা স্ক্যান করুন"
+                aria-label={t('scanLedger')}
               >
                 <ScanLine className="w-4 h-4" />
-                স্ক্যান
+                {t('scan')}
               </button>
             )}
           </div>
@@ -904,11 +904,11 @@ export function HomeView() {
         </button>
         <button
           onClick={() => setIsSettingsOpen(true)}
-          aria-label="অ্যারো মেনু খুলুন"
+          aria-label={t('moreMenu')}
           className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-slate-400 active:text-slate-600 transition-colors"
         >
           <MoreHorizontal className="w-5 h-5" />
-          <span className="text-[10px] font-bold">বিস্তারিত</span>
+          <span className="text-[10px] font-bold">{t('moreTitle')}</span>
         </button>
       </div>
 

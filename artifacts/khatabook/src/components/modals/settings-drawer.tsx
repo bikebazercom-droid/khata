@@ -4,7 +4,7 @@ import { useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { useClerk, useAuth, useUser } from '@clerk/react';
 import { useRemoveOwnerPushToken } from '@workspace/api-client-react';
-import { ArrowLeft, EllipsisVertical, LogIn, LogOut, Mail, Phone, Trash2 } from 'lucide-react';
+import { ArrowLeft, EllipsisVertical, Globe2, LogIn, LogOut, Mail, Phone, Trash2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -18,6 +18,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { phoneLogout } from '@/lib/phoneAuth';
@@ -63,7 +68,7 @@ export function SettingsDrawer({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { t } = useLanguage();
+  const { t, lang, setLang } = useLanguage();
   const queryClient = useQueryClient();
   const { signOut } = useClerk();
   const { isSignedIn } = useAuth();
@@ -218,7 +223,7 @@ export function SettingsDrawer({
               <span>ফিরে যান</span>
             </button>
             <DialogTitle className="col-start-2 row-start-1 whitespace-nowrap text-center text-lg font-bold text-white">
-              বিস্তারিত
+              {t('moreTitle')}
             </DialogTitle>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -235,6 +240,23 @@ export function SettingsDrawer({
                 sideOffset={8}
                 className="w-[min(20rem,calc(100vw-2rem))] rounded-xl border-slate-200 bg-white p-1.5 shadow-xl"
               >
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger className="min-h-11 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-700 focus:bg-slate-100">
+                    <Globe2 className="h-4 w-4" />
+                    Language / ভাষা
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="min-w-36 rounded-xl border-slate-200 bg-white p-1.5 shadow-xl">
+                    <DropdownMenuRadioGroup
+                      value={lang}
+                      onValueChange={(value) => {
+                        if (value === 'bn' || value === 'en') setLang(value);
+                      }}
+                    >
+                      <DropdownMenuRadioItem value="bn" className="min-h-10 rounded-lg text-sm">বাংলা</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="en" className="min-h-10 rounded-lg text-sm">English</DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
                 <DropdownMenuItem
                   disabled
                   className="cursor-default items-start rounded-lg px-3 py-3 opacity-100 data-[disabled]:opacity-100 focus:bg-transparent"
@@ -242,10 +264,10 @@ export function SettingsDrawer({
                   <div className="flex min-w-0 flex-col gap-1">
                     <span className="flex items-center gap-2 text-xs font-semibold text-slate-500">
                       {authMethod === 'phone' ? <Phone className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
-                      লগইন অবস্থা / পরিচয়
+                      {t('loginIdentity')}
                     </span>
                     <span className="max-w-full truncate text-sm font-semibold text-slate-800">
-                      {isAuthenticated ? loginIdentity || (authMethod === 'phone' ? 'ফোন নম্বরে লগইন' : 'ইমেইলে লগইন') : 'লগইন করা নেই'}
+                      {isAuthenticated ? loginIdentity || (authMethod === 'phone' ? t('phoneLoginFallback') : t('emailLoginFallback')) : t('noLogin')}
                     </span>
                   </div>
                 </DropdownMenuItem>
@@ -267,7 +289,7 @@ export function SettingsDrawer({
                   disabled={role !== 'owner'}
                   onSelect={() => setShowDeleteConfirm(true)}
                   className="min-h-11 rounded-lg px-3 py-2.5 text-sm font-semibold text-red-600 focus:bg-red-50 focus:text-red-700"
-                  title={role === 'owner' ? undefined : 'শুধু মালিক খাতা ডিলিট করতে পারবেন'}
+                  title={role === 'owner' ? undefined : (lang === 'en' ? 'Only the owner can delete a ledger' : 'শুধু মালিক খাতা ডিলিট করতে পারবেন')}
                 >
                   <Trash2 className="h-4 w-4" />
                   {t('deleteAccount')}
