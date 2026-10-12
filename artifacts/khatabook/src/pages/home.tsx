@@ -908,7 +908,7 @@ export function HomeView() {
           className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-slate-400 active:text-slate-600 transition-colors"
         >
           <MoreHorizontal className="w-5 h-5" />
-          <span className="text-[10px] font-bold">অ্যারো</span>
+          <span className="text-[10px] font-bold">বিস্তারিত</span>
         </button>
       </div>
 
