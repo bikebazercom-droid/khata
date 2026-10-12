@@ -207,25 +207,25 @@ export function SettingsDrawer({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showCloseButton={false} className="left-auto right-0 top-0 flex h-[100dvh] w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 border-l border-slate-200 bg-slate-50 p-0 shadow-2xl data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right sm:w-[420px] pt-[var(--safe-top)] pb-[var(--safe-bottom)]">
         <DialogHeader className="shrink-0 border-b border-slate-200 bg-[#1B3A6B] px-4 py-4 text-left">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <button
-                type="button"
-                onClick={() => onOpenChange(false)}
-                aria-label="ড্যাশবোর্ডে ফিরে যান"
-                className="flex h-10 shrink-0 items-center gap-2 rounded-xl bg-white/15 px-3 text-sm font-bold text-white transition-colors hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-              >
-                <ArrowLeft className="h-5 w-5" />
-                <span>ফিরে যান</span>
-              </button>
-              <DialogTitle className="truncate text-lg font-bold text-white">আরো</DialogTitle>
-            </div>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              aria-label="ড্যাশবোর্ডে ফিরে যান"
+              className="justify-self-start flex h-10 shrink-0 items-center gap-2 rounded-xl bg-white/15 px-3 text-sm font-bold text-white transition-colors hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            >
+              <ArrowLeft className="h-5 w-5" />
+              <span>ফিরে যান</span>
+            </button>
+            <DialogTitle className="col-start-2 row-start-1 whitespace-nowrap text-center text-lg font-bold text-white">
+              বিস্তারিত
+            </DialogTitle>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
                   aria-label="আরও অপশন"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white transition-colors hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                  className="col-start-3 row-start-1 flex h-10 w-10 shrink-0 items-center justify-center justify-self-end rounded-xl bg-white/15 text-white transition-colors hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                 >
                   <EllipsisVertical className="h-5 w-5" />
                 </button>
