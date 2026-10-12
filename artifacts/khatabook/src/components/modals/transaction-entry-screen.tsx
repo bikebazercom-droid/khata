@@ -25,7 +25,7 @@ import {
 import { ChevronLeft, Camera, X, ArrowLeftRight, FileText, FolderOpen, Image as ImageIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { cn, evaluateCalculatorExpression, formatCurrency, formatExpressionForDisplay, toBengaliDigits, trimNumberForExpression } from '@/lib/utils';
+import { cn, evaluateCalculatorExpression, formatExpressionForDisplay, toBengaliDigits, trimNumberForExpression } from '@/lib/utils';
 import { applyBalanceDelta, shiftSummaryForPartyChange } from '@/lib/optimistic';
 import { CameraCaptureModal } from '@/components/modals/camera-capture-modal';
 import { Textarea } from '@/components/ui/textarea';
@@ -40,6 +40,7 @@ import { queueEntry, updatePendingEntry, type QueuedEntry } from '@/lib/entryOut
 import { restorePartyListCaches, touchPartyActivityInListCaches } from '@/lib/partyOutbox';
 import { isLedgerAmountLimitError } from '@/lib/ledgerSaveError';
 import { readOfflineIdentity } from '@/lib/offlineSession';
+import { useLanguage } from '@/lib/i18n';
 
 type KeyKind = 'digit' | 'muted' | 'accent';
 type KeyDef = { label: string; value: string; kind: KeyKind };
@@ -154,12 +155,15 @@ export function TransactionEntryScreen({
   queuedEntry?: QueuedEntry;
 }) {
   const isEditMode = !!initialEntry;
+  const { t, formatCurrency, isEnglish } = useLanguage();
   const { role: userRole, adjustmentPartyIds, userId } = useAppAuth();
   const { selectedBusinessId } = useBusinessContext();
   const { isOnline } = useConnectionState();
   const canAdjustSource = userRole === 'owner' || adjustmentPartyIds.includes(partyId);
-  const partyRoleLabel = partyRole === 'SUPPLIER' ? 'সরবরাহকারী' : 'কাস্টমার';
-  const partyRoleSearchLabel = partyRole === 'SUPPLIER' ? 'সরবরাহকারীর' : 'কাস্টমারের';
+  const partyRoleLabel = partyRole === 'SUPPLIER' ? t('supplierRole') : t('customerRole');
+  const partyRoleSearchLabel = partyRole === 'SUPPLIER'
+    ? (isEnglish ? 'supplier' : 'সরবরাহকারীর')
+    : (isEnglish ? 'customer' : 'কাস্টমারের');
   const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
   /** Stores the cloud-storage path of the bill image already on the entry so
    *  handleUpdate can keep it unchanged when the user hasn't replaced it. */
@@ -368,8 +372,8 @@ export function TransactionEntryScreen({
   // Sub-bar formula text — always shows the full expression + live result
   // e.g. "500× = 500", "500×100 = 50000", and after = stays as "500×100 = 50000".
   const formulaPreviewText = useMemo(() => {
-    const toDisplay = (s: string) => toBengaliDigits(formatExpressionForDisplay(s));
-    if (!expression) return toBengaliDigits(lastFormulaText);
+    const toDisplay = (s: string) => isEnglish ? formatExpressionForDisplay(s) : toBengaliDigits(formatExpressionForDisplay(s));
+    if (!expression) return isEnglish ? lastFormulaText : toBengaliDigits(lastFormulaText);
     const displayExpr = toDisplay(expression);
     // Evaluate — strip trailing operator for partial expressions
     const directResult = evaluateCalculatorExpression(expression);
@@ -378,8 +382,8 @@ export function TransactionEntryScreen({
         ? directResult
         : evaluateCalculatorExpression(expression.replace(/[+\-*/]+$/, ''));
     if (partialResult === null) return displayExpr;
-    return `${displayExpr} = ${toBengaliDigits(trimNumberForExpression(partialResult))}`;
-  }, [expression, lastFormulaText]);
+    return `${displayExpr} = ${isEnglish ? trimNumberForExpression(partialResult) : toBengaliDigits(trimNumberForExpression(partialResult))}`;
+  }, [expression, lastFormulaText, isEnglish]);
 
   // True when any editable field differs from the entry's original saved value.
   // Only meaningful in edit mode — always false in create mode.
@@ -636,7 +640,7 @@ export function TransactionEntryScreen({
       (userRole !== 'owner' && !adjustmentPartyIds.includes(transferPartyId))
     )) {
       toast.warning(`${partyRoleLabel} বেছে নিন`, {
-        description: 'অ্যাডজাস্টমেন্ট সংরক্ষণ করতে একই ধরনের অন্য একটি পক্ষ বেছে নিন।',
+        description: t('chooseAdjustmentParty'),
       });
       return;
     }
@@ -908,7 +912,7 @@ export function TransactionEntryScreen({
       (userRole !== 'owner' && !adjustmentPartyIds.includes(transferPartyId))
     )) {
       toast.warning(`${partyRoleLabel} বেছে নিন`, {
-        description: `অ্যাডজাস্টমেন্টের জন্য একজন ${partyRoleLabel} নির্বাচন করুন।`,
+        description: t('selectAdjustmentParty'),
         duration: 3000,
       });
       return;
@@ -1028,8 +1032,8 @@ export function TransactionEntryScreen({
           <ChevronLeft className="w-6 h-6" />
         </button>
         <h2 className={cn('font-extrabold text-[15px] leading-tight truncate', isGet ? 'text-emerald-600' : 'text-red-500')}>
-          {isGet ? `আপনি পেয়েছেন ${formatCurrency(displayAmount)} ` : `আপনি দিয়েছেন ${formatCurrency(displayAmount)} `}
-          <span className="text-slate-700">{isGet ? `${partyName}-এর থেকে` : `${partyName}-কে`}</span>
+          {isGet ? `${t('amountReceived')} ${formatCurrency(displayAmount)} ` : `${t('amountPaid')} ${formatCurrency(displayAmount)} `}
+          <span className="text-slate-700">{isGet ? `${partyName} ${t('fromParty')}` : `${partyName} ${t('toParty')}`}</span>
         </h2>
       </div>
 
@@ -1050,15 +1054,17 @@ export function TransactionEntryScreen({
               autoComplete="off"
               autoCorrect="off"
               spellCheck={false}
-              aria-label="পরিমাণ লিখুন"
+              aria-label={t('amountPlaceholder')}
               data-testid="input-transaction-amount"
-              value={toBengaliDigits(formatExpressionForDisplay(expression).replace(/-/g, '−'))}
+              value={isEnglish
+                ? formatExpressionForDisplay(expression).replace(/-/g, '−')
+                : toBengaliDigits(formatExpressionForDisplay(expression).replace(/-/g, '−'))}
               onChange={handleAmountChange}
               onSelect={captureAmountSelection}
               onClick={captureAmountSelection}
               onKeyUp={captureAmountSelection}
               onBlur={captureAmountSelection}
-              placeholder="পরিমাণ লিখুন"
+              placeholder={t('amountPlaceholder')}
               className={cn(
                 'min-w-0 flex-1 bg-transparent text-left text-2xl font-extrabold tracking-tight tabular-nums placeholder:text-slate-300 focus:outline-none',
                 isGet ? 'text-emerald-600' : 'text-red-500',
@@ -1093,7 +1099,7 @@ export function TransactionEntryScreen({
           )}
           {showError && (
             <div className="px-4 py-2 border-t border-red-100 bg-red-50">
-              <p className="text-xs font-bold text-red-500">সঠিক হিসাব বা সংখ্যা লিখুন</p>
+              <p className="text-xs font-bold text-red-500">{t('invalidAmount')}</p>
             </div>
           )}
         </div>
@@ -1114,7 +1120,7 @@ export function TransactionEntryScreen({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               tabIndex={showMetadata ? 0 : -1}
-              placeholder="বিস্তারিত লিখুন (পণ্য, বিল নং, পরিমাণ ইত্যাদি)"
+              placeholder={t('detailsPlaceholder')}
               rows={1}
               className="w-full resize-none overflow-hidden rounded-xl bg-white px-4 py-3 text-sm font-medium placeholder:text-slate-400 transition-[height] duration-150 ease-out focus:outline-none focus:ring-2 focus:ring-primary/20"
               style={{ boxSizing: 'border-box', height: 50, minHeight: 50 }}
@@ -1279,7 +1285,7 @@ export function TransactionEntryScreen({
                 onClick={handleAttachClick}
                 className="h-11 rounded-xl bg-white border border-slate-200 text-sm font-bold text-slate-600 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
               >
-                <Camera className="w-4 h-4" /> বিল সংযুক্ত করুন
+                <Camera className="w-4 h-4" /> {t('attachBill')}
               </button>
             )
           )}
@@ -1294,10 +1300,10 @@ export function TransactionEntryScreen({
             <ArrowLeftRight className="w-4 h-4 text-blue-600 shrink-0" />
             <div className="min-w-0">
               <p className="text-xs font-extrabold text-blue-900 truncate">
-                অ্যাডজাস্টমেন্ট
+                {t('adjustment')}
               </p>
               <p className="text-[10px] leading-4 font-medium text-blue-800">
-                আপনার এই লেনদেনের অ্যাডজাস্টমেন্ট পরিবর্তনের অনুমতি নেই।
+                {t('adjustmentNotAllowed')}
               </p>
             </div>
           </div>
@@ -1318,7 +1324,7 @@ export function TransactionEntryScreen({
                 <span className="truncate">
                   {isTransferMode && transferPartyId
                     ? `⇄ ${transferPartyOptions.find(p => p.id === transferPartyId)?.name ?? 'নির্বাচিত'}`
-                    : 'অ্যাডজাস্টমেন্ট'}
+                    : t('adjustment')}
                 </span>
               </span>
               {/* Toggle pill */}
@@ -1385,7 +1391,7 @@ export function TransactionEntryScreen({
             isGet ? 'bg-emerald-600' : 'bg-red-500'
           )}
         >
-          {isEditMode ? 'সংরক্ষণ করুন' : 'এন্ট্রি নিশ্চিত করুন'}
+          {isEditMode ? t('saveChanges') : t('confirmEntry')}
         </button>
       </div>
 
@@ -1510,7 +1516,7 @@ export function TransactionEntryScreen({
           <AlertDialogContent className="max-w-sm rounded-2xl">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-slate-800">
-                অ্যাডজাস্টমেন্ট লিংক সরাবেন?
+                {t('removeAdjustmentLink')}
               </AlertDialogTitle>
               <AlertDialogDescription className="text-slate-600">
                 লিংক সরালে অন্য পক্ষের খাতা থেকে মিলানো এন্ট্রিটি মুছে যাবে এবং দুই পক্ষের বাকি হিসাব আপডেট হবে।

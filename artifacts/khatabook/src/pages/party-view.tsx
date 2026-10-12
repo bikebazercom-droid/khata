@@ -26,7 +26,8 @@ import {
   Loader2,
   ArrowLeftRight,
 } from 'lucide-react';
-import { formatCurrency, cn } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { useLanguage } from '@/lib/i18n';
 import { resolveLedgerBookName } from '@/lib/ledger-book-name';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -93,9 +94,15 @@ function balanceBadgeFontSize(value: string, availableWidth: number): string {
 
 const bengaliIntegerFormatter = new Intl.NumberFormat('bn-BD', { useGrouping: false });
 
-function relativeLedgerDate(date: Date): string {
+function relativeLedgerDate(date: Date, lang: 'bn' | 'en'): string {
   const dayDifference = differenceInCalendarDays(new Date(), date);
-  if (dayDifference === 0) return 'আজ';
+  if (dayDifference === 0) return lang === 'en' ? 'Today' : 'আজ';
+  if (lang === 'en') {
+    const days = Math.abs(dayDifference);
+    return dayDifference > 0
+      ? `${days} ${days === 1 ? 'day' : 'days'} ago`
+      : `in ${days} ${days === 1 ? 'day' : 'days'}`;
+  }
   const dayCount = bengaliIntegerFormatter.format(Math.abs(dayDifference));
   return dayDifference > 0 ? `${dayCount} দিন আগে` : `${dayCount} দিন পরে`;
 }
@@ -117,6 +124,7 @@ function groupByDay<T extends { dueDate: string | null; createdAt: string | Date
 }
 
 export function PartyView() {
+  const { t, formatCurrency, isEnglish, lang } = useLanguage();
   const [, params] = useRoute('/party/:id');
   const id = params?.id;
   const [, navigate] = useLocation();
@@ -279,7 +287,7 @@ export function PartyView() {
       const nativeShare = await shareGeneratedFileWithNative(blob, {
         fileName: filename,
         mimeType: 'application/pdf',
-        title: `${party.name} এর হিসাবের রিপোর্ট`,
+        title: `${party.name} ${t('ledgerReport')}`,
       });
       if (!nativeShare) await finalizedWorker.save(filename);
       // Silent by design: the browser's own download indicator is the
@@ -318,15 +326,15 @@ export function PartyView() {
       const nativeShare = await shareGeneratedFileWithNative(blob, {
         fileName: filename,
         mimeType: 'application/pdf',
-        title: 'হিসাবের রিপোর্ট',
+        title: t('ledgerReport'),
         shareText: messageText,
       });
 
       if (nativeShare) {
         toast.success(
           nativeShare.copiedText
-            ? 'রিমাইন্ডারের লেখা কপি হয়েছে—WhatsApp-এ গিয়ে পেস্ট করুন'
-            : 'রিপোর্ট PDF শেয়ার করার জন্য প্রস্তুত',
+            ? t('reminderCopied')
+            : t('reportReadyToShare'),
         );
         return;
       }
@@ -340,7 +348,7 @@ export function PartyView() {
       if (canShareFile) {
         await navigator.share({
           files: [file],
-          title: 'হিসাবের রিপোর্ট',
+          title: t('ledgerReport'),
           text: messageText,
         });
         // Silent by design: the native share sheet opening is itself the
@@ -377,9 +385,9 @@ export function PartyView() {
 
   const handleSms = () => {
     if (!party) return;
-    const label = party.balanceType === 'YOU_WILL_GET' ? 'আপনি পাবেন' : 'আপনি দেবেন';
+    const label = party.balanceType === 'YOU_WILL_GET' ? t('youWillGet') : t('youWillGive');
     setSmsMessage(
-      `প্রিয় ${party.name}, আপনার হিসাবে ${label} ${formatCurrency(displayParty?.currentBalance ?? party.currentBalance)}। ধন্যবাদান্তে, Banglakhata।`
+      `${t('smsGreeting')} ${party.name}, ${t('smsLedgerBalance')} ${label} ${formatCurrency(displayParty?.currentBalance ?? party.currentBalance)}. ${t('smsThanks')}, Banglakhata.`
     );
     setCopiedSms(false);
   };
@@ -434,7 +442,7 @@ export function PartyView() {
         <div className="flex items-center gap-3 px-3 pb-6 pt-[calc(0.75rem+var(--safe-top))]">
           <Link
             href="/"
-            aria-label="পিছনে যান"
+            aria-label={t('back')}
             className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all"
           >
             <ChevronLeft className="w-6 h-6" />
@@ -454,7 +462,7 @@ export function PartyView() {
               <div className="flex items-center gap-2">
                 <h2 className="text-[15px] font-extrabold text-white leading-tight truncate">{party.name}</h2>
                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/20 text-white uppercase tracking-wider shrink-0">
-                  {party.role === 'CUSTOMER' ? 'কাস্টমার' : 'সাপ্লায়ার'}
+                  {party.role === 'CUSTOMER' ? t('customerRole') : t('supplierRole')}
                 </span>
               </div>
             </div>
@@ -473,7 +481,7 @@ export function PartyView() {
       <div className="px-3 -mt-4 shrink-0 relative z-10">
         <div className="bg-white rounded-2xl shadow-md px-4 py-3.5 flex items-center justify-between">
           <p className={cn('text-sm font-extrabold', isGive ? 'text-red-600' : 'text-emerald-600')}>
-            {isGive ? 'আপনি দেবেন' : 'আপনি পাবেন'}
+            {isGive ? t('youWillGive') : t('youWillGet')}
           </p>
           <p className={cn('text-xl font-extrabold tracking-tight', isGive ? 'text-red-600' : 'text-emerald-600')}>
             {formatCurrency(displayParty?.currentBalance ?? party.currentBalance)}
@@ -490,7 +498,7 @@ export function PartyView() {
             className="flex flex-col items-center gap-1 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
           >
             <FileDown className="w-5 h-5 text-slate-500" />
-            <span className="text-[11px] font-bold text-slate-600">রিপোর্ট</span>
+            <span className="text-[11px] font-bold text-slate-600">{t('report')}</span>
           </button>
           <button
             type="button"
@@ -503,7 +511,7 @@ export function PartyView() {
             ) : (
               <MessageCircle className="w-5 h-5 text-emerald-500" />
             )}
-            <span className="text-[11px] font-bold text-slate-600">রিমাইন্ডার</span>
+            <span className="text-[11px] font-bold text-slate-600">{t('reminder')}</span>
           </button>
           <button
             type="button"
@@ -511,7 +519,7 @@ export function PartyView() {
             className="flex flex-col items-center gap-1 py-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
           >
             <MessageSquareText className="w-5 h-5 text-slate-400" />
-            <span className="text-[11px] font-bold text-slate-600">এসএমএস</span>
+            <span className="text-[11px] font-bold text-slate-600">{t('sms')}</span>
           </button>
         </div>
       )}
@@ -527,23 +535,23 @@ export function PartyView() {
             <div className="w-20 h-20 bg-white border-4 border-slate-100 shadow-sm rounded-full flex items-center justify-center mb-5 text-slate-300">
               <FileText className="w-9 h-9" />
             </div>
-            <h3 className="text-lg font-extrabold text-slate-900 mb-2 tracking-tight">এখনো কোনো লেনদেন নেই</h3>
-            <p className="text-slate-500 font-medium text-sm">{party.name}-এর সাথে হিসাব রাখা শুরু করতে একটি লেনদেন যুক্ত করুন।</p>
+            <h3 className="text-lg font-extrabold text-slate-900 mb-2 tracking-tight">{t('noTransactions')}</h3>
+            <p className="text-slate-500 font-medium text-sm">{isEnglish ? `${t('startPartyLedger')} ${party.name}.` : `${party.name}${t('startPartyLedger')}`}</p>
           </div>
         ) : (
           <>
             {/* Column headers */}
             <div className="sticky top-0 z-[5] grid grid-cols-[minmax(0,1fr)_5rem_5rem] min-[380px]:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] min-[480px]:grid-cols-[minmax(0,1fr)_6rem_6rem] bg-[#F5F6F8] px-1.5 py-2 text-[8px] font-bold uppercase tracking-wider text-slate-500 min-[480px]:px-3 min-[480px]:text-[10px]">
-              <span>এন্ট্রি</span>
-              <span className="min-w-0 px-1 text-center leading-tight text-red-500">আপনি দিয়েছেন</span>
-              <span className="min-w-0 px-1 text-right leading-tight text-emerald-500">আপনি পেয়েছেন</span>
+               <span>{t('ledgerEntry')}</span>
+               <span className="min-w-0 px-1 text-center leading-tight text-red-500">{t('amountPaid')}</span>
+               <span className="min-w-0 px-1 text-right leading-tight text-emerald-500">{t('amountReceived')}</span>
             </div>
 
             {groupedEntries.map((group) => (
               <div key={group.dayKey}>
                 <div className="sticky top-[26px] z-[4] flex justify-center bg-[#F5F6F8]/95 py-1.5 backdrop-blur-sm">
                   <span className="text-[11px] font-semibold tracking-wide text-slate-500">
-                    {format(group.date, 'd MMM yy')} • {relativeLedgerDate(group.date)}
+                    {format(group.date, 'd MMM yy')} • {relativeLedgerDate(group.date, lang)}
                   </span>
                 </div>
                 <div className="space-y-2 px-1.5 min-[480px]:px-2.5">
@@ -683,14 +691,14 @@ export function PartyView() {
           className="flex-1 h-12 text-base font-extrabold shadow-[0_4px_14px_0_rgba(239,68,68,0.35)] active:scale-[0.98] transition-all rounded-xl flex items-center justify-center leading-none"
           onClick={() => setTransactionType(LedgerEntryType.YOU_GAVE)}
         >
-          আপনি দিয়েছেন ৳
+          {t('amountPaid')} ৳
         </Button>
         <Button
           variant="success"
           className="flex-1 h-12 text-base font-extrabold shadow-[0_4px_14px_0_rgba(16,185,129,0.35)] active:scale-[0.98] transition-all rounded-xl flex items-center justify-center leading-none"
           onClick={() => setTransactionType(LedgerEntryType.YOU_GOT)}
         >
-          আপনি পেয়েছেন ৳
+          {t('amountReceived')} ৳
         </Button>
       </div>
 
@@ -726,7 +734,7 @@ export function PartyView() {
         <DialogContent className="max-w-sm rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <MessageSquareText className="w-5 h-5 text-slate-500" /> এসএমএস তৈরি হয়েছে
+              <MessageSquareText className="w-5 h-5 text-slate-500" /> {t('smsReady')}
             </DialogTitle>
           </DialogHeader>
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm font-medium text-slate-700 leading-relaxed">
@@ -734,9 +742,9 @@ export function PartyView() {
           </div>
           <Button onClick={handleCopySms} variant="outline" className="w-full font-bold">
             {copiedSms ? <Check className="w-4 h-4 mr-2 text-emerald-600" /> : <Copy className="w-4 h-4 mr-2" />}
-            {copiedSms ? 'কপি হয়েছে' : 'বার্তা কপি করুন'}
+            {copiedSms ? t('copyDone') : t('copyMessage')}
           </Button>
-          <p className="text-xs text-slate-400 font-medium text-center">এটি একটি সিমুলেটেড এসএমএস — কোনো বাস্তব এসএমএস পাঠানো হয়নি।</p>
+          <p className="text-xs text-slate-400 font-medium text-center">{t('simulatedSms')}</p>
         </DialogContent>
       </Dialog>
 
