@@ -38,9 +38,21 @@ minimumReleaseAgeExclude:
 
 onlyBuiltDependencies:
   - '@swc/core'
+  - '@clerk/shared'
+  - browser-tabs-lock
+  - core-js
   - esbuild
   - msw
   - unrs-resolver
+
+allowBuilds:
+  '@clerk/shared': true
+  '@swc/core': true
+  browser-tabs-lock: true
+  core-js: true
+  esbuild: true
+  msw: true
+  unrs-resolver: true
 
 overrides:
   '@esbuild-kit/esm-loader': npm:tsx@^4.21.0
