@@ -38,30 +38,57 @@ export interface AuthenticatedRequest extends Request {
 
 export async function ensureDefaultBusiness(): Promise<void> {
   try {
-    await db
-      .insert(businessesTable)
-      .values({ id: SEED_BUSINESS_ID, name: "আমার খাতা" })
-      .onConflictDoNothing();
+    await db.transaction(async (tx) => {
+      // Do not issue an insert for the reserved row when it already exists.
+      // The targeted conflict clause still makes concurrent startup attempts safe.
+      const [seedBusiness] = await tx
+        .select({ id: businessesTable.id })
+        .from(businessesTable)
+        .where(eq(businessesTable.id, SEED_BUSINESS_ID))
+        .limit(1);
 
-    await db
-      .update(partiesTable)
-      .set({ businessId: SEED_BUSINESS_ID })
-      .where(isNull(partiesTable.businessId));
+      if (!seedBusiness) {
+        await tx
+          .insert(businessesTable)
+          .values({ id: SEED_BUSINESS_ID, name: "আমার খাতা" })
+          .onConflictDoNothing({ target: businessesTable.id });
+      }
 
-    await db
-      .update(businessSettingsTable)
-      .set({ businessId: SEED_BUSINESS_ID })
-      .where(isNull(businessSettingsTable.businessId));
+      const [confirmedSeedBusiness] = await tx
+        .select({ id: businessesTable.id })
+        .from(businessesTable)
+        .where(eq(businessesTable.id, SEED_BUSINESS_ID))
+        .limit(1);
+      if (!confirmedSeedBusiness) {
+        throw new Error("Default business row is unavailable after initialization");
+      }
 
-    // Backfill user_businesses for any existing app_users rows
-    const existingUsers = await db.select().from(appUsersTable);
-    for (const u of existingUsers) {
-      if (u.workerAccessDeletedAt) continue;
-      await db
-        .insert(userBusinessesTable)
-        .values({ userId: u.id, businessId: u.businessId })
-        .onConflictDoNothing();
-    }
+      await tx
+        .update(partiesTable)
+        .set({ businessId: SEED_BUSINESS_ID })
+        .where(isNull(partiesTable.businessId));
+
+      await tx
+        .update(businessSettingsTable)
+        .set({ businessId: SEED_BUSINESS_ID })
+        .where(isNull(businessSettingsTable.businessId));
+
+      // Read only the fields needed for membership backfill.
+      const existingUsers = await tx
+        .select({
+          id: appUsersTable.id,
+          businessId: appUsersTable.businessId,
+          workerAccessDeletedAt: appUsersTable.workerAccessDeletedAt,
+        })
+        .from(appUsersTable);
+      for (const user of existingUsers) {
+        if (user.workerAccessDeletedAt) continue;
+        await tx
+          .insert(userBusinessesTable)
+          .values({ userId: user.id, businessId: user.businessId })
+          .onConflictDoNothing();
+      }
+    });
   } catch (err) {
     console.error("[startup] ensureDefaultBusiness failed:", err);
   }
