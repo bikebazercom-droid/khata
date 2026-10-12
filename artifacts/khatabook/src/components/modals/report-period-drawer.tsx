@@ -1,5 +1,6 @@
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/lib/i18n';
 import {
   Drawer,
   DrawerContent,
@@ -8,15 +9,6 @@ import {
 } from '@/components/ui/drawer';
 
 export type ReportPeriod = 'ALL' | 'THIS_MONTH' | 'SINGLE_DAY' | 'LAST_WEEK' | 'LAST_MONTH' | 'CUSTOM_RANGE';
-
-const OPTIONS: { id: ReportPeriod; label: string }[] = [
-  { id: 'ALL', label: 'সব' },
-  { id: 'THIS_MONTH', label: 'এই মাসে' },
-  { id: 'SINGLE_DAY', label: 'এক দিন' },
-  { id: 'LAST_WEEK', label: 'গত সপ্তাহে' },
-  { id: 'LAST_MONTH', label: 'গত মাসের' },
-  { id: 'CUSTOM_RANGE', label: 'তারিখের পরিসর' },
-];
 
 export function ReportPeriodDrawer({
   open,
@@ -29,14 +21,23 @@ export function ReportPeriodDrawer({
   value: ReportPeriod;
   onSelect: (period: ReportPeriod) => void;
 }) {
+  const { t } = useLanguage();
+  const options: { id: ReportPeriod; label: string }[] = [
+    { id: 'ALL', label: t('all') },
+    { id: 'THIS_MONTH', label: t('thisMonth') },
+    { id: 'SINGLE_DAY', label: t('oneDay') },
+    { id: 'LAST_WEEK', label: t('lastWeek') },
+    { id: 'LAST_MONTH', label: t('lastMonth') },
+    { id: 'CUSTOM_RANGE', label: t('dateRange') },
+  ];
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent>
         <DrawerHeader className="text-left">
-          <DrawerTitle className="text-base font-extrabold text-slate-900">রিপোর্ট সময়কাল নির্বাচন করুন</DrawerTitle>
+          <DrawerTitle className="text-base font-extrabold text-slate-900">{t('reportPeriod')}</DrawerTitle>
         </DrawerHeader>
         <div className="px-4 pb-8">
-          {OPTIONS.map((option) => (
+          {options.map((option) => (
             <button
               key={option.id}
               type="button"

@@ -38,7 +38,7 @@ import {
   endOfMonth,
   subMonths,
 } from 'date-fns';
-import { bn } from 'date-fns/locale';
+import { bn, enUS } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { formatCurrency, cn } from '@/lib/utils';
 import { resolveLedgerBookName } from '@/lib/ledger-book-name';
@@ -50,7 +50,6 @@ import {
   buildPartyStatementRows,
   calculatePartyStatementSummary,
   filterPartyStatementEntriesByRange,
-  formatPartyStatementPdfDate,
   resolvePartyStatementDateRange,
 } from '@/lib/party-statement';
 import { generatePaginatedStatementPdf } from '@/lib/paginated-statement-pdf';
@@ -64,6 +63,7 @@ import {
 } from '@/lib/pdf-report-branding';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
 import { buildPortablePdfFilename } from '@/lib/report-filename';
+import { useLanguage } from '@/lib/i18n';
 
 function statementAmountFontSize(value: string, viewportWidth: number): string {
   const availableWidth = Math.max(30, (viewportWidth - 32) * 0.3 - 16);
@@ -86,6 +86,7 @@ function ReportOptionsSheet({
   onClose: () => void;
   onConfirm: (includeDetailed: boolean) => void;
 }) {
+  const { t } = useLanguage();
   const [includeDetailed, setIncludeDetailed] = useState(false);
 
   if (!open) return null;
@@ -102,7 +103,7 @@ function ReportOptionsSheet({
         {/* Drag handle */}
         <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto mb-5" />
 
-        <p className="text-[#004B93] font-bold text-[16px] mb-4">রিপোর্টে অন্তর্ভুক্ত করুন</p>
+          <p className="text-[#004B93] font-bold text-[16px] mb-4">{t('includeInReport')}</p>
 
         {/* Checkbox row */}
         <button
@@ -118,7 +119,7 @@ function ReportOptionsSheet({
           >
             {includeDetailed && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
           </div>
-          <span className="text-[15px] text-slate-800 font-medium">বিস্তারিত প্রবেশিকা</span>
+          <span className="text-[15px] text-slate-800 font-medium">{t('detailedEntries')}</span>
         </button>
 
         <div className="h-px bg-slate-100 my-3" />
@@ -128,7 +129,7 @@ function ReportOptionsSheet({
           onClick={() => onConfirm(includeDetailed)}
           className="w-full h-12 bg-[#004B93] text-white rounded-xl font-bold text-[15px] active:opacity-90 transition-opacity mt-2"
         >
-          ঠিক আছে
+          {t('ok')}
         </button>
       </div>
     </div>
@@ -187,6 +188,7 @@ function resolveDateRange(
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function PartyReportView() {
+  const { lang, isEnglish, t, formatCurrency: formatLocalizedCurrency, formatNumber } = useLanguage();
   const [, params]    = useRoute('/party/:id/report');
   const id            = params?.id ?? '';
   const [, navigate]  = useLocation();
@@ -283,7 +285,10 @@ export function PartyReportView() {
   }, [dateFiltered, search]);
 
   const loading = partyLoading || entriesLoading;
-  const curLbl  = PERIOD_LABELS[period];
+  const curLbl  = isEnglish ? ({
+    ALL: t('all'), THIS_MONTH: t('thisMonth'), SINGLE_DAY: t('oneDay'),
+    LAST_WEEK: t('lastWeek'), LAST_MONTH: t('lastMonth'), CUSTOM_RANGE: t('dateRange'),
+  } as const)[period] : PERIOD_LABELS[period];
 
   // ── PDF generation ────────────────────────────────────────────────────────
 
@@ -292,20 +297,21 @@ export function PartyReportView() {
     const phone = party?.phone ?? '';
     const safeName = escapeHtml(name);
     const safePhone = escapeHtml(phone);
-    const partyRoleLabel = party?.role === 'CUSTOMER' ? 'কাস্টমার' : 'সাপ্লায়ার';
+    const partyRoleLabel = party?.role === 'CUSTOMER' ? t('customerRole') : t('supplierRole');
     const now   = new Date();
 
     const statementRange = resolvePartyStatementDateRange(reportRange, dateFiltered);
     const periodStr = (() => {
-      if (!statementRange) return 'কোনো লেনদেন নেই';
-      const s = format(statementRange.start, 'd MMMM yyyy', { locale: bn });
-      const e = format(statementRange.end,   'd MMMM yyyy', { locale: bn });
+       if (!statementRange) return t('noTransactions');
+       const locale = isEnglish ? enUS : bn;
+       const s = format(statementRange.start, 'd MMMM yyyy', { locale });
+       const e = format(statementRange.end,   'd MMMM yyyy', { locale });
       return `${s} - ${e}`;
     })();
 
     // Plain amount — no currency symbol (used inside table cells)
     const fmtAmt = (a: number) =>
-      Math.abs(a).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      Math.abs(a).toLocaleString(isEnglish ? 'en-BD' : 'bn-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     // Balance with Dr/Cr suffix:
     //   positive = party owes you (Dr — party is debited)
     //   negative = you owe party (Cr — party is credited)
@@ -320,14 +326,17 @@ export function PartyReportView() {
 
     for (const row of statementRows) {
       if (row.dayKey !== lastDayKey) {
+        const [groupYear, groupMonth, groupDay] = row.dayKey.split('-').map(Number);
+        const groupDate = format(new Date(groupYear, groupMonth - 1, groupDay), 'd MMMM yyyy', { locale: isEnglish ? enUS : bn });
+        const groupDateLabel = isEnglish ? groupDate : groupDate.replace(/[0-9]/g, d => '০১২৩৪৫৬৭৮৯'[Number(d)]);
         // In chronological order, the opening balance belongs to the first group.
         const openNote = row.dayKey === openingBalanceDayKey
-          ? `<td style="border:0;text-align:right;font-weight:400;color:#64748b;font-size:11px;white-space:nowrap;">(ওপেনিং ব্যালেন্স: ${fmtBal(openingBalance)})</td>`
+          ? `<td style="border:0;text-align:right;font-weight:400;color:#64748b;font-size:11px;white-space:nowrap;">(${t('openingBalance')}: ${fmtBal(openingBalance)})</td>`
           : '<td style="border:0;"></td>';
         tableRows += `<tr data-pdf-kind="day" style="background:#f1f5f9;">
           <td colspan="6" style="padding:0;border:1px solid #cbd5e1;">
             <table style="width:100%;border-collapse:collapse;"><tr>
-              <td style="border:0;padding:7px 10px;font-weight:700;font-size:12px;">${row.dayLabel}</td>
+              <td style="border:0;padding:7px 10px;font-weight:700;font-size:12px;">${groupDateLabel}</td>
               ${openNote}
             </tr></table>
           </td>
@@ -337,7 +346,9 @@ export function PartyReportView() {
 
       const details = escapeHtml(row.details);
       const adjustment = escapeHtml(row.adjustment ?? '');
-      const dateOnly = escapeHtml(formatPartyStatementPdfDate(row.dayKey));
+      const [pdfYear, pdfMonth, pdfDay] = row.dayKey.split('-').map(Number);
+      const localizedDate = format(new Date(pdfYear, pdfMonth - 1, pdfDay), 'd MMM yy', { locale: isEnglish ? enUS : bn });
+      const dateOnly = escapeHtml(isEnglish ? localizedDate : localizedDate.replace(/[0-9]/g, d => '০১২৩৪৫৬৭৮৯'[Number(d)]));
       const debitText = row.debit !== null ? fmtAmt(row.debit) : '';
       const creditText = row.credit !== null ? fmtAmt(row.credit) : '';
       const balanceText = fmtBal(row.balanceAfter);
@@ -359,28 +370,30 @@ export function PartyReportView() {
     }
 
     if (!tableRows) {
-      tableRows = `<tr data-pdf-kind="empty"><td colspan="6" style="padding:16px;text-align:center;color:#94a3b8;border:1px solid #e2e8f0;">কোনো লেনদেন নেই</td></tr>`;
+      tableRows = `<tr data-pdf-kind="empty"><td colspan="6" style="padding:16px;text-align:center;color:#94a3b8;border:1px solid #e2e8f0;">${t('noTransactions')}</td></tr>`;
     }
 
     // YOU_GAVE entries are debits; YOU_GOT entries are credits.
     tableRows += `<tr data-pdf-kind="total" style="background:#f8fafc;font-weight:700;vertical-align:middle;">
-      <td colspan="3" style="padding:14px 8px;border:1px solid #cbd5e1;text-align:center;vertical-align:middle;font-size:12px;">সর্বমোট</td>
+      <td colspan="3" style="padding:14px 8px;border:1px solid #cbd5e1;text-align:center;vertical-align:middle;font-size:12px;">${t('total')}</td>
       <td style="padding:14px 8px;border:1px solid #cbd5e1;text-align:center;vertical-align:middle;background:#fef2f2;color:#b91c1c;font-size:${fitPdfCellFontSize(fmtAmt(totalDebit), 92)}px;overflow-wrap:anywhere;word-break:break-word;">${fmtAmt(totalDebit)}</td>
       <td style="padding:14px 8px;border:1px solid #cbd5e1;text-align:center;vertical-align:middle;background:#f0fdf4;color:#047857;font-size:${fitPdfCellFontSize(fmtAmt(totalCredit), 92)}px;overflow-wrap:anywhere;word-break:break-word;">${fmtAmt(totalCredit)}</td>
       <td style="padding:14px 8px;border:1px solid #cbd5e1;text-align:center;vertical-align:middle;font-size:${fitPdfCellFontSize(fmtBal(closingBalance), 112)}px;color:${balClr(closingBalance)};overflow-wrap:anywhere;word-break:break-word;">${fmtBal(closingBalance)}</td>
     </tr>`;
 
     const timeStr  = format(now, 'h:mm a');
-    const dateDay  = format(now, 'd', { locale: bn });
-    const dateMon  = format(now, 'MMMM', { locale: bn });
-    const dateYr   = format(now, 'yy');
+    const dateDay  = format(now, 'd', { locale: isEnglish ? enUS : bn });
+    const dateMon  = format(now, 'MMMM', { locale: isEnglish ? enUS : bn });
+    const dateYr   = format(now, 'yy', { locale: isEnglish ? enUS : bn });
     const dateStr  = `${dateDay} ${dateMon}'${dateYr}`;
 
     const openBalClr    = balClr(openingBalance);
     const netClr        = balClr(closingBalance);
-    const partyRelation = closingBalance >= 0 ? `${safeName} দেবে` : `${safeName} পাবে`;
+    const partyRelation = closingBalance >= 0
+      ? `${safeName} ${isEnglish ? 'owes you' : 'দেবে'}`
+      : `${safeName} ${isEnglish ? 'you owe' : 'পাবে'}`;
 
-    return `<!DOCTYPE html><html lang="bn"><head><meta charset="UTF-8"/>
+    return `<!DOCTYPE html><html lang="${lang}"><head><meta charset="UTF-8"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700;900&display=swap" rel="stylesheet">
@@ -427,10 +440,10 @@ export function PartyReportView() {
   <div class="statement-pdf-intro">
 
     <!-- Title -->
-    <div style="text-align:center;margin-bottom:20px;">
-      <div style="font-size:18px;font-weight:700;color:#1e293b;">${safeName} এর স্টেটমেন্ট</div>
+      <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:18px;font-weight:700;color:#1e293b;">${safeName} ${t('detailedStatement')}</div>
         <div style="font-size:12px;color:#64748b;margin-top:4px;">${partyRoleLabel}</div>
-      ${phone ? `<div style="font-size:12px;color:#64748b;margin-top:4px;">ফোন নম্বর: ${safePhone}</div>` : ''}
+      ${phone ? `<div style="font-size:12px;color:#64748b;margin-top:4px;">${isEnglish ? 'Phone' : 'ফোন নম্বর'}: ${safePhone}</div>` : ''}
       <div style="font-size:12px;color:#64748b;margin-top:3px;">(${periodStr})</div>
     </div>
 
@@ -438,20 +451,20 @@ export function PartyReportView() {
     <table style="width:100%;border-collapse:collapse;border:1px solid #cbd5e1;margin-bottom:18px;break-inside:avoid;page-break-inside:avoid;">
       <tr>
         <td style="padding:12px 14px;border-right:1px solid #cbd5e1;width:25%;vertical-align:top;">
-          <div style="font-size:11px;color:#64748b;margin-bottom:5px;">ওপেনিং ব্যালেন্স</div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:5px;">${t('openingBalance')}</div>
           <div style="font-size:15px;font-weight:700;color:${openBalClr};">৳${fmtBal(openingBalance)}</div>
-          ${statementRange ? `<div style="font-size:10px;color:#94a3b8;margin-top:3px;">(on ${format(statementRange.start,'d MMMM yyyy',{locale:bn})})</div>` : ''}
+          ${statementRange ? `<div style="font-size:10px;color:#94a3b8;margin-top:3px;">(${isEnglish ? 'on' : 'তারিখ'} ${format(statementRange.start,'d MMMM yyyy',{locale:isEnglish ? enUS : bn})})</div>` : ''}
         </td>
         <td style="padding:12px 14px;border-right:1px solid #cbd5e1;width:25%;vertical-align:top;">
-          <div style="font-size:11px;color:#64748b;margin-bottom:5px;">মোট ডেবিট / খরচ (-)</div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:5px;">${t('totalDebit')}</div>
           <div style="font-size:15px;font-weight:700;color:#b91c1c;">৳${fmtAmt(totalDebit)}</div>
         </td>
         <td style="padding:12px 14px;border-right:1px solid #cbd5e1;width:25%;vertical-align:top;">
-          <div style="font-size:11px;color:#64748b;margin-bottom:5px;">মোট ক্রেডিট / জমা (+)</div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:5px;">${t('totalCredit')}</div>
           <div style="font-size:15px;font-weight:700;color:#047857;">৳${fmtAmt(totalCredit)}</div>
         </td>
         <td style="padding:12px 14px;width:25%;vertical-align:top;">
-          <div style="font-size:11px;color:#64748b;margin-bottom:5px;">মোট ব্যালেন্স</div>
+          <div style="font-size:11px;color:#64748b;margin-bottom:5px;">${t('totalBalance')}</div>
           <div style="font-size:15px;font-weight:700;color:${netClr};">৳${fmtBal(closingBalance)}</div>
           <div style="font-size:10px;color:#94a3b8;margin-top:3px;">(${partyRelation})</div>
         </td>
@@ -460,7 +473,7 @@ export function PartyReportView() {
 
     <!-- Entry count -->
     <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:#374151;">
-      এন্ট্রির সংখ্যা: ${dateFiltered.length} (${curLbl})
+      ${isEnglish ? 'Entries' : 'এন্ট্রির সংখ্যা'}: ${formatNumber(dateFiltered.length)} (${curLbl})
     </div>
 
   </div>
@@ -473,12 +486,12 @@ export function PartyReportView() {
       </colgroup>
       <thead>
         <tr style="background:#f8fafc;">
-          <th style="padding:5px;border:1px solid #cbd5e1;text-align:left;font-size:11px;color:#374151;font-weight:700;width:16%;overflow-wrap:anywhere;">তারিখ</th>
-          <th style="padding:5px;border:1px solid #cbd5e1;text-align:left;font-size:11px;color:#374151;font-weight:700;width:22%;overflow-wrap:anywhere;">ডিটেইলস</th>
-          <th style="padding:5px;border:1px solid #cbd5e1;text-align:left;font-size:11px;color:#374151;font-weight:700;width:17%;overflow-wrap:anywhere;">অ্যাডজাস্টমেন্ট</th>
-          <th style="padding:5px;border:1px solid #cbd5e1;text-align:right;font-size:10px;color:#374151;font-weight:700;background:#fef2f2;width:14%;overflow-wrap:anywhere;">ডেবিট / খরচ (-)</th>
-          <th style="padding:5px;border:1px solid #cbd5e1;text-align:right;font-size:10px;color:#374151;font-weight:700;background:#f0fdf4;width:14%;overflow-wrap:anywhere;">ক্রেডিট / জমা (+)</th>
-          <th style="padding:5px;border:1px solid #cbd5e1;text-align:right;font-size:10px;color:#374151;font-weight:700;width:17%;overflow-wrap:anywhere;">ব্যালেন্স (Dr/Cr)</th>
+          <th style="padding:5px;border:1px solid #cbd5e1;text-align:left;font-size:11px;color:#374151;font-weight:700;width:16%;overflow-wrap:anywhere;">${t('date')}</th>
+          <th style="padding:5px;border:1px solid #cbd5e1;text-align:left;font-size:11px;color:#374151;font-weight:700;width:22%;overflow-wrap:anywhere;">${t('details')}</th>
+          <th style="padding:5px;border:1px solid #cbd5e1;text-align:left;font-size:11px;color:#374151;font-weight:700;width:17%;overflow-wrap:anywhere;">${t('adjustment')}</th>
+          <th style="padding:5px;border:1px solid #cbd5e1;text-align:right;font-size:10px;color:#374151;font-weight:700;background:#fef2f2;width:14%;overflow-wrap:anywhere;">${t('debit')}</th>
+          <th style="padding:5px;border:1px solid #cbd5e1;text-align:right;font-size:10px;color:#374151;font-weight:700;background:#f0fdf4;width:14%;overflow-wrap:anywhere;">${t('credit')}</th>
+          <th style="padding:5px;border:1px solid #cbd5e1;text-align:right;font-size:10px;color:#374151;font-weight:700;width:17%;overflow-wrap:anywhere;">${isEnglish ? 'Balance (Dr/Cr)' : 'ব্যালেন্স (Dr/Cr)'}</th>
         </tr>
       </thead>
       <tbody>${tableRows}</tbody>
@@ -487,7 +500,7 @@ export function PartyReportView() {
   <!-- Repeated footer: page number is filled after all rows are paginated. -->
   <div class="statement-pdf-footer">
   <div class="statement-pdf-meta">
-      <span>রিপোর্ট তৈরি হয়েছে : ${timeStr} | ${dateStr}</span>
+      <span>${t('reportGeneratedAt')}: ${timeStr} | ${dateStr}</span>
       <span class="statement-pdf-page-number">Page 1 of 1</span>
     </div>
 
@@ -499,7 +512,7 @@ export function PartyReportView() {
       </td>
       <td style="width:42%;padding:4px 8px;vertical-align:middle;text-align:right;color:#dbeafe;">
         ${renderPdfSupportContacts(reportBranding?.supportPhone, reportBranding?.supportEmail)}
-        <div style="margin-top:3px;padding-top:3px;border-top:1px solid rgba(219,234,254,0.35);font-size:8px;line-height:1.2;white-space:nowrap;">নিয়ম ও শর্তাবলী প্রযোজ্য</div>
+        <div style="margin-top:3px;padding-top:3px;border-top:1px solid rgba(219,234,254,0.35);font-size:8px;line-height:1.2;white-space:nowrap;">${t('termsApply')}</div>
       </td>
     </tr>
   </table>
@@ -531,12 +544,12 @@ export function PartyReportView() {
       const nativeShare = await shareGeneratedFileWithNative(blob, {
         fileName: filename,
         mimeType: 'application/pdf',
-        title: `${party?.name ?? 'পার্টি'} এর রিপোর্ট`,
+        title: `${party?.name ?? (isEnglish ? 'Party' : 'পার্টি')} ${t('reportTitleSuffix')}`,
       });
-      if (nativeShare) toast.success('রিপোর্ট PDF শেয়ার করার জন্য প্রস্তুত');
+      if (nativeShare) toast.success(t('pdfShareReady'));
       else {
         triggerDownload(blob, filename);
-        toast.success('PDF ডাউনলোড হয়েছে');
+        toast.success(t('pdfDownloaded'));
       }
     } catch (err) {
       console.error(err);
@@ -554,24 +567,24 @@ export function PartyReportView() {
       const nativeShare = await shareGeneratedFileWithNative(blob, {
         fileName: filename,
         mimeType: 'application/pdf',
-        title: `${party?.name ?? ''} এর রিপোর্ট`,
+        title: `${party?.name ?? ''} ${t('reportTitleSuffix')}`,
       });
       if (nativeShare) {
-        toast.success('রিপোর্ট PDF শেয়ার করার জন্য প্রস্তুত');
+        toast.success(t('pdfShareReady'));
         return;
       }
 
       const file     = new File([blob], filename, { type: 'application/pdf' });
       if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: `${party?.name ?? ''} এর রিপোর্ট` });
+        await navigator.share({ files: [file], title: `${party?.name ?? ''} ${t('reportTitleSuffix')}` });
       } else {
         triggerDownload(blob, filename);
-        toast.success('PDF ডাউনলোড হয়েছে');
+        toast.success(t('pdfDownloaded'));
       }
     } catch (err) {
       if ((err as DOMException).name !== 'AbortError') {
         console.error(err);
-        toast.error('শেয়ার করতে সমস্যা হয়েছে।');
+        toast.error(t('shareError'));
       }
     } finally {
       setIsShareBusy(false);
@@ -598,12 +611,12 @@ export function PartyReportView() {
           <button
             onClick={() => navigate(`/party/${id}`)}
             className="text-white active:opacity-70 transition-opacity shrink-0"
-            aria-label="ফিরে যান"
+            aria-label={t('back')}
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
           <h1 className="text-white font-extrabold text-[17px] tracking-tight flex-1 truncate">
-            {partyLoading ? 'লোড হচ্ছে…' : `${party?.name ?? ''} এর রিপোর্ট`}
+            {partyLoading ? t('loading') : `${party?.name ?? ''} ${t('reportTitleSuffix')}`}
           </h1>
         </div>
 
@@ -619,9 +632,9 @@ export function PartyReportView() {
           >
             <CalendarIcon className="w-3.5 h-3.5 text-white/70 shrink-0" />
             <div className="min-w-0">
-              <p className="text-[9px] font-bold text-white/60 uppercase tracking-wider">আরম্ভের তারিখ</p>
+          <p className="text-[9px] font-bold text-white/60 uppercase tracking-wider">{t('startDate')}</p>
               <p className={cn('text-[12px] font-bold truncate', startDate ? 'text-white' : 'text-white/50')}>
-                {startDate ? formatBengaliDateInput(startDate) : 'নির্বাচন করুন'}
+                {startDate ? formatBengaliDateInput(startDate, lang) : t('selectDate')}
               </p>
             </div>
           </button>
@@ -636,9 +649,9 @@ export function PartyReportView() {
           >
             <CalendarIcon className="w-3.5 h-3.5 text-white/70 shrink-0" />
             <div className="min-w-0">
-              <p className="text-[9px] font-bold text-white/60 uppercase tracking-wider">শেষের তারিখ</p>
+              <p className="text-[9px] font-bold text-white/60 uppercase tracking-wider">{t('endDate')}</p>
               <p className={cn('text-[12px] font-bold truncate', endDate ? 'text-white' : 'text-white/50')}>
-                {endDate ? formatBengaliDateInput(endDate) : 'নির্বাচন করুন'}
+                {endDate ? formatBengaliDateInput(endDate, lang) : t('selectDate')}
               </p>
             </div>
           </button>
@@ -649,7 +662,7 @@ export function PartyReportView() {
           <Search className="w-4 h-4 text-white/60 ml-3 shrink-0" />
           <input
             type="text"
-            placeholder="এন্ট্রি অনুসন্ধান করুন"
+            placeholder={t('searchEntries')}
             className="flex-1 bg-transparent text-white placeholder-white/50 text-[13px] font-medium py-2.5 px-2 outline-none"
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -676,33 +689,33 @@ export function PartyReportView() {
             {/* Stats */}
             <div className="px-4 pt-4 pb-2">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-[15px] font-bold text-slate-800">মোট ব্যালেন্স</p>
+                <p className="text-[15px] font-bold text-slate-800">{t('totalBalance')}</p>
                 <p className={cn('text-[18px] font-extrabold tracking-tight', isGet ? 'text-emerald-600' : 'text-red-600')}>
-                  {formatCurrency(Math.abs(closingBalance))}
+                  {formatLocalizedCurrency(Math.abs(closingBalance))}
                 </p>
               </div>
               <div className="h-px bg-slate-200 mb-3" />
               <div className="grid grid-cols-[40%_30%_30%]">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">মোট</p>
-                  <p className="text-[13px] font-extrabold text-slate-800 mt-0.5">{filtered.length} এন্ট্রিগুলো</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('total')}</p>
+                  <p className="text-[13px] font-extrabold text-slate-800 mt-0.5">{formatNumber(filtered.length)} {t('entries')}</p>
                 </div>
                 <div className="min-w-0 text-center">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">আপনি দিয়েছেন</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('debit')}</p>
                   <p
                     className="mt-0.5 overflow-hidden whitespace-nowrap text-[13px] font-extrabold text-red-600"
-                    style={{ fontSize: statementAmountFontSize(formatCurrency(totalDebit), window.innerWidth) }}
+                    style={{ fontSize: statementAmountFontSize(formatLocalizedCurrency(totalDebit), window.innerWidth) }}
                   >
-                    {formatCurrency(totalDebit)}
+                    {formatLocalizedCurrency(totalDebit)}
                   </p>
                 </div>
                 <div className="min-w-0 text-right">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">আপনি পেয়েছেন</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t('credit')}</p>
                   <p
                     className="mt-0.5 overflow-hidden whitespace-nowrap text-right text-[13px] font-extrabold text-emerald-600"
-                    style={{ fontSize: statementAmountFontSize(formatCurrency(totalCredit), window.innerWidth) }}
+                    style={{ fontSize: statementAmountFontSize(formatLocalizedCurrency(totalCredit), window.innerWidth) }}
                   >
-                    {formatCurrency(totalCredit)}
+                    {formatLocalizedCurrency(totalCredit)}
                   </p>
                 </div>
               </div>
@@ -713,7 +726,7 @@ export function PartyReportView() {
               {filtered.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-slate-400 text-center">
                   <p className="text-sm font-medium">
-                    {search.trim() ? 'কোনো মিল পাওয়া যায়নি' : 'এই সময়কালে কোনো লেনদেন নেই'}
+                    {search.trim() ? t('noMatchingEntries') : t('noEntriesInPeriod')}
                   </p>
                 </div>
               ) : (
@@ -734,13 +747,13 @@ export function PartyReportView() {
                         {/* Col 1: date + running balance — always white */}
                         <div className="min-w-0 bg-white px-3 py-3">
                           <p className="text-[13px] font-bold text-slate-800">
-                            {format(businessDate, 'd MMM yy')}
+                            {format(businessDate, 'd MMM yy', { locale: isEnglish ? enUS : bn })}
                           </p>
                           <p className={cn(
                             'mt-0.5 overflow-hidden whitespace-nowrap text-[11px] font-semibold',
                             bal >= 0 ? 'text-emerald-600' : 'text-red-500',
-                          )} title={`ব্যালেন্স: ${formatCurrency(Math.abs(bal))}`}>
-                            ব্যালেন্স: {formatCurrency(Math.abs(bal))}
+                          )} title={`${t('balanceLabel')} ${formatLocalizedCurrency(Math.abs(bal))}`}>
+                            {t('balanceLabel')} {formatLocalizedCurrency(Math.abs(bal))}
                           </p>
                         </div>
 
@@ -749,9 +762,9 @@ export function PartyReportView() {
                           {isDebit && (
                             <span
                               className="block max-w-full overflow-hidden whitespace-nowrap text-right font-extrabold text-red-600"
-                              style={{ fontSize: statementAmountFontSize(formatCurrency(entry.amount), window.innerWidth) }}
+                              style={{ fontSize: statementAmountFontSize(formatLocalizedCurrency(entry.amount), window.innerWidth) }}
                             >
-                              {formatCurrency(entry.amount)}
+                              {formatLocalizedCurrency(entry.amount)}
                             </span>
                           )}
                         </div>
@@ -761,9 +774,9 @@ export function PartyReportView() {
                           {!isDebit && (
                             <span
                               className="block max-w-full overflow-hidden whitespace-nowrap text-right font-extrabold text-emerald-700"
-                              style={{ fontSize: statementAmountFontSize(formatCurrency(entry.amount), window.innerWidth) }}
+                              style={{ fontSize: statementAmountFontSize(formatLocalizedCurrency(entry.amount), window.innerWidth) }}
                             >
-                              {formatCurrency(entry.amount)}
+                              {formatLocalizedCurrency(entry.amount)}
                             </span>
                           )}
                         </div>
@@ -789,7 +802,7 @@ export function PartyReportView() {
             ? <Loader2 className="w-4 h-4 animate-spin" />
             : <FileDown className="w-4 h-4" />
           }
-          {isPdfBusy ? 'তৈরি হচ্ছে…' : 'PDF ডাউনলোড'}
+          {isPdfBusy ? t('generating') : t('downloadPdf')}
         </button>
         <button
           type="button"
@@ -801,7 +814,7 @@ export function PartyReportView() {
             ? <Loader2 className="w-4 h-4 animate-spin" />
             : <Share2 className="w-4 h-4" />
           }
-          {isShareBusy ? 'তৈরি হচ্ছে…' : 'শেয়ার করুন'}
+          {isShareBusy ? t('generating') : t('share')}
         </button>
       </div>
 
@@ -822,6 +835,7 @@ export function PartyReportView() {
       {/* ══ Bengali Calendar Modal ══ */}
       {calendarFor === 'start' && (
         <BengaliCalendarModal
+          ariaLabel={isEnglish ? 'Select start date' : 'আরম্ভের তারিখ নির্বাচন করুন'}
           value={startDate}
           onConfirm={d => { setStartDate(d); setPeriod('CUSTOM_RANGE'); setCalendarFor(null); }}
           onCancel={() => setCalendarFor(null)}
@@ -830,6 +844,7 @@ export function PartyReportView() {
       )}
       {calendarFor === 'end' && (
         <BengaliCalendarModal
+          ariaLabel={isEnglish ? 'Select end date' : 'শেষের তারিখ নির্বাচন করুন'}
           value={endDate}
           onConfirm={d => { setEndDate(d); setPeriod('CUSTOM_RANGE'); setCalendarFor(null); }}
           onCancel={() => setCalendarFor(null)}

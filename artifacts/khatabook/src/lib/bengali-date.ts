@@ -20,6 +20,18 @@ export const BN_MONTHS_SHORT = [
 export const BN_DAYS_COLUMNS = ['র', 'সো', 'ম', 'বু', 'বৃ', 'শু', 'শ'];
 export const BN_DAYS_SHORT = ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহস্পতি', 'শুক্র', 'শনি'];
 
-export function formatBengaliDateInput(date: Date): string {
+export function formatBengaliDateInput(date: Date, lang: 'bn' | 'en' = 'bn'): string {
+  if (lang === 'en') {
+    return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+  }
   return `${toBengaliDigits(date.getDate())} ${BN_MONTHS_SHORT[date.getMonth()]} ${toBengaliDigits(date.getFullYear())}`;
+}
+
+export function formatLocalizedDateInput(date: Date, lang: 'bn' | 'en'): string {
+  if (lang === 'bn') return formatBengaliDateInput(date);
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
 }

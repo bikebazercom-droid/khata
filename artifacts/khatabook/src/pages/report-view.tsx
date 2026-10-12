@@ -19,7 +19,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { ChevronLeft, Calendar as CalendarIcon, Search, ChevronDown, FileDown, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { bn } from 'date-fns/locale';
+import { bn, enUS } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { formatCurrency, cn, toBengaliDigits, escapeHtml } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -41,6 +41,7 @@ import { resolveLedgerBookName } from '@/lib/ledger-book-name';
 import { addPdfLinkAnnotations } from '@/lib/pdf-link-annotations';
 import { splitAdjustmentDescription } from '@/lib/adjustment-display';
 import { buildPortablePdfFilename } from '@/lib/report-filename';
+import { useLanguage } from '@/lib/i18n';
 import {
   fitPdfCellFontSize,
   fitPdfHeaderNameFontSize,
@@ -78,28 +79,34 @@ const reportTimeFormatter = new Intl.DateTimeFormat('bn-BD', {
   hourCycle: 'h23',
 });
 
-function formatReportDate(date: Date): string {
-  return toBengaliDigits(format(date, 'd MMM yy', { locale: bn }));
+function formatReportDate(date: Date, lang: 'bn' | 'en'): string {
+  const value = format(date, 'd MMM yy', { locale: lang === 'en' ? enUS : bn });
+  return lang === 'en' ? value : toBengaliDigits(value);
 }
 
-function formatReportTime(value: string | Date): string {
+function formatReportTime(value: string | Date, lang: 'bn' | 'en'): string {
   const date = value instanceof Date ? value : new Date(value);
-  return toBengaliDigits(reportTimeFormatter.format(date));
+  return lang === 'en'
+    ? new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).format(date)
+    : toBengaliDigits(reportTimeFormatter.format(date));
 }
 
-function formatReportTimestamp(value: string | Date): string {
+function formatReportTimestamp(value: string | Date, lang: 'bn' | 'en'): string {
   const date = value instanceof Date ? value : new Date(value);
-  return `${formatReportDate(date)} • ${formatReportTime(date)}`;
+  return `${formatReportDate(date, lang)} • ${formatReportTime(date, lang)}`;
 }
 
 function formatReportEntryDate(
   dueDate: string | null | undefined,
   createdAt: string | Date,
+  lang: 'bn' | 'en',
 ): string {
-  return toBengaliDigits(formatLedgerEntryDate(dueDate, createdAt));
+  const value = formatLedgerEntryDate(dueDate, createdAt, lang);
+  return lang === 'en' ? value : toBengaliDigits(value);
 }
 
 export function ReportView() {
+  const { lang, isEnglish, t, formatCurrency: formatLocalizedCurrency, formatNumber } = useLanguage();
   const [, navigate] = useLocation();
   const { selectedBusinessId, businesses } = useBusinessContext();
   const activeBusinessName = businesses.find((business) => business.id === selectedBusinessId)?.name;
@@ -114,7 +121,7 @@ export function ReportView() {
   const roleParam = new URLSearchParams(window.location.search).get('role') ?? 'customer';
   const isSupplier = roleParam === 'supplier';
   const partyRole = isSupplier ? PartyRole.SUPPLIER : PartyRole.CUSTOMER;
-  const roleLabel = isSupplier ? 'সরবরাহকারী' : 'গ্রাহক';
+  const roleLabel = isSupplier ? t('supplier') : t('customer');
 
   const { data: settings } = useGetBusinessSettings({
     query: { queryKey: businessScopedQueryKey(getGetBusinessSettingsQueryKey(), selectedBusinessId) },
@@ -161,14 +168,16 @@ export function ReportView() {
   );
 
   const periodLabel = useMemo(() => {
+    const locale = isEnglish ? enUS : bn;
     if (period === 'CUSTOM_RANGE' && startDate && endDate)
-      return toBengaliDigits(
-        `${format(startDate, 'd MMM yyyy', { locale: bn })} - ${format(endDate, 'd MMM yyyy', { locale: bn })}`,
-      );
+      return `${format(startDate, 'd MMM yyyy', { locale })} - ${format(endDate, 'd MMM yyyy', { locale })}`;
     if (period === 'SINGLE_DAY' && startDate)
-      return toBengaliDigits(format(startDate, 'd MMMM yyyy', { locale: bn }));
-    return PERIOD_LABELS[period];
-  }, [period, startDate, endDate]);
+      return format(startDate, 'd MMMM yyyy', { locale });
+    return isEnglish ? ({
+      ALL: t('all'), THIS_MONTH: t('thisMonth'), SINGLE_DAY: t('oneDay'),
+      LAST_WEEK: t('lastWeek'), LAST_MONTH: t('lastMonth'), CUSTOM_RANGE: t('dateRange'),
+    } as const)[period] : PERIOD_LABELS[period];
+  }, [period, startDate, endDate, isEnglish, t]);
 
   // ── HTML-to-canvas PDF (browser shapes Bengali natively) ─────────────────
   const handleDownload = async () => {
@@ -179,21 +188,21 @@ export function ReportView() {
       settings?.storeName,
       shopProfile.businessName,
     ) ?? 'বাংলাখাতা';
-    const dateStr    = toBengaliDigits(new Date().toLocaleDateString('bn-BD', {
+    const dateStr    = new Date().toLocaleDateString(isEnglish ? 'en-BD' : 'bn-BD', {
       day: 'numeric',
       month: 'long',
       year: 'numeric',
-    }));
+    });
     const pdfEntries = sortGlobalLedgerEntriesChronologically(entries);
     const rowsHtml = pdfEntries.map(e => {
       const isGave   = e.type === 'YOU_GAVE';
-      const dateCell = formatReportEntryDate(e.dueDate, e.createdAt);
+      const dateCell = formatReportEntryDate(e.dueDate, e.createdAt, lang);
       const adjustment = splitAdjustmentDescription(
         e.description,
         e.isTransfer,
       );
-      const debitText = isGave ? formatCurrency(e.amount) : '';
-      const creditText = !isGave ? formatCurrency(e.amount) : '';
+      const debitText = isGave ? formatLocalizedCurrency(e.amount) : '';
+      const creditText = !isGave ? formatLocalizedCurrency(e.amount) : '';
       const debitCell  = isGave
         ? `<td style="padding:14px 8px;border:1px solid #000;text-align:center;vertical-align:middle;background:#FEF2F2;color:#000;font-weight:500;font-size:${fitPdfCellFontSize(debitText, 105)}px;overflow-wrap:anywhere;word-break:break-word;">${debitText}</td>`
         : `<td style="padding:14px 8px;border:1px solid #000;text-align:center;vertical-align:middle;background:#FEF2F2;"></td>`;
@@ -234,7 +243,7 @@ export function ReportView() {
       <div style="padding:30px;box-sizing:border-box;">
         <!-- 2. Title -->
         <div style="text-align:center;margin-bottom:25px;">
-          <div style="font-size:24px;font-weight:bold;color:#000;letter-spacing:0.5px;">লেনদেনের বিবরণী</div>
+          <div style="font-size:24px;font-weight:bold;color:#000;letter-spacing:0.5px;">${t('detailedStatement')}</div>
           <div style="font-size:15px;color:#555;font-weight:500;margin-top:6px;">${periodLabel} | ${dateStr}</div>
         </div>
 
@@ -242,17 +251,17 @@ export function ReportView() {
         <table style="width:100%;border-collapse:collapse;margin-bottom:25px;text-align:center;border:1px solid #E5E7EB;">
           <tr>
             <td style="width:33.33%;padding:16px;border-right:1px solid #E5E7EB;">
-              <div style="font-size:14px;color:#666;margin-bottom:6px;">আপনি দিয়েছেন</div>
-              <div style="font-size:18px;font-weight:bold;color:#DC2626;">${formatCurrency(totalDebit)}</div>
+              <div style="font-size:14px;color:#666;margin-bottom:6px;">${t('debit')}</div>
+              <div style="font-size:18px;font-weight:bold;color:#DC2626;">${formatLocalizedCurrency(totalDebit)}</div>
             </td>
             <td style="width:33.33%;padding:16px;border-right:1px solid #E5E7EB;">
-              <div style="font-size:14px;color:#666;margin-bottom:6px;">আপনি পেয়েছেন</div>
-              <div style="font-size:18px;font-weight:bold;color:#16A34A;">${formatCurrency(totalCredit)}</div>
+              <div style="font-size:14px;color:#666;margin-bottom:6px;">${t('credit')}</div>
+              <div style="font-size:18px;font-weight:bold;color:#16A34A;">${formatLocalizedCurrency(totalCredit)}</div>
             </td>
             <td style="width:33.33%;padding:16px;">
-              <div style="font-size:14px;color:#666;margin-bottom:6px;">মোট ব্যালেন্স</div>
+              <div style="font-size:14px;color:#666;margin-bottom:6px;">${t('totalBalance')}</div>
               <div style="font-size:18px;font-weight:bold;color:${netBalance >= 0 ? '#16A34A' : '#DC2626'};">
-                ${formatCurrency(Math.abs(netBalance))} ${netBalance >= 0 ? 'পাওনা' : 'দেনা'}
+                ${formatLocalizedCurrency(Math.abs(netBalance))} ${netBalance >= 0 ? t('receivable') : t('payable')}
               </div>
             </td>
           </tr>
@@ -260,7 +269,7 @@ export function ReportView() {
 
         <!-- Count label -->
         <div style="font-size:15px;font-weight:bold;color:#000;margin-bottom:12px;">
-          মোট লেনদেন: ${toBengaliDigits(String(pdfEntries.length))} (${PERIOD_LABELS.ALL})
+          ${t('transaction')}: ${formatNumber(pdfEntries.length)} (${t('all')})
         </div>
 
         <!-- 4. Transaction Table -->
@@ -271,12 +280,12 @@ export function ReportView() {
           </colgroup>
           <thead>
             <tr style="background:#F8FAFC;font-weight:bold;">
-              <th style="padding:14px 8px;border:1px solid #000;width:18%;text-align:center;vertical-align:middle;">তারিখ</th>
-              <th style="padding:14px 8px;border:1px solid #000;width:26%;text-align:center;vertical-align:middle;">${isSupplier ? 'সরবরাহকারীর নাম' : 'গ্রাহকের নাম'}</th>
-              <th style="padding:14px 8px;border:1px solid #000;text-align:center;vertical-align:middle;">বিবরণ</th>
-              <th style="padding:14px 8px;border:1px solid #000;width:15%;text-align:center;vertical-align:middle;">অ্যাডজাস্টমেন্ট</th>
-              <th style="padding:14px 8px;border:1px solid #000;width:15%;text-align:center;vertical-align:middle;background:#FEF2F2;">আপনি দিয়েছেন</th>
-              <th style="padding:14px 8px;border:1px solid #000;width:15%;text-align:center;vertical-align:middle;background:#F0FDF4;">আপনি পেয়েছেন</th>
+              <th style="padding:14px 8px;border:1px solid #000;width:18%;text-align:center;vertical-align:middle;">${t('date')}</th>
+              <th style="padding:14px 8px;border:1px solid #000;width:26%;text-align:center;vertical-align:middle;">${isSupplier ? t('supplier') : t('customer')}</th>
+              <th style="padding:14px 8px;border:1px solid #000;text-align:center;vertical-align:middle;">${t('details')}</th>
+              <th style="padding:14px 8px;border:1px solid #000;width:15%;text-align:center;vertical-align:middle;">${t('adjustment')}</th>
+              <th style="padding:14px 8px;border:1px solid #000;width:15%;text-align:center;vertical-align:middle;background:#FEF2F2;">${t('debit')}</th>
+              <th style="padding:14px 8px;border:1px solid #000;width:15%;text-align:center;vertical-align:middle;background:#F0FDF4;">${t('credit')}</th>
             </tr>
           </thead>
           <tbody>
@@ -329,7 +338,7 @@ export function ReportView() {
       const nativeShare = await shareGeneratedFileWithNative(pdfBlob, {
         fileName: filename,
         mimeType: 'application/pdf',
-        title: `${roleLabel} লেনদেনের রিপোর্ট`,
+        title: `${roleLabel} ${t('reportPdfTitle')}`,
       });
       let shared = nativeShare !== null;
       let downloaded = false;
@@ -338,7 +347,7 @@ export function ReportView() {
         const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
         if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
           try {
-            await navigator.share({ files: [pdfFile], title: `${roleLabel} লেনদেনের রিপোর্ট` });
+            await navigator.share({ files: [pdfFile], title: `${roleLabel} ${t('reportPdfTitle')}` });
             shared = true;
           } catch (err) {
             if ((err as DOMException).name === 'AbortError') return;
@@ -350,12 +359,12 @@ export function ReportView() {
           downloaded = true;
         }
       }
-      if (shared) toast.success('পিডিএফ রিপোর্ট শেয়ার করার জন্য প্রস্তুত');
-      else if (downloaded) toast.success('পিডিএফ রিপোর্ট ডাউনলোড হয়েছে');
+      if (shared) toast.success(t('pdfShareReady'));
+      else if (downloaded) toast.success(t('pdfDownloaded'));
     } catch (err) {
       if (document.body.contains(container)) document.body.removeChild(container);
       console.error('Report PDF failed:', err);
-      toast.error('রিপোর্ট তৈরি করতে সমস্যা হয়েছে।');
+      toast.error(t('reportCreateError'));
     } finally {
       setIsGenerating(false);
     }
@@ -364,7 +373,7 @@ export function ReportView() {
   const handleCsvExport = async () => {
     setIsExportingCsv(true);
     try {
-      const csv = buildGlobalLedgerReportCsv(entries);
+      const csv = buildGlobalLedgerReportCsv(entries, lang);
       const tag = isSupplier ? 'সরবরাহকারী' : 'গ্রাহক';
       const fileDate = toBengaliDigits(new Date().toISOString().slice(0, 10));
       const filename = `বাংলাখাতা_${tag}_হিসাব_${fileDate}.csv`;
@@ -372,7 +381,7 @@ export function ReportView() {
       const nativeShare = await shareGeneratedFileWithNative(blob, {
         fileName: filename,
         mimeType: 'text/csv',
-        title: `${roleLabel} লেনদেনের সিএসভি রিপোর্ট`,
+        title: `${roleLabel} ${t('csvReport')}`,
       });
       let shared = nativeShare !== null;
 
@@ -388,7 +397,7 @@ export function ReportView() {
 
         if (canShareFile) {
           try {
-            await navigator.share({ files: [file], title: `${roleLabel} লেনদেনের সিএসভি রিপোর্ট` });
+            await navigator.share({ files: [file], title: `${roleLabel} ${t('csvReport')}` });
             shared = true;
           } catch (error) {
             if ((error as DOMException).name === 'AbortError') return;
@@ -408,10 +417,10 @@ export function ReportView() {
         window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       }
 
-      toast.success(shared ? 'সিএসভি রিপোর্ট শেয়ার করা হয়েছে' : 'সিএসভি রিপোর্ট ডাউনলোড হয়েছে');
+      toast.success(shared ? t('csvShared') : t('csvDownloaded'));
     } catch (error) {
       console.error('Report CSV export failed:', error);
-      toast.error('সিএসভি রিপোর্ট তৈরি করতে সমস্যা হয়েছে।');
+      toast.error(t('csvCreateError'));
     } finally {
       setIsExportingCsv(false);
     }
@@ -427,8 +436,8 @@ export function ReportView() {
         <button onClick={() => navigate('/')} aria-label="ফিরে যান" className="text-white active:opacity-70 transition-opacity">
           <ChevronLeft className="w-6 h-6" />
         </button>
-        <h1 className="text-white font-extrabold text-[17px] tracking-tight">
-          {roleLabel} রিপোর্ট দেখুন
+          <h1 className="text-white font-extrabold text-[17px] tracking-tight">
+          {roleLabel} {t('report')}
         </h1>
       </div>
 
@@ -444,9 +453,9 @@ export function ReportView() {
           >
             <CalendarIcon className="h-4 w-4 shrink-0 text-slate-400" />
             <div className="min-w-0">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">আরম্ভের তারিখ</p>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">{t('startDate')}</p>
               <p className="truncate text-[13px] font-bold text-slate-800">
-                {startDate ? formatBengaliDateInput(startDate) : 'নির্বাচন করুন'}
+                {startDate ? formatBengaliDateInput(startDate, lang) : t('selectDate')}
               </p>
             </div>
           </button>
@@ -460,9 +469,9 @@ export function ReportView() {
           >
             <CalendarIcon className="h-4 w-4 shrink-0 text-slate-400" />
             <div className="min-w-0">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">শেষের তারিখ</p>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">{t('endDate')}</p>
               <p className="truncate text-[13px] font-bold text-slate-800">
-                {endDate ? formatBengaliDateInput(endDate) : 'নির্বাচন করুন'}
+                {endDate ? formatBengaliDateInput(endDate, lang) : t('selectDate')}
               </p>
             </div>
           </button>
@@ -473,7 +482,7 @@ export function ReportView() {
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <Input
-              placeholder="লেনদেন খুঁজুন"
+              placeholder={t('searchTransactions')}
               className="pl-10 h-11 bg-slate-50 border-slate-200 rounded-xl font-medium"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -484,7 +493,7 @@ export function ReportView() {
             onClick={() => setIsPeriodOpen(true)}
             className="flex items-center gap-1.5 h-11 px-4 rounded-xl bg-[#0b57d0] text-white font-bold text-sm shrink-0 active:scale-95 transition-all"
           >
-            {PERIOD_LABELS[period]}
+            {periodLabel}
             <ChevronDown className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -492,34 +501,34 @@ export function ReportView() {
         {/* Metrics bar */}
         <div className="px-4 pb-3">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-bold text-slate-500">মোট ব্যালেন্স</p>
+            <p className="text-sm font-bold text-slate-500">{t('totalBalance')}</p>
             <p className={cn('text-xl font-extrabold tracking-tight', netBalance >= 0 ? 'text-emerald-600' : 'text-red-600')}>
-              {formatCurrency(Math.abs(netBalance))}
+              {formatLocalizedCurrency(Math.abs(netBalance))}
             </p>
           </div>
           <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
             <div className="min-w-0 p-3">
-              <p className="text-[10px] font-bold text-slate-500">লেনদেন</p>
+                <p className="text-[10px] font-bold text-slate-500">{t('transaction')}</p>
               <p className="mt-0.5 text-[13px] font-extrabold text-slate-800">
-                {toBengaliDigits(String(entries.length))}টি
+                {formatNumber(entries.length)}{isEnglish ? '' : 'টি'}
               </p>
             </div>
             <div className="min-w-0 border-l border-slate-200 bg-[#FFF8F8] px-2 py-3">
-              <p className="text-[9px] font-bold leading-tight text-red-700">আপনি দিয়েছেন</p>
+              <p className="text-[9px] font-bold leading-tight text-red-700">{t('debit')}</p>
               <p
                 className="mt-1 block max-w-full overflow-hidden whitespace-nowrap text-right font-extrabold leading-none text-red-600"
-                style={{ fontSize: reportAmountFontSize(formatCurrency(totalDebit), reportAmountColumnWidth(window.innerWidth)) }}
+                style={{ fontSize: reportAmountFontSize(formatLocalizedCurrency(totalDebit), reportAmountColumnWidth(window.innerWidth)) }}
               >
-                {formatCurrency(totalDebit)}
+                {formatLocalizedCurrency(totalDebit)}
               </p>
             </div>
             <div className="min-w-0 border-l border-slate-200 bg-[#F3FCF5] px-2 py-3 text-right">
-              <p className="text-[9px] font-bold leading-tight text-emerald-700">আপনি পেয়েছেন</p>
+              <p className="text-[9px] font-bold leading-tight text-emerald-700">{t('credit')}</p>
               <p
                 className="mt-1 block max-w-full overflow-hidden whitespace-nowrap text-right font-extrabold leading-none text-emerald-600"
-                style={{ fontSize: reportAmountFontSize(formatCurrency(totalCredit), reportAmountColumnWidth(window.innerWidth)) }}
+                style={{ fontSize: reportAmountFontSize(formatLocalizedCurrency(totalCredit), reportAmountColumnWidth(window.innerWidth)) }}
               >
-                {formatCurrency(totalCredit)}
+                {formatLocalizedCurrency(totalCredit)}
               </p>
             </div>
           </div>
@@ -532,14 +541,14 @@ export function ReportView() {
           </div>
         ) : entries.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-slate-400 px-8 text-center">
-            <p className="text-sm font-medium">এই সময়ে কোনো লেনদেন পাওয়া যায়নি</p>
+            <p className="text-sm font-medium">{t('noEntriesInPeriod')}</p>
           </div>
         ) : (
           <div className="px-4 space-y-2">
             {entries.map((entry) => {
               const isGave = entry.type === 'YOU_GAVE';
               const imgSrc = billImageSrc(entry.billImage);
-              const formattedAmount = formatCurrency(entry.amount);
+              const formattedAmount = formatLocalizedCurrency(entry.amount);
               const adjustment = splitAdjustmentDescription(
                 entry.description,
                 entry.isTransfer,
@@ -556,14 +565,14 @@ export function ReportView() {
                   <div className="min-w-0 px-3 py-2.5">
                     <p className="text-[13px] font-bold text-slate-800 truncate">{entry.partyName}</p>
                     <p className="text-[11px] font-medium text-slate-400 mt-0.5">
-                      {formatReportTimestamp(entry.createdAt)}
+                      {formatReportTimestamp(entry.createdAt, lang)}
                     </p>
                     {adjustment.details && (
                       <p className="text-[11px] text-slate-500 mt-0.5 truncate">{adjustment.details}</p>
                     )}
                     {adjustment.adjustment && (
                       <p className="mt-1 inline-flex max-w-full rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
-                        <span className="shrink-0">অ্যাডজাস্টমেন্ট:</span>
+                        <span className="shrink-0">{t('adjustmentLabel')}</span>
                         <span className="ml-1 truncate">{adjustment.adjustment.replace(/^অন্য খাতায়:\s*/, '')}</span>
                       </p>
                     )}
@@ -578,7 +587,7 @@ export function ReportView() {
                   </div>
                   <div
                     role="group"
-                    aria-label="আপনি দিয়েছেন"
+                    aria-label={t('debit')}
                     className="flex min-w-0 items-center justify-end overflow-hidden border-l border-slate-100 bg-[#FFF5F5] px-1.5 py-2.5"
                   >
                     {isGave && (
@@ -592,7 +601,7 @@ export function ReportView() {
                   </div>
                   <div
                     role="group"
-                    aria-label="আপনি পেয়েছেন"
+                    aria-label={t('credit')}
                     className="flex min-w-0 items-center justify-end overflow-hidden border-l border-slate-100 bg-[#F0FDF4] px-1.5 py-2.5"
                   >
                     {!isGave && (
@@ -621,17 +630,17 @@ export function ReportView() {
           className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl bg-[#0b57d0] text-white font-extrabold text-[15px] active:scale-[0.98] transition-all disabled:opacity-60"
         >
           {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileDown className="w-5 h-5" />}
-          {isGenerating ? 'তৈরি হচ্ছে…' : '📥 ডাউনলোড'}
+          {isGenerating ? t('generating') : t('downloadPdf')}
         </button>
         <button
           type="button"
           onClick={handleCsvExport}
           disabled={isLoading || isExportingCsv}
           className="w-full h-14 flex items-center justify-center gap-2 rounded-2xl border border-[#0b57d0] bg-white text-[#0b57d0] font-extrabold text-sm active:scale-[0.98] transition-all disabled:opacity-60"
-          aria-label="সিএসভি রিপোর্ট ডাউনলোড বা শেয়ার করুন"
+          aria-label={isEnglish ? 'Download or share CSV report' : 'সিএসভি রিপোর্ট ডাউনলোড বা শেয়ার করুন'}
         >
           {isExportingCsv ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileSpreadsheet className="w-5 h-5" />}
-          {isExportingCsv ? 'তৈরি হচ্ছে…' : 'সিএসভি ডাউনলোড'}
+          {isExportingCsv ? t('generating') : t('downloadCsv')}
         </button>
         </div>
       </div>
@@ -639,7 +648,7 @@ export function ReportView() {
       <ReportPeriodDrawer open={isPeriodOpen} onOpenChange={setIsPeriodOpen} value={period} onSelect={setPeriod} />
       {calendarFor === 'start' && (
         <BengaliCalendarModal
-          ariaLabel="আরম্ভের তারিখ নির্বাচন করুন"
+          ariaLabel={isEnglish ? 'Select start date' : 'আরম্ভের তারিখ নির্বাচন করুন'}
           value={startDate}
           onConfirm={(date) => {
             setStartDate(date);
@@ -656,7 +665,7 @@ export function ReportView() {
       )}
       {calendarFor === 'end' && (
         <BengaliCalendarModal
-          ariaLabel="শেষের তারিখ নির্বাচন করুন"
+          ariaLabel={isEnglish ? 'Select end date' : 'শেষের তারিখ নির্বাচন করুন'}
           value={endDate}
           onConfirm={(date) => {
             setEndDate(date);

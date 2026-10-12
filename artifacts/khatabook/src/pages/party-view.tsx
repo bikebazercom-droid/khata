@@ -43,6 +43,7 @@ import {
 import { billImageSrc, prefetchImagesForPdf } from '@/lib/billImageStorage';
 import { toast } from 'sonner';
 import { differenceInCalendarDays, format } from 'date-fns';
+import { bn, enUS } from 'date-fns/locale';
 import { formatLedgerEntryDateTime, getLedgerEntryDateKey } from '@/lib/date-time';
 import { useAppAuth } from '@/App';
 import { useBusinessContext } from '@/lib/businessContext';
@@ -551,7 +552,7 @@ export function PartyView() {
               <div key={group.dayKey}>
                 <div className="sticky top-[26px] z-[4] flex justify-center bg-[#F5F6F8]/95 py-1.5 backdrop-blur-sm">
                   <span className="text-[11px] font-semibold tracking-wide text-slate-500">
-                    {format(group.date, 'd MMM yy')} • {relativeLedgerDate(group.date, lang)}
+                    {format(group.date, 'd MMM yy', { locale: isEnglish ? enUS : bn })} • {relativeLedgerDate(group.date, lang)}
                   </span>
                 </div>
                 <div className="space-y-2 px-1.5 min-[480px]:px-2.5">
@@ -595,7 +596,7 @@ export function PartyView() {
                       >
                         <div className="min-w-0 py-2.5 pl-2 pr-1 min-[480px]:py-3 min-[480px]:pl-3 min-[480px]:pr-2">
                           <p className="flex flex-wrap items-center gap-1 text-[10px] font-bold text-slate-700 min-[480px]:gap-1.5 min-[480px]:text-[12px]">
-                            {formatLedgerEntryDateTime(entry.dueDate, entry.createdAt)}
+                            {formatLedgerEntryDateTime(entry.dueDate, entry.createdAt, lang)}
                             {entry.isTransfer && (
                               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 text-[9px] font-bold">
                                 <ArrowLeftRight className="w-2.5 h-2.5" />ট্রান্সফার

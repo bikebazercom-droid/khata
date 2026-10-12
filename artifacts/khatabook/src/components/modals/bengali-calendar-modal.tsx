@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { BN_DAYS_COLUMNS, BN_DAYS_SHORT, BN_MONTHS, BN_MONTHS_SHORT, toBengaliDigits } from '@/lib/bengali-date';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/lib/i18n';
 
 export function BengaliCalendarModal({
   value,
@@ -16,6 +17,7 @@ export function BengaliCalendarModal({
   onCancel: () => void;
   onClear: () => void;
 }) {
+  const { lang, t } = useLanguage();
   const today = new Date();
   const initialDate = value ?? today;
   const [tempDate, setTempDate] = useState<Date>(initialDate);
@@ -71,29 +73,31 @@ export function BengaliCalendarModal({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="bg-[#1565C0] px-5 pb-6 pt-5 text-white">
-          <p className="mb-1 text-[13px] font-medium opacity-70">{toBengaliDigits(tempDate.getFullYear())}</p>
+          <p className="mb-1 text-[13px] font-medium opacity-70">{lang === 'en' ? tempDate.getFullYear() : toBengaliDigits(tempDate.getFullYear())}</p>
           <p className="text-[28px] font-extrabold leading-none">
-            {BN_DAYS_SHORT[tempDate.getDay()]}&nbsp;
-            {toBengaliDigits(tempDate.getDate())}&nbsp;
-            {BN_MONTHS_SHORT[tempDate.getMonth()]}
+            {lang === 'en'
+              ? new Intl.DateTimeFormat('en-US', { weekday: 'short', day: 'numeric', month: 'short' }).format(tempDate)
+              : <>{BN_DAYS_SHORT[tempDate.getDay()]}&nbsp;{toBengaliDigits(tempDate.getDate())}&nbsp;{BN_MONTHS_SHORT[tempDate.getMonth()]}</>}
           </p>
         </div>
 
         <div className="flex items-center justify-between px-3 py-3">
           <button
             type="button"
-            aria-label="আগের মাস"
+            aria-label={lang === 'en' ? 'Previous month' : 'আগের মাস'}
             onClick={previousMonth}
             className="flex h-9 w-9 items-center justify-center rounded-full text-slate-600 active:bg-slate-100"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
           <p className="text-[15px] font-bold text-slate-800">
-            {BN_MONTHS[viewMonth]} {toBengaliDigits(viewYear)}
+            {lang === 'en'
+              ? new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date(viewYear, viewMonth, 1))
+              : <>{BN_MONTHS[viewMonth]} {toBengaliDigits(viewYear)}</>}
           </p>
           <button
             type="button"
-            aria-label="পরের মাস"
+            aria-label={lang === 'en' ? 'Next month' : 'পরের মাস'}
             onClick={nextMonth}
             className="flex h-9 w-9 items-center justify-center rounded-full text-slate-600 active:bg-slate-100"
           >
@@ -102,7 +106,7 @@ export function BengaliCalendarModal({
         </div>
 
         <div className="mb-1 grid grid-cols-7 px-3">
-          {BN_DAYS_COLUMNS.map((day, index) => (
+          {(lang === 'en' ? ['S', 'M', 'T', 'W', 'T', 'F', 'S'] : BN_DAYS_COLUMNS).map((day, index) => (
             <div
               key={`${day}-${index}`}
               className="py-1 text-center text-[13px] font-semibold text-slate-400"
@@ -118,7 +122,9 @@ export function BengaliCalendarModal({
               {day !== null && (
                 <button
                   type="button"
-                  aria-label={`${toBengaliDigits(day)} ${BN_MONTHS[viewMonth]} ${toBengaliDigits(viewYear)}`}
+                  aria-label={lang === 'en'
+                    ? `${day} ${new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date(viewYear, viewMonth, 1))} ${viewYear}`
+                    : `${toBengaliDigits(day)} ${BN_MONTHS[viewMonth]} ${toBengaliDigits(viewYear)}`}
                   aria-pressed={isSelected(day)}
                   onClick={() => setTempDate(new Date(viewYear, viewMonth, day))}
                   className={cn(
@@ -130,7 +136,7 @@ export function BengaliCalendarModal({
                         : 'text-slate-800 hover:bg-slate-100 active:bg-slate-200',
                   )}
                 >
-                  {toBengaliDigits(day)}
+                  {lang === 'en' ? day : toBengaliDigits(day)}
                 </button>
               )}
             </div>
@@ -143,21 +149,21 @@ export function BengaliCalendarModal({
             onClick={() => onConfirm(tempDate)}
             className="text-[14px] font-bold text-[#1565C0] transition-opacity active:opacity-60"
           >
-            ঠিক আছে
+            {t('ok')}
           </button>
           <button
             type="button"
             onClick={onCancel}
             className="text-[14px] font-bold text-[#1565C0] transition-opacity active:opacity-60"
           >
-            বাতিল করুন
+            {lang === 'en' ? 'Cancel' : 'বাতিল করুন'}
           </button>
           <button
             type="button"
             onClick={onClear}
             className="text-[14px] font-bold text-[#1565C0] transition-opacity active:opacity-60"
           >
-            সরিয়ে দিন
+            {lang === 'en' ? 'Clear date' : 'সরিয়ে দিন'}
           </button>
         </div>
       </div>
