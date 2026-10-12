@@ -3,6 +3,7 @@ import { useRoute, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { useBusinessContext } from '@/lib/businessContext';
 import { businessScopedQueryKey } from '@/lib/businessQueryKey';
+import { useLanguage } from '@/lib/i18n';
 import {
   useGetParty,
   useDeleteParty,
@@ -43,6 +44,7 @@ import { format } from 'date-fns';
 import { bn } from 'date-fns/locale';
 
 export function PartyProfileView() {
+  const { isEnglish } = useLanguage();
   const [, params] = useRoute('/party/:id/profile');
   const id = params?.id;
   const [, navigate] = useLocation();
@@ -415,7 +417,9 @@ export function PartyProfileView() {
           <AlertDialogHeader>
             <AlertDialogTitle>{roleLabel} ডিলিট করুন</AlertDialogTitle>
             <AlertDialogDescription className="text-slate-600">
-              এই {roleLabel}-এর সব লেনদেন স্থায়ীভাবে মুছে যাবে। সংযুক্ত ট্রান্সফার অন্য খাতা থেকেও মুছে সেই পক্ষের ব্যালেন্স সংশোধন হবে। এই কাজ পূর্বাবস্থায় ফেরানো যাবে না।
+              {isEnglish
+                ? 'All transactions for this party will be permanently deleted. Linked transfers will also be deleted from other ledgers and the related balances adjusted. This cannot be undone.'
+                : <>এই {roleLabel}-এর সব লেনদেন স্থায়ীভাবে মুছে যাবে। সংযুক্ত ট্রান্সফার অন্য খাতা থেকেও মুছে সেই পক্ষের ব্যালেন্স সংশোধন হবে। এই কাজ পূর্বাবস্থায় ফেরানো যাবে না।</>}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

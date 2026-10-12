@@ -3,6 +3,7 @@ import { useRoute, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { useBusinessContext } from '@/lib/businessContext';
 import { businessScopedQueryKey } from '@/lib/businessQueryKey';
+import { useLanguage } from '@/lib/i18n';
 import {
   useGetParty,
   useListLedgerEntries,
@@ -49,6 +50,7 @@ function entryDateKey(entry: { dueDate: Date | string | null; createdAt: Date | 
 }
 
 export function TransactionDetailPage() {
+  const { isEnglish } = useLanguage();
   const [, params] = useRoute('/party/:partyId/entry/:entryId');
   const partyId = params?.partyId ?? '';
   const entryId = params?.entryId ?? '';
@@ -506,7 +508,9 @@ export function TransactionDetailPage() {
             <AlertDialogTitle>লেনদেন মুছে ফেলুন?</AlertDialogTitle>
             <AlertDialogDescription className="text-slate-600">
               {entry.isTransfer ? (
-                <>এই ট্রান্সফার এবং অন্য খাতার সংযুক্ত এন্ট্রিটিও স্থায়ীভাবে মুছে যাবে। দুই পক্ষের ব্যালেন্স আপডেট হবে। এটি পূর্বাবস্থায় ফেরানো যাবে না।</>
+                isEnglish
+                  ? <>This transfer and its linked entry in the other ledger will be permanently deleted. Both balances will be updated. This cannot be undone.</>
+                  : <>এই ট্রান্সফার এবং অন্য খাতার সংযুক্ত এন্ট্রিটিও স্থায়ীভাবে মুছে যাবে। দুই পক্ষের ব্যালেন্স আপডেট হবে। এটি পূর্বাবস্থায় ফেরানো যাবে না।</>
               ) : (
                 <>এই লেনদেন মুছে গেলে <span className="font-semibold text-slate-800">{party.name}</span>-এর ব্যালেন্স আপডেট হবে। এটি পূর্বাবস্থায় ফেরানো যাবে না।</>
               )}

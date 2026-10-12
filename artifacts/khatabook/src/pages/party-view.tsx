@@ -274,7 +274,9 @@ export function PartyView() {
 
       if (failedCount > 0) {
         toast.warning(
-          `${failedCount}টি বিলের ছবি লোড করা যায়নি — সেগুলো পিডিএফে দেখাবে না`,
+          lang === 'en'
+            ? `${failedCount} bill image${failedCount === 1 ? '' : 's'} failed to load and will be omitted from the PDF.`
+            : `${failedCount}টি বিলের ছবি লোড করা যায়নি — সেগুলো পিডিএফে দেখাবে না`,
           { duration: 5000 }
         );
       }
@@ -313,7 +315,9 @@ export function PartyView() {
 
       if (failedCount > 0) {
         toast.warning(
-          `${failedCount}টি বিলের ছবি লোড করা যায়নি — সেগুলো পিডিএফে দেখাবে না`,
+          lang === 'en'
+            ? `${failedCount} bill image${failedCount === 1 ? '' : 's'} failed to load and will be omitted from the PDF.`
+            : `${failedCount}টি বিলের ছবি লোড করা যায়নি — সেগুলো পিডিএফে দেখাবে না`,
           { duration: 5000 }
         );
       }
@@ -424,10 +428,10 @@ export function PartyView() {
   if (!party) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-500 font-medium h-full">
-        পার্টি খুঁজে পাওয়া যায়নি
+        {t('partyNotFound')}
         <Link href="/">
           <Button variant="outline" size="sm">
-            <ChevronLeft className="w-4 h-4 mr-1" /> পিছনে যান
+            <ChevronLeft className="w-4 h-4 mr-1" /> {t('back')}
           </Button>
         </Link>
       </div>
@@ -470,7 +474,7 @@ export function PartyView() {
           </button>
           <a
             href={`tel:${party.phone}`}
-            aria-label="কল করুন"
+            aria-label={t('callAction')}
             className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all"
           >
             <Phone className="w-5 h-5" />
@@ -599,7 +603,7 @@ export function PartyView() {
                             {formatLedgerEntryDateTime(entry.dueDate, entry.createdAt, lang)}
                             {entry.isTransfer && (
                               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 text-[9px] font-bold">
-                                <ArrowLeftRight className="w-2.5 h-2.5" />ট্রান্সফার
+                                <ArrowLeftRight className="w-2.5 h-2.5" />{t('transferLabel')}
                               </span>
                             )}
                           </p>
@@ -626,21 +630,21 @@ export function PartyView() {
                             )}>
                               <ArrowLeftRight className="mt-0.5 h-3 w-3 shrink-0" />
                               <span className="min-w-0">
-                                {isGave ? 'আমি দিয়েছি' : 'আমি পেয়েছি'}
+                                {isGave ? t('transferGaveDescription') : t('transferReceivedDescription')}
                                 {transferPartyName ? ` — ${transferPartyName}` : ''}
                               </span>
                             </p>
                           )}
                           {entry.billReference && (
                             <span className="inline-block mt-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200 uppercase tracking-wider">
-                              বিল: {entry.billReference}
+                              {t('billReferenceLabel')} {entry.billReference}
                             </span>
                           )}
                           {imgSrc && (
                             <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
                               <BillAttachmentPreview
                                 src={imgSrc}
-                                alt="সংযুক্ত বিল"
+                                alt={t('attachedBillAlt')}
                                 className="h-10 w-10 active:scale-95 transition-transform"
                                 imageClassName="h-full w-full object-cover"
                               />
