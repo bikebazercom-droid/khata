@@ -152,6 +152,32 @@ CREATE TABLE IF NOT EXISTS "user_businesses" (
 	CONSTRAINT "user_businesses_user_id_business_id_pk" PRIMARY KEY("user_id","business_id")
 );
 
+CREATE TABLE IF NOT EXISTS "notifications" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"business_id" uuid NOT NULL REFERENCES "businesses"("id") ON DELETE cascade,
+	"recipient_user_id" uuid NOT NULL REFERENCES "app_users"("id") ON DELETE cascade,
+	"actor_user_id" uuid REFERENCES "app_users"("id") ON DELETE set null,
+	"actor_name" text NOT NULL,
+	"party_id" uuid,
+	"party_name" text,
+	"entry_id" uuid,
+	"entry_count" integer DEFAULT 1 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"read_at" timestamp with time zone
+);
+
+CREATE TABLE IF NOT EXISTS "owner_push_tokens" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"user_id" uuid NOT NULL REFERENCES "app_users"("id") ON DELETE cascade,
+	"token" text NOT NULL,
+	"platform" text NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS "notifications_recipient_business_created_idx" ON "notifications" ("recipient_user_id","business_id","created_at");
+CREATE UNIQUE INDEX IF NOT EXISTS "owner_push_tokens_token_unique" ON "owner_push_tokens" ("token");
+CREATE INDEX IF NOT EXISTS "owner_push_tokens_user_id_idx" ON "owner_push_tokens" ("user_id");
+
 CREATE TABLE IF NOT EXISTS "worker_invites" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"business_id" uuid NOT NULL,

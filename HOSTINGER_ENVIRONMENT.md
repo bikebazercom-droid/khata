@@ -7,6 +7,8 @@ in Replit does not mean the same variable exists on Hostinger.
 ## Build and Node application settings
 
 - Node.js: 22 or newer (24 is used in the workspace).
+- pnpm: 10.26+ or 11.x. The root package accepts both instead of pinning a
+  single patch release, so Hostinger's pnpm 11 runtime is supported.
 - Build command: `pnpm run build:hostinger`
 - Required build-time variable: `HOSTINGER_EXTERNAL_CLERK_PUBLISHABLE_KEY`.
   Set it to the publishable key for the external Clerk instance used by this
@@ -42,6 +44,11 @@ For Clerk sign-in, also set `CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` at
 runtime to keys from the same external Clerk instance as the build-time
 `HOSTINGER_EXTERNAL_CLERK_PUBLISHABLE_KEY`. Keep the secret key in Hostinger's
 secret-variable settings.
+
+Before deploying notification endpoints, apply the additive SQL in
+`supabase/migrations/20261012_000002_add_notifications_and_owner_push_tokens.sql`
+to the Hostinger app's Supabase database. The build step does not execute
+database queries or apply migrations.
 
 ## SMS OTP configuration
 

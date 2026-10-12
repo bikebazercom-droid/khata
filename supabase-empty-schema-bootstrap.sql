@@ -19,6 +19,8 @@ BEGIN
        'businesses',
        'app_user_login_sessions',
        'app_users',
+        'notifications',
+        'owner_push_tokens',
        'otp_codes',
        'otp_rate_limit_counters',
        'parties',
@@ -109,6 +111,35 @@ CREATE TABLE "app_users" (
 	CONSTRAINT "app_users_clerk_user_id_unique" UNIQUE("clerk_user_id"),
 	CONSTRAINT "app_users_phone_unique" UNIQUE("phone")
 );
+
+CREATE TABLE "notifications" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"business_id" uuid NOT NULL,
+	"recipient_user_id" uuid NOT NULL,
+	"actor_user_id" uuid,
+	"actor_name" text NOT NULL,
+	"party_id" uuid,
+	"party_name" text,
+	"entry_id" uuid,
+	"entry_count" integer DEFAULT 1 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"read_at" timestamp with time zone,
+	CONSTRAINT "notifications_business_id_businesses_id_fk" FOREIGN KEY ("business_id") REFERENCES "businesses"("id") ON DELETE cascade,
+	CONSTRAINT "notifications_recipient_user_id_app_users_id_fk" FOREIGN KEY ("recipient_user_id") REFERENCES "app_users"("id") ON DELETE cascade,
+	CONSTRAINT "notifications_actor_user_id_app_users_id_fk" FOREIGN KEY ("actor_user_id") REFERENCES "app_users"("id") ON DELETE set null
+);
+
+CREATE TABLE "owner_push_tokens" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"user_id" uuid NOT NULL,
+	"token" text NOT NULL,
+	"platform" text NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "owner_push_tokens_user_id_app_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "app_users"("id") ON DELETE cascade
+);
+CREATE UNIQUE INDEX "owner_push_tokens_token_unique" ON "owner_push_tokens" ("token");
+CREATE INDEX "owner_push_tokens_user_id_idx" ON "owner_push_tokens" ("user_id");
+CREATE INDEX "notifications_recipient_business_created_idx" ON "notifications" ("recipient_user_id","business_id","created_at");
 
 CREATE TABLE "otp_codes" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
