@@ -573,7 +573,7 @@ export function PartyView() {
                     const formattedBalance = formatCurrency(Math.abs(entry.balanceAfter));
                     const balanceAvailableWidth = Math.max(40, viewportWidth - 38 - (2 * amountColumnWidth));
                     const balanceFontSize = balanceBadgeFontSize(
-                      `ব্যালেন্স: ${formattedBalance}`,
+                      `${t('balanceLabel')} ${formattedBalance}`,
                       balanceAvailableWidth,
                     );
                     return (
@@ -609,7 +609,7 @@ export function PartyView() {
                               ? 'bg-[#EAF4F1] text-emerald-800'
                               : 'bg-[#FFF0F0] text-red-700',
                           )} style={{ fontSize: balanceFontSize }}>
-                            <span className="shrink-0">ব্যালেন্স:</span>
+                            <span className="shrink-0">{t('balanceLabel')}</span>
                             <span className="ml-1 min-w-0 whitespace-nowrap">
                               {formattedBalance}
                             </span>
