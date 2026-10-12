@@ -6,8 +6,6 @@
 -- The current schema defines these fields as NUMERIC(20,2). Increasing the
 -- precision preserves existing values and supports amounts beyond NUMERIC(12,2).
 
-BEGIN;
-
 ALTER TABLE public.ledger_entries
   ALTER COLUMN amount TYPE NUMERIC(20, 2)
   USING amount::NUMERIC(20, 2);
@@ -59,5 +57,3 @@ BEGIN
   END IF;
 END;
 $verify_money_column_precision$;
-
-COMMIT;

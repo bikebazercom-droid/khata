@@ -45,16 +45,26 @@ runtime to keys from the same external Clerk instance as the build-time
 `HOSTINGER_EXTERNAL_CLERK_PUBLISHABLE_KEY`. Keep the secret key in Hostinger's
 secret-variable settings.
 
-Before deploying notification endpoints, run
-`pnpm run db:migrate:hostinger-notifications` once with `DATABASE_URL` set to the
-Hostinger app's Supabase database and
-`HOSTINGER_DATABASE_MIGRATION_CONFIRM=apply`. The command applies the additive
-SQL in `supabase/migrations/20261012_000002_add_notifications_and_owner_push_tokens.sql`
-in a transaction. The build and API startup do not apply database migrations;
-this avoids production DDL on every restart.
+Before deploying code that requires a schema change, run
+`pnpm run db:migrate:hostinger-supabase` with `DATABASE_URL` set to the intended
+Hostinger Supabase database and `HOSTINGER_DATABASE_MIGRATION_CONFIRM=apply`.
+The command applies every pending SQL file in `supabase/migrations/` in
+filename order, records its version and SHA-256 checksum in
+`public.banglakhata_schema_migrations`, and commits each migration and its
+tracking row in one transaction. It refuses changed migration files whose
+checksums were already recorded; add a new migration instead of editing an
+applied one. Concurrent runs are serialized with a PostgreSQL advisory lock.
+The build and API startup do not apply database migrations, avoiding
+production DDL on routine builds and restarts.
+
+Name new migration files `YYYYMMDD_NNNNNN_description.sql` and never edit a
+migration after it has been recorded as applied. On a database without the
+migration registry, all current SQL files are considered pending; review them
+before the first run. Re-running the command later skips recorded files and
+reports an error if an applied file's checksum has changed.
 
 ```sh
-HOSTINGER_DATABASE_MIGRATION_CONFIRM=apply pnpm run db:migrate:hostinger-notifications
+HOSTINGER_DATABASE_MIGRATION_CONFIRM=apply pnpm run db:migrate:hostinger-supabase
 ```
 
 ## SMS OTP configuration
