@@ -18,6 +18,10 @@ const webAppScreen = readFileSync(
   resolve(mobileRoot, 'components/WebAppScreen.tsx'),
   'utf8',
 );
+const webHome = readFileSync(
+  resolve(workspaceRoot, 'artifacts/khatabook/src/pages/home.tsx'),
+  'utf8',
+);
 const websiteCss = readFileSync(
   resolve(workspaceRoot, 'artifacts/khatabook/src/index.css'),
   'utf8',
@@ -38,6 +42,11 @@ describe('mobile viewport contract', () => {
 
   it('resizes the Android WebView for the software keyboard', () => {
     expect(appConfig.expo.android.softwareKeyboardLayoutMode).toBe('resize');
+  });
+
+  it('does not let the native WebView force stale API cache responses', () => {
+    expect(webAppScreen).not.toMatch(/cacheMode\s*=/);
+    expect(webHome.match(/request:\s*\{\s*cache:\s*'no-store'\s*\}/g)).toHaveLength(2);
   });
 
   it('keeps safe-area and short-keyboard viewport rules in the website CSS', () => {

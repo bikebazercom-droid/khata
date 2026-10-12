@@ -136,13 +136,17 @@ export function HomeView() {
   const activeBookName = resolveLedgerBookName(activeBusiness?.name, settings?.storeName);
   const summaryParams = { role };
   const partyParams = { role, search, dueFilter: apiDueFilter };
+  // Party-list freshness is handled by React Query/offline persistence, not
+  // the WebView HTTP cache; always let invalidation reach the API.
   const { data: summaryParties = [] } = useListParties(summaryParams, {
+    request: { cache: 'no-store' },
     query: {
       queryKey: businessScopedQueryKey(getListPartiesQueryKey(summaryParams), selectedBusinessId),
       refetchOnMount: 'always',
     },
   });
   const { data: queriedParties } = useListParties(partyParams, {
+    request: { cache: 'no-store' },
     query: {
       queryKey: businessScopedQueryKey(getListPartiesQueryKey(partyParams), selectedBusinessId),
       refetchOnMount: 'always',

@@ -552,8 +552,9 @@ export function WebAppScreen() {
         javaScriptEnabled
         javaScriptCanOpenWindowsAutomatically
         domStorageEnabled
+        // Keep the platform's normal HTTP cache policy. LOAD_CACHE_ELSE_NETWORK
+        // also affects API GETs and can hide successful writes behind stale list data.
         cacheEnabled
-        cacheMode={Platform.OS === 'android' ? 'LOAD_CACHE_ELSE_NETWORK' : undefined}
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         injectedJavaScriptBeforeContentLoaded={nativeAuthToken
