@@ -9,6 +9,7 @@ import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 import {
   optimisticallyAddPartyToListCaches,
   queuePartyOperation,
+  reconcilePartyInListCaches,
   restorePartyListCaches,
 } from '@/lib/partyOutbox';
 import { readOfflineIdentity } from '@/lib/offlineSession';
@@ -336,10 +337,22 @@ function AddPartyForm({
         restorePartyListCaches(queryClient, context.previousPartyLists);
         queryClient.setQueryData(context.summaryKey, context.previousSummary);
       },
-      onSettled: () => {
-        queryClient.invalidateQueries({ queryKey: getListPartiesQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
-        queryClient.invalidateQueries({ queryKey: ['owner-parties'] });
+      onSuccess: (createdParty) => {
+        reconcilePartyInListCaches(queryClient, selectedBusinessId, createdParty);
+        void queryClient.invalidateQueries({
+          queryKey: getListPartiesQueryKey(),
+          refetchType: 'active',
+        });
+        void queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+        void queryClient.invalidateQueries({ queryKey: ['owner-parties'] });
+      },
+      onSettled: (_data, error) => {
+        if (!error || isTransientNetworkError(error)) return;
+        void queryClient.invalidateQueries({
+          queryKey: getListPartiesQueryKey(),
+          refetchType: 'active',
+        });
+        void queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
       },
     },
   });

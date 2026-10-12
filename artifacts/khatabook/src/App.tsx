@@ -218,7 +218,10 @@ function RealtimeSyncManager() {
             });
           }
           void qc.invalidateQueries({ queryKey: getListGlobalLedgerEntriesQueryKey() });
-          void qc.invalidateQueries({ queryKey: getListPartiesQueryKey() });
+          void qc.invalidateQueries({
+            queryKey: getListPartiesQueryKey(),
+            refetchType: 'active',
+          });
           void qc.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
           void qc.invalidateQueries({ queryKey: getListNotificationsQueryKey() });
         });

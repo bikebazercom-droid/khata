@@ -195,6 +195,27 @@ function applyParty(queryClient: QueryClient, businessId: string, kind: PartyOpe
   for (const query of detailQueries) queryClient.setQueryData(query.queryKey, party);
 }
 
+export function reconcilePartyInListCaches(
+  queryClient: QueryClient,
+  businessId: string | null,
+  party: Party,
+): void {
+  const listQueries = queryClient.getQueryCache().findAll({
+    predicate: (query) =>
+      isPartyListQuery(query) &&
+      hasBusinessScope(query, businessId ?? '__default_business__'),
+  });
+
+  for (const query of listQueries) {
+    queryClient.setQueryData<Party[]>(query.queryKey, (old) => {
+      const withoutParty = (Array.isArray(old) ? old : [])
+        .filter((item) => item.id !== party.id);
+      if (!matchesListParams(party, query)) return withoutParty;
+      return sortPartiesByRecentActivity([party, ...withoutParty]);
+    });
+  }
+}
+
 export interface PartyListCacheSnapshot {
   queryKey: readonly unknown[];
   data: Party[] | undefined;

@@ -329,6 +329,7 @@ describe('AddPartyModal contact picker', () => {
     let mutationOptions: {
       mutation?: {
         onMutate?: (variables: { data: Partial<Party> }) => Promise<unknown>;
+        onSuccess?: (data: Party) => void;
         onSettled?: (
           data: Party | undefined,
           error: unknown,
@@ -372,6 +373,7 @@ describe('AddPartyModal contact picker', () => {
     };
     resolveSave(savedParty);
     await saveRequest;
+    mutationOptions.mutation?.onSuccess?.(savedParty);
     await mutationOptions.mutation?.onSettled?.(savedParty, null, request, optimisticContext);
 
     await waitFor(() => {
