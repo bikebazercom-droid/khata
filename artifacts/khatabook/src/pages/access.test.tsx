@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { AccessPage } from './access';
+import { LanguageProvider, LANGUAGE_STORAGE_KEY } from '@/lib/i18n';
 
 const owner = vi.hoisted(() => ({
   workers: [] as Array<{ id: string; identity: string; status: 'active' | 'pending'; partyIds: string[]; adjustmentPartyIds: string[]; lastLogin: null; lastLogout: null; invitedAt: null }>,
@@ -37,7 +38,24 @@ describe('party access worker adjustment editor', () => {
     owner.partiesError = false;
     owner.mutate.mockReset();
   });
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    window.localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+  });
+
+  it('translates the ledger access screen and party cards in English mode', () => {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, 'en');
+    render(<LanguageProvider><AccessPage /></LanguageProvider>);
+
+    expect(screen.getByText('Khata & Access')).toBeInTheDocument();
+    expect(screen.getByText('Control and activity for your ledgers')).toBeInTheDocument();
+    expect(screen.getByText('Ledger access')).toBeInTheDocument();
+    expect(screen.getByText('Staff list')).toBeInTheDocument();
+    expect(screen.getByText('Activity')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search customers/suppliers...')).toBeInTheDocument();
+    expect(screen.getByText(/Supplier •/)).toBeInTheDocument();
+    expect(screen.getByText('No one has been given access')).toBeInTheDocument();
+  });
 
   const openParty = () => {
     render(<AccessPage />);

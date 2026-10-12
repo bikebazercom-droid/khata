@@ -11,6 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { bn as bnLocale } from 'date-fns/locale';
+import { useLanguage } from '@/lib/i18n';
 
 type TabType = 'parties' | 'staff' | 'activity';
 const isValidWorkerIdentity = (identity: string) =>
@@ -18,6 +19,7 @@ const isValidWorkerIdentity = (identity: string) =>
   /^(?:\+?88)?01[3-9]\d{8}$/.test(identity.trim());
 
 export function AccessPage() {
+  const { t } = useLanguage();
   const [, navigate] = useLocation();
   const { data: workers = [], isLoading: workersLoading, isError: workersError } = useOwnerWorkers();
   const { data: parties = [], isLoading: partiesLoading, isFetching: partiesFetching, isError: partiesError, refetch: refetchParties } = useOwnerParties();
@@ -50,8 +52,8 @@ export function AccessPage() {
             <ChevronLeft className="w-6 h-6" />
           </button>
           <div className="min-w-0 flex-1 text-left">
-            <h2 className="text-[17px] font-extrabold text-white leading-tight">খাতা ও অ্যাক্সেস</h2>
-            <p className="text-[11px] font-semibold text-white/70 mt-0.5">আপনার খাতার কন্ট্রোল ও অ্যাক্টিভিটি</p>
+            <h2 className="text-[17px] font-extrabold text-white leading-tight">{t('khataAccessTitle')}</h2>
+            <p className="text-[11px] font-semibold text-white/70 mt-0.5">{t('khataAccessSubtitle')}</p>
           </div>
           {activeTab === 'staff' && (
             <button
@@ -73,7 +75,7 @@ export function AccessPage() {
                 activeTab === 'parties' ? 'text-white border-white' : 'text-white/60 border-transparent'
               )}
             >
-              খাতা অ্যাক্সেস
+              {t('khataAccessTab')}
             </button>
             <button
               onClick={() => setActiveTab('staff')}
@@ -82,7 +84,7 @@ export function AccessPage() {
                 activeTab === 'staff' ? 'text-white border-white' : 'text-white/60 border-transparent'
               )}
             >
-              স্টাফ তালিকা
+              {t('staffList')}
             </button>
             <button
               onClick={() => setActiveTab('activity')}
@@ -91,7 +93,7 @@ export function AccessPage() {
                 activeTab === 'activity' ? 'text-white border-white' : 'text-white/60 border-transparent'
               )}
             >
-              অ্যাক্টিভিটি
+              {t('activityTab')}
             </button>
           </div>
         </div>
@@ -105,7 +107,7 @@ export function AccessPage() {
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="কাস্টমার/সাপ্লায়ার খুঁজুন..."
+                placeholder={t('searchCustomerSupplier')}
                 className="pl-9 h-11 bg-white border-slate-200 rounded-xl"
               />
             </div>
@@ -145,7 +147,7 @@ export function AccessPage() {
                           <div>
                             <p className="font-bold text-slate-900 text-[15px]">{party.name}</p>
                             <p className="text-[10px] font-semibold text-slate-500 mt-0.5">
-                              {party.role === 'CUSTOMER' ? 'কাস্টমার' : 'সাপ্লায়ার'} • {party.id.slice(-4)}
+                              {party.role === 'CUSTOMER' ? t('customerRole') : t('supplierRole')} • {party.id.slice(-4)}
                             </p>
                           </div>
                         </div>
@@ -175,7 +177,7 @@ export function AccessPage() {
                         </div>
                       ) : (
                         <div className="mt-2 pt-3 border-t border-slate-100 flex items-center gap-2">
-                          <span className="text-xs font-medium text-slate-400">কাউকে অ্যাক্সেস দেওয়া নেই</span>
+                          <span className="text-xs font-medium text-slate-400">{t('noStaffAccess')}</span>
                         </div>
                       )}
                     </div>
@@ -354,6 +356,7 @@ export function AccessPage() {
 }
 
 function AddWorkerDialog({ open, onOpenChange, parties, partiesPending, partiesError, retryParties }: { open: boolean; onOpenChange: (val: boolean) => void; parties: OwnerParty[]; partiesPending: boolean; partiesError: boolean; retryParties: () => void }) {
+  const { t } = useLanguage();
   const [identity, setIdentity] = useState('');
   const [partyIds, setPartyIds] = useState<string[]>([]);
   const [adjustmentPartyIds, setAdjustmentPartyIds] = useState<string[]>([]);
@@ -413,13 +416,13 @@ function AddWorkerDialog({ open, onOpenChange, parties, partiesPending, partiesE
                 : parties.length === 0 ? <p className="text-xs text-slate-500">কোনো খাতা নেই</p> : null}
               {!partiesPending && !partiesError && parties.map(party => (
                 <div key={party.id} className="py-2 border-b border-slate-100">
-                  <p className="text-sm font-semibold text-slate-800">{party.name} <span className="text-xs font-normal text-slate-500">· {party.role === 'CUSTOMER' ? 'কাস্টমার' : 'সাপ্লায়ার'}</span></p>
+                  <p className="text-sm font-semibold text-slate-800">{party.name} <span className="text-xs font-normal text-slate-500">· {party.role === 'CUSTOMER' ? t('customerRole') : t('supplierRole')}</span></p>
                   <div className="flex flex-wrap gap-3 mt-2">
                     <label className="flex gap-2 items-center text-xs font-semibold text-slate-700 cursor-pointer">
                       <Checkbox data-testid={`input-create-access-${party.id}`} className="size-5 border-2 border-slate-500 data-[state=checked]:border-[#1B3A6B] data-[state=checked]:bg-[#1B3A6B] data-[state=checked]:text-white" checked={partyIds.includes(party.id)} onCheckedChange={checked => {
                         setPartyIds(ids => checked === true ? [...ids, party.id] : ids.filter(id => id !== party.id));
                       }} />
-                      খাতা অ্যাক্সেস
+                      {t('khataAccessTab')}
                     </label>
                     <label className="flex gap-2 items-center text-xs font-semibold cursor-pointer text-slate-700">
                       <Checkbox data-testid={`input-create-adjustment-${party.id}`} className="size-5 border-2 border-slate-500 data-[state=checked]:border-[#1B3A6B] data-[state=checked]:bg-[#1B3A6B] data-[state=checked]:text-white" checked={adjustmentPartyIds.includes(party.id)} onCheckedChange={checked => setAdjustmentPartyIds(ids => checked === true ? [...ids, party.id] : ids.filter(id => id !== party.id))} />
@@ -455,6 +458,7 @@ function AddWorkerDialog({ open, onOpenChange, parties, partiesPending, partiesE
 }
 
 function WorkerDetailDialog({ worker, open, onOpenChange, parties, partiesPending, partiesError, retryParties }: { worker: Worker; open: boolean; onOpenChange: (val: boolean) => void; parties: OwnerParty[]; partiesPending: boolean; partiesError: boolean; retryParties: () => void }) {
+  const { t } = useLanguage();
   const updateWorker = useUpdateWorker();
   const deleteWorker = useDeleteWorker();
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -563,7 +567,7 @@ function WorkerDetailDialog({ worker, open, onOpenChange, parties, partiesPendin
               <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="কাস্টমার/সাপ্লায়ার খুঁজুন..."
+              placeholder={t('searchCustomerSupplier')}
               className="pl-9 h-10 bg-white border-slate-200 rounded-xl"
             />
           </div>
@@ -600,13 +604,13 @@ function WorkerDetailDialog({ worker, open, onOpenChange, parties, partiesPendin
                       </div>
                        <div className="min-w-0">
                          <p className="font-bold text-sm text-slate-900 break-words" data-testid={`text-worker-party-${party.id}`}>{party.name}</p>
-                        <p className="text-[10px] font-semibold text-slate-500">{party.role === 'CUSTOMER' ? 'কাস্টমার' : 'সাপ্লায়ার'}</p>
+                         <p className="text-[10px] font-semibold text-slate-500">{party.role === 'CUSTOMER' ? t('customerRole') : t('supplierRole')}</p>
                       </div>
                     </div>
                       <div className="flex flex-wrap gap-3">
                         <label className="flex gap-2 items-center text-xs font-semibold text-slate-700 cursor-pointer">
                           <Checkbox data-testid={`input-worker-access-${party.id}`} className="size-5 border-2 border-slate-500 data-[state=checked]:border-[#1B3A6B] data-[state=checked]:bg-[#1B3A6B] data-[state=checked]:text-white" checked={isAssigned} disabled={updateWorker.isPending} onCheckedChange={() => toggleParty(party.id)} />
-                         খাতা অ্যাক্সেস
+                         {t('khataAccessTab')}
                        </label>
                         <label className="flex gap-2 items-center text-xs font-semibold cursor-pointer text-slate-700">
                           <Checkbox data-testid={`input-worker-adjustment-${party.id}`} className="size-5 border-2 border-slate-500 data-[state=checked]:border-[#1B3A6B] data-[state=checked]:bg-[#1B3A6B] data-[state=checked]:text-white" checked={draftAdjustmentIds.includes(party.id)} disabled={updateWorker.isPending} onCheckedChange={() => toggleAdjustment(party.id)} />
@@ -658,6 +662,7 @@ function WorkerDetailDialog({ worker, open, onOpenChange, parties, partiesPendin
 }
 
 function PartyAccessDialog({ party, workers, open, onOpenChange, parties, partiesPending, partiesError, retryParties }: { party: OwnerParty; workers: Worker[]; open: boolean; onOpenChange: (val: boolean) => void; parties: OwnerParty[]; partiesPending: boolean; partiesError: boolean; retryParties: () => void }) {
+  const { t } = useLanguage();
   const [identity, setIdentity] = useState('');
   const createWorker = useCreateWorker();
   const updateWorker = useUpdateWorker();
@@ -726,7 +731,7 @@ function PartyAccessDialog({ party, workers, open, onOpenChange, parties, partie
             <div>
               <DialogTitle className="text-lg font-extrabold text-slate-900">{party.name}</DialogTitle>
               <p className="text-xs font-semibold text-slate-500 mt-1">
-                {party.role === 'CUSTOMER' ? 'কাস্টমার' : 'সাপ্লায়ার'}
+                {party.role === 'CUSTOMER' ? t('customerRole') : t('supplierRole')}
               </p>
             </div>
           </div>
@@ -763,7 +768,7 @@ function PartyAccessDialog({ party, workers, open, onOpenChange, parties, partie
             <h3 className="text-sm font-bold text-slate-800 mb-3 px-1">অ্যাসাইন করা স্টাফ</h3>
             {assignedWorkers.length === 0 ? (
               <div className="text-center p-6 text-slate-500 text-sm font-medium bg-white rounded-2xl border border-slate-200 shadow-sm">
-                কাউকে এই কাস্টমার/সাপ্লায়ারের অ্যাক্সেস দেওয়া নেই
+                {t('noAssignedStaffForParty')}
               </div>
             ) : (
               <div className="space-y-3">
@@ -862,6 +867,7 @@ function PartyWorkerPermissions({ worker, parties, partiesPending, partiesError,
   partiesError: boolean;
   retryParties: () => void;
 }) {
+  const { t } = useLanguage();
   const updateWorker = useUpdateWorker();
   const [search, setSearch] = useState('');
   const [draftPartyIds, setDraftPartyIds] = useState<string[]>(() => worker.partyIds);
@@ -907,7 +913,7 @@ function PartyWorkerPermissions({ worker, parties, partiesPending, partiesError,
           data-testid={`input-party-worker-search-${worker.id}`}
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="কাস্টমার/সাপ্লায়ার খুঁজুন..."
+          placeholder={t('searchCustomerSupplier')}
           className="pl-9 h-9 bg-slate-50 border-slate-200 rounded-xl"
         />
       </div>
@@ -926,7 +932,7 @@ function PartyWorkerPermissions({ worker, parties, partiesPending, partiesError,
             return (
               <div key={p.id} data-testid={`row-party-worker-permission-${worker.id}-${p.id}`} className="rounded-xl border border-slate-200 bg-slate-50 p-2.5">
                 <p className="text-xs font-bold text-slate-800 break-words">
-                  {p.name} <span className="font-normal text-slate-500">· {p.role === 'CUSTOMER' ? 'কাস্টমার' : 'সাপ্লায়ার'}</span>
+                  {p.name} <span className="font-normal text-slate-500">· {p.role === 'CUSTOMER' ? t('customerRole') : t('supplierRole')}</span>
                 </p>
                 <div className="flex flex-wrap gap-x-4 gap-y-2 mt-2">
                   <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
@@ -934,7 +940,7 @@ function PartyWorkerPermissions({ worker, parties, partiesPending, partiesError,
                       setDraftPartyIds(ids => checked === true ? [...ids, p.id] : ids.filter(id => id !== p.id));
                       setSaveError('');
                     }} />
-                    খাতা অ্যাক্সেস
+                    {t('khataAccessTab')}
                   </label>
                   <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer text-slate-700">
                     <Checkbox data-testid={`input-party-worker-adjustment-${worker.id}-${p.id}`} checked={draftAdjustmentIds.includes(p.id)} disabled={updateWorker.isPending} onCheckedChange={checked => {
