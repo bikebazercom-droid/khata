@@ -7,6 +7,42 @@ import { type AuthenticatedRequest } from "../middlewares/requireAuth";
 import userRouter from "./user";
 
 describe("account deletion and client sign-out", () => {
+  it("reads and updates a language preference scoped to the authenticated user", async () => {
+    const [business] = await db.insert(businessesTable).values({ name: "Language preference regression" }).returning();
+    const [user] = await db.insert(appUsersTable).values({
+      businessId: business!.id,
+      clerkUserId: `language-preference-${crypto.randomUUID()}`,
+      role: "owner",
+    }).returning();
+
+    const app = express();
+    app.use(express.json());
+    app.use((req: Request, _res: Response, next: NextFunction) => {
+      (req as AuthenticatedRequest).userId = user!.id;
+      next();
+    });
+    app.use(userRouter);
+
+    try {
+      const initial = await request(app).get("/user/preferences");
+      expect(initial.status).toBe(200);
+      expect(initial.body).toEqual({ language: null });
+
+      const saved = await request(app).patch("/user/preferences").send({ language: "en" });
+      expect(saved.status).toBe(200);
+      expect(saved.body).toEqual({ language: "en" });
+
+      const reread = await request(app).get("/user/preferences");
+      expect(reread.body).toEqual({ language: "en" });
+
+      const invalid = await request(app).patch("/user/preferences").send({ language: "fr" });
+      expect(invalid.status).toBe(400);
+    } finally {
+      await db.delete(appUsersTable).where(eq(appUsersTable.id, user!.id));
+      await db.delete(businessesTable).where(eq(businessesTable.id, business!.id));
+    }
+  });
+
   it("leaves no replacement user, business, or sign-in session after deletion", async () => {
     const [business] = await db.insert(businessesTable).values({ name: "Delete account regression" }).returning();
     const clerkUserId = `delete-regression-${crypto.randomUUID()}`;

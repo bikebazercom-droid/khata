@@ -13,6 +13,8 @@ export const appUsersTable = pgTable("app_users", {
   phone: text("phone").unique(),
   /** Set only from a verified Clerk email address returned by Clerk's API. */
   verifiedEmail: text("verified_email"),
+  /** Per-user interface language; null until the user explicitly chooses one. */
+  language: text("language"),
   /** Incremented at phone logout to invalidate all previously issued JWTs. */
   phoneSessionVersion: integer("phone_session_version").notNull().default(0),
   businessId: uuid("business_id")

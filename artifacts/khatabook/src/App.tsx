@@ -18,7 +18,14 @@ import { useRetryPendingUploads } from '@/lib/useRetryPendingUploads';
 import { BusinessContextProvider } from '@/lib/businessContext';
 import type { BusinessInfo } from '@/lib/businessContext';
 import { BusinessSwitcherDrawer } from '@/components/modals/business-switcher-drawer';
-import { LanguageProvider } from '@/lib/i18n';
+import { LANGUAGE_STORAGE_KEY, LanguageProvider, useLanguage, type Lang } from '@/lib/i18n';
+import {
+  fetchLanguagePreference,
+  getLanguageSelection,
+  markLanguageSelection,
+  saveLanguagePreference,
+} from '@/lib/language-preference';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { drainEntries, ENTRY_OUTBOX_CHANGED } from '@/lib/entryOutbox';
 import { applyQueuedPartyOperations, drainPartyOperations, PARTY_OUTBOX_CHANGED, PARTY_OUTBOX_REJECTED } from '@/lib/partyOutbox';
 import { clearAllPendingUploads } from '@/lib/pendingUploads';
@@ -665,11 +672,131 @@ function AuthServerReporter({ onNetworkFailure, onSettled }: { onNetworkFailure:
   return null;
 }
 
+function LanguagePreferenceOnboarding() {
+  const { isAuthenticated, userId, authMethod } = useAppAuth();
+  const { setLang, isEnglish } = useLanguage();
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated || !userId || authMethod === 'dev') {
+      setOpen(false);
+      return;
+    }
+    let active = true;
+
+    const applyLocalSelection = async (language: Lang) => {
+      if (!active) return;
+      setLang(language);
+      markLanguageSelection(userId, language);
+      setOpen(false);
+      try {
+        await saveLanguagePreference(language);
+      } catch (saveError) {
+        console.warn('Could not sync the saved language preference:', saveError);
+      }
+    };
+
+    const resolvePreference = async () => {
+      try {
+        const serverLanguage = await fetchLanguagePreference();
+        if (!active) return;
+        if (serverLanguage) {
+          setLang(serverLanguage);
+          markLanguageSelection(userId, serverLanguage);
+          setOpen(false);
+          return;
+        }
+        const localSelection = getLanguageSelection(userId);
+        if (localSelection) {
+          await applyLocalSelection(localSelection);
+          return;
+        }
+        // Older builds only stored explicit English as distinct from the
+        // default Bangla value, so preserve that existing user choice.
+        if (window.localStorage.getItem(LANGUAGE_STORAGE_KEY) === 'en') {
+          await applyLocalSelection('en');
+          return;
+        }
+        setOpen(true);
+      } catch (loadError) {
+        if (!active) return;
+        const localSelection = getLanguageSelection(userId);
+        if (localSelection) {
+          await applyLocalSelection(localSelection);
+        } else if (window.localStorage.getItem(LANGUAGE_STORAGE_KEY) === 'en') {
+          await applyLocalSelection('en');
+        } else {
+          setOpen(true);
+        }
+        console.warn('Could not load the server language preference:', loadError);
+      }
+    };
+
+    void resolvePreference();
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated, userId, authMethod, setLang]);
+
+  const chooseLanguage = async (language: Lang) => {
+    if (!userId) return;
+    setLang(language);
+    markLanguageSelection(userId, language);
+    setOpen(false);
+    try {
+      await saveLanguagePreference(language);
+    } catch {
+      toast.error(isEnglish
+        ? 'Your choice is saved on this device, but could not sync to your account. Check your connection and try again.'
+        : 'আপনার পছন্দ এই ডিভাইসে সংরক্ষিত হয়েছে, কিন্তু অ্যাকাউন্টে সিঙ্ক হয়নি। ইন্টারনেট দেখে আবার চেষ্টা করুন।');
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={() => {}}>
+      <DialogContent
+        className="w-[min(26rem,calc(100vw-2rem))] rounded-2xl"
+        onEscapeKeyDown={(event) => event.preventDefault()}
+        onPointerDownOutside={(event) => event.preventDefault()}
+        onInteractOutside={(event) => event.preventDefault()}
+      >
+        <DialogHeader>
+          <DialogTitle className="text-center text-xl">
+            Choose your language / ভাষা নির্বাচন করুন
+          </DialogTitle>
+          <DialogDescription className="text-center">
+            Select your preferred language for BanglaKhata.
+            <br />
+            বাংলা খাতার জন্য আপনার পছন্দের ভাষা নির্বাচন করুন।
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => void chooseLanguage('bn')}
+            className="min-h-12 rounded-xl border border-slate-200 bg-white px-4 font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-60"
+          >
+            বাংলা
+          </button>
+          <button
+            type="button"
+            onClick={() => void chooseLanguage('en')}
+            className="min-h-12 rounded-xl bg-[#0A4384] px-4 font-semibold text-white hover:bg-[#08376d] disabled:opacity-60"
+          >
+            English
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function AppRouter({ onNetworkFailure, onSettled }: { onNetworkFailure: () => void; onSettled: () => void }) {
   return (
     <>
       <AuthServerReporter onNetworkFailure={onNetworkFailure} onSettled={onSettled} />
       <LanguageProvider>
+        <LanguagePreferenceOnboarding />
         <ConnectionStateProvider>
         <AuthCacheInvalidator />
         <RealtimeSyncManager />

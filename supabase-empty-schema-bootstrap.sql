@@ -93,6 +93,7 @@ CREATE TABLE "app_users" (
 	"clerk_user_id" text,
 	"phone" text,
 	"verified_email" text,
+	"language" text,
 	"phone_session_version" integer DEFAULT 0 NOT NULL,
 	"business_id" uuid NOT NULL,
 	"role" "user_role" DEFAULT 'owner' NOT NULL,

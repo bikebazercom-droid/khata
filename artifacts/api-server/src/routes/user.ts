@@ -24,8 +24,44 @@ import {
   staffDestinationsTable,
 } from "@workspace/db";
 import { type AuthenticatedRequest } from "../middlewares/requireAuth";
+import { z } from "zod";
 
 const router: IRouter = Router();
+
+// ─── GET/PATCH /user/preferences ──────────────────────────────────────────────
+
+router.get("/user/preferences", async (req, res): Promise<void> => {
+  const { userId } = req as unknown as AuthenticatedRequest;
+  const [user] = await db
+    .select({ language: appUsersTable.language })
+    .from(appUsersTable)
+    .where(eq(appUsersTable.id, userId))
+    .limit(1);
+  if (!user) {
+    res.status(404).json({ error: "User not found." });
+    return;
+  }
+  res.json({ language: user.language });
+});
+
+router.patch("/user/preferences", async (req, res): Promise<void> => {
+  const { userId } = req as unknown as AuthenticatedRequest;
+  const parsed = z.object({ language: z.enum(["bn", "en"]) }).safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "language must be bn or en." });
+    return;
+  }
+  const [user] = await db
+    .update(appUsersTable)
+    .set({ language: parsed.data.language })
+    .where(eq(appUsersTable.id, userId))
+    .returning({ language: appUsersTable.language });
+  if (!user) {
+    res.status(404).json({ error: "User not found." });
+    return;
+  }
+  res.json({ language: user.language });
+});
 
 // ─── DELETE /user/account ────────────────────────────────────────────────────
 

@@ -30,6 +30,7 @@ import { clearOfflineIdentity, markLocalLogoutPending, readOfflineIdentity } fro
 import { clearPersistedQueries } from '@/lib/queryPersister';
 import { clearAllPendingUploads } from '@/lib/pendingUploads';
 import { useLanguage } from '@/lib/i18n';
+import { markLanguageSelection, saveLanguagePreference } from '@/lib/language-preference';
 import { useAppAuth } from '@/App';
 import { revokeNetworkWrites } from '@/lib/useAuthConnectivity';
 import {
@@ -72,7 +73,7 @@ export function SettingsDrawer({
   const queryClient = useQueryClient();
   const { signOut } = useClerk();
   const { isSignedIn } = useAuth();
-  const { isAuthenticated, role, phone, authMethod } = useAppAuth();
+  const { isAuthenticated, role, phone, authMethod, userId } = useAppAuth();
   const { user: clerkUser } = useUser();
   const removeOwnerPushToken = useRemoveOwnerPushToken();
   const [, navigate] = useLocation();
@@ -249,7 +250,13 @@ export function SettingsDrawer({
                     <DropdownMenuRadioGroup
                       value={lang}
                       onValueChange={(value) => {
-                        if (value === 'bn' || value === 'en') setLang(value);
+                        if (value !== 'bn' && value !== 'en') return;
+                        setLang(value);
+                        if (!userId) return;
+                        markLanguageSelection(userId, value);
+                        void saveLanguagePreference(value).catch(() => {
+                          toast.error(t('languageSyncError'));
+                        });
                       }}
                     >
                       <DropdownMenuRadioItem value="bn" className="min-h-10 rounded-lg text-sm">বাংলা</DropdownMenuRadioItem>
