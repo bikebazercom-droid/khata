@@ -72,6 +72,10 @@ export async function restorePersistedQueries(
   businessId: string,
 ): Promise<void> {
   setQueryPersistenceScope(actorId, businessId);
+  if (typeof navigator === 'undefined' || navigator.onLine) {
+    await clearPersistedPartyQueries(actorId, businessId);
+    return;
+  }
   const database = await openDatabase();
   const snapshots = await new Promise<PersistedQuery[]>((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, 'readonly');
@@ -82,8 +86,36 @@ export async function restorePersistedQueries(
   for (const snapshot of snapshots) {
     if (snapshot.actorId !== actorId || snapshot.businessId !== businessId) continue;
     if (!cacheableForScope(snapshot.queryKey, businessId)) continue;
+    // A delayed IndexedDB read must never overwrite a live query response.
+    if (queryClient.getQueryState(snapshot.queryKey)?.data !== undefined) continue;
     queryClient.setQueryData(snapshot.queryKey, snapshot.data, { updatedAt: snapshot.updatedAt });
   }
+}
+
+/** Remove saved party-list responses before refreshing the active business online. */
+export async function clearPersistedPartyQueries(actorId: string, businessId: string): Promise<void> {
+  const database = await openDatabase();
+  await new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.getAll();
+    request.onsuccess = () => {
+      const snapshots = request.result as PersistedQuery[];
+      for (const snapshot of snapshots) {
+        if (
+          snapshot.actorId === actorId &&
+          snapshot.businessId === businessId &&
+          snapshot.queryKey[0] === '/api/parties'
+        ) {
+          store.delete(snapshot.key);
+        }
+      }
+    };
+    request.onerror = () => reject(request.error ?? new Error('Could not clear saved party lists'));
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error('Could not clear saved party lists'));
+    transaction.onabort = () => reject(transaction.error ?? new Error('Saved party-list clear aborted'));
+  });
 }
 
 export async function clearPersistedQueries(actorId?: string): Promise<void> {

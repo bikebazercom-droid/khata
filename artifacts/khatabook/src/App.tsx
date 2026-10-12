@@ -25,7 +25,7 @@ import { clearAllPendingUploads } from '@/lib/pendingUploads';
 import { useBusinessContext } from '@/lib/businessContext';
 import { isNetworkWriteAuthorized, isOfflineMode, markServerReauthenticated, revokeNetworkWrites, useAuthConnectivity } from '@/lib/useAuthConnectivity';
 import { clearLocalLogoutPending, clearOfflineIdentity, isLocalLogoutPending, readOfflineIdentity, saveOfflineIdentity } from '@/lib/offlineSession';
-import { clearPersistedQueries, persistCache, restorePersistedQueries, setQueryPersistenceScope } from '@/lib/queryPersister';
+import { clearPersistedPartyQueries, clearPersistedQueries, persistCache, restorePersistedQueries, setQueryPersistenceScope } from '@/lib/queryPersister';
 import { EntrySavedFeedbackHost } from '@/components/ui/entry-saved-feedback';
 import { lazyWithChunkRecovery } from '@/lib/lazyWithChunkRecovery';
 import {
@@ -181,13 +181,17 @@ function RealtimeSyncManager() {
   const { isAuthenticated, userId, role, businessId } = useAppAuth();
   const { selectedBusinessId, setSelectedBusiness } = useBusinessContext();
   const { setIsOnline } = useConnectionState();
-  useRealtimeSync(isAuthenticated, setIsOnline);
   const qc = useQueryClient();
   const [, navigate] = useLocation();
   const markNotificationRead = useMarkNotificationRead();
   const activeScope = useRef('');
   const activeBusinessId = selectedBusinessId ?? businessId;
   const scope = isAuthenticated && userId ? JSON.stringify([userId, activeBusinessId]) : '';
+  const clearOnlinePartySnapshot = useCallback(async () => {
+    if (!userId || !activeBusinessId) return;
+    await clearPersistedPartyQueries(userId, activeBusinessId);
+  }, [userId, activeBusinessId]);
+  useRealtimeSync(isAuthenticated, setIsOnline, clearOnlinePartySnapshot);
   activeScope.current = scope;
   useEffect(() => {
     if (!scope || !userId) return;
@@ -754,14 +758,10 @@ function AppClient() {
   const cachedIdentity = isLocalLogoutPending() ? null : readOfflineIdentity();
 
   useEffect(() => {
-    if (
-      !cachedIdentity ||
-      location === "/privacy-policy" ||
-      location === "/support"
-    ) return;
+    if (!cachedIdentity) return;
     setQueryPersistenceScope(cachedIdentity.userId, cachedIdentity.businessId);
     void restorePersistedQueries(queryClient, cachedIdentity.userId, cachedIdentity.businessId).catch(() => {});
-  }, [cachedIdentity?.userId, cachedIdentity?.businessId, location]);
+  }, [cachedIdentity?.userId, cachedIdentity?.businessId]);
 
   // Legal and support pages must remain reachable without an auth session,
   // Clerk configuration, or a successful server connectivity probe.

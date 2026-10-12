@@ -38,6 +38,7 @@ const storage = {
 
 beforeEach(() => {
   records.clear();
+  vi.stubGlobal('navigator', { onLine: false });
   vi.stubGlobal('indexedDB', {
     open: () => {
       const request: { result: typeof storage; onsuccess?: () => void; onupgradeneeded?: () => void } = { result: storage };
@@ -88,5 +89,29 @@ describe('offline query snapshots', () => {
     restored.clear();
     otherActor.clear();
     await clear();
+  });
+
+  it('does not restore stale party lists while online and removes that business snapshot', async () => {
+    const {
+      setQueryPersistenceScope: setScope,
+      persistCache: attachPersister,
+      restorePersistedQueries: restore,
+    } = await import('../lib/queryPersister');
+    const queryClient = new QueryClient();
+    const partyKey = ['/api/parties', { role: 'CUSTOMER' }, { activeBusinessId: 'business-A' }] as const;
+    setScope('actor-A', 'business-A');
+    const unsubscribe = attachPersister(queryClient);
+    queryClient.setQueryData(partyKey, [{ id: 'deleted-party', name: 'Outdated result' }]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    vi.stubGlobal('navigator', { onLine: true });
+    const restored = new QueryClient();
+    await restore(restored, 'actor-A', 'business-A');
+
+    expect(restored.getQueryData(partyKey)).toBeUndefined();
+    expect(records.size).toBe(0);
+    unsubscribe();
+    queryClient.clear();
+    restored.clear();
   });
 });

@@ -79,6 +79,7 @@ const VISIBILITY_STALE_THRESHOLD_MS = 60_000;
 export function useRealtimeSync(
   enabled: boolean,
   onConnectionChange?: (isOnline: boolean) => void,
+  beforeOnlineRefresh?: () => Promise<void>,
 ) {
   const qc = useQueryClient();
   // Stable ref so visibilitychange listener doesn't re-close over stale `qc`.
@@ -123,6 +124,15 @@ export function useRealtimeSync(
       void qcRef.current.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
     }
 
+    async function refreshAfterNetworkRestore() {
+      try {
+        await beforeOnlineRefresh?.();
+      } catch {
+        // Still refresh server data if local cache cleanup is unavailable.
+      }
+      await qcRef.current.invalidateQueries();
+    }
+
     function handleVisibilityChange() {
       if (document.visibilityState === 'hidden') {
         hiddenAt = Date.now();
@@ -151,7 +161,7 @@ export function useRealtimeSync(
       // triggers invalidateQueries. This listener is a safety net for the
       // window between the browser regaining network and the SSE handshake
       // completing — keeps the cache current as quickly as possible.
-      void qcRef.current.invalidateQueries();
+      void refreshAfterNetworkRestore();
     }
 
     window.addEventListener('online', handleBrowserOnline);
@@ -161,8 +171,10 @@ export function useRealtimeSync(
     // (Re)connect: sweep all caches to catch up on missed events.
     es.addEventListener('connected', () => {
       markOnline();
-      void qc.invalidateQueries();
+      // Let the offline mutation queue resume immediately; cache cleanup and
+      // fresh query reads happen alongside that independent replay.
       window.dispatchEvent(new Event('banglakhata-connection-restored'));
+      void refreshAfterNetworkRestore();
     });
 
     // SSE error (dropped connection / brief blip): start grace timer.
@@ -272,5 +284,5 @@ export function useRealtimeSync(
       window.removeEventListener('pageshow', refreshForegroundPartyData);
       window.removeEventListener('online', handleBrowserOnline);
     };
-  }, [enabled, onConnectionChange, qc]);
+  }, [enabled, onConnectionChange, beforeOnlineRefresh, qc]);
 }
