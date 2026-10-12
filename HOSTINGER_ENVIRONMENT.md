@@ -67,6 +67,15 @@ reports an error if an applied file's checksum has changed.
 HOSTINGER_DATABASE_MIGRATION_CONFIRM=apply pnpm run db:migrate:hostinger-supabase
 ```
 
+The migration tests include a PostgreSQL integration test. Run it only against
+a disposable local PostgreSQL instance using
+`MIGRATION_TEST_DATABASE_URL`; the test rejects non-local database hosts and
+creates/drops a uniquely named temporary database:
+
+```sh
+MIGRATION_TEST_DATABASE_URL=postgresql://localhost/postgres pnpm --filter @workspace/db run test:migrations
+```
+
 ## SMS OTP configuration
 
 - `SMS_NET_BD_API_KEY` is required to deliver phone OTPs. Store it as a
