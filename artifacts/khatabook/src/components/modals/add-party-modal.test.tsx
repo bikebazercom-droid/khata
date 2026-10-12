@@ -1,7 +1,15 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PartyRole } from '@workspace/api-client-react';
+import {
+  BalanceType,
+  DueFilter,
+  getListPartiesQueryKey,
+  PartyRole,
+  type Party,
+} from '@workspace/api-client-react';
+import { useState } from 'react';
+import { businessScopedQueryKey } from '@/lib/businessQueryKey';
 
 const mocks = vi.hoisted(() => ({
   canSelectDeviceContacts: vi.fn(),
@@ -37,6 +45,25 @@ const contacts = [
 
 const scrolledElements: Element[] = [];
 
+function PartyListProbe({
+  queryKey,
+  queryFn,
+}: {
+  queryKey: readonly unknown[];
+  queryFn: () => Promise<Party[]>;
+}) {
+  const { data = [] } = useQuery<Party[]>({
+    queryKey,
+    queryFn,
+  });
+
+  return (
+    <ul aria-label="পার্টির তালিকা">
+      {data.map((party) => <li key={party.id}>{party.name}</li>)}
+    </ul>
+  );
+}
+
 function renderPicker(defaultRole: PartyRole = PartyRole.CUSTOMER) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -51,6 +78,39 @@ function renderPicker(defaultRole: PartyRole = PartyRole.CUSTOMER) {
     </QueryClientProvider>,
   );
   return { ...view, onOpenChange, queryClient };
+}
+
+function renderCreatePartyFlow(role: PartyRole, initialParties: Party[], queryFn: () => Promise<Party[]>) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+  const params = { role, search: '', dueFilter: DueFilter.ALL };
+  const queryKey = businessScopedQueryKey(getListPartiesQueryKey(params), 'business-1');
+  queryClient.setQueryData(queryKey, initialParties);
+
+  function Flow() {
+    const [open, setOpen] = useState(true);
+    return (
+      <>
+        <PartyListProbe queryKey={queryKey} queryFn={queryFn} />
+        {open && <AddPartyModal open onOpenChange={setOpen} defaultRole={role} />}
+      </>
+    );
+  }
+
+  return {
+    ...render(
+      <QueryClientProvider client={queryClient}>
+        <Flow />
+      </QueryClientProvider>,
+    ),
+    queryClient,
+    queryKey,
+    queryFn,
+  };
 }
 
 async function importContacts() {
@@ -81,6 +141,7 @@ describe('AddPartyModal contact picker', () => {
 
   afterEach(() => {
     Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+    Reflect.deleteProperty(window, 'ReactNativeWebView');
   });
 
   it('keeps browser contact import behind a tap, then searches and selects a named contact', async () => {
@@ -238,5 +299,85 @@ describe('AddPartyModal contact picker', () => {
       role: PartyRole.SUPPLIER,
     });
     expect(Object.hasOwn(request.data, 'phone')).toBe(false);
+  });
+
+  it.each([
+    [PartyRole.CUSTOMER, 'New customer'],
+    [PartyRole.SUPPLIER, 'New supplier'],
+  ] as const)('shows a newly added %s at the top in the shared WebView UI without a reload', async (role, name) => {
+    const existingParty: Party = {
+      id: `existing-${role}`,
+      name: 'Older party',
+      phone: '',
+      role,
+      currentBalance: 0,
+      balanceType: BalanceType.YOU_WILL_GET,
+      dueDate: null,
+      lastTransactionAt: null,
+      createdAt: '2026-10-01T00:00:00.000Z',
+    };
+    let savedParty: Party | undefined;
+    let resolveSave!: (party: Party) => void;
+    const saveRequest = new Promise<Party>((resolve) => { resolveSave = resolve; });
+    const serverQueryFn = vi.fn(async () => savedParty ? [savedParty, existingParty] : [existingParty]);
+    const { queryClient, queryKey } = renderCreatePartyFlow(role, [existingParty], serverQueryFn);
+    Object.defineProperty(window, 'ReactNativeWebView', {
+      configurable: true,
+      value: { postMessage: vi.fn() },
+    });
+
+    let mutationOptions: {
+      mutation?: {
+        onMutate?: (variables: { data: Partial<Party> }) => Promise<unknown>;
+        onSettled?: (
+          data: Party | undefined,
+          error: unknown,
+          variables: { data: Partial<Party> },
+          context: unknown,
+        ) => unknown;
+      };
+    } = {};
+    let optimisticContextPromise: Promise<unknown> | undefined;
+    mocks.useCreateParty.mockImplementation((options: typeof mutationOptions) => {
+      mutationOptions = options;
+      return {
+        mutate: (variables: { data: Partial<Party> }) => {
+          mocks.createParty(variables);
+          optimisticContextPromise = mutationOptions.mutation?.onMutate?.(variables);
+        },
+        isPending: false,
+      };
+    });
+
+    fireEvent.click(screen.getByTestId('button-party-add'));
+    fireEvent.change(screen.getByTestId('input-party-name'), { target: { value: name } });
+    fireEvent.click(screen.getByTestId('button-submit-party'));
+
+    await waitFor(() => expect(screen.queryByTestId('input-party-name')).not.toBeInTheDocument());
+    expect(mocks.createParty).toHaveBeenCalledOnce();
+    expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([name, 'Older party']);
+
+    const request = mocks.createParty.mock.calls[0]?.[0] as { data: Partial<Party> };
+    const optimisticContext = await optimisticContextPromise;
+    savedParty = {
+      id: request.data.id ?? 'server-generated-party',
+      name,
+      phone: request.data.phone ?? '',
+      role,
+      currentBalance: 0,
+      balanceType: BalanceType.YOU_WILL_GET,
+      dueDate: null,
+      lastTransactionAt: null,
+      createdAt: new Date().toISOString(),
+    };
+    resolveSave(savedParty);
+    await saveRequest;
+    await mutationOptions.mutation?.onSettled?.(savedParty, null, request, optimisticContext);
+
+    await waitFor(() => {
+      expect(serverQueryFn).toHaveBeenCalled();
+      expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual([name, 'Older party']);
+    });
+    expect(queryClient.getQueryData<Party[]>(queryKey)?.[0]?.id).toBe(savedParty.id);
   });
 });
