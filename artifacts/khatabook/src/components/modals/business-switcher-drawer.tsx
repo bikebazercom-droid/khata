@@ -33,6 +33,7 @@ export function BusinessSwitcherDrawer() {
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [newName, setNewName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -73,6 +74,7 @@ export function BusinessSwitcherDrawer() {
   async function handleCreate() {
     if (!newName.trim() || isCreating) return;
     setIsCreating(true);
+    setCreateError(false);
     try {
       const res = await fetch('/api/businesses', {
         method: 'POST',
@@ -88,7 +90,7 @@ export function BusinessSwitcherDrawer() {
       await handleSwitch(created.id);
     } catch (err) {
       console.error('Failed to create business:', err);
-      alert(t('createFailed'));
+      setCreateError(true);
     } finally {
       setIsCreating(false);
     }
@@ -295,10 +297,15 @@ export function BusinessSwitcherDrawer() {
                   autoFocus
                   placeholder={t('newKhataPlaceholder')}
                   value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
+                  onChange={(e) => { setNewName(e.target.value); setCreateError(false); }}
                   onKeyDown={(e) => e.key === 'Enter' && void handleCreate()}
                   className="w-full px-3 py-2.5 text-[14px] border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#0052B4]/30"
                 />
+                {createError && (
+                  <p role="alert" className="text-sm text-red-700">
+                    {t('createFailed')}
+                  </p>
+                )}
                 <div className="flex gap-2">
                   <button
                     type="button"

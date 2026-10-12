@@ -254,8 +254,8 @@ export function SettingsDrawer({
                         setLang(value);
                         if (!userId) return;
                         markLanguageSelection(userId, value);
-                        void saveLanguagePreference(value).catch(() => {
-                          toast.error(t('languageSyncError'));
+                        void saveLanguagePreference(value).catch((syncError) => {
+                          console.warn('Language choice saved locally; account sync is pending:', syncError);
                         });
                       }}
                     >

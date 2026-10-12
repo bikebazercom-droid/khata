@@ -745,10 +745,8 @@ function LanguagePreferenceOnboarding() {
     setOpen(false);
     try {
       await saveLanguagePreference(language);
-    } catch {
-      toast.error(isEnglish
-        ? 'Your choice is saved on this device, but could not sync to your account. Check your connection and try again.'
-        : 'আপনার পছন্দ এই ডিভাইসে সংরক্ষিত হয়েছে, কিন্তু অ্যাকাউন্টে সিঙ্ক হয়নি। ইন্টারনেট দেখে আবার চেষ্টা করুন।');
+    } catch (syncError) {
+      console.warn('Language choice saved locally; account sync is pending:', syncError);
     }
   };
 

@@ -32,16 +32,24 @@ const router: IRouter = Router();
 
 router.get("/user/preferences", async (req, res): Promise<void> => {
   const { userId } = req as unknown as AuthenticatedRequest;
-  const [user] = await db
-    .select({ language: appUsersTable.language })
-    .from(appUsersTable)
-    .where(eq(appUsersTable.id, userId))
-    .limit(1);
-  if (!user) {
-    res.status(404).json({ error: "User not found." });
-    return;
+  try {
+    const [user] = await db
+      .select({ language: appUsersTable.language })
+      .from(appUsersTable)
+      .where(eq(appUsersTable.id, userId))
+      .limit(1);
+    if (!user) {
+      res.status(404).json({ error: "User not found." });
+      return;
+    }
+    res.json({ language: user.language });
+  } catch (error) {
+    console.error("[user/preferences] read failed; client may use its local preference:", error);
+    res.status(503).json({
+      error: "Language preference is temporarily unavailable.",
+      code: "LANGUAGE_PREFERENCE_UNAVAILABLE",
+    });
   }
-  res.json({ language: user.language });
 });
 
 router.patch("/user/preferences", async (req, res): Promise<void> => {
@@ -51,16 +59,24 @@ router.patch("/user/preferences", async (req, res): Promise<void> => {
     res.status(400).json({ error: "language must be bn or en." });
     return;
   }
-  const [user] = await db
-    .update(appUsersTable)
-    .set({ language: parsed.data.language })
-    .where(eq(appUsersTable.id, userId))
-    .returning({ language: appUsersTable.language });
-  if (!user) {
-    res.status(404).json({ error: "User not found." });
-    return;
+  try {
+    const [user] = await db
+      .update(appUsersTable)
+      .set({ language: parsed.data.language })
+      .where(eq(appUsersTable.id, userId))
+      .returning({ language: appUsersTable.language });
+    if (!user) {
+      res.status(404).json({ error: "User not found." });
+      return;
+    }
+    res.json({ language: user.language });
+  } catch (error) {
+    console.error("[user/preferences] write failed; device preference remains available:", error);
+    res.status(503).json({
+      error: "Language preference could not be synchronized.",
+      code: "LANGUAGE_PREFERENCE_UNAVAILABLE",
+    });
   }
-  res.json({ language: user.language });
 });
 
 // ─── DELETE /user/account ────────────────────────────────────────────────────

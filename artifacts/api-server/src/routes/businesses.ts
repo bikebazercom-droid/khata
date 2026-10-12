@@ -70,40 +70,44 @@ router.get("/businesses", async (req, res) => {
  */
 router.post("/businesses", async (req, res) => {
   const { userId } = req as AuthenticatedRequest;
-  const { name } = req.body as { name?: string };
+  const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
 
-  if (!name?.trim()) {
+  if (!name) {
     res.status(400).json({ error: "name is required" });
     return;
   }
 
   try {
-    const [biz] = await db
-      .insert(businessesTable)
-      .values({ name: name.trim() })
-      .returning();
+    const biz = await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(businessesTable)
+        .values({ name })
+        .returning();
+      if (!created) throw new Error("Business insert returned no row");
 
-    // Ensure default settings row exists
-    await db
-      .insert(businessSettingsTable)
-      .values({ businessId: biz!.id, storeName: name.trim() })
-      .onConflictDoNothing();
-
-    // Link to user
-    await db
-      .insert(userBusinessesTable)
-      .values({ userId, businessId: biz!.id })
-      .onConflictDoNothing();
+      await tx
+        .insert(businessSettingsTable)
+        .values({ businessId: created.id, storeName: name })
+        .onConflictDoNothing();
+      await tx
+        .insert(userBusinessesTable)
+        .values({ userId, businessId: created.id })
+        .onConflictDoNothing();
+      return created;
+    });
 
     res.status(201).json({
-      id: biz!.id,
-      name: biz!.name,
-      createdAt: biz!.createdAt,
+      id: biz.id,
+      name: biz.name,
+      createdAt: biz.createdAt,
       partyCount: 0,
     });
   } catch (err) {
     console.error("POST /api/businesses error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(503).json({
+      error: "Business setup is temporarily unavailable.",
+      code: "BUSINESS_CREATE_UNAVAILABLE",
+    });
   }
 });
 
