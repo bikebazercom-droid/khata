@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
-import type { Party, PartyInput, PartyUpdate } from '@workspace/api-client-react';
+import { getListPartiesQueryKey, type Party, type PartyInput, type PartyUpdate } from '@workspace/api-client-react';
 
 const api = vi.hoisted(() => ({
   createParty: vi.fn(),
@@ -78,11 +78,11 @@ describe('offline customer changes', () => {
     const outbox = await import('../lib/partyOutbox');
     const queryClient = new QueryClient();
     const scope = { activeBusinessId: 'business-A' };
-    const matchingSearchKey = ['listParties', { role: 'CUSTOMER', search: 'new', dueFilter: 'ALL' }, scope];
-    const nonMatchingSearchKey = ['listParties', { role: 'CUSTOMER', search: 'old', dueFilter: 'ALL' }, scope];
-    const supplierKey = ['listParties', { role: 'SUPPLIER', search: 'new', dueFilter: 'ALL' }, scope];
+    const matchingSearchKey = [...getListPartiesQueryKey({ role: 'CUSTOMER', search: 'new', dueFilter: 'ALL' }), scope];
+    const nonMatchingSearchKey = [...getListPartiesQueryKey({ role: 'CUSTOMER', search: 'old', dueFilter: 'ALL' }), scope];
+    const supplierKey = [...getListPartiesQueryKey({ role: 'SUPPLIER', search: 'new', dueFilter: 'ALL' }), scope];
     const otherBusinessKey = [
-      'listParties',
+      getListPartiesQueryKey()[0],
       { role: 'CUSTOMER', search: 'new', dueFilter: 'ALL' },
       { activeBusinessId: 'business-B' },
     ];
@@ -153,7 +153,10 @@ describe('offline customer changes', () => {
       data: { name: 'New name' },
     });
 
-    const listKey = ['listParties', { role: 'CUSTOMER', search: '', dueFilter: 'ALL' }, { activeBusinessId: 'business-A' }];
+    const listKey = [
+      ...getListPartiesQueryKey({ role: 'CUSTOMER', search: '', dueFilter: 'ALL' }),
+      { activeBusinessId: 'business-A' },
+    ];
     queryClient.setQueryData(listKey, []);
     await outbox.applyQueuedPartyOperations(queryClient, 'actor-A', 'business-A');
     expect(queryClient.getQueryData<Party[]>(listKey)?.[0]?.name).toBe('New name');

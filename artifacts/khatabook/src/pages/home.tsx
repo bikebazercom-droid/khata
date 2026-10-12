@@ -157,7 +157,7 @@ export function HomeView() {
         const listQueries = queryClient.getQueryCache().findAll({
           predicate: (query) => {
             const lastKey = query.queryKey[query.queryKey.length - 1];
-            return query.queryKey[0] === 'listParties' &&
+            return query.queryKey[0] === getListPartiesQueryKey()[0] &&
               typeof lastKey === 'object' &&
               lastKey !== null &&
               'activeBusinessId' in lastKey &&

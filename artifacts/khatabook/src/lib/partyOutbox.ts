@@ -1,4 +1,13 @@
-import { createParty, deleteParty, getParty, updateParty, type Party, type PartyInput, type PartyUpdate } from '@workspace/api-client-react';
+import {
+  createParty,
+  deleteParty,
+  getListPartiesQueryKey,
+  getParty,
+  updateParty,
+  type Party,
+  type PartyInput,
+  type PartyUpdate,
+} from '@workspace/api-client-react';
 import type { QueryClient, Query } from '@tanstack/react-query';
 import { listEntries } from './entryOutbox';
 import { sortPartiesByRecentActivity } from './party-activity';
@@ -21,6 +30,8 @@ export interface QueuedPartyOperation {
 
 export const PARTY_OUTBOX_CHANGED = 'banglakhata-party-outbox-changed';
 export const PARTY_OUTBOX_REJECTED = 'banglakhata-party-outbox-rejected';
+
+const PARTY_LIST_QUERY_KEY = getListPartiesQueryKey()[0];
 
 const DB_NAME = 'banglakhata-party-outbox';
 const STORE_NAME = 'operations';
@@ -130,6 +141,10 @@ function hasBusinessScope(query: Query, businessId: string): boolean {
     (lastKey as { activeBusinessId?: unknown }).activeBusinessId === (businessId || '__default_business__');
 }
 
+function isPartyListQuery(query: Query): boolean {
+  return query.queryKey[0] === PARTY_LIST_QUERY_KEY;
+}
+
 function matchesListParams(party: Party, query: Query): boolean {
   const params = query.queryKey[1];
   if (typeof params !== 'object' || params === null) return true;
@@ -150,7 +165,7 @@ function matchesListParams(party: Party, query: Query): boolean {
 
 function applyParty(queryClient: QueryClient, businessId: string, kind: PartyOperationKind, party: Party) {
   const listQueries = queryClient.getQueryCache().findAll({
-    predicate: (query) => query.queryKey[0] === 'listParties' && hasBusinessScope(query, businessId),
+    predicate: (query) => isPartyListQuery(query) && hasBusinessScope(query, businessId),
   });
   for (const query of listQueries) {
     queryClient.setQueryData<Party[]>(query.queryKey, (old) => {
@@ -191,7 +206,7 @@ export async function optimisticallyAddPartyToListCaches(
   party: Party,
 ): Promise<PartyListCacheSnapshot[]> {
   const belongsToBusiness = (query: Query) =>
-    query.queryKey[0] === 'listParties' &&
+    isPartyListQuery(query) &&
     hasBusinessScope(query, businessId ?? '__default_business__');
   const matchingQueries = queryClient.getQueryCache().findAll({ predicate: belongsToBusiness });
   await Promise.all(
@@ -240,7 +255,7 @@ export function touchPartyActivityInListCaches(
   const snapshots: PartyListCacheSnapshot[] = [];
   const listQueries = queryClient.getQueryCache().findAll({
     predicate: (query) =>
-      query.queryKey[0] === 'listParties' &&
+      isPartyListQuery(query) &&
       hasBusinessScope(query, businessId ?? '__default_business__'),
   });
 

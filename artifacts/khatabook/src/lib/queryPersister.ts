@@ -17,7 +17,7 @@ interface CacheScope {
 const DB_NAME = 'banglakhata-offline-cache';
 const STORE_NAME = 'queries';
 const CACHEABLE_QUERY_KEYS = new Set([
-  'listParties',
+  '/api/parties',
   'getParty',
   'listLedgerEntries',
   'getDashboardSummary',

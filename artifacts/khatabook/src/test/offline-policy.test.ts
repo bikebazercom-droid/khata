@@ -61,21 +61,21 @@ describe('offline query snapshots', () => {
     const unsubscribe = attachPersister(queryClient);
 
     queryClient.setQueryData(
-      ['listParties', { role: 'CUSTOMER' }, { activeBusinessId: 'business-A' }],
+      ['/api/parties', { role: 'CUSTOMER' }, { activeBusinessId: 'business-A' }],
       [{ id: 'party-A', name: 'Offline Customer' }],
     );
     queryClient.setQueryData(
-      ['listParties', { role: 'CUSTOMER' }, { activeBusinessId: 'business-B' }],
+      ['/api/parties', { role: 'CUSTOMER' }, { activeBusinessId: 'business-B' }],
       [{ id: 'party-B', name: 'Other Business' }],
     );
-    queryClient.setQueryData(['/api/parties'], [{ id: 'legacy' }]);
+    queryClient.setQueryData(['/api/auth/me'], [{ id: 'not-cacheable' }]);
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     const restored = new QueryClient();
     await restore(restored, 'actor-A', 'business-A');
-    expect(restored.getQueryData(['listParties', { role: 'CUSTOMER' }, { activeBusinessId: 'business-A' }]))
+    expect(restored.getQueryData(['/api/parties', { role: 'CUSTOMER' }, { activeBusinessId: 'business-A' }]))
       .toEqual([{ id: 'party-A', name: 'Offline Customer' }]);
-    expect(restored.getQueryData(['listParties', { role: 'CUSTOMER' }, { activeBusinessId: 'business-B' }]))
+    expect(restored.getQueryData(['/api/parties', { role: 'CUSTOMER' }, { activeBusinessId: 'business-B' }]))
       .toBeUndefined();
     expect(restored.getQueryCache().getAll()).toHaveLength(1);
 
