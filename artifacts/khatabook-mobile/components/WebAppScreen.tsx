@@ -30,6 +30,7 @@ import {
   createStaffLedgerNavigationEventScript,
   createWebEventScript,
   NATIVE_PUSH_STATUS_EVENT,
+  markNotificationResponseHandled,
   parseStaffLedgerNotificationResponse,
 } from '@/lib/notificationBridge';
 import { useOptionalAuth } from '@/contexts/AuthContext';
@@ -280,8 +281,10 @@ export function WebAppScreen() {
             void NotificationsApi.clearLastNotificationResponseAsync().catch(() => {});
             return;
           }
-          if (handledNotificationResponses.current.has(parsed.requestId)) return;
-          handledNotificationResponses.current.add(parsed.requestId);
+          if (!markNotificationResponseHandled(
+            handledNotificationResponses.current,
+            parsed.requestId,
+          )) return;
 
           pendingPushNavigation.current = parsed.navigation;
           sendPendingPushNavigation();

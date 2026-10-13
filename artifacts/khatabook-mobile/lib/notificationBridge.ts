@@ -38,6 +38,15 @@ export function createStaffLedgerNavigationEventScript(
   return createWebEventScript(OPEN_NOTIFICATION_EVENT, navigation);
 }
 
+export function markNotificationResponseHandled(
+  handledRequestIds: Set<string>,
+  requestId: string,
+): boolean {
+  if (handledRequestIds.has(requestId)) return false;
+  handledRequestIds.add(requestId);
+  return true;
+}
+
 export function parseStaffLedgerNotificationResponse(
   response: unknown,
 ): ParsedStaffLedgerNotification | null {
