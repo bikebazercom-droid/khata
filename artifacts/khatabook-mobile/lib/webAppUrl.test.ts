@@ -17,6 +17,15 @@ describe('resolveWebAppUrl', () => {
       .toBe('https://dev.example.com/');
   });
 
+  it('falls back to the deployment domain when the explicit URL is an undefined placeholder', () => {
+    expect(resolveWebAppUrl('undefined', 'banglakhata.com'))
+      .toBe('https://banglakhata.com/');
+  });
+
+  it('rejects an undefined placeholder when no valid fallback exists', () => {
+    expect(resolveWebAppUrl('undefined')).toBeNull();
+  });
+
   it('rejects missing, malformed, insecure, or credential-bearing URLs', () => {
     expect(resolveWebAppUrl()).toBeNull();
     expect(resolveWebAppUrl('not a URL', undefined)).toBeNull();

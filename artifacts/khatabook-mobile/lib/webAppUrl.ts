@@ -9,31 +9,42 @@ export function resolveWebAppUrl(
   configuredUrl?: string,
   deploymentDomain?: string,
 ): string | null {
-  const explicitUrl = configuredUrl?.trim();
-  const domain = deploymentDomain?.trim();
-  const candidate = explicitUrl || domain;
-  if (!candidate) return null;
+  const candidates = [
+    { value: configuredUrl?.trim(), explicit: true },
+    { value: deploymentDomain?.trim(), explicit: false },
+  ];
 
-  const normalized = /^[a-z][a-z\d+.-]*:\/\//i.test(candidate)
-    ? candidate
-    : `https://${candidate}`;
+  for (const candidate of candidates) {
+    if (!candidate.value) continue;
+    const normalized = /^[a-z][a-z\d+.-]*:\/\//i.test(candidate.value)
+      ? candidate.value
+      : `https://${candidate.value}`;
 
-  try {
-    const url = new URL(normalized);
-    if (url.protocol !== 'https:' || !url.hostname || url.username || url.password) {
-      return null;
+    try {
+      const url = new URL(normalized);
+      if (
+        url.protocol !== 'https:'
+        || !url.hostname
+        || ['undefined', 'null', 'none'].includes(url.hostname.toLowerCase())
+        || url.username
+        || url.password
+      ) {
+        continue;
+      }
+
+      if (!candidate.explicit) {
+        url.pathname = '/';
+        url.search = '';
+        url.hash = '';
+      }
+
+      return url.toString();
+    } catch {
+      // Try the deployment-domain fallback if an explicit URL is malformed.
     }
-
-    if (!explicitUrl) {
-      url.pathname = '/';
-      url.search = '';
-      url.hash = '';
-    }
-
-    return url.toString();
-  } catch {
-    return null;
   }
+
+  return null;
 }
 
 export function resolveWebAppStartUrl(

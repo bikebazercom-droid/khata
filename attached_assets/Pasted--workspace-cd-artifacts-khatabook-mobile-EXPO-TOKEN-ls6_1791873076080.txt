@@ -1,0 +1,55 @@
+~/workspace$ cd artifacts/khatabook-mobile
+EXPO_TOKEN="ls61rwezmG0otZeSru05A9I0lPNa2Uh2DqSrMygA" npx eas-cli build --platform android --profile preview --non-interactive
+The field "cli.appVersionSource" is not set, but it will be required in the future. Learn more: https://docs.expo.dev/build-reference/app-versions/
+Environment variables with visibility "Plain text" and "Sensitive" loaded from the "preview" environment on EAS: EXPO_PUBLIC_DOMAIN, EXPO_PUBLIC_SUPABASE_ANON_KEY, EXPO_PUBLIC_SUPABASE_URL.
+Environment variables loaded from the "preview" build profile "env" configuration: EXPO_PUBLIC_DOMAIN, EXPO_PUBLIC_WEB_APP_URL.
+The following environment variables are defined in both the "preview" build profile "env" configuration and the "preview" environment on EAS: EXPO_PUBLIC_DOMAIN. The values from the build profile configuration will be used.
+
+
+
+The field "cli.appVersionSource" is not set, but it will be required in the future. Learn more: https://docs.expo.dev/build-reference/app-versions/
+✔ Using remote Android credentials (Expo server)
+✔ Using Keystore from configuration: Build Credentials IZhrqi6Ntt (default)
+
+Compressing project files and uploading to EAS Build. Learn more: https://expo.fyi/eas-build-archive
+✔ Compressed project files 25s (83.3 MB)
+✔ Uploaded to EAS 8s
+✔ Computed project fingerprint
+
+See logs: https://expo.dev/accounts/shakil112233445566778899/projects/khatabook-mobile/builds/2adfa518-00c9-46b2-ada5-fe0d33e9ab7c
+
+Waiting for build to complete. You can press Ctrl+C to exit.
+✔ Build finished
+
+  ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+  █ ▄▄▄▄▄ █ ▀ ██ ▀▄▄▄▀▀ █▄▄▄▄ ▄▄█ ▀██ ▄▄▄▄▄ █
+  █ █   █ █ ▄ ▀▀█▄ ▀▄ ▀▀▄▀▀█▀▄▄ ▄ ███ █   █ █
+  █ █▄▄▄█ █▀▀ ▀█▄▀▀▄▄ ▀▄█ ▄▀ ▀▄▄▀ ▀▀█ █▄▄▄█ █
+  █▄▄▄▄▄▄▄█▄█▄▀▄█ █▄▀ █ ▀ ▀ █ ▀ ▀ ▀▄█▄▄▄▄▄▄▄█
+  █▄ ▀▀ ▄▄▀█▄█▄▄█   ▄▄▄▀▄▀▀▀█▀▀▀▄▀▄▄▀▀ ▀▄ ▄ █
+  █▄ ▀██▄▄ ██ █▀ ▄▄▀ ▀██ █▄▄█▀▄▀ ▄▀  ▄ ▀▀██ █
+  █  ▀▄▀▀▄ █▄▄▄▀▄▀█▄ ▀█▄▄█▀▄█ ▀▄▄▀█▀ ▀▀▀██  █
+  █ ▀▄▄█ ▄▀▄▀▄ ▄▄  ▀ ▀▀▄ ▀ ▄▄▀  ▀▀▀   █  █▀ █
+  ██▀▄ ▀▀▄▀ ▄█▀▄▀▀▀▀▄ ▄▀ ▀▀▀█▀▀ ▄▀█ ▄▀ ▀ ▀▄▀█
+  █▀ █ ▀▄▄█▄▀ ▄██▀ █▀█▀  █▄██ ▄█▀▄▀▀█ ██▀█▄▄█
+  █ ▄ ▀██▄▀██▀█▄▄▄█▀ ▄▄▀▄▄▀▄█▄ ▄ ▀▄ ▄▀█▀██▀ █
+  ██   ▀▄▄▀▄▄ █▀▄▀█▄▀ ▀▄ █  █▀ █▀ ▀▄████ ▄▀ █
+  █ ▀▄▄▄█▄▀▄▀▀ ▄█▀ ▀▄█▄▀▄▀ ▀▀▀ █▄█▄██▀▀▀ ▀█ █
+  █▀█▄▄ █▄     ▄ ▄▄ ▀ ▀ ▀▀▄██▄▄▀ ▀█ ▄▀█ ▄▄█▄█
+  █▀▀ █▀█▄  ▄██▀▄▀▄▄▄▀▄▀▄▄▀ █▄▀█▄▄▄█▄▀▀▀▀▀▄ █
+  ███ ▄ ▄▄▀ ▀▀ ▄██ ▀ ██▀ █▄██▄    █▀▀█▄▀▀▄▀ █
+  █▄▄▄█▄▄▄▄▀██▀▄▀▀▀▀▄█▄▀▄▀▀▀▀▄  ▄▀  ▄▄▄  ██ █
+  █ ▄▄▄▄▄ █▀█  ▀█▀▄█▀▀▀▀ █ ▄▄▄ ▄    █▄█ █▄█▄█
+  █ █   █ █▄  █▄ ▄▄▀█ ▄▄▄▀▀▀▀▀▀▄ ▄   ▄▄▄ █  █
+  █ █▄▄▄█ █▀ ██▀█▀█▄▀███▀▀▄██▀ ▀▀▄▄▀▄█▄▀ █▀ █
+  █▄▄▄▄▄▄▄█▄▄▄▄███▄█▄█▄█▄████▄█▄▄██▄██▄█▄█▄██
+
+
+🤖 Open this link on your Android devices (or scan the QR code) to install the app:
+https://expo.dev/accounts/shakil112233445566778899/projects/khatabook-mobile/builds/2adfa518-00c9-46b2-ada5-fe0d33e9ab7c
+npm notice
+npm notice New minor version of npm available! 11.6.2 -> 11.21.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.21.0
+npm notice To update run: npm install -g npm@11.21.0
+npm notice
+~/.../artifacts/khatabook-mobile$
