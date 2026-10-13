@@ -13,6 +13,9 @@ export type ParsedStaffLedgerNotification = {
   navigation: StaffLedgerNavigation;
 };
 
+const NOTIFICATION_RESPONSE_DEDUPE_TTL_MS = 10 * 60 * 1000;
+const MAX_HANDLED_NOTIFICATION_RESPONSES = 200;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -38,13 +41,34 @@ export function createStaffLedgerNavigationEventScript(
   return createWebEventScript(OPEN_NOTIFICATION_EVENT, navigation);
 }
 
-export function markNotificationResponseHandled(
-  handledRequestIds: Set<string>,
-  requestId: string,
-): boolean {
-  if (handledRequestIds.has(requestId)) return false;
-  handledRequestIds.add(requestId);
-  return true;
+export function createNotificationResponseDeduper(
+  ttlMs = NOTIFICATION_RESPONSE_DEDUPE_TTL_MS,
+  maxEntries = MAX_HANDLED_NOTIFICATION_RESPONSES,
+): (requestId: string, nowMs?: number) => boolean {
+  const handledUntilByRequestId = new Map<string, number>();
+
+  return (requestId, nowMs = Date.now()) => {
+    for (const [handledRequestId, expiresAt] of handledUntilByRequestId) {
+      if (expiresAt <= nowMs) handledUntilByRequestId.delete(handledRequestId);
+    }
+
+    if (!requestId || handledUntilByRequestId.has(requestId)) return false;
+
+    while (handledUntilByRequestId.size >= maxEntries) {
+      const oldestRequestId = handledUntilByRequestId.keys().next().value;
+      if (oldestRequestId === undefined) break;
+      handledUntilByRequestId.delete(oldestRequestId);
+    }
+
+    handledUntilByRequestId.set(requestId, nowMs + ttlMs);
+    return true;
+  };
+}
+
+const markSharedNotificationResponseHandled = createNotificationResponseDeduper();
+
+export function markNotificationResponseHandled(requestId: string): boolean {
+  return markSharedNotificationResponseHandled(requestId);
 }
 
 export function parseStaffLedgerNotificationResponse(

@@ -72,9 +72,12 @@ function createNativeAuthBootstrapScript(token: string): string {
 }
 
 type PushNavigationData = {
-  notificationId: string;
-  businessId: string;
-  partyId: string | null;
+  requestId: string;
+  navigation: {
+    notificationId: string;
+    businessId: string;
+    partyId: string | null;
+  };
 };
 
 function isBrowserUrl(url: string) {
@@ -107,7 +110,6 @@ export function WebAppScreen() {
   const [nativeAuthError, setNativeAuthError] = useState(false);
   const webViewRef = useRef<WebView>(null);
   const pendingPushNavigation = useRef<PushNavigationData | null>(null);
-  const handledNotificationResponses = useRef(new Set<string>());
   const webPageReady = useRef(false);
   const [retryKey, setRetryKey] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -184,15 +186,22 @@ export function WebAppScreen() {
   }, []);
 
   const sendPendingPushNavigation = useCallback(() => {
-    const payload = pendingPushNavigation.current;
+    const pending = pendingPushNavigation.current;
     if (
       !canUseNativeNotifications(Platform.OS, __DEV__)
-      || !payload
+      || !pending
       || !webPageReady.current
       || !webViewRef.current
     ) return;
 
-    webViewRef.current.injectJavaScript(createStaffLedgerNavigationEventScript(payload));
+    if (!markNotificationResponseHandled(pending.requestId)) {
+      pendingPushNavigation.current = null;
+      return;
+    }
+
+    webViewRef.current.injectJavaScript(
+      createStaffLedgerNavigationEventScript(pending.navigation),
+    );
     pendingPushNavigation.current = null;
     void import('expo-notifications')
       .then(({ clearLastNotificationResponseAsync }) => clearLastNotificationResponseAsync())
@@ -281,12 +290,10 @@ export function WebAppScreen() {
             void NotificationsApi.clearLastNotificationResponseAsync().catch(() => {});
             return;
           }
-          if (!markNotificationResponseHandled(
-            handledNotificationResponses.current,
-            parsed.requestId,
-          )) return;
-
-          pendingPushNavigation.current = parsed.navigation;
+          pendingPushNavigation.current = {
+            requestId: parsed.requestId,
+            navigation: parsed.navigation,
+          };
           sendPendingPushNavigation();
         };
 

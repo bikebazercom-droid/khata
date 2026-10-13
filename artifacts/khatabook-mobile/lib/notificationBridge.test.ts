@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createPushTokenEventScript,
+  createNotificationResponseDeduper,
   createStaffLedgerNavigationEventScript,
   markNotificationResponseHandled,
   parseStaffLedgerNotificationResponse,
@@ -91,7 +92,6 @@ describe('native notification WebView bridge', () => {
         },
       },
     });
-    const handledRequestIds = new Set<string>();
     const dispatchedScripts: string[] = [];
 
     for (const notificationResponse of [
@@ -100,7 +100,8 @@ describe('native notification WebView bridge', () => {
       response('request-2'),
     ]) {
       const parsed = parseStaffLedgerNotificationResponse(notificationResponse);
-      if (parsed && markNotificationResponseHandled(handledRequestIds, parsed.requestId)) {
+      // The app marks a request handled only when the ready WebView receives navigation.
+      if (parsed && markNotificationResponseHandled(parsed.requestId)) {
         dispatchedScripts.push(createStaffLedgerNavigationEventScript(parsed.navigation));
       }
     }
@@ -108,5 +109,81 @@ describe('native notification WebView bridge', () => {
     expect(dispatchedScripts).toHaveLength(2);
     expect(dispatchedScripts[0]).toContain('"notificationId":"notification-request-1"');
     expect(dispatchedScripts[1]).toContain('"notificationId":"notification-request-2"');
+  });
+
+  it('keeps request IDs deduplicated across simulated screen remounts, then expires them', () => {
+    const firstScreenDispatched: string[] = [];
+    const remountedScreenDispatched: string[] = [];
+
+    const firstScreenResponse = parseStaffLedgerNotificationResponse({
+      notification: {
+        request: {
+          identifier: 'remounted-request',
+          content: {
+            data: {
+              type: 'staff-ledger-entry',
+              notificationId: 'notification-remounted',
+              businessId: 'business-1',
+              partyId: 'party-1',
+            },
+          },
+        },
+      },
+    });
+    expect(firstScreenResponse).not.toBeNull();
+    if (firstScreenResponse && markNotificationResponseHandled(firstScreenResponse.requestId)) {
+      firstScreenDispatched.push(
+        createStaffLedgerNavigationEventScript(firstScreenResponse.navigation),
+      );
+    }
+
+    // Expo returns the same last response to the new screen instance.
+    const replayedResponse = parseStaffLedgerNotificationResponse({
+      notification: {
+        request: {
+          identifier: 'remounted-request',
+          content: {
+            data: {
+              type: 'staff-ledger-entry',
+              notificationId: 'notification-remounted',
+              businessId: 'business-1',
+              partyId: 'party-1',
+            },
+          },
+        },
+      },
+    });
+    if (replayedResponse && markNotificationResponseHandled(replayedResponse.requestId)) {
+      remountedScreenDispatched.push(
+        createStaffLedgerNavigationEventScript(replayedResponse.navigation),
+      );
+    }
+    expect(firstScreenDispatched).toHaveLength(1);
+    expect(remountedScreenDispatched).toHaveLength(0);
+
+    const differentRequest = parseStaffLedgerNotificationResponse({
+      notification: {
+        request: {
+          identifier: 'different-request',
+          content: {
+            data: {
+              type: 'staff-ledger-entry',
+              notificationId: 'notification-different',
+              businessId: 'business-1',
+              partyId: 'party-1',
+            },
+          },
+        },
+      },
+    });
+    expect(differentRequest).not.toBeNull();
+    expect(markNotificationResponseHandled(differentRequest!.requestId)).toBe(true);
+  });
+
+  it('expires request IDs after the configured short-lived dedupe window', () => {
+    const markHandled = createNotificationResponseDeduper(1_000);
+    expect(markHandled('expiring-request', 10_000)).toBe(true);
+    expect(markHandled('expiring-request', 10_500)).toBe(false);
+    expect(markHandled('expiring-request', 11_000)).toBe(true);
   });
 });
