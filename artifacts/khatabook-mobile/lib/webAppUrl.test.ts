@@ -22,16 +22,18 @@ describe('resolveWebAppUrl', () => {
       .toBe('https://banglakhata.com/');
   });
 
-  it('rejects an undefined placeholder when no valid fallback exists', () => {
-    expect(resolveWebAppUrl('undefined')).toBeNull();
+  it('uses the production website when the explicit URL is an undefined placeholder and no domain is set', () => {
+    expect(resolveWebAppUrl('undefined')).toBe('https://banglakhata.com/');
   });
 
-  it('rejects missing, malformed, insecure, or credential-bearing URLs', () => {
-    expect(resolveWebAppUrl()).toBeNull();
-    expect(resolveWebAppUrl('not a URL', undefined)).toBeNull();
-    expect(resolveWebAppUrl('http://ledger.example.com', undefined)).toBeNull();
-    expect(resolveWebAppUrl('https://user:password@ledger.example.com', undefined)).toBeNull();
-    expect(resolveWebAppUrl('javascript:alert(1)', undefined)).toBeNull();
+  it('uses the production website when values are missing, malformed, insecure, or credential-bearing', () => {
+    const fallback = 'https://banglakhata.com/';
+    expect(resolveWebAppUrl()).toBe(fallback);
+    expect(resolveWebAppUrl('not a URL', undefined)).toBe(fallback);
+    expect(resolveWebAppUrl('http://ledger.example.com', undefined)).toBe(fallback);
+    expect(resolveWebAppUrl('https://user:password@ledger.example.com', undefined)).toBe(fallback);
+    expect(resolveWebAppUrl('javascript:alert(1)', undefined)).toBe(fallback);
+    expect(resolveWebAppUrl('https://null/', 'none')).toBe(fallback);
   });
 });
 

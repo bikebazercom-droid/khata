@@ -1,14 +1,15 @@
 /**
  * Resolve the website loaded by the Expo shell.
  *
- * Expo development/build workflows provide EXPO_PUBLIC_DOMAIN. A dedicated
- * website URL can override it when mobile and web are published on different
- * hosts.
+ * Expo build variables can be missing or contain placeholder values, so the
+ * production website is always available as the final fallback.
  */
+const PRODUCTION_WEB_APP_URL = 'https://banglakhata.com/';
+
 export function resolveWebAppUrl(
   configuredUrl?: string,
   deploymentDomain?: string,
-): string | null {
+): string {
   const candidates = [
     { value: configuredUrl?.trim(), explicit: true },
     { value: deploymentDomain?.trim(), explicit: false },
@@ -44,7 +45,7 @@ export function resolveWebAppUrl(
     }
   }
 
-  return null;
+  return PRODUCTION_WEB_APP_URL;
 }
 
 export function resolveWebAppStartUrl(
@@ -61,7 +62,7 @@ export function resolveWebAppStartUrl(
   }
 }
 
-export function getWebAppUrl(): string | null {
+export function getWebAppUrl(): string {
   return resolveWebAppUrl(
     process.env.EXPO_PUBLIC_WEB_APP_URL,
     process.env.EXPO_PUBLIC_DOMAIN,
