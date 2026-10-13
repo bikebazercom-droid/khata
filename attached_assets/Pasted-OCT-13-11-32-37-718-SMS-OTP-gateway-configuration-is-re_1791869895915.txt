@@ -1,0 +1,637 @@
+OCT 13,11:32:37.718
+SMS OTP gateway configuration is ready
+OCT 13,11:32:37.728
+Server listening
+OCT 13,11:32:37.744
+Attention: Clerk collects telemetry data from its SDKs when connected to development instances.
+OCT 13,11:32:37.745
+The data collected is used to inform Clerk's product roadmap.
+OCT 13,11:32:37.745
+To learn more, including how to opt-out from the telemetry program, visit: https://clerk.com/docs/telemetry.
+OCT 13,11:32:37.810
+[migrateBillImages] no base64 bill images found — nothing to migrate
+OCT 13,11:32:37.820
+request errored
+OCT 13,11:32:37.823
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:45.113
+SMS OTP gateway configuration is ready
+OCT 13,11:32:45.123
+Server listening
+OCT 13,11:32:45.145
+Attention: Clerk collects telemetry data from its SDKs when connected to development instances.
+OCT 13,11:32:45.146
+The data collected is used to inform Clerk's product roadmap.
+OCT 13,11:32:45.146
+To learn more, including how to opt-out from the telemetry program, visit: https://clerk.com/docs/telemetry.
+OCT 13,11:32:45.199
+[migrateBillImages] no base64 bill images found — nothing to migrate
+OCT 13,11:32:45.207
+request errored
+OCT 13,11:32:45.210
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:51.231
+request completed
+OCT 13,11:32:51.506
+request completed
+OCT 13,11:32:52.716
+SMS OTP gateway configuration is ready
+OCT 13,11:32:52.727
+Server listening
+OCT 13,11:32:52.759
+Attention: Clerk collects telemetry data from its SDKs when connected to development instances.
+OCT 13,11:32:52.759
+The data collected is used to inform Clerk's product roadmap.
+OCT 13,11:32:52.759
+To learn more, including how to opt-out from the telemetry program, visit: https://clerk.com/docs/telemetry.
+OCT 13,11:32:52.785
+request completed
+OCT 13,11:32:52.818
+[migrateBillImages] no base64 bill images found — nothing to migrate
+OCT 13,11:32:54.171
+request completed
+OCT 13,11:32:54.330
+request errored
+OCT 13,11:32:54.330
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:54.469
+request completed
+OCT 13,11:32:54.909
+request completed
+OCT 13,11:32:56.420
+request errored
+OCT 13,11:32:56.421
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:56.443
+request completed
+OCT 13,11:32:56.449
+request errored
+OCT 13,11:32:56.450
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:56.461
+request errored
+OCT 13,11:32:56.462
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:56.469
+request errored
+OCT 13,11:32:56.470
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:56.471
+request errored
+OCT 13,11:32:56.472
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:56.598
+request errored
+OCT 13,11:32:56.599
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:57.644
+request errored
+OCT 13,11:32:57.645
+request errored
+OCT 13,11:32:57.645
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:57.645
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:57.817
+request completed
+OCT 13,11:32:58.281
+request errored
+OCT 13,11:32:58.281
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:58.552
+request errored
+OCT 13,11:32:58.554
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:58.564
+request errored
+OCT 13,11:32:58.564
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:58.571
+request errored
+OCT 13,11:32:58.571
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:58.739
+request errored
+OCT 13,11:32:58.739
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:58.789
+request errored
+OCT 13,11:32:58.791
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:58.796
+request completed
+OCT 13,11:32:58.801
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:58.804
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:58.801
+request errored
+OCT 13,11:32:58.804
+request errored
+OCT 13,11:32:59.047
+request completed
+OCT 13,11:32:59.586
+request errored
+OCT 13,11:32:59.587
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:59.965
+request errored
+OCT 13,11:32:59.966
+request errored
+OCT 13,11:32:59.966
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:59.967
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:59.968
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:32:59.968
+request errored
+OCT 13,11:33:00.841
+request completed
+OCT 13,11:33:05.460
+request errored
+OCT 13,11:33:05.461
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:33:08.346
+request errored
+OCT 13,11:33:08.346
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:33:17.850
+request completed
+OCT 13,11:33:18.353
+request errored
+OCT 13,11:33:18.354
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:33:21.221
+request completed
+OCT 13,11:33:22.339
+request completed
+OCT 13,11:33:22.515
+request completed
+OCT 13,11:33:22.864
+request completed
+OCT 13,11:33:22.867
+request completed
+OCT 13,11:33:24.252
+request completed
+OCT 13,11:33:24.254
+request completed
+OCT 13,11:33:24.264
+request completed
+OCT 13,11:33:24.616
+request completed
+OCT 13,11:33:24.617
+request completed
+OCT 13,11:33:24.778
+request completed
+OCT 13,11:33:24.779
+request completed
+OCT 13,11:33:24.782
+request completed
+OCT 13,11:33:24.923
+request completed
+OCT 13,11:33:24.929
+request completed
+OCT 13,11:33:24.930
+request completed
+OCT 13,11:33:25.064
+request completed
+OCT 13,11:33:25.072
+request completed
+OCT 13,11:33:25.082
+request completed
+OCT 13,11:33:25.105
+request completed
+OCT 13,11:33:25.196
+request completed
+OCT 13,11:33:25.197
+request completed
+OCT 13,11:33:25.207
+request completed
+OCT 13,11:33:25.236
+request completed
+OCT 13,11:33:25.329
+request completed
+OCT 13,11:33:25.329
+request completed
+OCT 13,11:33:25.337
+request completed
+OCT 13,11:33:25.483
+request completed
+OCT 13,11:33:25.490
+request completed
+OCT 13,11:33:25.495
+request completed
+OCT 13,11:33:25.655
+request completed
+OCT 13,11:33:25.660
+request completed
+OCT 13,11:33:25.678
+request completed
+OCT 13,11:33:25.955
+request completed
+OCT 13,11:33:26.150
+request completed
+OCT 13,11:33:26.264
+request completed
+OCT 13,11:33:26.869
+request completed
+OCT 13,11:33:26.875
+request completed
+OCT 13,11:33:26.894
+request completed
+OCT 13,11:33:26.894
+request completed
+OCT 13,11:33:27.131
+request completed
+OCT 13,11:33:27.326
+request completed
+OCT 13,11:33:27.384
+request completed
+OCT 13,11:33:27.387
+request completed
+OCT 13,11:33:27.857
+request completed
+OCT 13,11:33:27.867
+request completed
+OCT 13,11:33:27.916
+request completed
+OCT 13,11:33:27.961
+request completed
+OCT 13,11:33:28.009
+request completed
+OCT 13,11:33:28.009
+request completed
+OCT 13,11:33:28.133
+request completed
+OCT 13,11:33:28.133
+request completed
+OCT 13,11:33:28.155
+request completed
+OCT 13,11:33:28.349
+request errored
+OCT 13,11:33:28.350
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:33:28.465
+request completed
+OCT 13,11:33:28.467
+request completed
+OCT 13,11:33:28.513
+request completed
+OCT 13,11:33:28.523
+request completed
+OCT 13,11:33:28.535
+request completed
+OCT 13,11:33:28.591
+request completed
+OCT 13,11:33:28.713
+request completed
+OCT 13,11:33:28.820
+request completed
+OCT 13,11:33:28.831
+request completed
+OCT 13,11:33:28.831
+request completed
+OCT 13,11:33:28.836
+request completed
+OCT 13,11:33:28.841
+request completed
+OCT 13,11:33:29.047
+request completed
+OCT 13,11:33:29.073
+request completed
+OCT 13,11:33:29.075
+request completed
+OCT 13,11:33:29.148
+request completed
+OCT 13,11:33:29.190
+request completed
+OCT 13,11:33:29.239
+request completed
+OCT 13,11:33:29.271
+request completed
+OCT 13,11:33:29.352
+request completed
+OCT 13,11:33:29.403
+request completed
+OCT 13,11:33:29.461
+request completed
+OCT 13,11:33:29.466
+request completed
+OCT 13,11:33:29.488
+request completed
+OCT 13,11:33:29.594
+request completed
+OCT 13,11:33:29.668
+request completed
+OCT 13,11:33:29.749
+request completed
+OCT 13,11:33:29.806
+request completed
+OCT 13,11:33:30.182
+request completed
+OCT 13,11:33:30.240
+request completed
+OCT 13,11:33:30.431
+request completed
+OCT 13,11:33:30.432
+request completed
+OCT 13,11:33:30.435
+request completed
+OCT 13,11:33:38.352
+request errored
+OCT 13,11:33:38.353
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:33:48.352
+request errored
+OCT 13,11:33:48.353
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:33:51.588
+request completed
+OCT 13,11:33:58.334
+request errored
+OCT 13,11:33:58.334
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:34:08.371
+request errored
+OCT 13,11:34:08.371
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:34:13.304
+request errored
+OCT 13,11:34:13.304
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."phone" = $1
+params: +8801855580555
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async getOrCreatePhoneUser (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89404:22)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:95913:18
+OCT 13,11:34:29.691
+request completed
+OCT 13,11:34:29.906
+request completed
+OCT 13,11:34:51.417
+request completed
+OCT 13,11:34:51.886
+request completed
+OCT 13,11:34:52.162
+request completed
+OCT 13,11:34:52.586
+request completed
+OCT 13,11:34:56.458
+request completed
+OCT 13,11:34:56.619
+request completed
+OCT 13,11:34:57.232
+request completed
+OCT 13,11:34:57.605
+[requireAuth] Clerk JIT provision failed
+OCT 13,11:34:57.605
+request errored
+OCT 13,11:34:59.291
+request completed
+OCT 13,11:35:07.358
+[requireAuth] Clerk JIT provision failed
+OCT 13,11:35:07.359
+request errored
+OCT 13,11:35:10.204
+request errored
+OCT 13,11:35:10.204
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:35:17.717
+[requireAuth] Clerk JIT provision failed
+OCT 13,11:35:17.718
+request errored
+OCT 13,11:35:28.174
+[requireAuth] Clerk JIT provision failed
+OCT 13,11:35:28.175
+request errored
+OCT 13,11:35:35.573
+[requireAuth] Clerk JIT provision failed
+OCT 13,11:35:35.574
+request errored
+OCT 13,11:35:37.772
+[requireAuth] Clerk JIT provision failed
+OCT 13,11:35:37.772
+request errored
+OCT 13,11:35:47.855
+[requireAuth] Clerk JIT provision failed
+OCT 13,11:35:47.856
+request errored
+OCT 13,11:35:56.943
+[requireAuth] Clerk JIT provision failed
+OCT 13,11:35:56.944
+request errored
+OCT 13,11:35:57.516
+[requireAuth] Clerk JIT provision failed
+OCT 13,11:35:57.517
+request errored
+OCT 13,11:36:08.051
+[requireAuth] Clerk JIT provision failed
+OCT 13,11:36:08.052
+request errored
+OCT 13,11:36:15.947
+request errored
+OCT 13,11:36:15.947
+Error: Failed query: select "id", "clerk_user_id", "phone", "verified_email", "language", "phone_session_version", "business_id", "role", "display_name", "created_at", "login_source", "device_meta", "last_login", "last_logout", "status", "worker_access_deleted_at", "adjustment_party_ids" from "app_users" where "app_users"."id" = $1 limit $2
+params: 3be907d1-2e61-48f1-8f13-9b84d27186c1,1
+at NodePgPreparedQuery.queryWithCache (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:76987:15)
+at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+at async file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:77220:22
+at async requireAuth (file:///home/u760807821/domains/banglakhata.com/hbuilds/versions/01a133be-090d-7198-a5c9-39710d43e291/nodejs/artifacts/api-server/dist/index.mjs:89708:22)
+OCT 13,11:36:17.838
+[requireAuth] Clerk JIT provision failed
+OCT 13,11:36:17.838
+request errored
+OCT 13,11:36:27.684
+[requireAuth] Clerk JIT provision failed
+OCT 13,11:36:27.685
+request errored
+OCT 13,11:36:37.725
+[requireAuth] Clerk JIT provision failed
+OCT 13,11:36:37.726
+request errored
+OCT 13,11:36:40.155
+[requireAuth] Clerk JIT provision failed
+OCT 13,11:36:40.156
+request errored
+OCT 13,11:36:47.813
+[requireAuth] Clerk JIT provision failed
+OCT 13,11:36:47.814
+request errored
+OCT 13,11:36:57.815
+[requireAuth] Clerk JIT provision failed
+OCT 13,11:36:57.816
+request errored
+OCT 13,11:37:07.889
+[requireAuth] Clerk JIT provision failed
+OCT 13,11:37:07.890
+request errored
+OCT 13,11:37:17.697
+[requireAuth] Clerk JIT provision failed
+OCT 13,11:37:17.698
+request errored
+OCT 13,11:37:21.046
+[requireAuth] Clerk JIT provision failed
+OCT 13,11:37:21.047
+request errored
