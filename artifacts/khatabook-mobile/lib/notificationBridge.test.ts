@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createPushTokenEventScript,
   createNotificationResponseDeduper,
+  createPendingNotificationNavigationQueue,
   createStaffLedgerNavigationEventScript,
   markNotificationResponseHandled,
   parseStaffLedgerNotificationResponse,
@@ -185,5 +186,61 @@ describe('native notification WebView bridge', () => {
     expect(markHandled('expiring-request', 10_000)).toBe(true);
     expect(markHandled('expiring-request', 10_500)).toBe(false);
     expect(markHandled('expiring-request', 11_000)).toBe(true);
+  });
+
+  it('holds valid notification navigation until ready and dispatches it only once', () => {
+    const queue = createPendingNotificationNavigationQueue();
+    const parsed = parseStaffLedgerNotificationResponse({
+      notification: {
+        request: {
+          identifier: 'queued-until-ready',
+          content: {
+            data: {
+              type: 'staff-ledger-entry',
+              notificationId: 'notification-queued',
+              businessId: 'business-1',
+              partyId: 'party-1',
+            },
+          },
+        },
+      },
+    });
+    expect(parsed).not.toBeNull();
+    if (!parsed) return;
+
+    queue.enqueue(parsed);
+    expect(queue.takeWhenReady(false)).toBeNull();
+
+    const scripts: string[] = [];
+    const readyNotification = queue.takeWhenReady(true);
+    if (readyNotification && markNotificationResponseHandled(readyNotification.requestId)) {
+      scripts.push(createStaffLedgerNavigationEventScript(readyNotification.navigation));
+    }
+    expect(queue.takeWhenReady(true)).toBeNull();
+
+    expect(scripts).toHaveLength(1);
+    expect(scripts[0]).toContain('"notificationId":"notification-queued"');
+  });
+
+  it('discards malformed notification responses without queueing navigation', () => {
+    const queue = createPendingNotificationNavigationQueue();
+    const parsed = parseStaffLedgerNotificationResponse({
+      notification: {
+        request: {
+          identifier: 'invalid-notification',
+          content: {
+            data: {
+              type: 'staff-ledger-entry',
+              notificationId: '',
+              businessId: 'business-1',
+            },
+          },
+        },
+      },
+    });
+
+    expect(parsed).toBeNull();
+    if (parsed) queue.enqueue(parsed);
+    expect(queue.takeWhenReady(true)).toBeNull();
   });
 });

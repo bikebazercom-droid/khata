@@ -13,6 +13,11 @@ export type ParsedStaffLedgerNotification = {
   navigation: StaffLedgerNavigation;
 };
 
+export type PendingNotificationNavigationQueue = {
+  enqueue: (notification: ParsedStaffLedgerNotification) => void;
+  takeWhenReady: (isReady: boolean) => ParsedStaffLedgerNotification | null;
+};
+
 const NOTIFICATION_RESPONSE_DEDUPE_TTL_MS = 10 * 60 * 1000;
 const MAX_HANDLED_NOTIFICATION_RESPONSES = 200;
 
@@ -39,6 +44,22 @@ export function createStaffLedgerNavigationEventScript(
   navigation: StaffLedgerNavigation,
 ): string {
   return createWebEventScript(OPEN_NOTIFICATION_EVENT, navigation);
+}
+
+export function createPendingNotificationNavigationQueue(): PendingNotificationNavigationQueue {
+  let pending: ParsedStaffLedgerNotification | null = null;
+
+  return {
+    enqueue(notification) {
+      pending = notification;
+    },
+    takeWhenReady(isReady) {
+      if (!isReady || !pending) return null;
+      const notification = pending;
+      pending = null;
+      return notification;
+    },
+  };
 }
 
 export function createNotificationResponseDeduper(

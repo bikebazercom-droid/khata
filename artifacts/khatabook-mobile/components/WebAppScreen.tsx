@@ -27,6 +27,7 @@ import { useTransactionSuccessSound } from '@/lib/useTransactionSuccessSound';
 import { canUseNativeNotifications } from '@/lib/notificationRuntime';
 import {
   createPushTokenEventScript,
+  createPendingNotificationNavigationQueue,
   createStaffLedgerNavigationEventScript,
   createWebEventScript,
   NATIVE_PUSH_STATUS_EVENT,
@@ -71,15 +72,6 @@ function createNativeAuthBootstrapScript(token: string): string {
   })(); true;`;
 }
 
-type PushNavigationData = {
-  requestId: string;
-  navigation: {
-    notificationId: string;
-    businessId: string;
-    partyId: string | null;
-  };
-};
-
 function isBrowserUrl(url: string) {
   return /^(https?:|about:|blob:|data:)/i.test(url);
 }
@@ -109,7 +101,7 @@ export function WebAppScreen() {
   const [nativeSessionAtStart, setNativeSessionAtStart] = useState(false);
   const [nativeAuthError, setNativeAuthError] = useState(false);
   const webViewRef = useRef<WebView>(null);
-  const pendingPushNavigation = useRef<PushNavigationData | null>(null);
+  const pendingPushNavigation = useRef(createPendingNotificationNavigationQueue());
   const webPageReady = useRef(false);
   const [retryKey, setRetryKey] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -186,23 +178,20 @@ export function WebAppScreen() {
   }, []);
 
   const sendPendingPushNavigation = useCallback(() => {
-    const pending = pendingPushNavigation.current;
-    if (
-      !canUseNativeNotifications(Platform.OS, __DEV__)
-      || !pending
-      || !webPageReady.current
-      || !webViewRef.current
-    ) return;
+    if (!canUseNativeNotifications(Platform.OS, __DEV__)) return;
+    const webView = webViewRef.current;
+    const pending = pendingPushNavigation.current.takeWhenReady(
+      webPageReady.current && Boolean(webView),
+    );
+    if (!pending || !webView) return;
 
     if (!markNotificationResponseHandled(pending.requestId)) {
-      pendingPushNavigation.current = null;
       return;
     }
 
-    webViewRef.current.injectJavaScript(
+    webView.injectJavaScript(
       createStaffLedgerNavigationEventScript(pending.navigation),
     );
-    pendingPushNavigation.current = null;
     void import('expo-notifications')
       .then(({ clearLastNotificationResponseAsync }) => clearLastNotificationResponseAsync())
       .catch(() => {});
@@ -290,10 +279,7 @@ export function WebAppScreen() {
             void NotificationsApi.clearLastNotificationResponseAsync().catch(() => {});
             return;
           }
-          pendingPushNavigation.current = {
-            requestId: parsed.requestId,
-            navigation: parsed.navigation,
-          };
+          pendingPushNavigation.current.enqueue(parsed);
           sendPendingPushNavigation();
         };
 
