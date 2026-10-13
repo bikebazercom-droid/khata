@@ -1,0 +1,65 @@
+~/workspace$ cd artifacts/khatabook-mobile
+eas build --platform android --profile preview
+★ eas-cli@24.13.0 is now available.
+To upgrade, run:
+npm install -g eas-cli
+Proceeding with outdated version.
+
+An Expo user account is required to proceed.
+
+Log in to EAS with email or username (exit and run eas login --help to see other login options)
+✔ Email or username … bickworld555@gmail.com
+✔ Password … ***************
+The field "cli.appVersionSource" is not set, but it will be required in the future. Learn more: https://docs.expo.dev/build-reference/app-versions/
+Environment variables with visibility "Plain text" and "Sensitive" loaded from the "preview" environment on EAS: EXPO_PUBLIC_DOMAIN, EXPO_PUBLIC_SUPABASE_ANON_KEY, EXPO_PUBLIC_SUPABASE_URL.
+Environment variables loaded from the "preview" build profile "env" configuration: EXPO_PUBLIC_DOMAIN, EXPO_PUBLIC_WEB_APP_URL.
+The following environment variables are defined in both the "preview" build profile "env" configuration and the "preview" environment on EAS: EXPO_PUBLIC_DOMAIN. The values from the build profile configuration will be used.
+
+The field "cli.appVersionSource" is not set, but it will be required in the future. Learn more: https://docs.expo.dev/build-reference/app-versions/
+✔ Using remote Android credentials (Expo server)
+✔ Using Keystore from configuration: Build Credentials IZhrqi6Ntt (default)
+
+Compressing project files and uploading to EAS Build. Learn more: https://expo.fyi/eas-build-archive
+✔ Compressed project files 11s (56.9 MB)
+✔ Uploaded to EAS 5s
+✔ Computed project fingerprint
+
+Build details: https://expo.dev/accounts/shakil112233445566778899/projects/khatabook-mobile/builds/7184d8f0-8f31-4013-90c5-a622a78604f5
+
+Waiting for build to complete. You can press Ctrl+C to exit.
+✔ Build finished
+
+  ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+  █ ▄▄▄▄▄ █  ▄██ ▀▄▄▀█▀ ▀▄▄▄▄ ▄▄█ ▀██ ▄▄▄▄▄ █
+  █ █   █ █ ▀█▀▀█▄ ▀▄█▀▀▄▀▀█▀▄▄▄▄▄█▀█ █   █ █
+  █ █▄▄▄█ █▀▀▀█ ▄▀▀▄▄▀▀ █ ▄▀ ▀▄█▀▀▀▄█ █▄▄▄█ █
+  █▄▄▄▄▄▄▄█▄█▄▀▄█ █▄▀ █▄▀ ▀▄█ █▄▀ ▀ █▄▄▄▄▄▄▄█
+  █  ▀▀ ▄▄▀█▄█▄▄█   ▄▄█▀▄▀▀▀▀▀▀▀ ▀▄▄▀▀ ▀▄ ▄ █
+  █▄█▀█▀▀▄ █▄ █▀ ▄▄▀ ███ █▄▄█▀▄▀ █▀  ▄ ▀▀██ █
+  █ ▀█ ▀█▄▄▄█▀▄▀▄▀█▄ ▄█▀▄█▀▀█ ▀▀▄▄█▀ ▀▀▀██  █
+  █ ▀ ▄█ ▄▀▄▀▄ ▄▄  ▀ ▀▀  ▀ ▄▄▀  ▀▀▀   █  █▀ █
+  ██▀█ █▀▄  ▄█▀▄▀▀▀▀▄ ▄▀ ▀ ▀█▀  ▄▀█ ▄▀ ▀ ▀▄▀█
+  █▀██  ▀▄█▄▄▀▄██▀ █ ▄▀  █▄██ ▄█ ▄▀▀█ ██▀█▄▄█
+  █   ███▄█ █ █▄▄▄█▀ ▀▄▀▄▄▀▀█▄ ▄ ▀▄ ▄▀█▀██▀ █
+  ██  ▀▀▄▄  ▄ █▀▄▀█▄▀ █▄ █  █▀ █▀ ▀▄████ ▄▀ █
+  █▄▀█▄ █▄ ▄▀▀ ▄█▀ ▀▄█▄▀▄▀ ▀▀▀ █▄█▄██▀▀▀ ▀█ █
+  █▀▀▄▄ ▄▄   █ ▄ ▄▄ ▀▄▀  ▄▄██▄▄▀ ▄█ ▄▀█ ▄▄█▄█
+  █▀ ▄█▀▄▄▄ ▄ █▀▄▀▄▄▄▄▄▄▄▀▀ █▄▀█▄▄▄█▄▀▀▀▀▀▄ █
+  ███▀▄ ▄▄█▀▀▀ ▄██ ▀ █▀█ █▄▄█▄    █▀▀█▄▀▀▄▀ █
+  █▄▄██▄▄▄█▀▀█▀▄▀▀▀▀▄█▄▀▄▀▀▀▀▄▀  ▀  ▄▄▄  ██ █
+  █ ▄▄▄▄▄ █▀▄  ▀█▀▄█  ▀▀▀▀ ▄██ ▄ █  █▄█ █▄█▄█
+  █ █   █ █▄▀ █▄ ▄▄▀█ ▄▀▄▀▀▀▀▄▀▄ ▀   ▄▄▄ █  █
+  █ █▄▄▄█ █▀ ██▀█▀█▄▀█▀█▀▀ ▄█▀▄▄▀▄▄▀▄█▄▀ █▀ █
+  █▄▄▄▄▄▄▄█▄▄▄▄███▄█▄█▄█▄████▄█▄▄██▄██▄█▄█▄██
+
+
+🤖 Open this link on your Android devices (or scan the QR code) to install the app:
+https://expo.dev/accounts/shakil112233445566778899/projects/khatabook-mobile/builds/7184d8f0-8f31-4013-90c5-a622a78604f5
+
+✔ Install and run the Android build on an emulator? … yes
+
+✔ Successfully downloaded app 4s
+adb executable doesn't seem to work. Please make sure Android Studio is installed on your device and ANDROID_HOME or ANDROID_SDK_ROOT env variables are set.
+spawn adb ENOENT
+    Error: build command failed.
+~/.../artifacts/khatabook-mobile$ 

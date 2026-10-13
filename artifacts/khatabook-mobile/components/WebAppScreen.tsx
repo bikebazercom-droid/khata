@@ -88,12 +88,13 @@ export function WebAppScreen() {
   const nativeAuth = useOptionalAuth();
   const initialNativeSessionCaptured = useRef(false);
   const playSuccessSound = useTransactionSuccessSound();
+  const productionWebAppUrl = getWebAppUrl();
   const webAppUrl = resolveVisualFixtureUrl(
-    getWebAppUrl(),
+    productionWebAppUrl,
     Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.search : '',
     Platform.OS,
     process.env.NODE_ENV !== 'production',
-  );
+  ) ?? productionWebAppUrl;
   const [nativeAuthReady, setNativeAuthReady] = useState(Platform.OS === 'web');
   const [nativeAuthToken, setNativeAuthToken] = useState<string | null>(null);
   const [nativeSessionAtStart, setNativeSessionAtStart] = useState(false);
@@ -475,9 +476,7 @@ export function WebAppScreen() {
     webAppUrl,
   ]);
 
-  const initialUrl = webAppUrl
-    ? resolveWebAppStartUrl(webAppUrl, nativeSessionAtStart)
-    : null;
+  const initialUrl = resolveWebAppStartUrl(nativeSessionAtStart);
 
   if (!nativeAuthReady) {
     return (
@@ -512,23 +511,10 @@ export function WebAppScreen() {
     );
   }
 
-  if (!webAppUrl) {
-    return (
-      <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
-        <View style={styles.message}>
-          <Text style={[styles.title, { color: colors.foreground }]}>ওয়েবসাইটের ঠিকানা পাওয়া যায়নি</Text>
-          <Text style={[styles.body, { color: colors.mutedForeground }]}>
-            EXPO_PUBLIC_DOMAIN বা EXPO_PUBLIC_WEB_APP_URL সেট করে আবার চেষ্টা করুন।
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   const websiteView = Platform.OS === 'web'
     ? createElement('iframe', {
       key: retryKey,
-      src: initialUrl ?? webAppUrl,
+      src: initialUrl,
       title: 'BanglaKhata',
       allow: 'camera; clipboard-read; clipboard-write',
       onLoad: handleLoadComplete,
@@ -544,7 +530,7 @@ export function WebAppScreen() {
       <WebView
         key={retryKey}
         ref={webViewRef}
-        source={{ uri: initialUrl ?? webAppUrl }}
+        source={{ uri: initialUrl }}
         style={styles.webView}
         automaticallyAdjustContentInsets={false}
         contentInsetAdjustmentBehavior="never"
