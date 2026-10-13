@@ -25,6 +25,13 @@ import { getWebAppUrl, resolveWebAppStartUrl } from '@/lib/webAppUrl';
 import { resolveVisualFixtureUrl } from '@/lib/visualFixtureUrl';
 import { useTransactionSuccessSound } from '@/lib/useTransactionSuccessSound';
 import { canUseNativeNotifications } from '@/lib/notificationRuntime';
+import {
+  createPushTokenEventScript,
+  createStaffLedgerNavigationEventScript,
+  createWebEventScript,
+  NATIVE_PUSH_STATUS_EVENT,
+  parseStaffLedgerNotificationResponse,
+} from '@/lib/notificationBridge';
 import { useOptionalAuth } from '@/contexts/AuthContext';
 import {
   NATIVE_FILE_EXPORT_RESULT_EVENT,
@@ -33,9 +40,6 @@ import {
   type NativeFileExportResult,
 } from '@/lib/nativeFileExport';
 
-const NATIVE_PUSH_TOKEN_EVENT = 'banglakhata-native-push-token';
-const NATIVE_PUSH_STATUS_EVENT = 'banglakhata-native-push-status';
-const OPEN_NOTIFICATION_EVENT = 'banglakhata-open-notification';
 const NATIVE_AUTH_READY_MESSAGE = 'banglakhata-native-auth-ready';
 const NATIVE_AUTH_REJECTED_MESSAGE = 'banglakhata-native-auth-rejected';
 const NATIVE_AUTH_LOGOUT_MESSAGE = 'banglakhata-native-auth-logout';
@@ -173,8 +177,9 @@ export function WebAppScreen() {
   }, []);
 
   const sendPushStatusToWeb = useCallback((status: string) => {
-    const script = `window.dispatchEvent(new CustomEvent(${JSON.stringify(NATIVE_PUSH_STATUS_EVENT)}, { detail: ${JSON.stringify({ status })} })); true;`;
-    webViewRef.current?.injectJavaScript(script);
+    webViewRef.current?.injectJavaScript(
+      createWebEventScript(NATIVE_PUSH_STATUS_EVENT, { status }),
+    );
   }, []);
 
   const sendPendingPushNavigation = useCallback(() => {
@@ -186,8 +191,7 @@ export function WebAppScreen() {
       || !webViewRef.current
     ) return;
 
-    const script = `window.dispatchEvent(new CustomEvent(${JSON.stringify(OPEN_NOTIFICATION_EVENT)}, { detail: ${JSON.stringify(payload)} })); true;`;
-    webViewRef.current.injectJavaScript(script);
+    webViewRef.current.injectJavaScript(createStaffLedgerNavigationEventScript(payload));
     pendingPushNavigation.current = null;
     void import('expo-notifications')
       .then(({ clearLastNotificationResponseAsync }) => clearLastNotificationResponseAsync())
@@ -239,8 +243,11 @@ export function WebAppScreen() {
 
       const token = await NotificationsApi.getExpoPushTokenAsync({ projectId });
       const platform = Platform.OS === 'ios' ? 'ios' : 'android';
-      const script = `window.dispatchEvent(new CustomEvent(${JSON.stringify(NATIVE_PUSH_TOKEN_EVENT)}, { detail: ${JSON.stringify({ token: token.data, platform })} })); true;`;
-      webViewRef.current?.injectJavaScript(script);
+      if (!token.data || !webViewRef.current) {
+        sendPushStatusToWeb(allowPrompt ? 'unavailable' : 'not-enabled');
+        return;
+      }
+      webViewRef.current.injectJavaScript(createPushTokenEventScript(token.data, platform));
       sendPushStatusToWeb('granted');
     } catch (error) {
       console.warn('Could not register owner push notifications:', error);
@@ -268,25 +275,15 @@ export function WebAppScreen() {
         });
 
         const handleNotificationResponse = (response: Notifications.NotificationResponse) => {
-          const requestId = response.notification.request.identifier;
-          if (handledNotificationResponses.current.has(requestId)) return;
-          handledNotificationResponses.current.add(requestId);
-
-          const data = response.notification.request.content.data as Record<string, unknown>;
-          if (
-            data.type !== 'staff-ledger-entry' ||
-            typeof data.notificationId !== 'string' ||
-            typeof data.businessId !== 'string'
-          ) {
+          const parsed = parseStaffLedgerNotificationResponse(response);
+          if (!parsed) {
             void NotificationsApi.clearLastNotificationResponseAsync().catch(() => {});
             return;
           }
+          if (handledNotificationResponses.current.has(parsed.requestId)) return;
+          handledNotificationResponses.current.add(parsed.requestId);
 
-          pendingPushNavigation.current = {
-            notificationId: data.notificationId,
-            businessId: data.businessId,
-            partyId: typeof data.partyId === 'string' ? data.partyId : null,
-          };
+          pendingPushNavigation.current = parsed.navigation;
           sendPendingPushNavigation();
         };
 
