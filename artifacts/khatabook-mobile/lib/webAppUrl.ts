@@ -3,13 +3,15 @@
  * Expo build variables: cloud builds can substitute missing values as the
  * literal hostname "undefined".
  */
+const PRODUCTION_WEB_APP_URL = 'https://banglakhata.com';
+
 export function resolveWebAppUrl(): string {
-  return 'https://banglakhata.com';
+  return PRODUCTION_WEB_APP_URL;
 }
 
 export function resolveWebAppStartUrl(hasNativeSession: boolean): string {
-  const route = hasNativeSession ? '/dashboard' : '/sign-in';
-  return new URL(route, resolveWebAppUrl()).toString();
+  const route = hasNativeSession ? 'dashboard' : 'sign-in';
+  return `${PRODUCTION_WEB_APP_URL}/${route}`;
 }
 
 export function getWebAppUrl(): string {

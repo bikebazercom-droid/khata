@@ -6,6 +6,14 @@ describe('resolveWebAppUrl', () => {
     expect(resolveWebAppUrl()).toBe('https://banglakhata.com');
     expect(getWebAppUrl()).toBe('https://banglakhata.com');
   });
+
+  it('always provides a valid absolute HTTPS URL for native WebView loading', () => {
+    for (const url of [resolveWebAppStartUrl(true), resolveWebAppStartUrl(false)]) {
+      expect(url).toMatch(/^https:\/\/banglakhata\.com\/(dashboard|sign-in)$/);
+      expect(new URL(url).protocol).toBe('https:');
+      expect(new URL(url).hostname).toBe('banglakhata.com');
+    }
+  });
 });
 
 describe('resolveWebAppStartUrl', () => {
