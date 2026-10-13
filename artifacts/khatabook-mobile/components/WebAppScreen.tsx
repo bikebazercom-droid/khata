@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import WebView, { type WebViewNavigation } from 'react-native-webview';
 import Constants from 'expo-constants';
-import * as Notifications from 'expo-notifications';
+import type * as Notifications from 'expo-notifications';
 import {
   getNativeContactsForWebView,
   NATIVE_CONTACTS_RESULT_EVENT,
@@ -24,6 +24,7 @@ import { useColors } from '@/hooks/useColors';
 import { getWebAppUrl, resolveWebAppStartUrl } from '@/lib/webAppUrl';
 import { resolveVisualFixtureUrl } from '@/lib/visualFixtureUrl';
 import { useTransactionSuccessSound } from '@/lib/useTransactionSuccessSound';
+import { canUseNativeNotifications } from '@/lib/notificationRuntime';
 import { useOptionalAuth } from '@/contexts/AuthContext';
 import {
   NATIVE_FILE_EXPORT_RESULT_EVENT,
@@ -178,34 +179,42 @@ export function WebAppScreen() {
 
   const sendPendingPushNavigation = useCallback(() => {
     const payload = pendingPushNavigation.current;
-    if (!payload || !webPageReady.current || !webViewRef.current) return;
+    if (
+      !canUseNativeNotifications(Platform.OS, __DEV__)
+      || !payload
+      || !webPageReady.current
+      || !webViewRef.current
+    ) return;
 
     const script = `window.dispatchEvent(new CustomEvent(${JSON.stringify(OPEN_NOTIFICATION_EVENT)}, { detail: ${JSON.stringify(payload)} })); true;`;
     webViewRef.current.injectJavaScript(script);
     pendingPushNavigation.current = null;
-    void Notifications.clearLastNotificationResponseAsync().catch(() => {});
+    void import('expo-notifications')
+      .then(({ clearLastNotificationResponseAsync }) => clearLastNotificationResponseAsync())
+      .catch(() => {});
   }, []);
 
   const requestOwnerPushToken = useCallback(async (allowPrompt: boolean) => {
-    if (Platform.OS !== 'android' && Platform.OS !== 'ios') {
-      if (allowPrompt) sendPushStatusToWeb('unavailable');
+    if (!canUseNativeNotifications(Platform.OS, __DEV__)) {
+      sendPushStatusToWeb(allowPrompt ? 'unavailable' : 'not-enabled');
       return;
     }
 
     try {
+      const NotificationsApi = await import('expo-notifications');
       if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('ledger-alerts', {
+        await NotificationsApi.setNotificationChannelAsync('ledger-alerts', {
           name: 'Ledger alerts',
-          importance: Notifications.AndroidImportance.MAX,
+          importance: NotificationsApi.AndroidImportance.MAX,
           sound: 'default',
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#1B3A6B',
         });
       }
 
-      let permission = await Notifications.getPermissionsAsync();
+      let permission = await NotificationsApi.getPermissionsAsync();
       if (!permission.granted && allowPrompt) {
-        permission = await Notifications.requestPermissionsAsync();
+        permission = await NotificationsApi.requestPermissionsAsync();
       }
       if (!permission.granted) {
         sendPushStatusToWeb(allowPrompt ? 'permission-denied' : 'not-enabled');
@@ -228,7 +237,7 @@ export function WebAppScreen() {
         return;
       }
 
-      const token = await Notifications.getExpoPushTokenAsync({ projectId });
+      const token = await NotificationsApi.getExpoPushTokenAsync({ projectId });
       const platform = Platform.OS === 'ios' ? 'ios' : 'android';
       const script = `window.dispatchEvent(new CustomEvent(${JSON.stringify(NATIVE_PUSH_TOKEN_EVENT)}, { detail: ${JSON.stringify({ token: token.data, platform })} })); true;`;
       webViewRef.current?.injectJavaScript(script);
@@ -240,45 +249,65 @@ export function WebAppScreen() {
   }, [sendPushStatusToWeb]);
 
   useEffect(() => {
-    if (Platform.OS === 'web') return undefined;
+    if (!canUseNativeNotifications(Platform.OS, __DEV__)) return undefined;
 
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowBanner: true,
-        shouldShowList: true,
-        shouldPlaySound: true,
-        shouldSetBadge: false,
-      }),
-    });
+    let isActive = true;
+    let subscription: { remove: () => void } | undefined;
 
-    const handleNotificationResponse = (response: Notifications.NotificationResponse) => {
-      const requestId = response.notification.request.identifier;
-      if (handledNotificationResponses.current.has(requestId)) return;
-      handledNotificationResponses.current.add(requestId);
+    void import('expo-notifications')
+      .then(async (NotificationsApi) => {
+        if (!isActive) return;
 
-      const data = response.notification.request.content.data as Record<string, unknown>;
-      if (
-        data.type !== 'staff-ledger-entry' ||
-        typeof data.notificationId !== 'string' ||
-        typeof data.businessId !== 'string'
-      ) {
-        void Notifications.clearLastNotificationResponseAsync().catch(() => {});
-        return;
-      }
+        NotificationsApi.setNotificationHandler({
+          handleNotification: async () => ({
+            shouldShowBanner: true,
+            shouldShowList: true,
+            shouldPlaySound: true,
+            shouldSetBadge: false,
+          }),
+        });
 
-      pendingPushNavigation.current = {
-        notificationId: data.notificationId,
-        businessId: data.businessId,
-        partyId: typeof data.partyId === 'string' ? data.partyId : null,
-      };
-      sendPendingPushNavigation();
+        const handleNotificationResponse = (response: Notifications.NotificationResponse) => {
+          const requestId = response.notification.request.identifier;
+          if (handledNotificationResponses.current.has(requestId)) return;
+          handledNotificationResponses.current.add(requestId);
+
+          const data = response.notification.request.content.data as Record<string, unknown>;
+          if (
+            data.type !== 'staff-ledger-entry' ||
+            typeof data.notificationId !== 'string' ||
+            typeof data.businessId !== 'string'
+          ) {
+            void NotificationsApi.clearLastNotificationResponseAsync().catch(() => {});
+            return;
+          }
+
+          pendingPushNavigation.current = {
+            notificationId: data.notificationId,
+            businessId: data.businessId,
+            partyId: typeof data.partyId === 'string' ? data.partyId : null,
+          };
+          sendPendingPushNavigation();
+        };
+
+        subscription = NotificationsApi.addNotificationResponseReceivedListener(
+          handleNotificationResponse,
+        );
+        try {
+          const response = await NotificationsApi.getLastNotificationResponseAsync();
+          if (isActive && response) handleNotificationResponse(response);
+        } catch (error) {
+          console.warn('Could not read the last notification response:', error);
+        }
+      })
+      .catch((error: unknown) => {
+        console.warn('Native notifications are unavailable:', error);
+      });
+
+    return () => {
+      isActive = false;
+      subscription?.remove();
     };
-
-    const subscription = Notifications.addNotificationResponseReceivedListener(handleNotificationResponse);
-    void Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (response) handleNotificationResponse(response);
-    });
-    return () => subscription.remove();
   }, [sendPendingPushNavigation]);
 
   const handleLoadComplete = useCallback(() => {

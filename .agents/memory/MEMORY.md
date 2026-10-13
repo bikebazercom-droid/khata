@@ -34,6 +34,7 @@
 - [Expo WebView contact access](expo-webview-contact-access.md) — request contacts when the user opens the party picker; never at app startup, and pass only names and phone numbers.
 - [Expo Contacts SDK migration](expo-contacts-sdk57-legacy-api.md) — in SDK 57, legacy `getContactsAsync` imported from the package root throws; import it from `expo-contacts/legacy`.
 - [Expo Audio component tests](expo-audio-component-tests.md) — mock `expo-audio` in mobile Vitest tests; importing its Expo runtime bootstrap fails under the jsdom setup.
+- [Expo Go remote notifications](expo-go-remote-notifications.md) — do not load `expo-notifications` in development previews; SDK 53+ Expo Go throws for remote push support.
 - [Expo Router Stack children](expo-router-stack-children.md) — register Stack.Screen elements directly or in arrays; nested fragments can crash the route mapper.
 - [Expo monorepo build root](public-npm-lockfile-eas.md) — build the nested mobile Expo app, and let its pnpm workspace lockfile control installs rather than adding a root npm lock.
 - [Portable report filenames](portable-report-filenames.md) — use ASCII-only PDF filenames for generated reports; keep Bengali in the PDF content and share title, not file metadata.
