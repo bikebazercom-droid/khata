@@ -4,7 +4,7 @@ import { useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { useClerk, useAuth, useUser } from '@clerk/react';
 import { useRemoveOwnerPushToken } from '@workspace/api-client-react';
-import { ArrowLeft, EllipsisVertical, Globe2, LogIn, LogOut, Mail, Phone, Trash2 } from 'lucide-react';
+import { ArrowLeft, ChevronDown, EllipsisVertical, Globe2, LogIn, LogOut, Mail, Phone, Trash2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -20,9 +20,6 @@ import {
   DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { phoneLogout } from '@/lib/phoneAuth';
@@ -80,6 +77,8 @@ export function SettingsDrawer({
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [isLanguageMenuExpanded, setIsLanguageMenuExpanded] = useState(false);
 
   const loginIdentity = authMethod === 'phone'
     ? phone || readOfflineIdentity()?.phone
@@ -226,7 +225,13 @@ export function SettingsDrawer({
             <DialogTitle className="col-start-2 row-start-1 whitespace-nowrap text-center text-lg font-bold text-white">
               {t('moreTitle')}
             </DialogTitle>
-            <DropdownMenu>
+            <DropdownMenu
+              open={isMoreMenuOpen}
+              onOpenChange={(nextOpen) => {
+                setIsMoreMenuOpen(nextOpen);
+                if (!nextOpen) setIsLanguageMenuExpanded(false);
+              }}
+            >
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
@@ -239,14 +244,31 @@ export function SettingsDrawer({
               <DropdownMenuContent
                 align="end"
                 sideOffset={8}
-                className="w-[min(20rem,calc(100vw-2rem))] rounded-xl border-slate-200 bg-white p-1.5 shadow-xl"
+                className="max-h-[calc(100dvh-7rem)] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border-slate-200 bg-white p-1.5 shadow-xl"
               >
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger className="min-h-11 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-700 focus:bg-slate-100">
-                    <Globe2 className="h-4 w-4" />
-                    Language / ভাষা
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="min-w-36 rounded-xl border-slate-200 bg-white p-1.5 shadow-xl">
+                <DropdownMenuItem
+                  aria-expanded={isLanguageMenuExpanded}
+                  aria-controls="settings-language-options"
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    setIsLanguageMenuExpanded((expanded) => !expanded);
+                  }}
+                  className="min-h-11 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-700 focus:bg-slate-100"
+                >
+                  <Globe2 className="h-4 w-4" />
+                  Language / ভাষা
+                  <ChevronDown
+                    aria-hidden="true"
+                    className={`ml-auto h-4 w-4 shrink-0 transition-transform duration-200 ${isLanguageMenuExpanded ? 'rotate-180' : ''}`}
+                  />
+                </DropdownMenuItem>
+                {isLanguageMenuExpanded && (
+                  <div
+                    id="settings-language-options"
+                    role="group"
+                    aria-label="Language options"
+                    className="ml-3 border-l border-slate-200 py-1 pl-2"
+                  >
                     <DropdownMenuRadioGroup
                       value={lang}
                       onValueChange={(value) => {
@@ -262,8 +284,8 @@ export function SettingsDrawer({
                       <DropdownMenuRadioItem value="bn" className="min-h-10 rounded-lg text-sm">বাংলা</DropdownMenuRadioItem>
                       <DropdownMenuRadioItem value="en" className="min-h-10 rounded-lg text-sm">English</DropdownMenuRadioItem>
                     </DropdownMenuRadioGroup>
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
+                  </div>
+                )}
                 <DropdownMenuItem
                   disabled
                   className="cursor-default items-start rounded-lg px-3 py-3 opacity-100 data-[disabled]:opacity-100 focus:bg-transparent"
