@@ -16,7 +16,9 @@ const mocks = vi.hoisted(() => ({
   hasNativeDeviceContacts: vi.fn(),
   selectDeviceContacts: vi.fn(),
   useCreateParty: vi.fn(),
+  useListParties: vi.fn(),
   createParty: vi.fn(),
+  navigate: vi.fn(),
 }));
 
 vi.mock('@/lib/device-contacts', () => ({
@@ -31,7 +33,16 @@ vi.mock('@/lib/businessContext', () => ({
 
 vi.mock('@workspace/api-client-react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@workspace/api-client-react')>();
-  return { ...actual, useCreateParty: mocks.useCreateParty };
+  return {
+    ...actual,
+    useCreateParty: mocks.useCreateParty,
+    useListParties: mocks.useListParties,
+  };
+});
+
+vi.mock('wouter', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('wouter')>();
+  return { ...actual, useLocation: () => ['/', mocks.navigate] };
 });
 
 import { AddPartyModal } from './add-party-modal';
@@ -130,6 +141,8 @@ describe('AddPartyModal contact picker', () => {
       mutate: mocks.createParty,
       isPending: false,
     });
+    mocks.navigate.mockReset();
+    mocks.useListParties.mockReset().mockReturnValue({ data: [], isLoading: false });
     scrolledElements.length = 0;
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
       configurable: true,
@@ -178,13 +191,17 @@ describe('AddPartyModal contact picker', () => {
     });
   });
 
-  it('automatically requests native contacts when the picker opens and keeps them when returning from the form', async () => {
+  it('keeps the business list primary and requests native contacts only after an explicit tap', async () => {
     mocks.hasNativeDeviceContacts.mockReturnValue(true);
     renderPicker();
 
-    await waitFor(() => expect(mocks.selectDeviceContacts).toHaveBeenCalledOnce());
+    expect(mocks.selectDeviceContacts).not.toHaveBeenCalled();
+    expect(screen.getByTestId('button-import-device-contacts')).toBeInTheDocument();
+    expect(screen.queryByTestId('button-select-contact-abdul')).not.toBeInTheDocument();
+
+    await importContacts();
     expect(await screen.findByTestId('button-select-contact-abdul')).toBeInTheDocument();
-    expect(screen.queryByTestId('button-import-device-contacts')).not.toBeInTheDocument();
+    expect(mocks.selectDeviceContacts).toHaveBeenCalledOnce();
 
     fireEvent.click(screen.getByTestId('button-select-contact-abdul'));
     fireEvent.click(screen.getByTestId('button-back-party-form'));
@@ -210,8 +227,15 @@ describe('AddPartyModal contact picker', () => {
   });
 
   it('jumps to a contact group without changing supplier scope', async () => {
+    mocks.useListParties.mockReturnValue({
+      data: [
+        { id: 'supplier-b', name: 'Babul Traders', phone: '01777777777' },
+        { id: 'supplier-bn', name: 'রহিম স্টোর', phone: '01812345678' },
+        { id: 'supplier-phone', name: '01912345678', phone: '01912345678' },
+      ],
+      isLoading: false,
+    });
     renderPicker(PartyRole.SUPPLIER);
-    await importContacts();
 
     fireEvent.click(screen.getByTestId('button-party-index-B'));
 
@@ -229,6 +253,39 @@ describe('AddPartyModal contact picker', () => {
     expect(phoneOnlyGroup).not.toBeNull();
     expect(scrolledElements).toContain(phoneOnlyGroup);
     expect(screen.getByRole('heading', { name: 'সাপ্লায়ার নির্বাচন করুন' })).toBeInTheDocument();
+  });
+
+  it('lists only the active business customers, filters them, and opens the selected ledger', () => {
+    const activeBusinessCustomers = [
+      { id: 'abu', name: 'abu kaka nij', phone: '+8801765342154', role: PartyRole.CUSTOMER },
+      { id: 'banglakhata', name: 'banglakhata', phone: '', role: PartyRole.CUSTOMER },
+      { id: 'tusher', name: 'tusher', phone: '', role: PartyRole.CUSTOMER },
+    ];
+    mocks.useListParties.mockReturnValue({ data: activeBusinessCustomers, isLoading: false });
+    const { onOpenChange } = renderPicker();
+
+    expect(screen.getByTestId('button-select-party-abu')).toBeInTheDocument();
+    expect(screen.getByTestId('button-select-party-banglakhata')).toBeInTheDocument();
+    expect(screen.getByTestId('button-select-party-tusher')).toBeInTheDocument();
+    expect(screen.queryByTestId('button-select-contact-abdul')).not.toBeInTheDocument();
+    expect(mocks.useListParties).toHaveBeenCalledWith(
+      { role: PartyRole.CUSTOMER, dueFilter: DueFilter.ALL },
+      expect.objectContaining({
+        query: expect.objectContaining({
+          queryKey: expect.arrayContaining([{ activeBusinessId: 'business-1' }]),
+          refetchOnMount: 'always',
+        }),
+      }),
+    );
+
+    fireEvent.change(screen.getByTestId('input-party-search'), { target: { value: 'tush' } });
+    expect(screen.getByTestId('button-select-party-tusher')).toBeInTheDocument();
+    expect(screen.queryByTestId('button-select-party-abu')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('button-select-party-tusher'));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(mocks.navigate).toHaveBeenCalledWith('/party/tusher');
+    expect(screen.queryByTestId('input-party-name')).not.toBeInTheDocument();
   });
 
   it('keeps manual add available when device contacts cannot be selected', async () => {

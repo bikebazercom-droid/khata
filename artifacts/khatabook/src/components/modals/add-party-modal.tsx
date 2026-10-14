@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -23,8 +23,10 @@ import {
 import { formatBangladeshPhoneForInput, normalizeBangladeshPhone } from '@/lib/bangladesh-phone';
 import {
   useCreateParty,
+  useListParties,
   PartyRole,
   BalanceType,
+  DueFilter,
   getListPartiesQueryKey,
   getGetDashboardSummaryQueryKey,
   type Party,
@@ -35,6 +37,7 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft, Search, X, Contact as ContactIcon, AlertCircle, ArrowRight, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { summaryContribution } from '@/lib/optimistic';
+import { useLocation } from 'wouter';
 
 const formSchema = z.object({
   name: z.string().trim().min(1, 'নাম আবশ্যক'),
@@ -48,12 +51,6 @@ function initialsOf(name: string) {
   if (!parts.length) return '';
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-}
-
-function isPhoneOnlyContact(contact: DirectoryContact): boolean {
-  const nameDigits = contact.name.replace(/\D/g, '');
-  const phoneDigits = contact.phone.replace(/\D/g, '');
-  return nameDigits.length >= 7 && (!phoneDigits || nameDigits === phoneDigits);
 }
 
 function contactIndexLetter(name: string): string {
@@ -82,6 +79,7 @@ export function AddPartyModal({
 }) {
   const [step, setStep] = useState<'contacts' | 'form'>('contacts');
   const [prefill, setPrefill] = useState<{ name: string; phone: string } | undefined>();
+  const [, navigate] = useLocation();
 
   if (!open) return null;
   return (
@@ -90,6 +88,10 @@ export function AddPartyModal({
         <ContactDirectoryScreen
           role={defaultRole}
           onClose={() => onOpenChange(false)}
+          onSelectParty={(partyId) => {
+            onOpenChange(false);
+            navigate(`/party/${partyId}`);
+          }}
           onManualAdd={() => { setPrefill(undefined); setStep('form'); }}
           onPickContact={(contact) => { setPrefill(contact); setStep('form'); }}
         />
@@ -107,28 +109,41 @@ export function AddPartyModal({
 }
 
 function ContactDirectoryScreen({
-  role, onClose, onManualAdd, onPickContact,
+  role, onClose, onSelectParty, onManualAdd, onPickContact,
 }: {
   role: PartyRole;
   onClose: () => void;
+  onSelectParty: (partyId: string) => void;
   onManualAdd: () => void;
   onPickContact: (contact: { name: string; phone: string }) => void;
 }) {
+  const { selectedBusinessId } = useBusinessContext();
+  const partyParams = { role, dueFilter: DueFilter.ALL };
+  const { data: parties = [], isLoading: partiesLoading, isError: partiesError, refetch: refetchParties } = useListParties(partyParams, {
+    request: { cache: 'no-store' },
+    query: {
+      queryKey: businessScopedQueryKey(getListPartiesQueryKey(partyParams), selectedBusinessId),
+      refetchOnMount: 'always',
+    },
+  });
   const [search, setSearch] = useState('');
   const [contacts, setContacts] = useState<DirectoryContact[] | null>(null);
   const [importing, setImporting] = useState(false);
   const [importMessage, setImportMessage] = useState('');
   const [importFailed, setImportFailed] = useState(false);
-  const autoImportRequested = useRef(false);
-  const filtered = useMemo(() => (contacts ?? []).filter((contact) =>
+  const filtered = useMemo(() => parties.filter((party) =>
+    party.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()) ||
+    (party.phone ?? '').includes(search)
+  ), [parties, search]);
+  const filteredContacts = useMemo(() => (contacts ?? []).filter((contact) =>
     contact.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()) || contact.phone.includes(search)
   ), [contacts, search]);
   const grouped = useMemo(() => {
-    const groups = new Map<string, DirectoryContact[]>();
-    for (const contact of filtered) {
-      const letter = contactIndexLetter(contact.name);
+    const groups = new Map<string, Party[]>();
+    for (const party of filtered) {
+      const letter = contactIndexLetter(party.name);
       if (!groups.has(letter)) groups.set(letter, []);
-      groups.get(letter)?.push(contact);
+      groups.get(letter)?.push(party);
     }
     const collator = new Intl.Collator('bn', { sensitivity: 'base' });
     for (const entries of groups.values()) entries.sort((a, b) => collator.compare(a.name, b.name));
@@ -157,18 +172,12 @@ function ContactDirectoryScreen({
     }
   }, []);
 
-  useEffect(() => {
-    if (!hasNativeDeviceContacts() || autoImportRequested.current) return;
-    autoImportRequested.current = true;
-    void importContacts();
-  }, [importContacts]);
-
   const jumpTo = (letter: string) => {
     document.getElementById(`party-letter-${letter}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   };
   const roleName = role === PartyRole.CUSTOMER ? 'গ্রাহক' : 'সাপ্লায়ার';
   const isNativeContactBridge = hasNativeDeviceContacts();
-  const hasContacts = contacts !== null && contacts.length > 0;
+  const hasContacts = filteredContacts.length > 0;
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
   const additionalLetters = indexLetters.filter((letter) => !/^[A-Z]$/.test(letter) && letter !== '#');
   const visibleIndex = [...alphabet, ...(grouped.has('#') ? ['#'] : []), ...additionalLetters];
@@ -199,11 +208,9 @@ function ContactDirectoryScreen({
               <Search className="absolute right-4 top-1/2 h-[19px] w-[19px] -translate-y-1/2 text-[#17202a]" />
               {search && <button type="button" onClick={() => setSearch('')} aria-label="খোঁজা মুছুন" className="absolute right-11 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-[#8294a7] hover:bg-[#f0f4f8]"><X className="h-4 w-4" /></button>}
             </label>
-            {(!isNativeContactBridge || importFailed) && (
-              <button type="button" onClick={importContacts} disabled={importing} aria-label={isNativeContactBridge ? 'আবার ফোনের কন্টাক্ট লোড করুন' : 'ফোনের কন্টাক্ট থেকে বেছে নিন'} title={isNativeContactBridge ? 'আবার ফোনের কন্টাক্ট লোড করুন' : 'ফোনের কন্টাক্ট থেকে বেছে নিন'} data-testid="button-import-device-contacts" className="grid h-[54px] w-[48px] shrink-0 place-items-center rounded-[12px] border border-[#d8dce1] bg-white text-[#0b57d0] transition hover:bg-[#f5f8fc] active:scale-95 disabled:opacity-60">
+            <button type="button" onClick={importContacts} disabled={importing} aria-label="ফোনের কন্টাক্ট থেকে বেছে নিন" title="ফোনের কন্টাক্ট থেকে বেছে নিন" data-testid="button-import-device-contacts" className="grid h-[54px] w-[48px] shrink-0 place-items-center rounded-[12px] border border-[#d8dce1] bg-white text-[#0b57d0] transition hover:bg-[#f5f8fc] active:scale-95 disabled:opacity-60">
                 {importing ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#9bb9d6] border-t-[#0b57d0]" /> : <ContactIcon className="h-5 w-5" />}
-              </button>
-            )}
+            </button>
           </div>
 
           <button type="button" onClick={onManualAdd} data-testid="button-party-add" className="mt-4 flex min-h-[64px] w-full items-center gap-4 rounded-xl px-1 text-left text-[#0b4d8f] transition hover:bg-[#f5f8fc] active:scale-[.99]">
@@ -222,36 +229,33 @@ function ContactDirectoryScreen({
         </div>
       </div>
 
-      <section className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain" aria-label="কন্টাক্ট তালিকা">
+      <section className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain" aria-label={role === PartyRole.CUSTOMER ? 'গ্রাহক তালিকা' : 'সাপ্লায়ার তালিকা'}>
         <div className="mx-auto min-h-full max-w-xl px-3 pb-[calc(1.5rem+var(--safe-bottom))]">
-          {contacts === null && importing ? (
-            <div role="status" data-testid="status-contact-loading" className="flex min-h-[240px] flex-col items-center justify-center px-8 text-center">
+          {partiesLoading ? (
+            <div role="status" data-testid="status-party-loading" className="flex min-h-[240px] items-center justify-center">
               <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#c4d5e7] border-t-[#0b57d0]" />
-              <p className="mt-3 text-sm font-medium text-[#7f8993]">ফোনের কন্টাক্ট আনা হচ্ছে...</p>
             </div>
-          ) : contacts === null ? (
-            <div className="flex min-h-[240px] flex-col items-center justify-center px-8 text-center">
-              <ContactIcon className="h-8 w-8 text-[#aab4bf]" />
-              <p className="mt-3 text-sm font-medium text-[#7f8993]">ফোনের কন্টাক্ট এখানে দেখা যাবে</p>
+          ) : partiesError ? (
+            <div className="flex min-h-[180px] flex-col items-center justify-center px-8 text-center">
+              <p role="alert" className="text-sm font-medium text-[#7f8993]">{roleName} তালিকা লোড করা যায়নি।</p>
+              <button type="button" onClick={() => void refetchParties()} className="mt-3 text-sm font-bold text-[#0b57d0]">আবার চেষ্টা করুন</button>
             </div>
           ) : filtered.length === 0 ? (
-            <div className="flex min-h-[220px] flex-col items-center justify-center px-8 text-center">
+            <div className="flex min-h-[180px] flex-col items-center justify-center px-8 text-center">
               <Search className="h-7 w-7 text-[#aab4bf]" />
-              <p className="mt-3 text-sm font-medium text-[#7f8993]">{contacts.length ? 'এই নামে কোনো কন্টাক্ট নেই' : 'কোনো কন্টাক্ট বেছে নেওয়া হয়নি'}</p>
+              <p className="mt-3 text-sm font-medium text-[#7f8993]">{parties.length ? `এই নামে কোনো ${roleName} নেই` : `এই ব্যবসায় কোনো ${roleName} নেই`}</p>
             </div>
           ) : (
             <div className="pb-3 pr-7">
               {Array.from(grouped.entries()).map(([letter, entries]) => (
                 <div key={letter} id={`party-letter-${letter}`} className="scroll-mt-2">
                   <p className="sticky top-0 z-[1] bg-white/95 px-1 pb-1 pt-2 text-[11px] font-bold uppercase tracking-[.14em] text-[#a0a8b1] backdrop-blur">{letter}</p>
-                  {entries.map((contact) => (
-                    <button key={contact.id} type="button" onClick={() => onPickContact({ name: contact.name, phone: contact.phone })} data-testid={`button-select-contact-${contact.id}`} className="flex min-h-[94px] w-full items-center gap-4 border-b border-[#eef0f2] px-2 py-3 text-left transition-colors hover:bg-[#f9fbfd] active:bg-[#f1f5f9]">
-                      <span className="grid h-[62px] w-[62px] shrink-0 place-items-center rounded-full bg-[#0b4d8f] text-[18px] font-medium text-white">
-                        {isPhoneOnlyContact(contact) ? <Plus className="h-7 w-7" /> : initialsOf(contact.name)}
-                      </span>
+                  {entries.map((party) => (
+                    <button key={party.id} type="button" onClick={() => onSelectParty(party.id)} data-testid={`button-select-party-${party.id}`} className="flex min-h-[94px] w-full items-center gap-4 border-b border-[#eef0f2] px-2 py-3 text-left transition-colors hover:bg-[#f9fbfd] active:bg-[#f1f5f9]">
+                      <span className="grid h-[62px] w-[62px] shrink-0 place-items-center rounded-full bg-[#0b4d8f] text-[18px] font-medium text-white">{initialsOf(party.name)}</span>
                       <span className="min-w-0 flex-1">
-                        <span className="block break-words text-[16px] font-medium leading-6 text-[#191f25]">{contact.name}</span>
-                        {contact.phone && <span className="mt-1 block whitespace-nowrap text-sm leading-5 text-[#9aa0a6]">{contact.phone}</span>}
+                        <span className="block break-words text-[16px] font-medium leading-6 text-[#191f25]">{party.name}</span>
+                        {party.phone && <span className="mt-1 block whitespace-nowrap text-sm leading-5 text-[#9aa0a6]">{party.phone}</span>}
                       </span>
                     </button>
                   ))}
@@ -259,8 +263,22 @@ function ContactDirectoryScreen({
               ))}
             </div>
           )}
+          {filteredContacts.length > 0 && (
+            <div className="border-t-4 border-[#f5f7f9] pb-3 pr-7">
+              <p className="px-2 pb-1 pt-3 text-xs font-bold text-[#7f8993]">ফোনের কন্টাক্ট — নতুন গ্রাহক</p>
+              {filteredContacts.map((contact) => (
+                <button key={contact.id} type="button" onClick={() => onPickContact({ name: contact.name, phone: contact.phone })} data-testid={`button-select-contact-${contact.id}`} className="flex min-h-[72px] w-full items-center gap-4 border-b border-[#eef0f2] px-2 py-3 text-left hover:bg-[#f9fbfd]">
+                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#0b4d8f] text-sm font-medium text-white">{initialsOf(contact.name)}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block break-words text-[15px] font-medium text-[#191f25]">{contact.name}</span>
+                    {contact.phone && <span className="mt-1 block text-sm text-[#9aa0a6]">{contact.phone}</span>}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        {hasContacts && (
+        {indexLetters.length > 0 && (
           <nav aria-label="নামের অক্ষর অনুযায়ী যান" className="absolute bottom-1 right-0 top-1 flex w-6 flex-col items-center justify-between overflow-y-auto overscroll-contain py-2">
             {visibleIndex.map((letter) => (
               <button key={letter} type="button" onClick={() => grouped.has(letter) && jumpTo(letter)} disabled={!grouped.has(letter)} aria-label={`${letter} অক্ষরের কন্টাক্ট`} data-testid={`button-party-index-${letter}`} className={cn('grid min-h-[18px] w-5 flex-1 place-items-center rounded text-[9px] font-medium leading-none transition-colors', grouped.has(letter) ? 'text-[#53606d] hover:bg-[#e9f0f7]' : 'text-[#aeb5bc]')}>{letter}</button>
