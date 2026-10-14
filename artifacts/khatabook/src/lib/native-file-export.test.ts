@@ -10,6 +10,7 @@ afterEach(() => {
 
 describe('native file export bridge', () => {
   it('uses the Expo bridge for generated files and returns the native result', async () => {
+    const csvText = '\uFEFFতারিখ,পার্টির নাম\r\n২০২৬-১০-১৪,বাংলা ✓\r\n';
     const bridge = {
       postMessage: vi.fn((rawMessage: string) => {
         const request = JSON.parse(rawMessage) as { requestId: string };
@@ -29,7 +30,7 @@ describe('native file export bridge', () => {
     });
 
     const result = await shareGeneratedFileWithNative(
-      new Blob(['ledger data'], { type: 'text/csv' }),
+      new Blob([csvText], { type: 'text/csv;charset=utf-8' }),
       {
         fileName: 'লেনদেন.csv',
         mimeType: 'text/csv',
@@ -46,10 +47,12 @@ describe('native file export bridge', () => {
       base64: string;
       shareText: string;
     };
+    const encodedBytes = new Uint8Array(await new Blob([csvText]).arrayBuffer());
+    const encodedBinary = Array.from(encodedBytes, (byte) => String.fromCharCode(byte)).join('');
     expect(request).toMatchObject({
       fileName: 'লেনদেন.csv',
       mimeType: 'text/csv',
-      base64: window.btoa('ledger data'),
+      base64: window.btoa(encodedBinary),
       shareText: 'রিমাইন্ডার',
     });
   });

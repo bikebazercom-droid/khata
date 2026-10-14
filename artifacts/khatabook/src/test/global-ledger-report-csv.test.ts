@@ -48,4 +48,17 @@ describe('buildGlobalLedgerReportCsv', () => {
       '\uFEFFতারিখ,পার্টির নাম,বিবরণ,আপনি দিয়েছেন (৳),আপনি পেয়েছেন (৳)\r\n',
     );
   });
+
+  it.each(['bn', 'en'] as const)('starts the %s export with exactly one UTF-8 BOM', (lang) => {
+    const csv = buildGlobalLedgerReportCsv([
+      makeEntry({ partyName: 'শাকিল Traders', description: 'অর্ডার ✓' }),
+    ], lang);
+    const bytes = new TextEncoder().encode(csv);
+
+    expect(csv.charCodeAt(0)).toBe(0xfeff);
+    expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+    expect(csv.indexOf('\uFEFF', 1)).toBe(-1);
+    expect(csv).toContain('শাকিল Traders');
+    expect(csv).toContain('অর্ডার ✓');
+  });
 });

@@ -7,6 +7,7 @@ const HEADERS = {
   bn: ['তারিখ', 'পার্টির নাম', 'বিবরণ', 'আপনি দিয়েছেন (৳)', 'আপনি পেয়েছেন (৳)'],
   en: ['Date', 'Party name', 'Details', 'You gave (৳)', 'You received (৳)'],
 } as const;
+const UTF8_BOM = '\uFEFF';
 
 function protectSpreadsheetFormula(value: string): string {
   return /^[\u0000-\u0020]*[=+\-@]/.test(value) ? `'${value}` : value;
@@ -32,6 +33,8 @@ export function buildGlobalLedgerReportCsv(entries: readonly CsvEntry[], lang: '
     ].map(escapeCsvField).join(',');
   });
 
-  // BOM helps spreadsheet apps recognize Bengali text; CRLF is the CSV record separator.
-  return `\uFEFF${[HEADERS[lang].map(escapeCsvField).join(','), ...rows].join('\r\n')}\r\n`;
+  // Keep exactly one UTF-8 BOM at byte zero so spreadsheet apps detect Bengali
+  // and other Unicode text correctly. CRLF is the CSV record separator.
+  const csvBody = `${[HEADERS[lang].map(escapeCsvField).join(','), ...rows].join('\r\n')}\r\n`;
+  return `${UTF8_BOM}${csvBody.replace(/^\uFEFF/, '')}`;
 }
