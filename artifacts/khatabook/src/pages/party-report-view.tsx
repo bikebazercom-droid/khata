@@ -489,8 +489,8 @@ export function PartyReportView() {
           <th style="padding:5px;border:1px solid #cbd5e1;text-align:left;font-size:11px;color:#374151;font-weight:700;width:16%;overflow-wrap:anywhere;">${t('date')}</th>
           <th style="padding:5px;border:1px solid #cbd5e1;text-align:left;font-size:11px;color:#374151;font-weight:700;width:22%;overflow-wrap:anywhere;">${t('details')}</th>
           <th style="padding:5px;border:1px solid #cbd5e1;text-align:left;font-size:11px;color:#374151;font-weight:700;width:17%;overflow-wrap:anywhere;">${t('adjustment')}</th>
-          <th style="padding:5px;border:1px solid #cbd5e1;text-align:right;font-size:10px;color:#374151;font-weight:700;background:#fef2f2;width:14%;overflow-wrap:anywhere;">${t('debit')}</th>
-          <th style="padding:5px;border:1px solid #cbd5e1;text-align:right;font-size:10px;color:#374151;font-weight:700;background:#f0fdf4;width:14%;overflow-wrap:anywhere;">${t('credit')}</th>
+          <th style="padding:5px 3px;border:1px solid #cbd5e1;text-align:center;font-size:9px;line-height:1.2;color:#374151;font-weight:700;background:#fef2f2;width:14%;overflow-wrap:anywhere;">${t('debit')}<br><span style="font-size:9px;white-space:nowrap;">(Dr)</span></th>
+          <th style="padding:5px 3px;border:1px solid #cbd5e1;text-align:center;font-size:9px;line-height:1.2;color:#374151;font-weight:700;background:#f0fdf4;width:14%;overflow-wrap:anywhere;">${t('credit')}<br><span style="font-size:9px;white-space:nowrap;">(Cr)</span></th>
           <th style="padding:5px;border:1px solid #cbd5e1;text-align:right;font-size:10px;color:#374151;font-weight:700;width:17%;overflow-wrap:anywhere;">${isEnglish ? 'Balance (Dr/Cr)' : 'ব্যালেন্স (Dr/Cr)'}</th>
         </tr>
       </thead>
