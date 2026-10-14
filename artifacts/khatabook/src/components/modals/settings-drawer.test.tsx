@@ -4,6 +4,7 @@ import { SettingsDrawer } from './settings-drawer';
 
 const mocks = vi.hoisted(() => ({
   setLang: vi.fn(),
+  lang: 'bn' as 'bn' | 'en',
 }));
 
 vi.mock('@clerk/react', () => ({
@@ -22,8 +23,10 @@ vi.mock('wouter', () => ({
 }));
 vi.mock('@/lib/i18n', () => ({
   useLanguage: () => ({
-    t: (key: string) => key,
-    lang: 'bn',
+    t: (key: string) => key === 'back'
+      ? (mocks.lang === 'en' ? 'Back' : 'ফিরে যান')
+      : key,
+    lang: mocks.lang,
     setLang: mocks.setLang,
   }),
 }));
@@ -41,6 +44,14 @@ describe('settings drawer language selection', () => {
   afterEach(() => {
     cleanup();
     mocks.setLang.mockClear();
+    mocks.lang = 'bn';
+  });
+
+  it('translates the settings return button to Back in English', () => {
+    mocks.lang = 'en';
+    render(<SettingsDrawer open onOpenChange={vi.fn()} />);
+
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
   });
 
   it('expands language choices underneath the row and switches language on selection', () => {

@@ -50,7 +50,7 @@ function entryDateKey(entry: { dueDate: Date | string | null; createdAt: Date | 
 }
 
 export function TransactionDetailPage() {
-  const { isEnglish } = useLanguage();
+  const { isEnglish, t } = useLanguage();
   const [, params] = useRoute('/party/:partyId/entry/:entryId');
   const partyId = params?.partyId ?? '';
   const entryId = params?.entryId ?? '';
@@ -269,7 +269,7 @@ export function TransactionDetailPage() {
       <div className="flex flex-col h-[100dvh] bg-[#F3F4F6] items-center justify-center gap-4 px-6">
         <p className="text-slate-500 font-semibold text-center">এন্ট্রিটি পাওয়া যায়নি</p>
         <Button variant="outline" onClick={() => navigate(partyId ? `/party/${partyId}` : '/')}>
-          ফিরে যান
+          {t('back')}
         </Button>
       </div>
     );
@@ -286,13 +286,13 @@ export function TransactionDetailPage() {
         <button
           type="button"
           onClick={() => navigate(`/party/${partyId}`)}
-          aria-label="ফিরে যান"
+          aria-label={t('back')}
           className="p-1 -ml-1 rounded-lg active:bg-white/20 transition-colors"
         >
           <ChevronLeft className="w-5 h-5 text-white" />
         </button>
         <h1 className="text-[17px] font-bold text-white tracking-tight flex-1">
-          বিস্তারিত প্রবেশিকা
+          {t('entryDetailsTitle')}
         </h1>
       </header>
 

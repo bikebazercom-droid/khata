@@ -27,7 +27,7 @@ import {
   ListChecks,
 } from 'lucide-react';
 import { format, isToday, parseISO } from 'date-fns';
-import { bn } from 'date-fns/locale';
+import { bn, enUS } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -42,6 +42,7 @@ import {
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
 import { SettingsDrawer } from '@/components/modals/settings-drawer';
+import { useLanguage } from '@/lib/i18n';
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
@@ -141,8 +142,8 @@ function groupLogsByDate(logs: DeploymentLog[]): Map<string, DeploymentLog[]> {
   return map;
 }
 
-function formatBanglaDate(dateStr: string): string {
-  return format(parseISO(dateStr), 'd MMMM, yyyy', { locale: bn });
+function formatLocalizedDate(dateStr: string, isEnglish: boolean): string {
+  return format(parseISO(dateStr), 'd MMMM, yyyy', { locale: isEnglish ? enUS : bn });
 }
 
 function formatBanglaTime(dateStr: string): string {
@@ -159,6 +160,7 @@ function destinationTally(logs: DeploymentLog[]): Record<string, number> {
 // ── main component ────────────────────────────────────────────────────────────
 
 export function StaffDeploymentPage() {
+  const { t, isEnglish } = useLanguage();
   const [, navigate] = useLocation();
   const qc = useQueryClient();
   const { selectedBusinessId } = useBusinessContext();
@@ -781,7 +783,7 @@ export function StaffDeploymentPage() {
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div className="flex-1 min-w-0">
-            <h1 className="text-white font-extrabold text-[16px] tracking-tight">ডিউটি ব্যবস্থাপনা</h1>
+            <h1 className="text-white font-extrabold text-[16px] tracking-tight">{t('dutyManagementTitle')}</h1>
             <p className="text-white/60 text-[11px] font-medium mt-0.5">Staff Duty Deployment & Rotation</p>
           </div>
           <button
@@ -803,7 +805,7 @@ export function StaffDeploymentPage() {
           >
             <span className="flex items-center gap-1.5">
               <Users className="w-3.5 h-3.5" />
-              ডিউটি লাইন
+              {t('dutyQueueTab')}
             </span>
           </button>
           <button
@@ -815,7 +817,7 @@ export function StaffDeploymentPage() {
           >
             <span className="flex items-center gap-1.5">
               <FolderOpen className="w-3.5 h-3.5" />
-              লগ ফোল্ডার
+              {t('dutyLogsTab')}
             </span>
           </button>
           <button
@@ -827,7 +829,7 @@ export function StaffDeploymentPage() {
           >
             <span className="flex items-center gap-1.5">
               <MapPin className="w-3.5 h-3.5" />
-              গন্তব্য তালিকা
+              {t('dutyDestinationsTab')}
             </span>
           </button>
         </div>
@@ -837,11 +839,11 @@ export function StaffDeploymentPage() {
       <div className="shrink-0 grid grid-cols-2 divide-x divide-slate-200 bg-white border-b border-slate-200 shadow-sm">
         <div className="px-4 py-3 text-center">
           <p className="text-[#1B3A6B] font-extrabold text-xl">{todayDeployed}</p>
-          <p className="text-[10px] font-semibold text-slate-400 mt-0.5">আজকে ডিউটিতে গেছেন</p>
+          <p className="text-[10px] font-semibold text-slate-400 mt-0.5">{t('dutyDeployedToday')}</p>
         </div>
         <div className="px-4 py-3 text-center">
           <p className="text-slate-800 font-extrabold text-xl">{queueRemaining}</p>
-          <p className="text-[10px] font-semibold text-slate-400 mt-0.5">লাইনে বাকি আছেন</p>
+          <p className="text-[10px] font-semibold text-slate-400 mt-0.5">{t('dutyQueueRemaining')}</p>
         </div>
       </div>
 
@@ -863,8 +865,8 @@ export function StaffDeploymentPage() {
                 <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
                   <Users className="w-8 h-8 text-slate-300" />
                 </div>
-                <p className="text-slate-500 font-semibold text-[14px]">কোনো স্টাফ নেই</p>
-                <p className="text-slate-400 text-[12px]">নিচের বাটনে ট্যাপ করে স্টাফ যোগ করুন</p>
+                <p className="text-slate-500 font-semibold text-[14px]">{t('dutyNoStaff')}</p>
+                <p className="text-slate-400 text-[12px]">{t('dutyAddStaffPrompt')}</p>
               </div>
             )}
 
@@ -971,7 +973,7 @@ export function StaffDeploymentPage() {
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-4 space-y-3">
               <div className="flex items-center gap-2">
                 <FileDown className="w-4 h-4 text-[#1B3A6B]" />
-                <p className="font-bold text-slate-800 text-[13px]">মাসিক ডিউটি স্টেটমেন্ট</p>
+                <p className="font-bold text-slate-800 text-[13px]">{t('dutyStatementTitle')}</p>
               </div>
               <div className="flex flex-col gap-2.5">
                 <input
@@ -1071,10 +1073,12 @@ export function StaffDeploymentPage() {
                 <div className="flex items-center gap-2 px-1">
                   <CalendarDays className="w-3.5 h-3.5 text-[#1B3A6B]" />
                   <p className="text-[12px] font-bold text-[#1B3A6B]">
-                    {isToday(parseISO(dateKey)) ? 'আজকে — ' : ''}{formatBanglaDate(dateKey)}
+                    {isToday(parseISO(dateKey)) ? `${isEnglish ? 'Today' : 'আজকে'} — ` : ''}{formatLocalizedDate(dateKey, isEnglish)}
                   </p>
                   <div className="flex-1 h-px bg-slate-200" />
-                  <span className="text-[10px] text-slate-400 font-semibold">{dayLogs.length} জন</span>
+                  <span className="text-[10px] text-slate-400 font-semibold">
+                    {dayLogs.length} {isEnglish ? 'staff' : 'জন'}
+                  </span>
                 </div>
 
                 {/* Log entries for this day */}
@@ -1226,7 +1230,7 @@ export function StaffDeploymentPage() {
             className="w-full bg-[#1B3A6B] hover:bg-[#243E72] font-bold"
           >
             <UserPlus2 className="w-4 h-4 mr-2" />
-            নতুন স্টাফ যোগ করুন
+            {t('dutyAddStaffAction')}
           </Button>
         </div>
       )}
@@ -1462,7 +1466,7 @@ export function StaffDeploymentPage() {
                   </div>
                   <div>
                     <p className="font-extrabold text-slate-900 text-[16px]">{editLog.staffName}</p>
-                    <p className="text-[11px] text-slate-400">{formatBanglaDate(editLog.deployedAt)} — {formatBanglaTime(editLog.deployedAt)}</p>
+                    <p className="text-[11px] text-slate-400">{formatLocalizedDate(editLog.deployedAt, isEnglish)} — {formatBanglaTime(editLog.deployedAt)}</p>
                   </div>
                 </div>
                 {/* Current destination badge */}

@@ -216,11 +216,11 @@ export function SettingsDrawer({
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              aria-label="ড্যাশবোর্ডে ফিরে যান"
+              aria-label={t('back')}
               className="justify-self-start flex h-10 shrink-0 items-center gap-2 rounded-xl bg-white/15 px-3 text-sm font-bold text-white transition-colors hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
             >
               <ArrowLeft className="h-5 w-5" />
-              <span>ফিরে যান</span>
+              <span>{t('back')}</span>
             </button>
             <DialogTitle className="col-start-2 row-start-1 whitespace-nowrap text-center text-lg font-bold text-white">
               {t('moreTitle')}
