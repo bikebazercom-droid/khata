@@ -40,4 +40,3 @@
 - [Portable report filenames](portable-report-filenames.md) — use ASCII-only PDF filenames for generated reports; keep Bengali in the PDF content and share title, not file metadata.
 - [Interactive PDF support contacts](pdf-support-links.md) — PDFs cannot run a custom contact-choice popup; provide direct `tel:`, WhatsApp, and `mailto:` links as separate actions.
 - [Local storage route tests](local-storage-route-tests.md) — configure isolated storage env and create `PUBLIC_HTML_DIR` before dynamically importing API storage routes.
-- [Pre-approved login policy](login-preapproval-policy.md) — allowlist entries authorize new owner-account creation only; they never replace phone OTP or verified email authentication.

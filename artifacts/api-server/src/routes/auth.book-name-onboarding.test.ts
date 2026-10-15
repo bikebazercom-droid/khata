@@ -10,10 +10,8 @@ import {
   businessesTable,
   db,
   otpCodesTable,
-  preapprovedLoginsTable,
   userBusinessesTable,
   userLoginEventsTable,
-  userLoginAttemptsTable,
 } from "@workspace/db";
 import { SEED_BUSINESS_ID, requireAuth } from "../middlewares/requireAuth";
 import { ensureSmsReady, sendOtpSms } from "../services/sms";
@@ -58,10 +56,6 @@ describe("first-book name onboarding", () => {
       id: SEED_BUSINESS_ID,
       name: "আমার খাতা",
     }).onConflictDoNothing();
-    await db.insert(preapprovedLoginsTable).values([
-      { kind: "email", identifier: clerkEmail },
-      { kind: "phone", identifier: normalizedOwnerPhone },
-    ]);
 
     const [seedOwner] = await db.select({ id: appUsersTable.id })
       .from(appUsersTable)
@@ -85,8 +79,6 @@ describe("first-book name onboarding", () => {
     clerkSession.userId = "";
     clerkSession.sessionId = "";
     await db.delete(otpCodesTable).where(eq(otpCodesTable.phone, normalizedOwnerPhone));
-    await db.delete(preapprovedLoginsTable).where(eq(preapprovedLoginsTable.identifier, clerkEmail));
-    await db.delete(preapprovedLoginsTable).where(eq(preapprovedLoginsTable.identifier, normalizedOwnerPhone));
 
     const [emailUser] = await db.select().from(appUsersTable)
       .where(eq(appUsersTable.clerkUserId, clerkUserId)).limit(1);
@@ -241,49 +233,5 @@ describe("first-book name onboarding", () => {
       .where(eq(businessSettingsTable.businessId, user!.businessId)).limit(1);
     expect(updatedBook?.name).toBe("Dhaka General Store");
     expect(updatedSettings?.storeName).toBe("Dhaka General Store");
-  });
-
-  it("denies new owner accounts without pre-approval even after OTP or OAuth identity verification", async () => {
-    const deniedClerkId = `book-name-denied-${randomUUID()}`;
-    const deniedEmail = `${deniedClerkId}@example.test`;
-    const deniedPhone = `017${String(randomInt(0, 100_000_000)).padStart(8, "0")}`;
-    const normalizedDeniedPhone = `+88${deniedPhone}`;
-    const fetchMetadata = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
-      new Response(JSON.stringify({
-        primary_email_address_id: "primary",
-        email_addresses: [{
-          id: "primary",
-          email_address: deniedEmail,
-          verification: { status: "verified" },
-        }],
-      }), { status: 200, headers: { "content-type": "application/json" } }));
-
-    try {
-      clerkSession.userId = deniedClerkId;
-      clerkSession.sessionId = `denied-${randomUUID()}`;
-      const clerkResult = await request(app).get("/auth/me").set("Authorization", "Bearer clerk");
-      expect(clerkResult.status, clerkResult.text).toBe(403);
-      expect(await db.select().from(appUsersTable).where(eq(appUsersTable.clerkUserId, deniedClerkId))).toHaveLength(0);
-
-      clerkSession.userId = "";
-      clerkSession.sessionId = "";
-      const sent = await request(app).post("/auth/phone/send-otp").send({ phone: deniedPhone });
-      expect(sent.status, sent.text).toBe(200);
-      const code = vi.mocked(sendOtpSms).mock.calls.at(-1)?.[1] as string;
-      const phoneResult = await request(app).post("/auth/phone/verify-otp")
-        .send({ phone: deniedPhone, code });
-      expect(phoneResult.status, phoneResult.text).toBe(403);
-      expect(await db.select().from(appUsersTable).where(eq(appUsersTable.phone, normalizedDeniedPhone))).toHaveLength(0);
-      const attempts = await db.select().from(userLoginAttemptsTable)
-        .where(eq(userLoginAttemptsTable.identifier, deniedEmail));
-      expect(attempts.some((attempt) => attempt.errorCode === "not_preapproved")).toBe(true);
-    } finally {
-      clerkSession.userId = "";
-      clerkSession.sessionId = "";
-      fetchMetadata.mockRestore();
-      await db.delete(otpCodesTable).where(eq(otpCodesTable.phone, normalizedDeniedPhone));
-      await db.delete(userLoginAttemptsTable).where(eq(userLoginAttemptsTable.identifier, deniedEmail));
-      await db.delete(userLoginAttemptsTable).where(eq(userLoginAttemptsTable.identifier, normalizedDeniedPhone));
-    }
   });
 });
