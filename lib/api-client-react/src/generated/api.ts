@@ -22,6 +22,7 @@ import type {
 import type {
   AccountDeletionResult,
   AdjustmentTarget,
+  AdminLoginAttemptList,
   AdminLoginInput,
   AdminLoginResult,
   AdminOtpConfig,
@@ -72,6 +73,9 @@ import type {
   PhoneOtpSendResult,
   PhoneOtpSession,
   PhoneOtpVerifyInput,
+  PreapprovedLogin,
+  PreapprovedLoginInput,
+  PreapprovedLoginList,
   PublicReportBranding,
   PushTokenInput,
   ReminderMessage,
@@ -3392,6 +3396,302 @@ export const useUpdateAdminUser = <TError = ErrorType<void>,
       > => {
       return useMutation(getUpdateAdminUserMutationOptions(options));
     }
+
+export const getListPreapprovedLoginsUrl = () => {
+
+
+
+
+  return `/api/admin/preapproved-logins`
+}
+
+/**
+ * @summary List pre-approved identities
+ */
+export const listPreapprovedLogins = async ( options?: RequestInit): Promise<PreapprovedLoginList> => {
+
+  return customFetch<PreapprovedLoginList>(getListPreapprovedLoginsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPreapprovedLoginsQueryKey = () => {
+    return [
+    `/api/admin/preapproved-logins`
+    ] as const;
+    }
+
+
+export const getListPreapprovedLoginsQueryOptions = <TData = Awaited<ReturnType<typeof listPreapprovedLogins>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPreapprovedLogins>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPreapprovedLoginsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPreapprovedLogins>>> = ({ signal }) => listPreapprovedLogins({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPreapprovedLogins>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPreapprovedLoginsQueryResult = NonNullable<Awaited<ReturnType<typeof listPreapprovedLogins>>>
+export type ListPreapprovedLoginsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List pre-approved identities
+ */
+
+export function useListPreapprovedLogins<TData = Awaited<ReturnType<typeof listPreapprovedLogins>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPreapprovedLogins>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPreapprovedLoginsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreatePreapprovedLoginUrl = () => {
+
+
+
+
+  return `/api/admin/preapproved-logins`
+}
+
+/**
+ * @summary Add a pre-approved identity
+ */
+export const createPreapprovedLogin = async (preapprovedLoginInput: PreapprovedLoginInput, options?: RequestInit): Promise<PreapprovedLogin> => {
+
+  return customFetch<PreapprovedLogin>(getCreatePreapprovedLoginUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(preapprovedLoginInput)
+  }
+);}
+
+
+
+
+
+export const getCreatePreapprovedLoginMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPreapprovedLogin>>, TError,{data: BodyType<PreapprovedLoginInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPreapprovedLogin>>, TError,{data: BodyType<PreapprovedLoginInput>}, TContext> => {
+
+const mutationKey = ['createPreapprovedLogin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPreapprovedLogin>>, {data: BodyType<PreapprovedLoginInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPreapprovedLogin(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePreapprovedLoginMutationResult = NonNullable<Awaited<ReturnType<typeof createPreapprovedLogin>>>
+    export type CreatePreapprovedLoginMutationBody = BodyType<PreapprovedLoginInput>
+    export type CreatePreapprovedLoginMutationError = ErrorType<void>
+
+    /**
+ * @summary Add a pre-approved identity
+ */
+export const useCreatePreapprovedLogin = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPreapprovedLogin>>, TError,{data: BodyType<PreapprovedLoginInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPreapprovedLogin>>,
+        TError,
+        {data: BodyType<PreapprovedLoginInput>},
+        TContext
+      > => {
+      return useMutation(getCreatePreapprovedLoginMutationOptions(options));
+    }
+
+export const getDeletePreapprovedLoginUrl = (id: string,) => {
+
+
+
+
+  return `/api/admin/preapproved-logins/${id}`
+}
+
+/**
+ * @summary Remove a pre-approved identity
+ */
+export const deletePreapprovedLogin = async (id: string, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeletePreapprovedLoginUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeletePreapprovedLoginMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePreapprovedLogin>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deletePreapprovedLogin>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['deletePreapprovedLogin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deletePreapprovedLogin>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deletePreapprovedLogin(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeletePreapprovedLoginMutationResult = NonNullable<Awaited<ReturnType<typeof deletePreapprovedLogin>>>
+
+    export type DeletePreapprovedLoginMutationError = ErrorType<void>
+
+    /**
+ * @summary Remove a pre-approved identity
+ */
+export const useDeletePreapprovedLogin = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePreapprovedLogin>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deletePreapprovedLogin>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getDeletePreapprovedLoginMutationOptions(options));
+    }
+
+export const getListAdminLoginAttemptsUrl = () => {
+
+
+
+
+  return `/api/admin/login-attempts`
+}
+
+/**
+ * @summary List recent failed sign-in attempts
+ */
+export const listAdminLoginAttempts = async ( options?: RequestInit): Promise<AdminLoginAttemptList> => {
+
+  return customFetch<AdminLoginAttemptList>(getListAdminLoginAttemptsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAdminLoginAttemptsQueryKey = () => {
+    return [
+    `/api/admin/login-attempts`
+    ] as const;
+    }
+
+
+export const getListAdminLoginAttemptsQueryOptions = <TData = Awaited<ReturnType<typeof listAdminLoginAttempts>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminLoginAttempts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAdminLoginAttemptsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminLoginAttempts>>> = ({ signal }) => listAdminLoginAttempts({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminLoginAttempts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAdminLoginAttemptsQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminLoginAttempts>>>
+export type ListAdminLoginAttemptsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List recent failed sign-in attempts
+ */
+
+export function useListAdminLoginAttempts<TData = Awaited<ReturnType<typeof listAdminLoginAttempts>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminLoginAttempts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAdminLoginAttemptsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetAdminOtpConfigUrl = () => {
 

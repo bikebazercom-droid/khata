@@ -8,6 +8,8 @@
 
 export * from './accountDeletionResult';
 export * from './adjustmentTarget';
+export * from './adminLoginAttempt';
+export * from './adminLoginAttemptList';
 export * from './adminLoginEvent';
 export * from './adminLoginInput';
 export * from './adminLoginResult';
@@ -83,6 +85,11 @@ export * from './phoneOtpSendInput';
 export * from './phoneOtpSendResult';
 export * from './phoneOtpSession';
 export * from './phoneOtpVerifyInput';
+export * from './preapprovedLogin';
+export * from './preapprovedLoginInput';
+export * from './preapprovedLoginInputKind';
+export * from './preapprovedLoginKind';
+export * from './preapprovedLoginList';
 export * from './publicReportBranding';
 export * from './pushTokenInput';
 export * from './pushTokenInputPlatform';

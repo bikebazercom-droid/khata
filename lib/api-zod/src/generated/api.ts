@@ -851,6 +851,69 @@ export const UpdateAdminUserResponse = zod.object({
 
 
 /**
+ * @summary List pre-approved identities
+ */
+export const ListPreapprovedLoginsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(['phone', 'email']),
+  "identifier": zod.string(),
+  "note": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Add a pre-approved identity
+ */
+export const createPreapprovedLoginBodyNoteMax = 300;
+
+
+
+export const CreatePreapprovedLoginBody = zod.object({
+  "kind": zod.enum(['phone', 'email']),
+  "identifier": zod.string(),
+  "note": zod.string().max(createPreapprovedLoginBodyNoteMax).optional()
+})
+
+export const CreatePreapprovedLoginResponse = zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(['phone', 'email']),
+  "identifier": zod.string(),
+  "note": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Remove a pre-approved identity
+ */
+export const DeletePreapprovedLoginParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeletePreapprovedLoginResponse = zod.void()
+
+
+/**
+ * @summary List recent failed sign-in attempts
+ */
+export const ListAdminLoginAttemptsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "identifier": zod.string(),
+  "authMethod": zod.string(),
+  "stage": zod.string(),
+  "errorCode": zod.string(),
+  "ip": zod.string().nullable(),
+  "device": zod.string(),
+  "occurredAt": zod.coerce.date()
+}))
+})
+
+
+/**
  * @summary Get OTP gateway configuration
  */
 export const GetAdminOtpConfigResponse = zod.object({

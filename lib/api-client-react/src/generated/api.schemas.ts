@@ -596,6 +596,58 @@ export type AdminUserDetail = AdminUser & {
   loginHistory: AdminLoginEvent[];
 };
 
+export type PreapprovedLoginKind = typeof PreapprovedLoginKind[keyof typeof PreapprovedLoginKind];
+
+
+export const PreapprovedLoginKind = {
+  phone: 'phone',
+  email: 'email',
+} as const;
+
+export interface PreapprovedLogin {
+  id: string;
+  kind: PreapprovedLoginKind;
+  identifier: string;
+  /** @nullable */
+  note: string | null;
+  createdAt: string;
+}
+
+export type PreapprovedLoginInputKind = typeof PreapprovedLoginInputKind[keyof typeof PreapprovedLoginInputKind];
+
+
+export const PreapprovedLoginInputKind = {
+  phone: 'phone',
+  email: 'email',
+} as const;
+
+export interface PreapprovedLoginInput {
+  kind: PreapprovedLoginInputKind;
+  identifier: string;
+  /** @maxLength 300 */
+  note?: string;
+}
+
+export interface PreapprovedLoginList {
+  items: PreapprovedLogin[];
+}
+
+export interface AdminLoginAttempt {
+  id: string;
+  identifier: string;
+  authMethod: string;
+  stage: string;
+  errorCode: string;
+  /** @nullable */
+  ip: string | null;
+  device: string;
+  occurredAt: string;
+}
+
+export interface AdminLoginAttemptList {
+  items: AdminLoginAttempt[];
+}
+
 export type AdminUserUpdateStatus = typeof AdminUserUpdateStatus[keyof typeof AdminUserUpdateStatus];
 
 

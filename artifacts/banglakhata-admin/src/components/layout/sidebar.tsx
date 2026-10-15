@@ -6,6 +6,7 @@ import {
   Settings,
   LogOut,
   Menu,
+  ShieldCheck,
 } from "lucide-react";
 import { clearAdminAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import { Button } from "@/components/ui/button";
 const links = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/users", label: "Users", icon: Users },
+  { href: "/sign-in-activity", label: "Sign-in activity", icon: ShieldCheck },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

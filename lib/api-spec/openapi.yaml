@@ -1011,6 +1011,77 @@ paths:
         "404":
           description: Not found
 
+  /admin/preapproved-logins:
+    get:
+      operationId: listPreapprovedLogins
+      tags: [admin]
+      summary: List pre-approved identities
+      security:
+        - adminBearer: []
+      responses:
+        "200":
+          description: Pre-approved login identities
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreapprovedLoginList"
+    post:
+      operationId: createPreapprovedLogin
+      tags: [admin]
+      summary: Add a pre-approved identity
+      security:
+        - adminBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PreapprovedLoginInput"
+      responses:
+        "201":
+          description: Pre-approved identity added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreapprovedLogin"
+        "400":
+          description: Invalid identity
+        "409":
+          description: Identity already pre-approved
+
+  /admin/preapproved-logins/{id}:
+    delete:
+      operationId: deletePreapprovedLogin
+      tags: [admin]
+      summary: Remove a pre-approved identity
+      security:
+        - adminBearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Identity removed
+        "404":
+          description: Identity not found
+
+  /admin/login-attempts:
+    get:
+      operationId: listAdminLoginAttempts
+      tags: [admin]
+      summary: List recent failed sign-in attempts
+      security:
+        - adminBearer: []
+      responses:
+        "200":
+          description: Latest 100 failed sign-in attempts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminLoginAttemptList"
   /admin/otp-config:
     get:
       operationId: getAdminOtpConfig
@@ -1946,6 +2017,53 @@ components:
         device: { type: string }
         authMethod: { type: string }
         source: { type: string }
+
+    PreapprovedLogin:
+      type: object
+      required: [id, kind, identifier, note, createdAt]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [phone, email] }
+        identifier: { type: string }
+        note: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+
+    PreapprovedLoginInput:
+      type: object
+      required: [kind, identifier]
+      properties:
+        kind: { type: string, enum: [phone, email] }
+        identifier: { type: string }
+        note: { type: string, maxLength: 300 }
+
+    PreapprovedLoginList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PreapprovedLogin" }
+
+    AdminLoginAttempt:
+      type: object
+      required: [id, identifier, authMethod, stage, errorCode, ip, device, occurredAt]
+      properties:
+        id: { type: string }
+        identifier: { type: string }
+        authMethod: { type: string }
+        stage: { type: string }
+        errorCode: { type: string }
+        ip: { type: ["string", "null"] }
+        device: { type: string }
+        occurredAt: { type: string, format: date-time }
+
+    AdminLoginAttemptList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminLoginAttempt" }
 
     AdminUserUpdate:
       type: object

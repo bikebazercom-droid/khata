@@ -25,6 +25,7 @@ import DashboardPage from '@/pages/dashboard';
 import UsersPage from '@/pages/users';
 import UserDetailPage from '@/pages/user-detail';
 import SettingsPage from '@/pages/settings';
+import SignInActivityPage from '@/pages/sign-in-activity';
 
 // Generated admin API calls read the latest JWT before every request.
 setAuthTokenGetter(getAdminToken);
@@ -174,6 +175,10 @@ function ProtectedSettings() {
   );
 }
 
+function ProtectedSignInActivity() {
+  return <AdminGuard><SignInActivityPage /></AdminGuard>;
+}
+
 function Router() {
   return (
     <Switch>
@@ -181,6 +186,7 @@ function Router() {
       <Route path="/dashboard" component={ProtectedDashboard} />
       <Route path="/users" component={ProtectedUsers} />
       <Route path="/users/:id" component={ProtectedUserDetail} />
+      <Route path="/sign-in-activity" component={ProtectedSignInActivity} />
       <Route path="/settings" component={ProtectedSettings} />
       <Route component={NotFound} />
     </Switch>

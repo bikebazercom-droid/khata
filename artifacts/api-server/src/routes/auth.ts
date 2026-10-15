@@ -35,7 +35,7 @@ import {
 } from "../middlewares/requireAuth";
 import { ensureSmsReady, sendOtpSms, SmsGatewayError } from "../services/sms";
 import { clientIp } from "../middlewares/ipBlock";
-import { deviceDescription } from "../lib/authTelemetry";
+import { deviceDescription, recordFailedLoginAttempt } from "../lib/authTelemetry";
 import { normalizeBdPhone } from "../lib/bdPhone";
 import { PostgresRateLimitStore } from "../lib/postgresRateLimitStore";
 import {
@@ -71,6 +71,13 @@ const sendOtpIpLimiter = rateLimit({
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: { error: "Too many OTP requests from this IP. Please wait 15 minutes before trying again." },
+  handler: (req, res) => {
+    void recordFailedLoginAttempt(req, {
+      identifier: typeof req.body?.phone === "string" ? normalizeBdPhone(req.body.phone) ?? "invalid_phone" : "unknown",
+      authMethod: "phone", stage: "send_otp", errorCode: "rate_limited_ip",
+    });
+    res.status(429).json({ error: "Too many OTP requests from this IP. Please wait 15 minutes before trying again." });
+  },
 });
 
 const sendOtpPhoneLimiter = rateLimit({
@@ -81,6 +88,13 @@ const sendOtpPhoneLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: getNormalizedOtpPhoneRateLimitKey,
   message: { error: "Too many codes requested for this phone. Please try again later." },
+  handler: (req, res) => {
+    void recordFailedLoginAttempt(req, {
+      identifier: typeof req.body?.phone === "string" ? normalizeBdPhone(req.body.phone) ?? "invalid_phone" : "unknown",
+      authMethod: "phone", stage: "send_otp", errorCode: "rate_limited_phone",
+    });
+    res.status(429).json({ error: "Too many codes requested for this phone. Please try again later." });
+  },
 });
 
 function otpDigest(phone: string, code: string): string {
@@ -123,6 +137,13 @@ const verifyOtpIpLimiter = rateLimit({
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: { error: "Too many verification attempts from this IP. Please wait 15 minutes." },
+  handler: (req, res) => {
+    void recordFailedLoginAttempt(req, {
+      identifier: typeof req.body?.phone === "string" ? normalizeBdPhone(req.body.phone) ?? "invalid_phone" : "unknown",
+      authMethod: "phone", stage: "verify_otp", errorCode: "rate_limited_ip",
+    });
+    res.status(429).json({ error: "Too many verification attempts from this IP. Please wait 15 minutes." });
+  },
 });
 
 /**
@@ -141,6 +162,13 @@ const verifyOtpPhoneLimiter = rateLimit({
   standardHeaders: "draft-7",
   legacyHeaders: false,
   message: { error: "Too many verification attempts for this number. Please request a new code." },
+  handler: (req, res) => {
+    void recordFailedLoginAttempt(req, {
+      identifier: typeof req.body?.phone === "string" ? normalizeBdPhone(req.body.phone) ?? "invalid_phone" : "unknown",
+      authMethod: "phone", stage: "verify_otp", errorCode: "rate_limited_phone",
+    });
+    res.status(429).json({ error: "Too many verification attempts for this number. Please request a new code." });
+  },
 });
 
 // ─── POST /api/auth/phone/send-otp ───────────────────────────────────────────
@@ -153,17 +181,27 @@ router.post(
     const [config] = await db.select({ enabled: adminOtpConfigTable.enabled })
       .from(adminOtpConfigTable).limit(1);
     if (config?.enabled === false) {
+      await recordFailedLoginAttempt(req, {
+        identifier: typeof req.body?.phone === "string" ? normalizeBdPhone(req.body.phone) ?? "invalid_phone" : "unknown",
+        authMethod: "phone", stage: "send_otp", errorCode: "otp_disabled",
+      });
       res.status(503).json({ error: "Phone OTP is temporarily disabled" });
       return;
     }
     const { phone } = req.body ?? {};
     if (typeof phone !== "string" || !phone.trim()) {
+      await recordFailedLoginAttempt(req, {
+        identifier: "unknown", authMethod: "phone", stage: "send_otp", errorCode: "missing_phone",
+      });
       res.status(400).json({ error: "phone is required" });
       return;
     }
 
     const normalized = normalizeBdPhone(phone.trim());
     if (!normalized) {
+      await recordFailedLoginAttempt(req, {
+        identifier: phone.trim(), authMethod: "phone", stage: "send_otp", errorCode: "invalid_phone",
+      });
       res.status(400).json({
         error: "Invalid Bangladeshi phone number. Use format: 01XXXXXXXXX",
       });
@@ -177,6 +215,9 @@ router.post(
         stage: "sms_configuration",
         ...smsFailureLogFields(error),
       }, "Phone OTP request cannot proceed because SMS delivery is not configured");
+      await recordFailedLoginAttempt(req, {
+        identifier: normalized, authMethod: "phone", stage: "send_otp", errorCode: safeFailureCode(error),
+      });
       res.status(503).json({ error: "Phone OTP is temporarily unavailable. Please try again later." });
       return;
     }
@@ -189,6 +230,9 @@ router.post(
         stage: "otp_generation",
         errorCode: safeFailureCode(error),
       }, "Phone OTP code generation failed");
+      await recordFailedLoginAttempt(req, {
+        identifier: normalized, authMethod: "phone", stage: "send_otp", errorCode: safeFailureCode(error),
+      });
       res.status(503).json({ error: "Could not prepare a sign-in code. Please try again later." });
       return;
     }
@@ -210,6 +254,9 @@ router.post(
         stage: "otp_persist",
         errorCode: safeFailureCode(error),
       }, "Generated phone OTP could not be stored");
+      await recordFailedLoginAttempt(req, {
+        identifier: normalized, authMethod: "phone", stage: "send_otp", errorCode: safeFailureCode(error),
+      });
       res.status(503).json({ error: "Could not prepare a sign-in code. Please try again later." });
       return;
     }
@@ -221,6 +268,9 @@ router.post(
         stage: "sms_delivery",
         ...smsFailureLogFields(error),
       }, "Phone OTP SMS delivery failed");
+      await recordFailedLoginAttempt(req, {
+        identifier: normalized, authMethod: "phone", stage: "send_otp", errorCode: safeFailureCode(error),
+      });
       try {
         await db.delete(otpCodesTable).where(eq(otpCodesTable.id, recordId));
       } catch (cleanupError) {
@@ -246,17 +296,28 @@ router.post(
     const [config] = await db.select({ enabled: adminOtpConfigTable.enabled })
       .from(adminOtpConfigTable).limit(1);
     if (config?.enabled === false) {
+      await recordFailedLoginAttempt(req, {
+        identifier: typeof req.body?.phone === "string" ? normalizeBdPhone(req.body.phone) ?? "invalid_phone" : "unknown",
+        authMethod: "phone", stage: "verify_otp", errorCode: "otp_disabled",
+      });
       res.status(503).json({ error: "Phone OTP is temporarily disabled" });
       return;
     }
     const { phone, code } = req.body ?? {};
     if (typeof phone !== "string" || typeof code !== "string") {
+      await recordFailedLoginAttempt(req, {
+        identifier: typeof phone === "string" ? normalizeBdPhone(phone) ?? phone : "unknown",
+        authMethod: "phone", stage: "verify_otp", errorCode: "missing_phone_or_code",
+      });
       res.status(400).json({ error: "phone and code are required" });
       return;
     }
 
     const normalized = normalizeBdPhone(phone.trim());
     if (!normalized) {
+      await recordFailedLoginAttempt(req, {
+        identifier: phone.trim(), authMethod: "phone", stage: "verify_otp", errorCode: "invalid_phone",
+      });
       res.status(400).json({ error: "Invalid phone number" });
       return;
     }
@@ -275,6 +336,9 @@ router.post(
       .limit(1);
 
     if (!record) {
+      await recordFailedLoginAttempt(req, {
+        identifier: normalized, authMethod: "phone", stage: "verify_otp", errorCode: "invalid_or_expired_code",
+      });
       res.status(401).json({ error: "Invalid or expired code" });
       return;
     }
@@ -290,13 +354,32 @@ router.post(
         gt(otpCodesTable.expiresAt, new Date()),
       )).returning({ id: otpCodesTable.id });
     if (!consumed) {
+      await recordFailedLoginAttempt(req, {
+        identifier: normalized, authMethod: "phone", stage: "verify_otp", errorCode: "invalid_or_expired_code",
+      });
       res.status(401).json({ error: "Invalid or expired code" });
       return;
     }
 
     // JIT provision the user + business.
-    const user = await getOrCreatePhoneUser(normalized);
+    let user;
+    try {
+      user = await getOrCreatePhoneUser(normalized);
+    } catch (error) {
+      if (error instanceof Error && error.name === "PreapprovalRequiredError") {
+        await recordFailedLoginAttempt(req, {
+          identifier: normalized, authMethod: "phone", stage: "account_creation", errorCode: "not_preapproved",
+        });
+        res.status(403).json({ error: "Account creation is currently limited to pre-approved phone numbers" });
+        return;
+      }
+      throw error;
+    }
     if (user.status !== "active" || user.workerAccessDeletedAt) {
+      await recordFailedLoginAttempt(req, {
+        identifier: normalized, authMethod: "phone", stage: "account_status",
+        errorCode: user.workerAccessDeletedAt ? "staff_access_removed" : "account_suspended",
+      });
       res.status(403).json({ error: user.workerAccessDeletedAt
         ? "Staff access removed. Ask the owner for a new invitation." : "Account suspended" });
       return;

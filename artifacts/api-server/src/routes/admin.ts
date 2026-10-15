@@ -4,12 +4,13 @@ import rateLimit from "express-rate-limit";
 import { and, count, countDistinct, desc, eq, gte, ilike, or, sql, isNotNull } from "drizzle-orm";
 import {
   db, appUsersTable, adminOtpConfigTable, userLoginEventsTable,
-  userPresenceTable, blockedIpsTable,
+  userPresenceTable, blockedIpsTable, preapprovedLoginsTable, userLoginAttemptsTable,
 } from "@workspace/db";
 import { requireAdmin, signAdminToken } from "../middlewares/requireAdmin";
 import { ensureSmsReady, getSmsGatewayStatus } from "../services/sms";
 import { logger } from "../lib/logger";
 import { clientIp, ipPolicy } from "../middlewares/ipBlock";
+import { normalizeBdPhone } from "../lib/bdPhone";
 
 const username = process.env.ADMIN_USERNAME;
 const password = process.env.ADMIN_PASSWORD;
@@ -138,6 +139,81 @@ router.patch("/admin/users/:userId", async (req, res) => {
   } catch (err) {
     logger.error({ err }, "admin/user update error");
     res.status(500).json({ error: "Unable to update user" });
+  }
+});
+
+router.get("/admin/preapproved-logins", async (_req, res) => {
+  try {
+    const items = await db.select().from(preapprovedLoginsTable)
+      .orderBy(desc(preapprovedLoginsTable.createdAt));
+    res.json({ items: items.map((item) => ({
+      id: item.id, kind: item.kind, identifier: item.identifier,
+      note: item.note, createdAt: item.createdAt.toISOString(),
+    })) });
+  } catch (err) {
+    logger.error({ err }, "admin/preapproved-logins GET error");
+    res.status(500).json({ error: "Unable to load pre-approved logins" });
+  }
+});
+
+router.post("/admin/preapproved-logins", async (req, res) => {
+  const kind = req.body?.kind;
+  const rawIdentifier = typeof req.body?.identifier === "string" ? req.body.identifier.trim() : "";
+  const note = req.body?.note;
+  if ((kind !== "phone" && kind !== "email") ||
+      (note !== undefined && note !== null && (typeof note !== "string" || note.length > 300))) {
+    res.status(400).json({ error: "Provide a phone or email and an optional note up to 300 characters" });
+    return;
+  }
+  const identifier = kind === "phone"
+    ? normalizeBdPhone(rawIdentifier)
+    : rawIdentifier.toLowerCase();
+  const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier ?? "");
+  if (!identifier || (kind === "email" && !validEmail)) {
+    res.status(400).json({ error: kind === "phone" ? "Enter a valid Bangladesh phone number" : "Enter a valid email address" });
+    return;
+  }
+  try {
+    const [item] = await db.insert(preapprovedLoginsTable)
+      .values({ kind, identifier, note: note || null })
+      .onConflictDoNothing()
+      .returning();
+    if (!item) { res.status(409).json({ error: "This login is already pre-approved" }); return; }
+    res.status(201).json({
+      id: item.id, kind: item.kind, identifier: item.identifier,
+      note: item.note, createdAt: item.createdAt.toISOString(),
+    });
+  } catch (err) {
+    logger.error({ err }, "admin/preapproved-logins POST error");
+    res.status(500).json({ error: "Unable to add pre-approved login" });
+  }
+});
+
+router.delete("/admin/preapproved-logins/:id", async (req, res) => {
+  try {
+    const [removed] = await db.delete(preapprovedLoginsTable)
+      .where(eq(preapprovedLoginsTable.id, req.params.id))
+      .returning({ id: preapprovedLoginsTable.id });
+    if (!removed) { res.status(404).json({ error: "Pre-approved login not found" }); return; }
+    res.status(204).end();
+  } catch (err) {
+    logger.error({ err }, "admin/preapproved-logins DELETE error");
+    res.status(500).json({ error: "Unable to remove pre-approved login" });
+  }
+});
+
+router.get("/admin/login-attempts", async (_req, res) => {
+  try {
+    const items = await db.select().from(userLoginAttemptsTable)
+      .orderBy(desc(userLoginAttemptsTable.occurredAt)).limit(100);
+    res.json({ items: items.map((item) => ({
+      id: item.id, identifier: item.identifier, authMethod: item.authMethod,
+      stage: item.stage, errorCode: item.errorCode, ip: item.ip,
+      device: item.device, occurredAt: item.occurredAt.toISOString(),
+    })) });
+  } catch (err) {
+    logger.error({ err }, "admin/login-attempts GET error");
+    res.status(500).json({ error: "Unable to load login attempts" });
   }
 });
 

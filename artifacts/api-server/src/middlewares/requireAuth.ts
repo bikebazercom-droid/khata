@@ -13,13 +13,29 @@ import {
   userBusinessesTable,
   workerInvitesTable,
   workerPartyAssignmentsTable,
+  preapprovedLoginsTable,
   type AppUser,
 } from "@workspace/db";
 import { clientIp } from "./ipBlock";
-import { deviceDescription } from "../lib/authTelemetry";
+import { deviceDescription, recordFailedLoginAttempt } from "../lib/authTelemetry";
 
 // Fixed UUID for the seed business that owns all pre-auth legacy data.
 export const SEED_BUSINESS_ID = "00000000-0000-0000-0000-000000000001";
+
+export class PreapprovalRequiredError extends Error {
+  constructor(public readonly kind: "phone" | "email", public readonly identifier: string) {
+    super("Identity is not on the pre-approved login list");
+    this.name = "PreapprovalRequiredError";
+  }
+}
+
+async function isPreapproved(kind: "phone" | "email", identifier: string): Promise<boolean> {
+  const [entry] = await db.select({ id: preapprovedLoginsTable.id })
+    .from(preapprovedLoginsTable)
+    .where(and(eq(preapprovedLoginsTable.kind, kind), eq(preapprovedLoginsTable.identifier, identifier)))
+    .limit(1);
+  return !!entry;
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -224,6 +240,9 @@ export async function getOrCreateClerkUser(
     if (existingEmail) throw new Error("Verified email is already linked to another user");
     const staff = await claimWorkerInvite({ email: verifiedEmail, clerkUserId });
     if (staff) return staff;
+    if (!await isPreapproved("email", verifiedEmail.toLowerCase())) {
+      throw new PreapprovalRequiredError("email", verifiedEmail.toLowerCase());
+    }
   }
 
   const [seedOwner] = await db
@@ -265,6 +284,9 @@ export async function getOrCreatePhoneUser(
 
   const staff = await claimWorkerInvite({ phone });
   if (staff) return staff;
+  if (!await isPreapproved("phone", phone)) {
+    throw new PreapprovalRequiredError("phone", phone);
+  }
 
   const [seedOwner] = await db
     .select()
@@ -673,6 +695,14 @@ export async function requireAuth(
       (req as AuthenticatedRequest).verifiedEmail = verifiedEmail ?? undefined;
       return next();
     } catch (err) {
+      if (err instanceof PreapprovalRequiredError) {
+        await recordFailedLoginAttempt(req, {
+          identifier: err.identifier, authMethod: "clerk", stage: "account_creation",
+          errorCode: "not_preapproved",
+        });
+        res.status(403).json({ error: "Account creation is currently limited to pre-approved email addresses" });
+        return;
+      }
       req.log?.error({ err }, "[requireAuth] Clerk JIT provision failed");
       res.status(500).json({ error: "Auth provisioning failed" });
       return;
