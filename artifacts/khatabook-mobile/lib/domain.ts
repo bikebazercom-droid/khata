@@ -29,37 +29,67 @@ export function evaluateCalculatorExpression(raw: string): number | null {
 
   const isOperator = (token: string) => ['+', '-', '*', '/'].includes(token);
   if (isOperator(tokens[0])) return null;
-  const round2 = (value: number) => Math.round(value * 100) / 100;
+  type Decimal = { numerator: bigint; denominator: bigint };
+  const gcd = (left: bigint, right: bigint): bigint => {
+    let a = left < 0n ? -left : left;
+    let b = right < 0n ? -right : right;
+    while (b !== 0n) [a, b] = [b, a % b];
+    return a || 1n;
+  };
+  const decimal = (numerator: bigint, denominator = 1n): Decimal => {
+    const sign = denominator < 0n ? -1n : 1n;
+    const divisor = gcd(numerator, denominator);
+    return { numerator: (numerator / divisor) * sign, denominator: (denominator / divisor) * sign };
+  };
+  const fromString = (value: string): Decimal => {
+    const [whole, fraction = ''] = value.split('.');
+    return decimal(BigInt(`${whole}${fraction}`), 10n ** BigInt(fraction.length));
+  };
+  const add = (a: Decimal, b: Decimal) => decimal(a.numerator * b.denominator + b.numerator * a.denominator, a.denominator * b.denominator);
+  const subtract = (a: Decimal, b: Decimal) => decimal(a.numerator * b.denominator - b.numerator * a.denominator, a.denominator * b.denominator);
+  const multiply = (a: Decimal, b: Decimal) => decimal(a.numerator * b.numerator, a.denominator * b.denominator);
+  const divide = (a: Decimal, b: Decimal) => b.numerator === 0n
+    ? null
+    : decimal(a.numerator * b.denominator, a.denominator * b.numerator);
+  const toNumber = (value: Decimal) => Number(value.numerator) / Number(value.denominator);
+  const toRoundedCurrency = (value: Decimal) => {
+    const scaled = value.numerator * 100n;
+    let cents = scaled / value.denominator;
+    const remainder = scaled % value.denominator;
+    // Match Math.round's midpoint behavior while deciding the rounding exactly.
+    if (scaled >= 0n && remainder * 2n >= value.denominator) cents += 1n;
+    if (scaled < 0n && -remainder * 2n > value.denominator) cents -= 1n;
+    return Number(cents) / 100;
+  };
   const first = tokens[0];
-  // Keep percentage fractions precise until the enclosing operation finishes.
-  // Rounding 80.10% to 0.80 would make 1,000,000 ÷ 80.10% equal 1,250,000.
-  let total = first.endsWith('%') ? parseFloat(first) / 100 : parseFloat(first);
-  if (!Number.isFinite(total)) return null;
+  let total = fromString(first.endsWith('%') ? first.slice(0, -1) : first);
+  if (first.endsWith('%')) total = decimal(total.numerator, total.denominator * 100n);
 
   for (let index = 1; index < tokens.length; index += 2) {
     const operator = tokens[index];
     const operand = tokens[index + 1];
     if (!isOperator(operator) || operand === undefined || isOperator(operand)) return null;
     const isPercent = operand.endsWith('%');
-    const number = parseFloat(isPercent ? operand.slice(0, -1) : operand);
-    if (!Number.isFinite(number)) return null;
-    const value = isPercent
-      ? operator === '+' || operator === '-'
-        ? round2(total * (number / 100))
-        : number / 100
-      : number;
+    let value = fromString(isPercent ? operand.slice(0, -1) : operand);
+    if (isPercent) value = decimal(value.numerator, value.denominator * 100n);
+    if ((operator === '+' || operator === '-') && isPercent) value = multiply(total, value);
 
     switch (operator) {
-      case '+': total = round2(total + value); break;
-      case '-': total = round2(total - value); break;
-      case '*': total = round2(total * value); break;
+      case '+': total = add(total, value); break;
+      case '-': total = subtract(total, value); break;
+      case '*': total = multiply(total, value); break;
       case '/':
-        if (value === 0) return null;
-        total = round2(total / value);
+        {
+          const result = divide(total, value);
+          if (!result) return null;
+          total = result;
+        }
         break;
     }
   }
-  return Number.isFinite(total) ? total : null;
+  const result = tokens.length > 1 ? toRoundedCurrency(total) : toNumber(total);
+  if (!Number.isFinite(result)) return null;
+  return result;
 }
 
 export function formatExpression(expression: string): string {

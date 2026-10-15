@@ -136,16 +136,42 @@ export function evaluateCalculatorExpression(raw: string): number | null {
   const isOperator = (t: string) => t === '+' || t === '-' || t === '*' || t === '/';
   if (isOperator(tokens[0])) return null;
 
-  // Round to 2 decimal places after every operation to eliminate
-  // floating-point noise (e.g. 0.1 + 0.2 → 0.30000000000000004 → 0.30).
-  const r2 = (n: number) => Math.round(n * 100) / 100;
+  type Decimal = { numerator: bigint; denominator: bigint };
+  const gcd = (left: bigint, right: bigint): bigint => {
+    let a = left < 0n ? -left : left;
+    let b = right < 0n ? -right : right;
+    while (b !== 0n) [a, b] = [b, a % b];
+    return a || 1n;
+  };
+  const decimal = (numerator: bigint, denominator = 1n): Decimal => {
+    const sign = denominator < 0n ? -1n : 1n;
+    const divisor = gcd(numerator, denominator);
+    return { numerator: (numerator / divisor) * sign, denominator: (denominator / divisor) * sign };
+  };
+  const fromString = (value: string): Decimal => {
+    const [whole, fraction = ''] = value.split('.');
+    return decimal(BigInt(`${whole}${fraction}`), 10n ** BigInt(fraction.length));
+  };
+  const add = (a: Decimal, b: Decimal) => decimal(a.numerator * b.denominator + b.numerator * a.denominator, a.denominator * b.denominator);
+  const subtract = (a: Decimal, b: Decimal) => decimal(a.numerator * b.denominator - b.numerator * a.denominator, a.denominator * b.denominator);
+  const multiply = (a: Decimal, b: Decimal) => decimal(a.numerator * b.numerator, a.denominator * b.denominator);
+  const divide = (a: Decimal, b: Decimal) => b.numerator === 0n
+    ? null
+    : decimal(a.numerator * b.denominator, a.denominator * b.numerator);
+  const toNumber = (value: Decimal) => Number(value.numerator) / Number(value.denominator);
+  const toRoundedCurrency = (value: Decimal) => {
+    const scaled = value.numerator * 100n;
+    let cents = scaled / value.denominator;
+    const remainder = scaled % value.denominator;
+    // Match Math.round's midpoint behavior while deciding the rounding exactly.
+    if (scaled >= 0n && remainder * 2n >= value.denominator) cents += 1n;
+    if (scaled < 0n && -remainder * 2n > value.denominator) cents -= 1n;
+    return Number(cents) / 100;
+  };
 
   const firstToken = tokens[0];
-  // Keep percentage fractions precise until the enclosing operation finishes.
-  // Rounding 80.10% to 0.80 here would make 1,000,000 ÷ 80.10% equal
-  // 1,250,000 instead of 1,248,439.45.
-  let acc = firstToken.endsWith('%') ? parseFloat(firstToken) / 100 : parseFloat(firstToken);
-  if (!Number.isFinite(acc)) return null;
+  let acc = fromString(firstToken.endsWith('%') ? firstToken.slice(0, -1) : firstToken);
+  if (firstToken.endsWith('%')) acc = decimal(acc.numerator, acc.denominator * 100n);
 
   for (let i = 1; i < tokens.length; i += 2) {
     const op = tokens[i];
@@ -153,27 +179,28 @@ export function evaluateCalculatorExpression(raw: string): number | null {
     if (!isOperator(op) || operandToken === undefined || isOperator(operandToken)) return null;
 
     const isPercent = operandToken.endsWith('%');
-    const rawNum = parseFloat(isPercent ? operandToken.slice(0, -1) : operandToken);
-    if (!Number.isFinite(rawNum)) return null;
-
-    const value = isPercent
-      ? op === '+' || op === '-'
-        ? r2(acc * (rawNum / 100)) // percent of the running total for +/-
-        : rawNum / 100             // keep literal fraction precise for */÷
-      : rawNum;
+    let value = fromString(isPercent ? operandToken.slice(0, -1) : operandToken);
+    if (isPercent) value = decimal(value.numerator, value.denominator * 100n);
+    if ((op === '+' || op === '-') && isPercent) value = multiply(acc, value);
 
     switch (op) {
-      case '+': acc = r2(acc + value); break;
-      case '-': acc = r2(acc - value); break;
-      case '*': acc = r2(acc * value); break;
+      case '+': acc = add(acc, value); break;
+      case '-': acc = subtract(acc, value); break;
+      case '*': acc = multiply(acc, value); break;
       case '/':
-        if (value === 0) return null;
-        acc = r2(acc / value);
+        {
+          const result = divide(acc, value);
+          if (!result) return null;
+          acc = result;
+        }
         break;
     }
   }
 
-  return Number.isFinite(acc) ? acc : null;
+  const result = tokens.length > 1 ? toRoundedCurrency(acc) : toNumber(acc);
+  if (!Number.isFinite(result)) return null;
+  // Preserve all intermediate precision; currency expressions round to cents once.
+  return result;
 }
 
 /** Converts internal "*"/"/" operator characters to the "×"/"÷" symbols used
