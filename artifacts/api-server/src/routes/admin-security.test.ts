@@ -5,7 +5,8 @@ import jwt from "jsonwebtoken";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, appUsersTable, businessesTable, userBusinessesTable, adminOtpConfigTable,
-  blockedIpsTable, userPresenceTable, userLoginEventsTable } from "@workspace/db";
+  blockedIpsTable, userPresenceTable, userLoginEventsTable, preapprovedLoginsTable,
+  userLoginAttemptsTable } from "@workspace/db";
 import { signAdminToken } from "../middlewares/requireAdmin";
 import { enforceIpBlock, trustedProxyCidrs } from "../middlewares/ipBlock";
 import { ensureSmsReady } from "../services/sms";
@@ -83,6 +84,37 @@ describe("admin security and foreground presence", () => {
     expect(user.status).toBe(200);
     expect(user.body).not.toHaveProperty("businesses");
     expect(user.body).toHaveProperty("loginHistory");
+  });
+
+  it("lets admins manage pre-approved identities and inspect failed login records", async () => {
+    const admin = `Bearer ${signAdminToken()}`;
+    const email = `approved-${randomInt(1_000_000, 9_999_999)}@example.test`;
+    const denied = await request(app).get("/admin/preapproved-logins");
+    expect(denied.status).toBe(401);
+
+    const created = await request(app).post("/admin/preapproved-logins")
+      .set("Authorization", admin).send({ kind: "email", identifier: email.toUpperCase(), note: "support case" });
+    expect(created.status, created.text).toBe(201);
+    expect(created.body).toMatchObject({ kind: "email", identifier: email, note: "support case" });
+    const listed = await request(app).get("/admin/preapproved-logins").set("Authorization", admin);
+    expect(listed.status).toBe(200);
+    expect(listed.body.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: created.body.id, identifier: email }),
+    ]));
+
+    const [attempt] = await db.insert(userLoginAttemptsTable).values({
+      identifier: email, authMethod: "clerk", stage: "account_creation",
+      errorCode: "not_preapproved", device: "test browser",
+    }).returning();
+    const attempts = await request(app).get("/admin/login-attempts").set("Authorization", admin);
+    expect(attempts.status).toBe(200);
+    expect(attempts.body.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ identifier: email, errorCode: "not_preapproved" }),
+    ]));
+
+    expect((await request(app).delete(`/admin/preapproved-logins/${created.body.id}`)
+      .set("Authorization", admin)).status).toBe(204);
+    await db.delete(userLoginAttemptsTable).where(eq(userLoginAttemptsTable.id, attempt!.id));
   });
 
   it("allows an explicitly verified direct policy but ignores spoofed XFF, blocking sessions and OTP", async () => {
