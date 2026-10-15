@@ -76,8 +76,16 @@ export default function UserDetailPage() {
           <div><span className="text-muted-foreground">Foreground activity (last 5 min)</span><p>{user.isOnline ? "Online" : "Offline"}</p></div>
           <div><span className="text-muted-foreground">Status</span><p>{user.status}</p></div>
           <div className="sm:col-span-2"><span className="text-muted-foreground">User ID</span><p className="font-mono break-all">{user.id}</p></div>
-          <div className="sm:col-span-2"><Button variant={user.status === "active" ? "destructive" : "default"}
-            onClick={changeStatus} disabled={update.isPending}>{user.status === "active" ? "Suspend user" : "Reactivate user"}</Button></div>
+          <div className="sm:col-span-2">
+            {user.deactivatedAt
+              ? <p role="status" className="rounded bg-slate-100 p-3 text-sm text-slate-700">
+                Account deactivated. Sign-in is blocked; business and ledger history are preserved.
+              </p>
+              : <Button variant={user.status === "active" ? "destructive" : "default"}
+                onClick={changeStatus} disabled={update.isPending}>
+                {user.status === "active" ? "Suspend user" : "Reactivate user"}
+              </Button>}
+          </div>
         </CardContent></Card>
       <Card className="border-0 shadow-sm bg-white">
         <CardHeader><CardTitle>Successful login history (latest 50 · retained 90 days)</CardTitle></CardHeader>
