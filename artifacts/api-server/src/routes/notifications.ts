@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, notificationsTable, ownerPushTokensTable } from "@workspace/db";
 import {
@@ -6,6 +6,8 @@ import {
   MarkAllNotificationsReadResponse,
   MarkNotificationReadParams,
   MarkNotificationReadResponse,
+  DeleteNotificationsBody,
+  DeleteNotificationsResponse,
   RegisterOwnerPushTokenBody,
   RemoveOwnerPushTokenBody,
 } from "@workspace/api-zod";
@@ -102,6 +104,32 @@ router.post("/notifications/read-all", async (req, res): Promise<void> => {
     });
   }
   res.json(MarkAllNotificationsReadResponse.parse({ updatedCount: updated.length }));
+});
+
+router.delete("/notifications", async (req, res): Promise<void> => {
+  const auth = requireOwner(req, res);
+  if (!auth) return;
+  const parsed = DeleteNotificationsBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const filters = [
+    eq(notificationsTable.businessId, auth.businessId),
+    eq(notificationsTable.recipientUserId, auth.userId),
+  ];
+  if (parsed.data.notificationIds.length > 0) {
+    filters.push(inArray(notificationsTable.id, parsed.data.notificationIds));
+  }
+  const deleted = await db.delete(notificationsTable).where(and(...filters))
+    .returning({ id: notificationsTable.id });
+  if (deleted.length > 0) {
+    broadcast(auth.businessId, {
+      type: "notification.updated",
+      payload: { recipientUserId: auth.userId },
+    });
+  }
+  res.json(DeleteNotificationsResponse.parse({ deletedCount: deleted.length }));
 });
 
 router.post("/notifications/push-token", async (req, res): Promise<void> => {

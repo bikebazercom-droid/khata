@@ -444,6 +444,25 @@ paths:
                   $ref: "#/components/schemas/Notification"
         "403":
           description: Owner access required
+    delete:
+      operationId: deleteNotifications
+      tags: [notifications]
+      summary: Delete selected owner notifications, or all notifications when the ID list is empty
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationDeleteInput"
+      responses:
+        "200":
+          description: Number of notifications deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationDeleteResult"
+        "403":
+          description: Owner access required
   /notifications/{notificationId}/read:
     post:
       operationId: markNotificationRead
@@ -1649,6 +1668,19 @@ components:
         entryCount: { type: integer, minimum: 1 }
         createdAt: { type: string, format: date-time }
         readAt: { type: ["string", "null"], format: date-time }
+    NotificationDeleteInput:
+      type: object
+      required: [notificationIds]
+      properties:
+        notificationIds:
+          type: array
+          items: { type: string }
+          description: Specific IDs to delete; an empty list clears all notifications for the current owner and business.
+    NotificationDeleteResult:
+      type: object
+      required: [deletedCount]
+      properties:
+        deletedCount: { type: integer }
     PushTokenInput:
       type: object
       required: [token, platform]

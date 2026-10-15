@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { StaffDeploymentPage } from './staff-deployment';
 import { LanguageProvider, LANGUAGE_STORAGE_KEY } from '@/lib/i18n';
 
@@ -36,5 +36,13 @@ describe('staff duty page localization', () => {
     expect(screen.getByText('In queue')).toBeInTheDocument();
     expect(screen.getByText('No staff added')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add new staff' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Duty logs' }));
+    expect(screen.getByText('Download PDF')).toBeInTheDocument();
+    expect(screen.getByText('No duty logs yet')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Destinations' }));
+    expect(screen.getByText('Add a new destination')).toBeInTheDocument();
+    expect(screen.getByText('No destinations yet')).toBeInTheDocument();
   });
 });

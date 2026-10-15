@@ -61,6 +61,8 @@ export * from './listPartiesParams';
 export * from './loginSource';
 export * from './markAllNotificationsReadResult';
 export * from './notification';
+export * from './notificationDeleteInput';
+export * from './notificationDeleteResult';
 export * from './ownerActivityEntry';
 export * from './ownerActivityResponse';
 export * from './ownerParty';

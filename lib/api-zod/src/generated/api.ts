@@ -278,6 +278,18 @@ export const ListNotificationsResponse = zod.array(ListNotificationsResponseItem
 
 
 /**
+ * @summary Delete selected owner notifications, or all notifications when the ID list is empty
+ */
+export const DeleteNotificationsBody = zod.object({
+  "notificationIds": zod.array(zod.string()).describe('Specific IDs to delete; an empty list clears all notifications for the current owner and business.')
+})
+
+export const DeleteNotificationsResponse = zod.object({
+  "deletedCount": zod.number()
+})
+
+
+/**
  * @summary Mark one owner notification as read
  */
 export const MarkNotificationReadParams = zod.object({

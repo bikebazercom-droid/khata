@@ -401,6 +401,15 @@ export interface Notification {
   readAt: string | null;
 }
 
+export interface NotificationDeleteInput {
+  /** Specific IDs to delete; an empty list clears all notifications for the current owner and business. */
+  notificationIds: string[];
+}
+
+export interface NotificationDeleteResult {
+  deletedCount: number;
+}
+
 export type PushTokenInputPlatform = typeof PushTokenInputPlatform[keyof typeof PushTokenInputPlatform];
 
 

@@ -118,6 +118,31 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
     expect(read.status).toBe(200);
     expect(read.body.readAt).toEqual(expect.any(String));
 
+    const selectedDelete = await request(app).delete("/notifications")
+      .set("Authorization", "Bearer uuid-owner")
+      .send({ notificationIds: [alert!.id] });
+    expect(selectedDelete.status).toBe(200);
+    expect(selectedDelete.body.deletedCount).toBe(1);
+
+    const [foreignNotification] = await db.insert(notificationsTable).values({
+      businessId: foreignBusinessId, recipientUserId: ownerId, actorName: "Foreign business",
+    }).returning();
+    const crossBusinessDelete = await request(app).delete("/notifications")
+      .set("Authorization", "Bearer uuid-owner")
+      .send({ notificationIds: [foreignNotification!.id] });
+    expect(crossBusinessDelete.body.deletedCount).toBe(0);
+    expect(await db.select().from(notificationsTable).where(eq(notificationsTable.id, foreignNotification!.id))).toHaveLength(1);
+
+    await db.insert(notificationsTable).values({
+      businessId, recipientUserId: ownerId, actorName: "Clear all test",
+    });
+    const clearAll = await request(app).delete("/notifications")
+      .set("Authorization", "Bearer uuid-owner")
+      .send({ notificationIds: [] });
+    expect(clearAll.status).toBe(200);
+    expect(clearAll.body.deletedCount).toBe(1);
+    expect((await request(app).get("/notifications").set("Authorization", "Bearer uuid-owner")).body).toHaveLength(0);
+
     const tokenValue = "ExpoPushToken[test-notification-device-token]";
     expect((await request(app).post("/notifications/push-token")
       .set("Authorization", `Bearer ${token}`)

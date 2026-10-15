@@ -56,6 +56,8 @@ import type {
   ListPartiesParams,
   MarkAllNotificationsReadResult,
   Notification,
+  NotificationDeleteInput,
+  NotificationDeleteResult,
   OwnerActivityResponse,
   OwnerParty,
   OwnerWorkerInput,
@@ -1437,6 +1439,77 @@ export function useListNotifications<TData = Awaited<ReturnType<typeof listNotif
 
 
 
+
+export const getDeleteNotificationsUrl = () => {
+
+
+
+
+  return `/api/notifications`
+}
+
+/**
+ * @summary Delete selected owner notifications, or all notifications when the ID list is empty
+ */
+export const deleteNotifications = async (notificationDeleteInput: NotificationDeleteInput, options?: RequestInit): Promise<NotificationDeleteResult> => {
+
+  return customFetch<NotificationDeleteResult>(getDeleteNotificationsUrl(),
+  {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(notificationDeleteInput)
+  }
+);}
+
+
+
+
+
+export const getDeleteNotificationsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteNotifications>>, TError,{data: BodyType<NotificationDeleteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteNotifications>>, TError,{data: BodyType<NotificationDeleteInput>}, TContext> => {
+
+const mutationKey = ['deleteNotifications'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteNotifications>>, {data: BodyType<NotificationDeleteInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  deleteNotifications(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteNotificationsMutationResult = NonNullable<Awaited<ReturnType<typeof deleteNotifications>>>
+    export type DeleteNotificationsMutationBody = BodyType<NotificationDeleteInput>
+    export type DeleteNotificationsMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete selected owner notifications, or all notifications when the ID list is empty
+ */
+export const useDeleteNotifications = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteNotifications>>, TError,{data: BodyType<NotificationDeleteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteNotifications>>,
+        TError,
+        {data: BodyType<NotificationDeleteInput>},
+        TContext
+      > => {
+      return useMutation(getDeleteNotificationsMutationOptions(options));
+    }
 
 export const getMarkNotificationReadUrl = (notificationId: string,) => {
 

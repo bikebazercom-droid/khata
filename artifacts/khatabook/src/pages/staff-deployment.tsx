@@ -250,9 +250,9 @@ export function StaffDeploymentPage() {
       qc.invalidateQueries({ queryKey: ['staff-personnel'] });
       setNewName('');
       setShowAdd(false);
-      toast.success('স্টাফ যোগ করা হয়েছে');
+      toast.success(isEnglish ? 'Staff member added' : 'স্টাফ যোগ করা হয়েছে');
     },
-    onError: () => toast.error('স্টাফ যোগ করতে ব্যর্থ হয়েছে'),
+    onError: () => toast.error(isEnglish ? 'Could not add staff member' : 'স্টাফ যোগ করতে ব্যর্থ হয়েছে'),
   });
 
   const deployMutation = useMutation({
@@ -270,9 +270,9 @@ export function StaffDeploymentPage() {
       qc.invalidateQueries({ queryKey: ['staff-personnel'] });
       qc.invalidateQueries({ queryKey: ['staff-logs'] });
       setDeployTarget(null);
-      toast.success('ডিউটি লগ করা হয়েছে');
+      toast.success(isEnglish ? 'Duty logged' : 'ডিউটি লগ করা হয়েছে');
     },
-    onError: () => toast.error('ডিউটি লগ করতে ব্যর্থ হয়েছে'),
+    onError: () => toast.error(isEnglish ? 'Could not log duty' : 'ডিউটি লগ করতে ব্যর্থ হয়েছে'),
   });
 
   const deleteMutation = useMutation({
@@ -286,9 +286,9 @@ export function StaffDeploymentPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['staff-personnel'] });
       setDeleteTarget(null);
-      toast.success('স্টাফ সরানো হয়েছে');
+      toast.success(isEnglish ? 'Staff member removed' : 'স্টাফ সরানো হয়েছে');
     },
-    onError: () => toast.error('স্টাফ সরাতে ব্যর্থ হয়েছে'),
+    onError: () => toast.error(isEnglish ? 'Could not remove staff member' : 'স্টাফ সরাতে ব্যর্থ হয়েছে'),
   });
 
   const editLogMutation = useMutation({
@@ -306,9 +306,9 @@ export function StaffDeploymentPage() {
       qc.invalidateQueries({ queryKey: ['staff-logs'] });
       setEditLog(null);
       setCustomEditDest('');
-      toast.success('ডিউটি লোকেশন আপডেট হয়েছে');
+      toast.success(isEnglish ? 'Duty location updated' : 'ডিউটি লোকেশন আপডেট হয়েছে');
     },
-    onError: () => toast.error('আপডেট করতে ব্যর্থ হয়েছে'),
+    onError: () => toast.error(isEnglish ? 'Could not update duty location' : 'আপডেট করতে ব্যর্থ হয়েছে'),
   });
 
   const addDestMutation = useMutation({
@@ -326,9 +326,9 @@ export function StaffDeploymentPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['staff-destinations'] });
       setNewDestName('');
-      toast.success('গন্তব্য যোগ করা হয়েছে');
+      toast.success(isEnglish ? 'Destination added' : 'গন্তব্য যোগ করা হয়েছে');
     },
-    onError: (err: Error) => toast.error(err.message || 'গন্তব্য যোগ করতে ব্যর্থ হয়েছে'),
+    onError: (err: Error) => toast.error(err.message || (isEnglish ? 'Could not add destination' : 'গন্তব্য যোগ করতে ব্যর্থ হয়েছে')),
   });
 
   const deleteDestMutation = useMutation({
@@ -342,9 +342,9 @@ export function StaffDeploymentPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['staff-destinations'] });
       setDeleteDestTarget(null);
-      toast.success('গন্তব্য সরানো হয়েছে');
+      toast.success(isEnglish ? 'Destination removed' : 'গন্তব্য সরানো হয়েছে');
     },
-    onError: () => toast.error('গন্তব্য সরাতে ব্যর্থ হয়েছে'),
+    onError: () => toast.error(isEnglish ? 'Could not remove destination' : 'গন্তব্য সরাতে ব্যর্থ হয়েছে'),
   });
 
   // ── computed ───────────────────────────────────────────────────────────────
@@ -506,12 +506,12 @@ export function StaffDeploymentPage() {
         if (document.body.contains(iframe)) document.body.removeChild(iframe);
       }, 2_000);
 
-      toast.success('প্রিন্ট ডায়ালগ খুলেছে — "PDF হিসেবে সেভ করুন" বেছে নিন');
+      toast.success(isEnglish ? 'Print dialog opened — choose "Save as PDF"' : 'প্রিন্ট ডায়ালগ খুলেছে — "PDF হিসেবে সেভ করুন" বেছে নিন');
     } catch (err) {
       console.error('[PDF export]', err);
       // On error remove immediately — no point keeping a broken iframe.
       if (document.body.contains(iframe)) document.body.removeChild(iframe);
-      toast.error('PDF তৈরি করতে ব্যর্থ হয়েছে');
+      toast.error(isEnglish ? 'Could not create the PDF' : 'PDF তৈরি করতে ব্যর্থ হয়েছে');
     } finally {
       setIsExporting(false);
     }
@@ -537,7 +537,7 @@ export function StaffDeploymentPage() {
     const todayLogs = logs.filter(l => isToday(parseISO(l.deployedAt)));
 
     if (todayLogs.length === 0) {
-      toast.error('আজকে ডিউটিতে যাওয়ার কোনো তথ্য পাওয়া যায়নি!');
+      toast.error(isEnglish ? 'No duty deployments found for today.' : 'আজকে ডিউটিতে যাওয়ার কোনো তথ্য পাওয়া যায়নি!');
       return;
     }
 
@@ -715,7 +715,7 @@ export function StaffDeploymentPage() {
         link.download = fileName;
         link.href     = canvas.toDataURL('image/jpeg', 0.95);
         link.click();
-        toast.success('JPG ডাউনলোড হয়েছে — WhatsApp-এ শেয়ার করুন');
+        toast.success(isEnglish ? 'JPG downloaded — share it on WhatsApp' : 'JPG ডাউনলোড হয়েছে — WhatsApp-এ শেয়ার করুন');
       };
 
       // ── Primary: Web Share API with file ────────────────────────────────
@@ -744,7 +744,7 @@ export function StaffDeploymentPage() {
             title: 'আজকের ডিউটি তালিকা',
             text:  'আজকের ডিউটি তালিকা সরাসরি Banglakhata থেকে শেয়ার করা হলো।',
           });
-          toast.success('শেয়ার সম্পন্ন হয়েছে!');
+          toast.success(isEnglish ? 'Shared successfully!' : 'শেয়ার সম্পন্ন হয়েছে!');
         } catch (shareErr: unknown) {
           // User dismissed the sheet — not a real error, just fall back.
           const cancelled =
@@ -759,7 +759,7 @@ export function StaffDeploymentPage() {
 
     } catch (err) {
       console.error('[JPG export]', err);
-      toast.error('JPG তৈরি করতে ব্যর্থ হয়েছে');
+      toast.error(isEnglish ? 'Could not create the JPG' : 'JPG তৈরি করতে ব্যর্থ হয়েছে');
     } finally {
       if (container && document.body.contains(container)) {
         document.body.removeChild(container);
@@ -784,7 +784,7 @@ export function StaffDeploymentPage() {
           </button>
           <div className="flex-1 min-w-0">
             <h1 className="text-white font-extrabold text-[16px] tracking-tight">{t('dutyManagementTitle')}</h1>
-            <p className="text-white/60 text-[11px] font-medium mt-0.5">Staff Duty Deployment & Rotation</p>
+                <p className="text-white/60 text-[11px] font-medium mt-0.5">{isEnglish ? 'Staff Duty Deployment & Rotation' : 'স্টাফ ডিউটি ডিপ্লয়মেন্ট ও রোটেশন'}</p>
           </div>
           <button
             onClick={() => setShowSettings(true)}
@@ -881,11 +881,11 @@ export function StaffDeploymentPage() {
                     {/* Active badge */}
                     <div className="bg-[#1B3A6B] px-4 py-2 flex items-center justify-between">
                       <span className="text-white text-[11px] font-bold uppercase tracking-wider">
-                        ✦ পরবর্তী ডিউটি লক্ষ্য
+                        ✦ {isEnglish ? 'Next in duty queue' : 'পরবর্তী ডিউটি লক্ষ্য'}
                       </span>
                       <span className="flex items-center gap-1 text-amber-300 text-[10px] font-bold">
                         <Clock className="w-3 h-3" />
-                        অপেক্ষায় আছেন
+                        {isEnglish ? 'Waiting' : 'অপেক্ষায় আছেন'}
                       </span>
                     </div>
                     <div className="flex items-center justify-between px-4 py-4">
@@ -897,7 +897,7 @@ export function StaffDeploymentPage() {
                         </div>
                         <div>
                           <p className="font-bold text-slate-900 text-[16px]">{member.name}</p>
-                          <p className="text-[11px] text-slate-400 font-medium">#১ — ডিউটি না দেওয়া পর্যন্ত এখানেই থাকবেন</p>
+                          <p className="text-[11px] text-slate-400 font-medium">#{isEnglish ? '1' : '১'} — {isEnglish ? 'Stays here until deployed' : 'ডিউটি না দেওয়া পর্যন্ত এখানেই থাকবেন'}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5">
@@ -927,7 +927,7 @@ export function StaffDeploymentPage() {
                         <p className="font-semibold text-slate-800 text-[14px] truncate">{member.name}</p>
                         <p className="text-[11px] text-slate-400 font-medium">
                           #{idx + 1} —{' '}
-                          <span className="text-[#1B3A6B]/60 font-semibold">ট্যাপ করে ম্যানুয়াল ডিউটি দিন</span>
+                          <span className="text-[#1B3A6B]/60 font-semibold">{isEnglish ? 'Tap to deploy manually' : 'ট্যাপ করে ম্যানুয়াল ডিউটি দিন'}</span>
                         </p>
                       </div>
                       <div className="flex items-center gap-1">
@@ -957,7 +957,7 @@ export function StaffDeploymentPage() {
               <div className="flex items-center gap-2 justify-center pt-1 pb-2">
                 <div className="h-px flex-1 bg-slate-200" />
                 <span className="text-[11px] text-slate-400 font-semibold whitespace-nowrap">
-                  ↻ স্বয়ংক্রিয় পুনরাবৃত্তি
+                  ↻ {isEnglish ? 'Automatic rotation' : 'স্বয়ংক্রিয় পুনরাবৃত্তি'}
                 </span>
                 <div className="h-px flex-1 bg-slate-200" />
               </div>
@@ -991,7 +991,7 @@ export function StaffDeploymentPage() {
                   {isExporting ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>তৈরি হচ্ছে…</span>
+                      <span>{isEnglish ? 'Generating…' : 'তৈরি হচ্ছে…'}</span>
                     </>
                   ) : (
                     <>
@@ -1009,7 +1009,7 @@ export function StaffDeploymentPage() {
                           d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
                         />
                       </svg>
-                      <span>ডাউনলোড পিডিএফ</span>
+                      <span>{isEnglish ? 'Download PDF' : 'ডাউনলোড পিডিএফ'}</span>
                     </>
                   )}
                 </button>
@@ -1017,7 +1017,7 @@ export function StaffDeploymentPage() {
                 {/* ── Divider ── */}
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-px bg-slate-100" />
-                  <span className="text-[11px] text-slate-400 font-medium">অথবা আজকের তালিকা</span>
+                  <span className="text-[11px] text-slate-400 font-medium">{isEnglish ? "Or today's list" : 'অথবা আজকের তালিকা'}</span>
                   <div className="flex-1 h-px bg-slate-100" />
                 </div>
 
@@ -1030,7 +1030,7 @@ export function StaffDeploymentPage() {
                   {isExportingJpg ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>তৈরি হচ্ছে…</span>
+                      <span>{isEnglish ? 'Generating…' : 'তৈরি হচ্ছে…'}</span>
                     </>
                   ) : (
                     <>
@@ -1043,7 +1043,7 @@ export function StaffDeploymentPage() {
                       >
                         <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
                       </svg>
-                      <span>আজকের তালিকা (JPG)</span>
+                      <span>{isEnglish ? "Today's list (JPG)" : 'আজকের তালিকা (JPG)'}</span>
                     </>
                   )}
                 </button>
@@ -1061,8 +1061,8 @@ export function StaffDeploymentPage() {
                 <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
                   <FolderOpen className="w-8 h-8 text-slate-300" />
                 </div>
-                <p className="text-slate-500 font-semibold text-[14px]">এখনো কোনো ডিউটি লগ নেই</p>
-                <p className="text-slate-400 text-[12px]">ডিউটি লাইন থেকে ডিপ্লয় করলে এখানে দেখাবে</p>
+                <p className="text-slate-500 font-semibold text-[14px]">{isEnglish ? 'No duty logs yet' : 'এখনো কোনো ডিউটি লগ নেই'}</p>
+                <p className="text-slate-400 text-[12px]">{isEnglish ? 'Deploy a staff member from the duty queue to see logs here' : 'ডিউটি লাইন থেকে ডিপ্লয় করলে এখানে দেখাবে'}</p>
               </div>
             )}
 
@@ -1112,7 +1112,7 @@ export function StaffDeploymentPage() {
                         <button
                           onClick={() => { setEditLog(log); setCustomEditDest(''); }}
                           className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-[#1B3A6B] hover:bg-[#1B3A6B]/10 active:scale-95 transition-all shrink-0"
-                          title="লোকেশন পরিবর্তন করুন"
+                          title={isEnglish ? 'Change location' : 'লোকেশন পরিবর্তন করুন'}
                         >
                           <Pencil className="w-3 h-3" />
                         </button>
@@ -1133,11 +1133,11 @@ export function StaffDeploymentPage() {
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-4 space-y-3">
               <div className="flex items-center gap-2">
                 <PlusCircle className="w-4 h-4 text-[#1B3A6B]" />
-                <p className="font-bold text-slate-800 text-[13px]">নতুন গন্তব্য যোগ করুন</p>
+                <p className="font-bold text-slate-800 text-[13px]">{isEnglish ? 'Add a new destination' : 'নতুন গন্তব্য যোগ করুন'}</p>
               </div>
               <div className="flex gap-2">
                 <Input
-                  placeholder="যেমন: রাজশাহী, রংপুর, হেড অফিস…"
+                  placeholder={isEnglish ? 'E.g. Dhaka, Rangpur, Head Office…' : 'যেমন: রাজশাহী, রংপুর, হেড অফিস…'}
                   value={newDestName}
                   onChange={e => setNewDestName(e.target.value)}
                   onKeyDown={e => {
@@ -1154,7 +1154,7 @@ export function StaffDeploymentPage() {
                 >
                   {addDestMutation.isPending
                     ? <Loader2 className="w-4 h-4 animate-spin" />
-                    : 'যোগ করুন'
+                    : isEnglish ? 'Add' : 'যোগ করুন'
                   }
                 </Button>
               </div>
@@ -1172,9 +1172,9 @@ export function StaffDeploymentPage() {
                 <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
                   <MapPin className="w-8 h-8 text-slate-300" />
                 </div>
-                <p className="text-slate-500 font-semibold text-[14px]">গন্তব্য তালিকা খালি</p>
+                <p className="text-slate-500 font-semibold text-[14px]">{isEnglish ? 'No destinations yet' : 'গন্তব্য তালিকা খালি'}</p>
                 <p className="text-slate-400 text-[12px] max-w-[220px]">
-                  উপরের ফিল্ডে গন্তব্যের নাম লিখে "যোগ করুন" বাটনে ট্যাপ করুন
+                  {isEnglish ? 'Enter a destination above and tap "Add".' : 'উপরের ফিল্ডে গন্তব্যের নাম লিখে "যোগ করুন" বাটনে ট্যাপ করুন'}
                 </p>
               </div>
             )}
@@ -1212,7 +1212,7 @@ export function StaffDeploymentPage() {
 
             {destinations.length > 0 && (
               <p className="text-center text-[11px] text-slate-400 font-medium px-2">
-                মোট {destinations.length}টি গন্তব্য · ডিপ্লয় মোডালে এই তালিকা দেখাবে
+                {isEnglish ? `${destinations.length} destinations · This list appears in the deploy dialog` : `মোট ${destinations.length}টি গন্তব্য · ডিপ্লয় মোডালে এই তালিকা দেখাবে`}
               </p>
             )}
           </div>
@@ -1255,7 +1255,7 @@ export function StaffDeploymentPage() {
             {/* Staff info */}
             <div className="px-5 py-3 border-b border-slate-100">
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                ডিউটি দিচ্ছেন
+                {isEnglish ? 'Deploying' : 'ডিউটি দিচ্ছেন'}
               </p>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-[#1B3A6B]/10 flex items-center justify-center">
@@ -1270,7 +1270,7 @@ export function StaffDeploymentPage() {
             {/* Dynamic destination grid */}
             <div className="px-5 pt-4 pb-5">
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
-                গন্তব্য নির্বাচন করুন
+                {isEnglish ? 'Choose a destination' : 'গন্তব্য নির্বাচন করুন'}
               </p>
 
               {destinationsLoading && (
@@ -1282,15 +1282,15 @@ export function StaffDeploymentPage() {
               {!destinationsLoading && destinations.length === 0 && (
                 <div className="flex flex-col items-center gap-2 py-6 text-center bg-amber-50 rounded-2xl border border-amber-100">
                   <MapPin className="w-6 h-6 text-amber-400" />
-                  <p className="text-amber-700 font-bold text-[13px]">অনুগ্রহ করে প্রথমে গন্তব্য যোগ করুন</p>
+                  <p className="text-amber-700 font-bold text-[13px]">{isEnglish ? 'Please add a destination first' : 'অনুগ্রহ করে প্রথমে গন্তব্য যোগ করুন'}</p>
                   <p className="text-amber-600 text-[11px] font-medium">
-                    "গন্তব্য তালিকা" ট্যাবে গিয়ে গন্তব্য যোগ করুন
+                    {isEnglish ? 'Add a destination from the Destinations tab.' : '"গন্তব্য তালিকা" ট্যাবে গিয়ে গন্তব্য যোগ করুন'}
                   </p>
                   <button
                     onClick={() => { setDeployTarget(null); setTab('destinations'); }}
                     className="mt-1 text-[12px] font-bold text-[#1B3A6B] underline underline-offset-2"
                   >
-                    গন্তব্য তালিকায় যান →
+                    {isEnglish ? 'Go to destinations →' : 'গন্তব্য তালিকায় যান →'}
                   </button>
                 </div>
               )}
@@ -1349,10 +1349,10 @@ export function StaffDeploymentPage() {
               <div className="w-10 h-1 bg-slate-200 rounded-full" />
             </div>
             <div className="px-5 pt-2 pb-6">
-              <p className="font-extrabold text-slate-900 text-[18px] mb-4">নতুন স্টাফ যোগ করুন</p>
+              <p className="font-extrabold text-slate-900 text-[18px] mb-4">{isEnglish ? 'Add new staff' : 'নতুন স্টাফ যোগ করুন'}</p>
               <Input
                 autoFocus
-                placeholder="স্টাফের নাম লিখুন…"
+                placeholder={isEnglish ? 'Enter staff name…' : 'স্টাফের নাম লিখুন…'}
                 value={newName}
                 onChange={e => setNewName(e.target.value)}
                 onKeyDown={e => {
@@ -1370,7 +1370,7 @@ export function StaffDeploymentPage() {
                 {addMutation.isPending ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  'যোগ করুন'
+                  isEnglish ? 'Add' : 'যোগ করুন'
                 )}
               </Button>
             </div>
@@ -1388,22 +1388,22 @@ export function StaffDeploymentPage() {
       <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
         <AlertDialogContent className="max-w-sm rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>স্টাফ ডিলিট করবেন?</AlertDialogTitle>
+            <AlertDialogTitle>{isEnglish ? 'Remove this staff member?' : 'স্টাফ ডিলিট করবেন?'}</AlertDialogTitle>
             <AlertDialogDescription>
-              আপনি কি এই স্টাফের নাম সম্পূর্ণ ডিলিট করতে চান?{' '}
-              <span className="font-semibold text-slate-800">{deleteTarget?.name}</span>-কে ডিউটি লাইন থেকে
-              সরিয়ে দেওয়া হবে এবং পরবর্তী জন স্বয়ংক্রিয়ভাবে #১ হবেন। পুরনো লগ মুছবে না।
+              {isEnglish ? 'Remove ' : 'আপনি কি এই স্টাফের নাম সম্পূর্ণ ডিলিট করতে চান? '}
+              <span className="font-semibold text-slate-800">{deleteTarget?.name}</span>
+              {isEnglish ? ' from the duty queue? The next person will move to #1. Existing logs will remain.' : '-কে ডিউটি লাইন থেকে সরিয়ে দেওয়া হবে এবং পরবর্তী জন স্বয়ংক্রিয়ভাবে #১ হবেন। পুরনো লগ মুছবে না।'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="font-bold">বাতিল</AlertDialogCancel>
+            <AlertDialogCancel className="font-bold">{isEnglish ? 'Cancel' : 'বাতিল'}</AlertDialogCancel>
             <Button
               variant="destructive"
               className="font-bold"
               disabled={deleteMutation.isPending}
               onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
             >
-              {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'সরিয়ে দিন'}
+              {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : (isEnglish ? 'Remove' : 'সরিয়ে দিন')}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1415,21 +1415,21 @@ export function StaffDeploymentPage() {
       <AlertDialog open={!!deleteDestTarget} onOpenChange={open => !open && setDeleteDestTarget(null)}>
         <AlertDialogContent className="max-w-sm rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>গন্তব্য সরিয়ে দেবেন?</AlertDialogTitle>
+            <AlertDialogTitle>{isEnglish ? 'Remove this destination?' : 'গন্তব্য সরিয়ে দেবেন?'}</AlertDialogTitle>
             <AlertDialogDescription>
-              <span className="font-semibold text-slate-800">"{deleteDestTarget?.name}"</span> গন্তব্যটি তালিকা থেকে
-              সরানো হবে। পুরনো লগে এই নাম থেকে যাবে।
+              <span className="font-semibold text-slate-800">"{deleteDestTarget?.name}"</span>
+              {isEnglish ? ' will be removed from the list. Existing logs will keep this name.' : ' গন্তব্যটি তালিকা থেকে সরানো হবে। পুরনো লগে এই নাম থেকে যাবে।'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="font-bold">বাতিল</AlertDialogCancel>
+            <AlertDialogCancel className="font-bold">{isEnglish ? 'Cancel' : 'বাতিল'}</AlertDialogCancel>
             <Button
               variant="destructive"
               className="font-bold"
               disabled={deleteDestMutation.isPending}
               onClick={() => deleteDestTarget && deleteDestMutation.mutate(deleteDestTarget.id)}
             >
-              {deleteDestMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'সরিয়ে দিন'}
+              {deleteDestMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : (isEnglish ? 'Remove' : 'সরিয়ে দিন')}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1455,7 +1455,7 @@ export function StaffDeploymentPage() {
             {/* Log info */}
             <div className="px-5 py-3 border-b border-slate-100">
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                লোকেশন পরিবর্তন করছেন
+                {isEnglish ? 'Changing location for' : 'লোকেশন পরিবর্তন করছেন'}
               </p>
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -1484,12 +1484,12 @@ export function StaffDeploymentPage() {
             {/* Destination list from saved destinations */}
             <div className="px-5 pt-4 pb-3">
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
-                নতুন লোকেশন বেছে নিন
+                {isEnglish ? 'Choose a new location' : 'নতুন লোকেশন বেছে নিন'}
               </p>
 
               {destinations.length === 0 ? (
                 <p className="text-slate-400 text-[12px] text-center py-3">
-                  কোনো সংরক্ষিত গন্তব্য নেই — নিচে লিখে পরিবর্তন করুন
+                  {isEnglish ? 'No saved destinations — enter a location below.' : 'কোনো সংরক্ষিত গন্তব্য নেই — নিচে লিখে পরিবর্তন করুন'}
                 </p>
               ) : (
                 <div className="grid grid-cols-2 gap-2 mb-0">
@@ -1511,7 +1511,7 @@ export function StaffDeploymentPage() {
                         <MapPin className="w-3.5 h-3.5 shrink-0" />
                         <span className="truncate">{dest.name}</span>
                         {isCurrent && (
-                          <span className="absolute top-0.5 right-1.5 text-[9px] font-bold opacity-60">বর্তমান</span>
+                          <span className="absolute top-0.5 right-1.5 text-[9px] font-bold opacity-60">{isEnglish ? 'Current' : 'বর্তমান'}</span>
                         )}
                       </button>
                     );
@@ -1523,11 +1523,11 @@ export function StaffDeploymentPage() {
             {/* Free-text override input (for corrections not in the list) */}
             <div className="px-5 pb-4 pt-2 border-t border-slate-100">
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                অথবা সরাসরি লিখুন
+                {isEnglish ? 'Or enter a location' : 'অথবা সরাসরি লিখুন'}
               </p>
               <div className="flex gap-2">
                 <Input
-                  placeholder="যেকোনো শহর, শাখা বা ঠিকানা…"
+                  placeholder={isEnglish ? 'Any city, branch, or address…' : 'যেকোনো শহর, শাখা বা ঠিকানা…'}
                   value={customEditDest}
                   onChange={e => setCustomEditDest(e.target.value)}
                   onKeyDown={e => {
