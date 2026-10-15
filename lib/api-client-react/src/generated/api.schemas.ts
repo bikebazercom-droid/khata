@@ -577,8 +577,6 @@ export interface AdminUser {
   createdAt: string;
   /** @nullable */
   lastLogin: string | null;
-  /** @nullable */
-  deactivatedAt: string | null;
 }
 
 export interface AdminLoginEvent {
@@ -796,9 +794,5 @@ page?: number;
  * @maximum 100
  */
 pageSize?: number;
-};
-
-export type SendAdminPhoneLoginOtp200 = {
-  success: boolean;
 };
 

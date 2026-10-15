@@ -33,8 +33,6 @@ export const appUsersTable = pgTable("app_users", {
   lastLogout: timestamp("last_logout", { withTimezone: true }),
   /** Admin-managed status; suspended users cannot sign in */
   status: userStatusEnum("status").notNull().default("active"),
-  /** Soft deactivation marker; preserves ledger ownership and history. */
-  deactivatedAt: timestamp("deactivated_at", { withTimezone: true }),
   /** Removed staff retain their identity and audit attribution, but no access. */
   workerAccessDeletedAt: timestamp("worker_access_deleted_at", { withTimezone: true }),
   adjustmentPartyIds: jsonb("adjustment_party_ids").$type<string[]>().notNull().default([]),

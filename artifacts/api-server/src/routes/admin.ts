@@ -1,20 +1,16 @@
 import { Router } from "express";
 import { isIP } from "node:net";
-import { createHmac, randomInt } from "node:crypto";
 import rateLimit from "express-rate-limit";
 import { and, count, countDistinct, desc, eq, gte, ilike, or, sql, isNotNull } from "drizzle-orm";
 import {
   db, appUsersTable, adminOtpConfigTable, userLoginEventsTable,
-  appUserLoginSessionsTable, otpCodesTable, userPresenceTable, blockedIpsTable,
-  preapprovedLoginsTable, userLoginAttemptsTable,
+  userPresenceTable, blockedIpsTable, preapprovedLoginsTable, userLoginAttemptsTable,
 } from "@workspace/db";
 import { requireAdmin, signAdminToken } from "../middlewares/requireAdmin";
-import { ensureSmsReady, getSmsGatewayStatus, sendOtpSms } from "../services/sms";
+import { ensureSmsReady, getSmsGatewayStatus } from "../services/sms";
 import { logger } from "../lib/logger";
 import { clientIp, ipPolicy } from "../middlewares/ipBlock";
 import { normalizeBdPhone } from "../lib/bdPhone";
-import { recordFailedLoginAttempt } from "../lib/authTelemetry";
-import { PostgresRateLimitStore } from "../lib/postgresRateLimitStore";
 
 const username = process.env.ADMIN_USERNAME;
 const password = process.env.ADMIN_PASSWORD;
@@ -78,7 +74,6 @@ function serializeUser(user: typeof appUsersTable.$inferSelect) {
     phone: user.phone,
     authProvider: user.clerkUserId ? "clerk" : "phone_otp",
     status: user.status,
-    deactivatedAt: user.deactivatedAt?.toISOString() ?? null,
     createdAt: user.createdAt.toISOString(), lastLogin: user.lastLogin?.toISOString() ?? null,
   };
 }
@@ -134,12 +129,6 @@ router.patch("/admin/users/:userId", async (req, res) => {
     res.status(400).json({ error: "status must be active or suspended" }); return;
   }
   try {
-    const [current] = await db.select({ deactivatedAt: appUsersTable.deactivatedAt })
-      .from(appUsersTable).where(eq(appUsersTable.id, req.params.userId)).limit(1);
-    if (!current) { res.status(404).json({ error: "User not found" }); return; }
-    if (req.body.status === "active" && current.deactivatedAt) {
-      res.status(409).json({ error: "Deactivated users cannot be unblocked" }); return;
-    }
     const [updated] = await db.update(appUsersTable).set({ status: req.body.status })
       .where(eq(appUsersTable.id, req.params.userId)).returning({ id: appUsersTable.id });
     if (!updated) { res.status(404).json({ error: "User not found" }); return; }
@@ -150,79 +139,6 @@ router.patch("/admin/users/:userId", async (req, res) => {
   } catch (err) {
     logger.error({ err }, "admin/user update error");
     res.status(500).json({ error: "Unable to update user" });
-  }
-});
-
-router.delete("/admin/users/:userId", async (req, res) => {
-  try {
-    const now = new Date();
-    const user = await db.transaction(async (tx) => {
-      const [updated] = await tx.update(appUsersTable).set({
-        status: "suspended", deactivatedAt: now,
-        phoneSessionVersion: sql`${appUsersTable.phoneSessionVersion} + 1`,
-      }).where(eq(appUsersTable.id, req.params.userId)).returning({ id: appUsersTable.id });
-      if (!updated) return null;
-      await tx.update(appUserLoginSessionsTable).set({ revokedAt: now })
-        .where(eq(appUserLoginSessionsTable.userId, updated.id));
-      await tx.delete(userPresenceTable).where(eq(userPresenceTable.userId, updated.id));
-      return updated;
-    });
-    if (!user) { res.status(404).json({ error: "User not found" }); return; }
-    res.json(await userDetail(user.id));
-  } catch (err) {
-    logger.error({ err }, "admin/user deactivation error");
-    res.status(500).json({ error: "Unable to deactivate user" });
-  }
-});
-
-const adminOtpResendLimiter = rateLimit({
-  windowMs: 15 * 60_000,
-  limit: 3,
-  standardHeaders: "draft-7",
-  legacyHeaders: false,
-  store: new PostgresRateLimitStore("admin-phone-otp-resend", 15 * 60_000),
-});
-
-router.post("/admin/users/:userId/send-phone-otp", adminOtpResendLimiter, async (req, res) => {
-  const userId = String(req.params.userId);
-  const [user] = await db.select({
-    id: appUsersTable.id, phone: appUsersTable.phone,
-    status: appUsersTable.status, deactivatedAt: appUsersTable.deactivatedAt,
-  }).from(appUsersTable).where(eq(appUsersTable.id, userId)).limit(1);
-  if (!user) { res.status(404).json({ error: "User not found" }); return; }
-  if (!user.phone) { res.status(400).json({ error: "This account has no phone number for OTP sign-in" }); return; }
-  if (user.status !== "active" || user.deactivatedAt) {
-    res.status(403).json({ error: "Reactivate this account before sending a sign-in code" }); return;
-  }
-  const [config] = await db.select({ enabled: adminOtpConfigTable.enabled })
-    .from(adminOtpConfigTable).limit(1);
-  if (config?.enabled === false) { res.status(503).json({ error: "Phone OTP is temporarily disabled" }); return; }
-
-  let code: string;
-  try {
-    await ensureSmsReady();
-    code = randomInt(0, 1_000_000).toString().padStart(6, "0");
-    const digest = createHmac("sha256", process.env.SESSION_SECRET!)
-      .update(`${user.phone}:${code}`).digest("hex");
-    await db.delete(otpCodesTable).where(eq(otpCodesTable.phone, user.phone));
-    const [record] = await db.insert(otpCodesTable).values({
-      phone: user.phone, code: digest, expiresAt: new Date(Date.now() + 10 * 60_000),
-    }).returning({ id: otpCodesTable.id });
-    if (!record) throw new Error("otp_record_not_returned");
-    try {
-      await sendOtpSms(user.phone, code);
-    } catch (error) {
-      await db.delete(otpCodesTable).where(eq(otpCodesTable.id, record.id));
-      throw error;
-    }
-    res.json({ success: true });
-  } catch (error) {
-    await recordFailedLoginAttempt(req, {
-      identifier: user.phone, authMethod: "phone", stage: "admin_otp_resend",
-      errorCode: error instanceof Error ? error.name : "otp_resend_failed",
-    });
-    logger.error({ err: error, userId: user.id }, "admin phone OTP resend failed");
-    res.status(503).json({ error: "Could not send a sign-in code. Please try again later." });
   }
 });
 

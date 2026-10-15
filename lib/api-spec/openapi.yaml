@@ -1010,51 +1010,6 @@ paths:
                 $ref: "#/components/schemas/AdminUserDetail"
         "404":
           description: Not found
-    delete:
-      operationId: deactivateAdminUser
-      tags: [admin]
-      summary: Soft-deactivate a user while preserving their ledger data
-      security:
-        - adminBearer: []
-      parameters:
-        - name: userId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Deactivated account
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AdminUserDetail"
-        "404":
-          description: Not found
-
-  /admin/users/{userId}/send-phone-otp:
-    post:
-      operationId: sendAdminPhoneLoginOtp
-      tags: [admin]
-      summary: Send a normal phone sign-in OTP to an active user
-      security:
-        - adminBearer: []
-      parameters:
-        - name: userId
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OTP sent; code is delivered only by SMS
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [success]
-                properties:
-                  success: { type: boolean }
 
   /admin/preapproved-logins:
     get:
@@ -2016,7 +1971,6 @@ components:
         - isOnline
         - createdAt
         - lastLogin
-        - deactivatedAt
       properties:
         id:
           type: string
@@ -2037,9 +1991,6 @@ components:
           type: string
           format: date-time
         lastLogin:
-          type: ["string", "null"]
-          format: date-time
-        deactivatedAt:
           type: ["string", "null"]
           format: date-time
 

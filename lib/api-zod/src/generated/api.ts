@@ -780,8 +780,7 @@ export const ListAdminUsersResponse = zod.object({
   "status": zod.enum(['active', 'suspended']),
   "isOnline": zod.boolean(),
   "createdAt": zod.coerce.date(),
-  "lastLogin": zod.coerce.date().nullable(),
-  "deactivatedAt": zod.coerce.date().nullable()
+  "lastLogin": zod.coerce.date().nullable()
 })),
   "total": zod.number(),
   "page": zod.number(),
@@ -805,8 +804,7 @@ export const GetAdminUserResponse = zod.object({
   "status": zod.enum(['active', 'suspended']),
   "isOnline": zod.boolean(),
   "createdAt": zod.coerce.date(),
-  "lastLogin": zod.coerce.date().nullable(),
-  "deactivatedAt": zod.coerce.date().nullable()
+  "lastLogin": zod.coerce.date().nullable()
 }).and(zod.object({
   "loginHistory": zod.array(zod.object({
   "id": zod.string(),
@@ -839,8 +837,7 @@ export const UpdateAdminUserResponse = zod.object({
   "status": zod.enum(['active', 'suspended']),
   "isOnline": zod.boolean(),
   "createdAt": zod.coerce.date(),
-  "lastLogin": zod.coerce.date().nullable(),
-  "deactivatedAt": zod.coerce.date().nullable()
+  "lastLogin": zod.coerce.date().nullable()
 }).and(zod.object({
   "loginHistory": zod.array(zod.object({
   "id": zod.string(),
@@ -851,48 +848,6 @@ export const UpdateAdminUserResponse = zod.object({
   "source": zod.string()
 }))
 }))
-
-
-/**
- * @summary Soft-deactivate a user while preserving their ledger data
- */
-export const DeactivateAdminUserParams = zod.object({
-  "userId": zod.coerce.string()
-})
-
-export const DeactivateAdminUserResponse = zod.object({
-  "id": zod.string(),
-  "name": zod.string(),
-  "email": zod.string().nullable(),
-  "phone": zod.string().nullable(),
-  "authProvider": zod.enum(['phone_otp', 'clerk']),
-  "status": zod.enum(['active', 'suspended']),
-  "isOnline": zod.boolean(),
-  "createdAt": zod.coerce.date(),
-  "lastLogin": zod.coerce.date().nullable(),
-  "deactivatedAt": zod.coerce.date().nullable()
-}).and(zod.object({
-  "loginHistory": zod.array(zod.object({
-  "id": zod.string(),
-  "occurredAt": zod.coerce.date(),
-  "ip": zod.string().nullable().describe('Unavailable unless verified direct or trusted-proxy policy determines a real client IP. Historical values may reflect shared proxies.'),
-  "device": zod.string(),
-  "authMethod": zod.string(),
-  "source": zod.string()
-}))
-}))
-
-
-/**
- * @summary Send a normal phone sign-in OTP to an active user
- */
-export const SendAdminPhoneLoginOtpParams = zod.object({
-  "userId": zod.coerce.string()
-})
-
-export const SendAdminPhoneLoginOtpResponse = zod.object({
-  "success": zod.boolean()
-})
 
 
 /**
