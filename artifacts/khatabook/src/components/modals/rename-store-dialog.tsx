@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/lib/i18n';
 
 export function RenameStoreDialog({
   open,
@@ -26,6 +27,7 @@ export function RenameStoreDialog({
   isOnboarding?: boolean;
   businessId?: string;
 }) {
+  const { t } = useLanguage();
   const { selectedBusinessId, businesses, setBusinesses } = useBusinessContext();
   const activeBusinessId = businessId ?? selectedBusinessId;
   const activeBusiness = businesses.find((item) => item.id === activeBusinessId);
@@ -95,7 +97,7 @@ export function RenameStoreDialog({
         );
         onOpenChange(false);
       } catch {
-        setSaveError('খাতার নাম সংরক্ষণ করা যায়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।');
+        setSaveError(t('khataSaveFailed'));
       } finally {
         setIsSaving(false);
       }
@@ -109,17 +111,18 @@ export function RenameStoreDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         className={cn('max-w-sm rounded-2xl', isOnboarding && '[&>button:last-child]:hidden')}
+        closeLabel={t('close')}
         onEscapeKeyDown={isOnboarding ? (event) => event.preventDefault() : undefined}
         onPointerDownOutside={isOnboarding ? (event) => event.preventDefault() : undefined}
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Pencil className="w-5 h-5 text-primary" />
-            {isOnboarding ? 'আপনার খাতার নাম লিখুন' : 'খাতার নাম সম্পাদনা করুন'}
+            {isOnboarding ? t('onboardingKhataTitle') : t('editKhataTitle')}
           </DialogTitle>
           {isOnboarding && (
             <p className="pt-2 text-sm leading-relaxed text-slate-500">
-              এই নামটি আপনার প্রথম ও প্রধান ব্যবসার খাতা হিসেবে সংরক্ষণ হবে।
+              {t('onboardingKhataDescription')}
             </p>
           )}
         </DialogHeader>
@@ -131,7 +134,7 @@ export function RenameStoreDialog({
             setIsEmptyError(false);
             setSaveError('');
           }}
-          placeholder={isOnboarding ? 'যেমন: শাকিল ট্রেডার্স' : 'খাতার নাম লিখুন'}
+          placeholder={isOnboarding ? t('khataNameExample') : t('khataNamePlaceholder')}
           className={cn('h-12 rounded-xl font-bold text-base', isEmptyError && 'border-red-400 focus-visible:ring-red-300')}
           maxLength={40}
           onKeyDown={(e) => {
@@ -141,10 +144,10 @@ export function RenameStoreDialog({
             }
           }}
         />
-        {isEmptyError && <p className="text-xs font-semibold text-red-500 -mt-2">খাতার নাম খালি রাখা যাবে না</p>}
+        {isEmptyError && <p className="text-xs font-semibold text-red-500 -mt-2">{t('khataNameRequired')}</p>}
         {saveError && <p role="alert" className="text-xs font-semibold text-red-600 -mt-2">{saveError}</p>}
         <Button className="w-full font-bold h-11 rounded-xl" onClick={() => void handleSave()} disabled={isSaving}>
-          {isOnboarding ? (isSaving ? 'সংরক্ষণ হচ্ছে…' : 'খাতা তৈরি করুন') : 'সেভ করুন'}
+          {isOnboarding ? (isSaving ? t('savingKhata') : t('createKhata')) : t('save')}
         </Button>
       </DialogContent>
     </Dialog>

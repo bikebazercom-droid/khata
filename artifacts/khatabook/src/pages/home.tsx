@@ -203,11 +203,11 @@ export function HomeView() {
               createdAt: new Date().toISOString(),
               status: 'pending',
             });
-            toast.success('নাম ডিভাইসে সেভ হয়েছে; সংযোগ ফিরলে সিঙ্ক হবে');
+            toast.success(t('partyRenameSavedOffline'));
             setRenameTarget(null);
             return;
           } catch {
-            toast.error('অফলাইন স্টোরেজে নাম সেভ করা যায়নি');
+            toast.error(t('partyRenameOfflineSaveFailed'));
           }
         }
 
@@ -221,7 +221,7 @@ export function HomeView() {
             queryClient.removeQueries({ queryKey: context.partyKey, exact: true });
           }
         }
-        toast.error('নাম পরিবর্তন করা যায়নি');
+        toast.error(t('partyRenameFailed'));
       },
       onSuccess: (updatedParty, variables, context) => {
         if (context) {
@@ -232,7 +232,7 @@ export function HomeView() {
             );
           }
         }
-        toast.success('নাম পরিবর্তন করা হয়েছে');
+        toast.success(t('partyRenameSuccess'));
         setRenameTarget(null);
       },
       onSettled: (_data, error, variables) => {
@@ -254,7 +254,7 @@ export function HomeView() {
     if (!renameTarget) return;
     const trimmedName = renameName.trim();
     if (!trimmedName) {
-      setRenameError('নাম খালি রাখা যাবে না');
+      setRenameError(t('nameRequired'));
       return;
     }
     if (trimmedName === renameTarget.name) {
@@ -930,12 +930,14 @@ export function HomeView() {
           }
         }}
       >
-        <DialogContent className="max-w-sm rounded-2xl">
+        <DialogContent className="max-w-sm rounded-2xl" closeLabel={t('close')}>
           <DialogHeader>
-            <DialogTitle>গ্রাহক / সরবরাহকারীর নাম পরিবর্তন</DialogTitle>
+            <DialogTitle>
+              {renameTarget?.role === PartyRole.SUPPLIER ? t('renameSupplierTitle') : t('renameCustomerTitle')}
+            </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-slate-500">
-            {renameTarget?.name} — নতুন নাম লিখুন
+            {renameTarget?.name} — {t('enterNewName')}
           </p>
           <Input
             autoFocus
@@ -948,7 +950,7 @@ export function HomeView() {
               if (event.key === 'Enter') savePartyRename();
             }}
             maxLength={120}
-            placeholder="নাম লিখুন"
+            placeholder={t('namePlaceholder')}
             className={cn('h-12 rounded-xl font-semibold', renameError && 'border-red-400')}
           />
           {renameError && <p className="text-xs font-semibold text-red-600">{renameError}</p>}
@@ -960,7 +962,7 @@ export function HomeView() {
               disabled={renamePartyMutation.isPending}
               onClick={() => setRenameTarget(null)}
             >
-              বাতিল
+              {t('cancel')}
             </Button>
             <Button
               type="button"
@@ -968,7 +970,7 @@ export function HomeView() {
               disabled={renamePartyMutation.isPending}
               onClick={savePartyRename}
             >
-              {renamePartyMutation.isPending ? 'সেভ হচ্ছে…' : 'সেভ করুন'}
+              {renamePartyMutation.isPending ? t('saving') : t('save')}
             </Button>
           </div>
         </DialogContent>

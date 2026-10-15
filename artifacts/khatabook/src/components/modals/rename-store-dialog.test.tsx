@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { LanguageProvider } from '@/lib/i18n';
 
 const mocks = vi.hoisted(() => ({
   businesses: [] as { id: string; name: string }[],
@@ -50,7 +51,8 @@ vi.mock('@workspace/api-client-react', async (importOriginal) => {
 
 import { RenameStoreDialog } from './rename-store-dialog';
 
-function renderOnboarding() {
+function renderDialog({ onboarding = true, language = 'bn' }: { onboarding?: boolean; language?: 'bn' | 'en' } = {}) {
+  window.localStorage.setItem('banglakhata-language', language);
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -63,12 +65,14 @@ function renderOnboarding() {
   const onOpenChange = vi.fn();
   render(
     <QueryClientProvider client={queryClient}>
-      <RenameStoreDialog
-        open
-        onOpenChange={onOpenChange}
-        isOnboarding
-        businessId="business-1"
-      />
+      <LanguageProvider>
+        <RenameStoreDialog
+          open
+          onOpenChange={onOpenChange}
+          isOnboarding={onboarding}
+          businessId="business-1"
+        />
+      </LanguageProvider>
     </QueryClientProvider>,
   );
   return { queryClient, onOpenChange };
@@ -76,6 +80,7 @@ function renderOnboarding() {
 
 describe('RenameStoreDialog first-book setup', () => {
   beforeEach(() => {
+    window.localStorage.clear();
     mocks.businesses = [{ id: 'business-1', name: '' }];
     mocks.getSettings.mockReset().mockReturnValue({ data: { storeName: '' } });
     mocks.setBusinesses.mockReset();
@@ -84,7 +89,7 @@ describe('RenameStoreDialog first-book setup', () => {
 
   it('saves the entered name to the current primary book and clears onboarding state', async () => {
     mocks.saveSettings.mockResolvedValue({ storeName: 'Shakil Traders' });
-    const { queryClient, onOpenChange } = renderOnboarding();
+    const { queryClient, onOpenChange } = renderDialog();
 
     fireEvent.change(screen.getByPlaceholderText('যেমন: শাকিল ট্রেডার্স'), {
       target: { value: '  Shakil Traders  ' },
@@ -108,7 +113,7 @@ describe('RenameStoreDialog first-book setup', () => {
 
   it('keeps required setup open and restores the empty book name when saving fails', async () => {
     mocks.saveSettings.mockRejectedValue(new Error('offline'));
-    const { queryClient, onOpenChange } = renderOnboarding();
+    const { queryClient, onOpenChange } = renderDialog();
 
     fireEvent.change(screen.getByPlaceholderText('যেমন: শাকিল ট্রেডার্স'), {
       target: { value: 'Shakil Traders' },
@@ -129,5 +134,16 @@ describe('RenameStoreDialog first-book setup', () => {
       businessName: '',
       needsBookName: true,
     });
+  });
+
+  it('translates the edit dialog title, placeholder, and save action to English', () => {
+    mocks.businesses = [{ id: 'business-1', name: 'Shakil Traders' }];
+    mocks.getSettings.mockReturnValue({ data: { storeName: 'Shakil Traders' } });
+    renderDialog({ onboarding: false, language: 'en' });
+
+    expect(screen.getByRole('heading', { name: 'Edit Khata Name' })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Enter ledger name')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
   });
 });
