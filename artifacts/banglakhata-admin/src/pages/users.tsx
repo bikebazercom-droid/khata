@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { SidebarLayout } from "@/components/layout/sidebar";
-import { useListAdminUsers, getListAdminUsersQueryKey } from "@workspace/api-client-react";
+import {
+  useListAdminUsers, getListAdminUsersQueryKey, getGetAdminUserQueryKey, useUpdateAdminUser,
+  type AdminUser,
+} from "@workspace/api-client-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +13,69 @@ import { formatShortDate } from "@/lib/format";
 import { Link } from "wouter";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { useDebounce } from "@/lib/use-debounce";
+import { adminFetch } from "@/lib/auth";
+
+function UserActions({ user }: { user: AdminUser }) {
+  const [message, setMessage] = useState("");
+  const [working, setWorking] = useState(false);
+  const queryClient = useQueryClient();
+  const update = useUpdateAdminUser();
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: getListAdminUsersQueryKey() });
+    void queryClient.invalidateQueries({ queryKey: getGetAdminUserQueryKey(user.id) });
+  };
+  const setBlocked = () => {
+    setMessage("");
+    update.mutate(
+      { userId: user.id, data: { status: user.status === "active" ? "suspended" : "active" } },
+      { onSuccess: refresh, onError: () => setMessage("Could not update status.") },
+    );
+  };
+  const deactivate = async () => {
+    if (!window.confirm(`Deactivate ${user.name || user.phone || user.email || "this user"}? Sign-in will be blocked; business and ledger history will be kept.`)) return;
+    setWorking(true);
+    setMessage("");
+    try {
+      const response = await adminFetch(`/api/admin/users/${encodeURIComponent(user.id)}`, { method: "DELETE" });
+      if (!response.ok) throw new Error();
+      refresh();
+      setMessage("Account deactivated; ledger history preserved.");
+    } catch {
+      setMessage("Could not deactivate this account.");
+    } finally {
+      setWorking(false);
+    }
+  };
+  const sendOtp = async () => {
+    setWorking(true);
+    setMessage("");
+    try {
+      const response = await adminFetch(`/api/admin/users/${encodeURIComponent(user.id)}/send-phone-otp`, { method: "POST" });
+      if (!response.ok) throw new Error();
+      setMessage(`A sign-in code was sent to ${user.phone}. The code is not shown to admins.`);
+    } catch {
+      setMessage("Could not send a sign-in code.");
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  return <div className="flex flex-col items-end gap-1.5">
+    <div className="flex flex-wrap justify-end gap-1.5">
+      {!user.deactivatedAt && <Button size="sm" variant={user.status === "active" ? "outline" : "default"}
+        onClick={setBlocked} disabled={update.isPending || working}>
+        {user.status === "active" ? "Block" : "Unblock"}
+      </Button>}
+      {user.phone && !user.deactivatedAt && <Button size="sm" variant="outline" onClick={sendOtp} disabled={working}>
+        Send OTP
+      </Button>}
+      {!user.deactivatedAt && <Button size="sm" variant="destructive" onClick={deactivate} disabled={working || update.isPending}>
+        Delete
+      </Button>}
+    </div>
+    {message && <span role="status" className="max-w-56 text-right text-xs text-muted-foreground">{message}</span>}
+  </div>;
+}
 
 export default function UsersPage() {
   const [page, setPage] = useState(1);
@@ -61,25 +128,26 @@ export default function UsersPage() {
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Active now</TableHead>
                 <TableHead className="text-right">Joined</TableHead>
-                <TableHead></TableHead>
+                <TableHead className="text-right">View</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     Loading users...
                   </TableCell>
                 </TableRow>
               ) : !data ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     No user data is available.
                   </TableCell>
                 </TableRow>
               ) : data.items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     No users found
                   </TableCell>
                 </TableRow>
@@ -100,7 +168,7 @@ export default function UsersPage() {
                     </TableCell>
                     <TableCell>
                       <Badge variant={user.status === 'active' ? 'success' : 'destructive'}>
-                        {user.status}
+                        {user.deactivatedAt ? "deactivated" : user.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right font-medium">{user.isOnline ? "● Online" : "Offline"}</TableCell>
@@ -112,6 +180,7 @@ export default function UsersPage() {
                         </Button>
                       </Link>
                     </TableCell>
+                    <TableCell className="text-right"><UserActions user={user} /></TableCell>
                   </TableRow>
                 ))
               )}

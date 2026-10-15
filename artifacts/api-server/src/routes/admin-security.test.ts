@@ -6,10 +6,10 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, appUsersTable, businessesTable, userBusinessesTable, adminOtpConfigTable,
   blockedIpsTable, userPresenceTable, userLoginEventsTable, preapprovedLoginsTable,
-  userLoginAttemptsTable } from "@workspace/db";
+  userLoginAttemptsTable, otpCodesTable, appUserLoginSessionsTable } from "@workspace/db";
 import { signAdminToken } from "../middlewares/requireAdmin";
 import { enforceIpBlock, trustedProxyCidrs } from "../middlewares/ipBlock";
-import { ensureSmsReady } from "../services/sms";
+import { ensureSmsReady, sendOtpSms } from "../services/sms";
 import adminRouter from "./admin";
 import authRouter from "./auth";
 
@@ -27,6 +27,7 @@ describe("admin security and foreground presence", () => {
   app.use(express.json(), enforceIpBlock, adminRouter, authRouter);
   let businessId: string;
   let userId: string;
+  let userPhone: string;
   let oldConfig: typeof adminOtpConfigTable.$inferSelect | undefined;
   let createdConfigId: string | undefined;
   const ip = "127.0.0.1";
@@ -43,12 +44,14 @@ describe("admin security and foreground presence", () => {
     if (!existing) {
       const [created] = await db.insert(adminOtpConfigTable).values({ enabled: true }).returning();
       createdConfigId = created!.id;
+    } else {
+      await db.update(adminOtpConfigTable).set({ enabled: true })
+        .where(eq(adminOtpConfigTable.id, existing.id));
     }
     const [business] = await db.insert(businessesTable).values({ name: "Admin security test" }).returning();
     businessId = business!.id;
-    const [user] = await db.insert(appUsersTable).values({
-      businessId, phone: `+88017${Math.floor(Math.random() * 100_000_000).toString().padStart(8, "0")}`,
-    }).returning();
+    userPhone = `+88017${Math.floor(Math.random() * 100_000_000).toString().padStart(8, "0")}`;
+    const [user] = await db.insert(appUsersTable).values({ businessId, phone: userPhone }).returning();
     userId = user!.id;
     await db.insert(userBusinessesTable).values({ businessId, userId });
   });
@@ -62,6 +65,7 @@ describe("admin security and foreground presence", () => {
       .where(eq(adminOtpConfigTable.id, oldConfig.id));
     if (createdConfigId) await db.delete(adminOtpConfigTable).where(eq(adminOtpConfigTable.id, createdConfigId));
     if (userId) await db.delete(userBusinessesTable).where(eq(userBusinessesTable.userId, userId));
+    if (userPhone) await db.delete(otpCodesTable).where(eq(otpCodesTable.phone, userPhone));
     if (userId) await db.delete(appUsersTable).where(eq(appUsersTable.id, userId));
     if (businessId) await db.delete(businessesTable).where(eq(businessesTable.id, businessId));
   });
@@ -115,6 +119,22 @@ describe("admin security and foreground presence", () => {
     expect((await request(app).delete(`/admin/preapproved-logins/${created.body.id}`)
       .set("Authorization", admin)).status).toBe(204);
     await db.delete(userLoginAttemptsTable).where(eq(userLoginAttemptsTable.id, attempt!.id));
+  });
+
+  it("sends an admin-requested normal OTP only by SMS, without returning the code", async () => {
+    const admin = `Bearer ${signAdminToken()}`;
+    vi.mocked(ensureSmsReady).mockResolvedValue(undefined);
+    vi.mocked(sendOtpSms).mockResolvedValue(undefined);
+    const response = await request(app).post(`/admin/users/${userId}/send-phone-otp`)
+      .set("Authorization", admin);
+    expect(response.status, response.text).toBe(200);
+    expect(response.body).toEqual({ success: true });
+    const [sentPhone, sentCode] = vi.mocked(sendOtpSms).mock.calls.at(-1)!;
+    expect(sentPhone).toBe(userPhone);
+    expect(sentCode).toMatch(/^\d{6}$/);
+    const [stored] = await db.select().from(otpCodesTable).where(eq(otpCodesTable.phone, userPhone)).limit(1);
+    expect(stored?.code).not.toBe(sentCode);
+    expect(response.body).not.toHaveProperty("code");
   });
 
   it("allows an explicitly verified direct policy but ignores spoofed XFF, blocking sessions and OTP", async () => {
@@ -191,5 +211,21 @@ describe("admin security and foreground presence", () => {
     expect((await request(app).post("/auth/phone/send-otp").send({ phone: otpTestPhone })).status).toBe(503);
     expect((await request(app).post("/auth/phone/verify-otp")
       .send({ phone: otpTestPhone, code: "123456" })).status).toBe(503);
+  });
+
+  it("soft-deactivates a user, revokes their sessions, preserves their record, and prevents unblocking", async () => {
+    const admin = `Bearer ${signAdminToken()}`;
+    const sessionId = `admin-security-deactivation-${randomInt(1_000_000, 9_999_999)}`;
+    await db.insert(appUserLoginSessionsTable).values({ userId, sessionId });
+    const response = await request(app).delete(`/admin/users/${userId}`).set("Authorization", admin);
+    expect(response.status, response.text).toBe(200);
+    expect(response.body).toMatchObject({ id: userId, status: "suspended" });
+    expect(response.body.deactivatedAt).toBeTruthy();
+    expect((await db.select().from(appUsersTable).where(eq(appUsersTable.id, userId)))).toHaveLength(1);
+    const [revoked] = await db.select().from(appUserLoginSessionsTable)
+      .where(eq(appUserLoginSessionsTable.sessionId, sessionId));
+    expect(revoked?.revokedAt).toBeInstanceOf(Date);
+    expect((await request(app).patch(`/admin/users/${userId}`).set("Authorization", admin)
+      .send({ status: "active" })).status).toBe(409);
   });
 });

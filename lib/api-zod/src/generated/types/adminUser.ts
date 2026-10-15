@@ -21,4 +21,6 @@ export interface AdminUser {
   createdAt: Date;
   /** @nullable */
   lastLogin: Date | null;
+  /** @nullable */
+  deactivatedAt: Date | null;
 }

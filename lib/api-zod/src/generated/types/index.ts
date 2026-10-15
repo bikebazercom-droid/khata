@@ -95,5 +95,6 @@ export * from './pushTokenInput';
 export * from './pushTokenInputPlatform';
 export * from './reminderMessage';
 export * from './reportBrandingInput';
+export * from './sendAdminPhoneLoginOtp200';
 export * from './uploadUrlRequest';
 export * from './uploadUrlResponse';
