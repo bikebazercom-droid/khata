@@ -80,9 +80,30 @@ describe('business invoice', () => {
       render(<BusinessInvoice />);
       expect(screen.getByTestId('input-invoice-company')).toHaveValue('Sample shop');
       expect(screen.getByTestId('input-invoice-item-description-1')).toHaveValue('Rice');
+      expect(screen.getByTestId('select-invoice-customer-id-type')).toHaveValue('nid');
+      expect(screen.getByTestId('input-invoice-customerIdNumber')).toHaveValue('');
     } finally {
       window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
     }
+  });
+
+  it('shows customer phone, document number, and address on the invoice only when provided', () => {
+    render(<BusinessInvoice />);
+    fireEvent.click(screen.getByTestId('button-invoice-mobile-view'));
+    expect(screen.queryByText(/NID:/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('button-invoice-mobile-view'));
+    fireEvent.change(screen.getByTestId('input-invoice-customer'), { target: { value: 'A. Customer' } });
+    fireEvent.change(screen.getByTestId('input-invoice-customerPhone'), { target: { value: '+971 50 123 4567' } });
+    fireEvent.change(screen.getByTestId('select-invoice-customer-id-type'), { target: { value: 'passport' } });
+    fireEvent.change(screen.getByTestId('input-invoice-customerIdNumber'), { target: { value: 'A98765432' } });
+    fireEvent.change(screen.getByTestId('input-invoice-customerAddress'), { target: { value: 'Dubai, UAE' } });
+    fireEvent.click(screen.getByTestId('button-invoice-mobile-view'));
+
+    expect(screen.getByText('A. Customer')).toBeInTheDocument();
+    expect(screen.getByText('Phone: +971 50 123 4567')).toBeInTheDocument();
+    expect(screen.getByText('Passport No: A98765432')).toBeInTheDocument();
+    expect(screen.getByText('Address: Dubai, UAE')).toBeInTheDocument();
   });
 
   it('exports using the fixed A4-width container and zero-scroll canvas', async () => {

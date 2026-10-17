@@ -6,10 +6,13 @@ import { useLanguage } from '@/lib/i18n';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
 
 type InvoiceLine = { id: number; description: string; amount: string; taxed: boolean };
+type CustomerDocumentType = 'nid' | 'passport' | 'civil_id' | 'trade_license' | 'other';
+const customerDocumentTypes: CustomerDocumentType[] = ['nid', 'passport', 'civil_id', 'trade_license', 'other'];
 type InvoiceData = {
   company: string; address: string; phone: string; website: string; logo: string;
   email: string; trn: string; locationUrl: string;
   customer: string; customerAddress: string; customerPhone: string;
+  customerIdType: CustomerDocumentType; customerIdNumber: string;
   number: string; date: string; due: string; currency: 'BDT' | 'USD'; taxRate: string; comments: string;
   paymentTerms: string; metalRate: string; placeOfSupply: string;
 };
@@ -99,6 +102,10 @@ function decodeInvoiceFromLink(): SharedInvoice | null {
     if (stringFields.some((field) => typeof data[field] !== 'string')) return null;
     const invoiceData = {
       ...data,
+      customerIdType: customerDocumentTypes.includes(data.customerIdType as CustomerDocumentType)
+        ? data.customerIdType as CustomerDocumentType
+        : 'nid',
+      customerIdNumber: typeof data.customerIdNumber === 'string' ? data.customerIdNumber : '',
       email: typeof data.email === 'string' ? data.email : '',
       trn: typeof data.trn === 'string' ? data.trn : '',
       locationUrl: typeof data.locationUrl === 'string' ? data.locationUrl : '',
@@ -162,7 +169,7 @@ export function BusinessInvoice() {
   const [invoiceData, setInvoiceData] = useState<InvoiceData>(() => sharedInvoice?.invoiceData ?? ({
     company: '', address: '', phone: '', website: '', logo: '',
     email: '', trn: '', locationUrl: '',
-    customer: '', customerAddress: '', customerPhone: '',
+    customer: '', customerAddress: '', customerPhone: '', customerIdType: 'nid', customerIdNumber: '',
     number: newInvoiceNumber(), date: today(), due: dueDate(), currency: 'BDT', taxRate: '0', comments: '',
     paymentTerms: 'Cash', metalRate: '', placeOfSupply: '',
     ...savedProfile,
@@ -180,6 +187,8 @@ export function BusinessInvoice() {
     company: 'Shop details', address: 'Business address', phone: 'Phone number', website: 'Website', logo: 'Business logo',
     email: 'Email address', trn: 'TRN / Tax registration number', locationUrl: 'Google Maps / business location URL',
     customer: 'Customer name', customerAddress: 'Customer address', customerPhone: 'Customer phone',
+    customerIdType: 'ID Type', customerIdNumber: 'ID / Document Number',
+    customerPhoneLabel: 'Phone', customerAddressLabel: 'Address',
     number: 'Invoice number', date: 'Invoice date', due: 'Payment due date', currency: 'Currency', tax: 'Tax rate (%)',
     paymentTerms: 'Payment terms', metalRate: 'Metal / unit rate', placeOfSupply: 'Place of supply',
     description: 'Item description', taxed: 'Taxable', amount: 'Amount', add: 'Add an item', comments: 'Notes or payment terms',
@@ -196,6 +205,8 @@ export function BusinessInvoice() {
     company: 'দোকানের নাম', address: 'ব্যবসার ঠিকানা', phone: 'ফোন নম্বর', website: 'ওয়েবসাইট', logo: 'দোকানের লোগো',
     email: 'ইমেইল ঠিকানা', trn: 'টিআরএন / কর নিবন্ধন নম্বর', locationUrl: 'গুগল ম্যাপ / ব্যবসার অবস্থানের লিংক',
     customer: 'গ্রাহকের নাম', customerAddress: 'গ্রাহকের ঠিকানা', customerPhone: 'গ্রাহকের ফোন',
+    customerIdType: 'পরিচয়পত্রের ধরন', customerIdNumber: 'আইডি / নথি নম্বর',
+    customerPhoneLabel: 'ফোন', customerAddressLabel: 'ঠিকানা',
     number: 'ইনভয়েস নম্বর', date: 'ইনভয়েসের তারিখ', due: 'পরিশোধের শেষ তারিখ', currency: 'মুদ্রা', tax: 'কর হার (%)',
     paymentTerms: 'পেমেন্টের শর্ত', metalRate: 'ধাতু / একক মূল্য', placeOfSupply: 'সরবরাহের স্থান',
     description: 'পণ্যের বিবরণ', taxed: 'করযোগ্য', amount: 'পরিমাণ', add: 'আইটেম যোগ করুন', comments: 'নোট বা পেমেন্টের শর্ত',
@@ -208,8 +219,28 @@ export function BusinessInvoice() {
     cancel: 'বাতিল', uploadLogo: 'PNG বা JPG লোগো আপলোড করুন', logoLimit: 'লোগো ইনভয়েসের হেডারে মানানসই করে ছোট করা হবে।',
     taxInvoice: 'ট্যাক্স ইনভয়েস', partyCopy: 'পার্টি কপি', scanToFind: 'খুঁজে পেতে স্ক্যান করুন',
   };
+  const customerDocumentLabels: Record<CustomerDocumentType, string> = en ? {
+    nid: 'National ID (NID)',
+    passport: 'Passport',
+    civil_id: 'Emirates ID / Civil ID',
+    trade_license: 'Trade License',
+    other: 'Other ID',
+  } : {
+    nid: 'জাতীয় পরিচয়পত্র (NID)',
+    passport: 'পাসপোর্ট',
+    civil_id: 'এমিরেটস আইডি / সিভিল আইডি',
+    trade_license: 'ট্রেড লাইসেন্স',
+    other: 'অন্যান্য পরিচয়পত্র',
+  };
   const set = (key: keyof InvoiceData, value: string) => setInvoiceData((current) => ({ ...current, [key]: value }));
   const current = invoiceData;
+  const customerDocumentOutputLabel: Record<CustomerDocumentType, string> = {
+    nid: 'NID',
+    passport: en ? 'Passport No' : 'পাসপোর্ট নম্বর',
+    civil_id: en ? 'Emirates ID / Civil ID' : 'এমিরেটস আইডি / সিভিল আইডি',
+    trade_license: en ? 'Trade License No' : 'ট্রেড লাইসেন্স নম্বর',
+    other: en ? 'ID No' : 'পরিচয়পত্র নম্বর',
+  };
   const saveBusinessProfile = () => {
     const profile: BusinessProfile = {
       company: current.company, address: current.address, phone: current.phone, website: current.website,
@@ -414,7 +445,15 @@ export function BusinessInvoice() {
               {sectionHeading(UserRound, en ? '02 · Customer' : '০২ · গ্রাহক', labels.billTo)}
               <div className="grid gap-x-3.5 gap-y-3 sm:grid-cols-2">
                 {field('customer', labels.customer)}{field('customerPhone', labels.customerPhone)}
-                <div className="sm:col-span-2">{field('customerAddress', labels.customerAddress)}</div>
+                <label className="block min-w-0 text-[12px] font-semibold text-[#55657b]">{labels.customerIdType}
+                  <select data-testid="select-invoice-customer-id-type" value={current.customerIdType} onChange={(event) => set('customerIdType', event.target.value as CustomerDocumentType)} className={inputClass}>
+                    {customerDocumentTypes.map((type) => <option key={type} value={type}>{customerDocumentLabels[type]}</option>)}
+                  </select>
+                </label>
+                {field('customerIdNumber', labels.customerIdNumber)}
+                <label className="block min-w-0 text-[12px] font-semibold text-[#55657b] sm:col-span-2">{labels.customerAddress}
+                  <textarea data-testid="input-invoice-customerAddress" value={current.customerAddress} onChange={(event) => set('customerAddress', event.target.value)} rows={3} className={`${inputClass} resize-y py-3`} />
+                </label>
               </div>
             </section>
             <section className="rounded-2xl border border-[#e2e8f0] bg-white p-4 shadow-[0_2px_10px_rgba(37,61,92,.035)] md:p-5">
@@ -519,7 +558,12 @@ export function BusinessInvoice() {
               <div className="border-l-[3px] border-[#8da4c3] pl-3">
                 <p className="mb-2 bg-[#1B3A6B] px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-[.16em] text-white">{labels.billTo}</p>
                 <p className="font-bold text-[#263e60]">{current.customer || '—'}</p>
-                <p className="mt-1 whitespace-pre-line text-[10px] leading-[1.7] text-[#6e7e93]">{[current.customerAddress, current.customerPhone].filter(Boolean).join('\n') || '—'}</p>
+                <div className="mt-1 space-y-0.5 break-words text-[10px] leading-[1.7] text-[#6e7e93]">
+                  {current.customerPhone && <p>{labels.customerPhoneLabel}: {current.customerPhone}</p>}
+                  {current.customerIdNumber.trim() && <p>{customerDocumentOutputLabel[current.customerIdType]}: {current.customerIdNumber}</p>}
+                  {current.customerAddress && <p className="whitespace-pre-line">{labels.customerAddressLabel}: {current.customerAddress}</p>}
+                  {!current.customerPhone && !current.customerIdNumber.trim() && !current.customerAddress && <p>—</p>}
+                </div>
               </div>
               <div className="min-w-0 self-end text-right text-[10px] text-[#6e7e93]">{labels.due}: {dateLabel(current.due, lang)}</div>
             </div>
