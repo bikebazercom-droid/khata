@@ -216,11 +216,12 @@ const money = (value: number, currency: string, lang: string) => {
 const dateLabel = (value: string, lang: string) =>
   value ? new Date(`${value}T12:00:00`).toLocaleDateString(localeForLanguage(lang)) : '—';
 
-export function BusinessInvoice({ historyRecord, autoAction = 'open' }: { historyRecord?: InvoiceHistoryRecord; autoAction?: InvoiceHistoryAction }) {
+export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly = false }: { historyRecord?: InvoiceHistoryRecord; autoAction?: InvoiceHistoryAction; viewOnly?: boolean }) {
   const { lang } = useLanguage();
   const en = lang === 'en';
   const printRef = useRef<HTMLDivElement>(null);
-  const [preview, setPreview] = useState(false);
+  const [preview, setPreview] = useState(viewOnly);
+  const [readOnlyPreview, setReadOnlyPreview] = useState(viewOnly);
   const [pdfMode, setPdfMode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [currencyPopoverOpen, setCurrencyPopoverOpen] = useState(false);
@@ -306,6 +307,10 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open' }: { histor
     const aliases = currencyCountryAliases[code] || [];
     return { code, name, symbol, aliases, search: `${code} ${name} ${symbol} ${aliases.join(' ')}`.toLocaleLowerCase(locale) };
   }), [locale]);
+  useEffect(() => {
+    setReadOnlyPreview(viewOnly);
+    if (viewOnly) setPreview(true);
+  }, [viewOnly]);
   const selectedCurrency = currencyOptions.find((option) => option.code === current.currency);
   const customerDocumentOutputLabel: Record<CustomerDocumentType, string> = {
     nid: 'NID',
@@ -350,9 +355,14 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open' }: { histor
   );
   const itemAmount = (value: string) => Number(value) || 0;
   const filename = `Invoice_${current.number.replace(/[^a-zA-Z0-9_-]/g, '_') || 'download'}.pdf`;
-  const persistHistory = () => {
+  const persistHistory = (): boolean => {
+    if (!current.customer.trim()) {
+      toast.error(en ? 'Enter the customer name before saving this invoice.' : 'ইনভয়েস সংরক্ষণের আগে গ্রাহকের নাম লিখুন।');
+      return false;
+    }
     saveInvoiceHistory({ type: 'Business', number: current.number, date: current.date, customerName: current.customer, customerPhone: current.customerPhone, total: totals.total, currency: current.currency, itemCount: lines.length, payload: { invoiceData: current, lines } });
     toast.success(en ? 'Invoice saved to history.' : 'ইনভয়েস ইতিহাসে সংরক্ষণ হয়েছে।');
+    return true;
   };
   const shareUrl = () => {
     const url = new URL(window.location.href);
@@ -433,7 +443,7 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open' }: { histor
   async function downloadPdf() {
     setBusy(true);
     try {
-      persistHistory();
+      if (!persistHistory()) return;
       const blob = await createPdf();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -470,12 +480,13 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open' }: { histor
           <div className="min-w-0"><h2 className="truncate text-[17px] font-bold tracking-tight text-[#1b2f4d]">{labels.title}</h2><p className="hidden text-xs text-[#77869a] sm:block">{labels.subtitle}</p></div>
         </div>
         <div className="flex items-center gap-2">
+          {readOnlyPreview && <button type="button" data-testid="button-invoice-preview-edit" onClick={() => { setReadOnlyPreview(false); setPreview(false); }} className="inline-flex min-h-10 items-center rounded-xl border border-[#d8e1ed] bg-white px-3 text-[13px] font-bold text-[#365273]">{en ? 'Edit' : 'সম্পাদনা'}</button>}
           <button type="button" aria-label={en ? 'Save invoice' : 'ইনভয়েস সংরক্ষণ'} data-testid="button-invoice-save-history" onClick={persistHistory} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#d8e1ed] bg-white px-3 text-[13px] font-bold text-[#365273]">
             <Save className="h-4 w-4" /><span className="hidden sm:inline">{en ? 'Save invoice' : 'ইনভয়েস সংরক্ষণ'}</span>
           </button>
-          <button type="button" data-testid="button-invoice-mobile-view" onClick={() => setPreview((value) => !value)} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#dce4ee] bg-white px-3 text-[13px] font-semibold text-[#3d526f] transition hover:bg-[#f5f8fc] lg:hidden">
+          {!readOnlyPreview && <button type="button" data-testid="button-invoice-mobile-view" onClick={() => setPreview((value) => !value)} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#dce4ee] bg-white px-3 text-[13px] font-semibold text-[#3d526f] transition hover:bg-[#f5f8fc] lg:hidden">
             {preview ? <PencilLine className="h-4 w-4" /> : <Eye className="h-4 w-4" />}{preview ? labels.edit : labels.preview}
-          </button>
+          </button>}
           <button type="button" data-testid="button-invoice-share" disabled={busy} onClick={shareInvoice} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#d8e1ed] bg-white px-3 text-[13px] font-bold text-[#365273] transition hover:bg-[#f5f8fc] disabled:opacity-60">
             <Share2 className="h-4 w-4" /><span className="hidden sm:inline">{labels.share}</span>
           </button>
@@ -485,7 +496,7 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open' }: { histor
         </div>
       </header>
       <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(360px,0.92fr)_minmax(470px,1.08fr)]">
-        <section className={`${preview ? 'hidden lg:block' : ''} min-h-0 overflow-y-auto px-4 py-5 md:px-6`}>
+        <section className={`${readOnlyPreview ? 'hidden' : preview ? 'hidden lg:block' : ''} min-h-0 overflow-y-auto px-4 py-5 md:px-6`}>
           <div className="mx-auto max-w-[650px] space-y-4 pb-8">
             <div className="mb-5 flex items-center justify-between">
               <div><p className="text-[10px] font-bold uppercase tracking-[.16em] text-[#8291a6]">{labels.setup}</p><p className="mt-1 text-sm text-[#697b92]">{en ? 'Fill in what you know. You can edit everything.' : 'প্রয়োজনীয় তথ্য দিন, সবকিছুই পরে সম্পাদনা করা যাবে।'}</p></div>

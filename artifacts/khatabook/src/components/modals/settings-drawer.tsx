@@ -4,7 +4,7 @@ import { useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { useClerk, useAuth, useUser } from '@clerk/react';
 import { useRemoveOwnerPushToken } from '@workspace/api-client-react';
-import { AlertTriangle, ArrowLeft, ChevronDown, EllipsisVertical, FileText, Globe2, LogIn, LogOut, Mail, Phone, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ChevronDown, EllipsisVertical, Globe2, LogIn, LogOut, Mail, Phone, Trash2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -87,11 +87,9 @@ export function SettingsDrawer({
   const [activeDetailsModule, setActiveDetailsModule] = useState<'invoice' | 'gold' | 'list'>('invoice');
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceHistoryRecord>();
   const [invoiceAction, setInvoiceAction] = useState<InvoiceHistoryAction>('open');
-  const [isInvoicesExpanded, setIsInvoicesExpanded] = useState(true);
   const openInvoice = (record: InvoiceHistoryRecord, action: InvoiceHistoryAction) => {
     setSelectedInvoice(record);
     setInvoiceAction(action);
-    setIsInvoicesExpanded(true);
     setActiveDetailsModule(record.type === 'Gold' ? 'gold' : 'invoice');
   };
 
@@ -356,34 +354,25 @@ export function SettingsDrawer({
             <p className="px-3 pb-1 text-xs font-bold uppercase tracking-wide text-slate-400">
               {lang === 'en' ? 'Modules' : 'মডিউল'}
             </p>
-            <button type="button" data-testid="button-invoices-menu" aria-expanded={isInvoicesExpanded} aria-controls="invoice-module-links"
-              onClick={() => setIsInvoicesExpanded((expanded) => !expanded)}
-              className={`flex min-h-11 items-center gap-2 rounded-xl px-3 text-left text-sm font-bold text-white transition-colors ${isInvoicesExpanded ? 'bg-[#1E293B]' : 'bg-transparent hover:bg-[#1E293B]'}`}>
-              <FileText className="h-4 w-4 text-amber-300" />
-              <span className="flex-1">{lang === 'en' ? 'Invoices' : 'ইনভয়েস'}</span>
-              <ChevronDown className={`h-4 w-4 transition-transform ${isInvoicesExpanded ? 'rotate-180' : ''}`} />
+            <button type="button" data-testid="nav-business-invoice" aria-current={activeDetailsModule === 'invoice' ? 'page' : undefined}
+              onClick={() => { setSelectedInvoice(undefined); setInvoiceAction('open'); setActiveDetailsModule('invoice'); }}
+              className={`flex min-h-11 items-center rounded-xl px-3 text-left text-sm font-semibold transition-colors ${activeDetailsModule === 'invoice' ? 'bg-amber-400 text-slate-950 shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+              {lang === 'en' ? 'Business Invoice' : 'বিজনেস ইনভয়েস'}
             </button>
-            {isInvoicesExpanded && <div id="invoice-module-links" className="ml-3 flex flex-col gap-1 border-l border-slate-700 pl-3">
-              <button type="button" data-testid="nav-business-invoice" aria-current={activeDetailsModule === 'invoice' ? 'page' : undefined}
-                onClick={() => { setSelectedInvoice(undefined); setActiveDetailsModule('invoice'); setIsInvoicesExpanded(true); }}
-                className={`flex min-h-10 items-center rounded-lg px-3 text-left text-sm font-semibold transition-colors ${activeDetailsModule === 'invoice' ? 'bg-amber-400 text-slate-950 shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
-                {lang === 'en' ? 'Business Invoice' : 'বিজনেস ইনভয়েস'}
-              </button>
-              <button type="button" data-testid="nav-gold-invoice" aria-current={activeDetailsModule === 'gold' ? 'page' : undefined}
-                onClick={() => { setSelectedInvoice(undefined); setActiveDetailsModule('gold'); setIsInvoicesExpanded(true); }}
-                className={`flex min-h-10 items-center rounded-lg px-3 text-left text-sm font-semibold transition-colors ${activeDetailsModule === 'gold' ? 'bg-amber-400 text-slate-950 shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
-                {lang === 'en' ? 'Gold Invoice' : 'গোল্ড ইনভয়েস'}
-              </button>
-              <button type="button" data-testid="nav-invoice-list" aria-current={activeDetailsModule === 'list' ? 'page' : undefined}
-                onClick={() => { setSelectedInvoice(undefined); setActiveDetailsModule('list'); setIsInvoicesExpanded(true); }}
-                className={`flex min-h-10 items-center rounded-lg px-3 text-left text-sm font-semibold transition-colors ${activeDetailsModule === 'list' ? 'bg-amber-400 text-slate-950 shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
-                {lang === 'en' ? 'Invoice List' : 'ইনভয়েস তালিকা'}
-              </button>
-            </div>}
+            <button type="button" data-testid="nav-gold-invoice" aria-current={activeDetailsModule === 'gold' ? 'page' : undefined}
+              onClick={() => { setSelectedInvoice(undefined); setInvoiceAction('open'); setActiveDetailsModule('gold'); }}
+              className={`flex min-h-11 items-center rounded-xl px-3 text-left text-sm font-semibold transition-colors ${activeDetailsModule === 'gold' ? 'bg-amber-400 text-slate-950 shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+              {lang === 'en' ? 'Gold Invoice' : 'গোল্ড ইনভয়েস'}
+            </button>
+            <button type="button" data-testid="nav-invoice-list" aria-current={activeDetailsModule === 'list' ? 'page' : undefined}
+              onClick={() => { setSelectedInvoice(undefined); setInvoiceAction('open'); setActiveDetailsModule('list'); }}
+              className={`flex min-h-11 items-center rounded-xl px-3 text-left text-sm font-semibold transition-colors ${activeDetailsModule === 'list' ? 'bg-amber-400 text-slate-950 shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+              {lang === 'en' ? 'Invoice List' : 'ইনভয়েস তালিকা'}
+            </button>
           </nav>
           <main className="min-h-0 min-w-0 flex-1">
-            {activeDetailsModule === 'invoice' && <BusinessInvoice historyRecord={selectedInvoice} autoAction={invoiceAction} />}
-            {activeDetailsModule === 'gold' && <GoldInvoice historyRecord={selectedInvoice} autoAction={invoiceAction} />}
+            {activeDetailsModule === 'invoice' && <BusinessInvoice historyRecord={selectedInvoice} autoAction={invoiceAction} viewOnly={!!selectedInvoice && invoiceAction === 'open'} />}
+            {activeDetailsModule === 'gold' && <GoldInvoice historyRecord={selectedInvoice} autoAction={invoiceAction} viewOnly={!!selectedInvoice && invoiceAction === 'open'} />}
             {activeDetailsModule === 'list' && <InvoiceList onOpen={openInvoice} />}
           </main>
         </div>

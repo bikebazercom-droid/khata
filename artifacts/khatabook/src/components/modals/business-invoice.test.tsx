@@ -142,6 +142,7 @@ describe('business invoice', () => {
     const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:invoice');
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     render(<BusinessInvoice />);
+    fireEvent.change(screen.getByTestId('input-invoice-customer'), { target: { value: 'Export Customer' } });
     fireEvent.click(screen.getByTestId('button-invoice-download'));
 
     await waitFor(() => expect(pdfCapture.options).not.toBeNull());

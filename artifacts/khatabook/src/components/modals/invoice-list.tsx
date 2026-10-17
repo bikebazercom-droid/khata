@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Download, Eye, Search, Share2, Trash2 } from 'lucide-react';
+import { Eye, Search, Trash2 } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n';
 import { deleteInvoiceHistory, INVOICE_HISTORY_EVENT, readInvoiceHistory, type InvoiceHistoryAction, type InvoiceHistoryRecord } from './invoice-history';
 
@@ -32,7 +32,7 @@ export function InvoiceList({ onOpen }: { onOpen: (record: InvoiceHistoryRecord,
           <option value="all">{en ? 'All Invoices' : 'সব ইনভয়েস'}</option><option value="Business">{en ? 'Business Invoices' : 'বিজনেস ইনভয়েস'}</option><option value="Gold">{en ? 'Gold Invoices' : 'গোল্ড ইনভয়েস'}</option>
         </select>
       </div>
-      <div className="overflow-x-auto rounded-xl border bg-white">
+      <div className="hidden overflow-x-auto rounded-xl border bg-white md:block">
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="bg-slate-100 text-xs uppercase text-slate-600"><tr>{[en?'Invoice No.':'ইনভয়েস নং',en?'Date':'তারিখ',en?'Type':'ধরন',en?'Customer Name':'গ্রাহকের নাম',en?'Total Amount':'মোট',en?'Actions':'কাজ'].map((x)=><th key={x} className="px-3 py-3">{x}</th>)}</tr></thead>
           <tbody>{visible.map((record)=><tr key={record.id} className="border-t">
@@ -41,13 +41,26 @@ export function InvoiceList({ onOpen }: { onOpen: (record: InvoiceHistoryRecord,
             <td className="px-3 py-3">{record.customerName || '—'}<small className="block text-slate-500">{record.customerPhone}</small></td><td className="px-3 py-3 font-semibold">{money(record)}</td>
             <td className="px-3 py-3"><div className="flex gap-1">
               <button data-testid={`button-history-open-${record.id}`} title={en?'View / Edit':'দেখুন / সম্পাদনা'} onClick={()=>onOpen(record,'open')} className="rounded p-2 hover:bg-slate-100"><Eye className="h-4 w-4"/></button>
-              <button data-testid={`button-history-download-${record.id}`} title={en?'Download PDF':'PDF ডাউনলোড'} onClick={()=>onOpen(record,'download')} className="rounded p-2 hover:bg-slate-100"><Download className="h-4 w-4"/></button>
-              <button data-testid={`button-history-share-${record.id}`} title={en?'Share':'শেয়ার'} onClick={()=>onOpen(record,'share')} className="rounded p-2 hover:bg-slate-100"><Share2 className="h-4 w-4"/></button>
               <button data-testid={`button-history-delete-${record.id}`} title={en?'Delete':'মুছুন'} onClick={()=>{if(window.confirm(en?'Delete this invoice from history?':'ইতিহাস থেকে ইনভয়েসটি মুছবেন?')){deleteInvoiceHistory(record.id);setRecords(readInvoiceHistory());}}} className="rounded p-2 text-rose-600 hover:bg-rose-50"><Trash2 className="h-4 w-4"/></button>
             </div></td></tr>)}
             {!visible.length && <tr><td colSpan={6} className="p-10 text-center text-slate-500">{en?'No saved invoices found.':'কোনো সংরক্ষিত ইনভয়েস নেই।'}</td></tr>}
           </tbody>
         </table>
+      </div>
+      <div className="space-y-2 md:hidden">
+        {visible.map((record) => <article key={record.id} className="rounded-xl border bg-white p-3 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0"><p className="break-all font-semibold text-slate-900">{record.number}</p><p className="mt-1 text-xs text-slate-500">{record.date} · {record.type}</p></div>
+            <p className="shrink-0 text-right font-semibold text-slate-900">{money(record)}</p>
+          </div>
+          <p className="mt-2 text-sm font-medium">{record.customerName || '—'}</p>
+          {record.customerPhone && <p className="text-xs text-slate-500">{record.customerPhone}</p>}
+          <div className="mt-2 flex justify-end gap-2 border-t pt-2">
+            <button type="button" data-testid={`button-history-open-${record.id}`} onClick={() => onOpen(record, 'open')} aria-label={en ? 'View invoice' : 'ইনভয়েস দেখুন'} className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-blue-900 hover:bg-blue-50"><Eye className="h-4 w-4" />{en ? 'View' : 'দেখুন'}</button>
+            <button type="button" data-testid={`button-history-delete-${record.id}`} onClick={() => { if (window.confirm(en ? 'Delete this invoice from history?' : 'ইতিহাস থেকে ইনভয়েসটি মুছবেন?')) { deleteInvoiceHistory(record.id); setRecords(readInvoiceHistory()); } }} aria-label={en ? 'Delete invoice' : 'ইনভয়েস মুছুন'} className="flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-rose-700 hover:bg-rose-50"><Trash2 className="h-4 w-4" />{en ? 'Delete' : 'মুছুন'}</button>
+          </div>
+        </article>)}
+        {!visible.length && <p className="rounded-xl border bg-white p-8 text-center text-sm text-slate-500">{en ? 'No saved invoices found.' : 'কোনো সংরক্ষিত ইনভয়েস নেই।'}</p>}
       </div>
     </div>
   </main>;
