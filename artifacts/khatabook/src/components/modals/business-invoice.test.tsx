@@ -24,4 +24,28 @@ describe('business invoice', () => {
     expect(screen.queryByTestId('input-invoice-item-description-2')).not.toBeInTheDocument();
     expect(screen.getByTestId('button-invoice-remove-1')).toBeDisabled();
   });
+
+  it('loads invoice details carried in a shared invoice link', () => {
+    const invoiceData = {
+      company: 'Sample shop', address: 'Main road', phone: '', website: '', logo: '',
+      customer: 'A customer', customerAddress: '', customerPhone: '',
+      number: 'INV-SHARED', date: '2026-10-17', due: '2026-11-16',
+      currency: 'BDT', taxRate: '0', comments: '',
+    };
+    const bytes = new TextEncoder().encode(JSON.stringify({
+      invoiceData,
+      lines: [{ id: 1, description: 'Rice', amount: '125', taxed: false }],
+    }));
+    const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join('');
+    const token = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    window.location.hash = `invoice=${token}`;
+
+    try {
+      render(<BusinessInvoice />);
+      expect(screen.getByTestId('input-invoice-company')).toHaveValue('Sample shop');
+      expect(screen.getByTestId('input-invoice-item-description-1')).toHaveValue('Rice');
+    } finally {
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    }
+  });
 });

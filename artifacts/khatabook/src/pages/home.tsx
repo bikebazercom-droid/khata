@@ -117,6 +117,9 @@ export function HomeView() {
   const [renameError, setRenameError] = useState('');
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  useEffect(() => {
+    if (window.location.hash.startsWith('#invoice=')) setIsSettingsOpen(true);
+  }, []);
   const businessScopeKey = userId && selectedBusinessId
     ? JSON.stringify([userId, selectedBusinessId])
     : '';

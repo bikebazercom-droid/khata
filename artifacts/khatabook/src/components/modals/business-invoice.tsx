@@ -11,6 +11,55 @@ type InvoiceData = {
   number: string; date: string; due: string; currency: 'BDT' | 'USD'; taxRate: string; comments: string;
 };
 
+type SharedInvoice = { invoiceData: InvoiceData; lines: InvoiceLine[] };
+
+function decodeInvoiceFromLink(): SharedInvoice | null {
+  if (typeof window === 'undefined') return null;
+  const match = window.location.hash.match(/^#invoice=([A-Za-z0-9_-]+)$/);
+  if (!match || match[1].length > 60000) return null;
+
+  try {
+    const base64 = match[1].replace(/-/g, '+').replace(/_/g, '/');
+    const binary = atob(base64 + '='.repeat((4 - base64.length % 4) % 4));
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    const parsed = JSON.parse(new TextDecoder().decode(bytes)) as Partial<SharedInvoice>;
+    if (!parsed.invoiceData || !Array.isArray(parsed.lines)) return null;
+    const data = parsed.invoiceData as Partial<InvoiceData>;
+    if (data.currency !== 'BDT' && data.currency !== 'USD') return null;
+
+    const stringFields: (keyof InvoiceData)[] = [
+      'company', 'address', 'phone', 'website', 'logo', 'customer',
+      'customerAddress', 'customerPhone', 'number', 'date', 'due', 'taxRate', 'comments',
+    ];
+    if (stringFields.some((field) => typeof data[field] !== 'string')) return null;
+    const invoiceData = data as InvoiceData;
+    const lines = parsed.lines.slice(0, 100).filter((line): line is InvoiceLine =>
+      Boolean(line) &&
+      typeof line === 'object' &&
+      typeof (line as InvoiceLine).description === 'string' &&
+      typeof (line as InvoiceLine).amount === 'string' &&
+      typeof (line as InvoiceLine).taxed === 'boolean',
+    ).map((line, index) => ({
+      id: index + 1,
+      description: line.description.slice(0, 1000),
+      amount: line.amount.slice(0, 32),
+      taxed: line.taxed,
+    }));
+    return { invoiceData, lines: lines.length ? lines : [{ id: 1, description: '', amount: '', taxed: false }] };
+  } catch {
+    return null;
+  }
+}
+
+function encodeInvoiceForLink(invoice: SharedInvoice): string {
+  const bytes = new TextEncoder().encode(JSON.stringify(invoice));
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
 const today = () => {
   const date = new Date();
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -33,13 +82,14 @@ export function BusinessInvoice() {
   const [preview, setPreview] = useState(false);
   const [pdfMode, setPdfMode] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [nextId, setNextId] = useState(2);
-  const [invoiceData, setInvoiceData] = useState<InvoiceData>({
+  const sharedInvoice = useMemo(decodeInvoiceFromLink, []);
+  const [invoiceData, setInvoiceData] = useState<InvoiceData>(() => sharedInvoice?.invoiceData ?? ({
     company: '', address: '', phone: '', website: '', logo: '',
     customer: '', customerAddress: '', customerPhone: '',
     number: newInvoiceNumber(), date: today(), due: dueDate(), currency: 'BDT', taxRate: '0', comments: '',
-  });
-  const [lines, setLines] = useState<InvoiceLine[]>([{ id: 1, description: '', amount: '', taxed: false }]);
+  }));
+  const [lines, setLines] = useState<InvoiceLine[]>(() => sharedInvoice?.lines ?? [{ id: 1, description: '', amount: '', taxed: false }]);
+  const [nextId, setNextId] = useState(() => Math.max(1, ...(sharedInvoice?.lines ?? []).map((line) => line.id)) + 1);
   const totals = useMemo(() => {
     const subtotal = lines.reduce((sum, item) => sum + Math.max(0, Number(item.amount) || 0), 0);
     const taxable = lines.reduce((sum, item) => sum + (item.taxed ? Math.max(0, Number(item.amount) || 0) : 0), 0);
@@ -55,7 +105,7 @@ export function BusinessInvoice() {
     edit: 'Edit details', preview: 'View invoice', download: 'Download PDF', share: 'Share',
     subtotal: 'Subtotal', taxable: 'Taxable amount', taxDue: 'Tax', total: 'Total due', thank: 'Thank you for your business.',
     companyBlock: 'From your shop', billTo: 'Bill to', commentsBlock: 'Notes', empty: 'Add your shop and customer details to complete the invoice.',
-    shared: 'Invoice summary copied. You can paste it into WhatsApp or email.', shareError: 'Could not share the invoice.',
+    shared: 'Invoice link copied. Paste it into WhatsApp or email.', shareError: 'Could not share the invoice.',
     setup: 'Invoice details', live: 'Live preview', item: 'Item', remove: 'Remove item', taxHint: 'Tax is calculated only on items marked taxable.',
   } : {
     title: 'বিজনেস ইনভয়েস', subtitle: 'গ্রাহকের জন্য পরিষ্কার ও পেশাদার বিল তৈরি করুন।',
@@ -66,7 +116,7 @@ export function BusinessInvoice() {
     edit: 'তথ্য সম্পাদনা', preview: 'ইনভয়েস দেখুন', download: 'PDF ডাউনলোড', share: 'শেয়ার',
     subtotal: 'সাবটোটাল', taxable: 'করযোগ্য পরিমাণ', taxDue: 'কর', total: 'মোট পাওনা', thank: 'আপনার ব্যবসার জন্য ধন্যবাদ।',
     companyBlock: 'আপনার দোকান থেকে', billTo: 'যার নামে বিল', commentsBlock: 'নোট', empty: 'ইনভয়েস সম্পূর্ণ করতে দোকান ও গ্রাহকের তথ্য দিন।',
-    shared: 'ইনভয়েসের সারাংশ কপি হয়েছে। WhatsApp বা ইমেইলে পেস্ট করুন।', shareError: 'ইনভয়েস শেয়ার করা যায়নি।',
+    shared: 'ইনভয়েসের লিংক কপি হয়েছে। WhatsApp বা ইমেইলে পেস্ট করুন।', shareError: 'ইনভয়েস শেয়ার করা যায়নি।',
     setup: 'ইনভয়েসের তথ্য', live: 'প্রিভিউ', item: 'আইটেম', remove: 'আইটেম মুছুন', taxHint: 'শুধু করযোগ্য হিসেবে চিহ্নিত আইটেমে কর হিসাব হবে।',
   };
   const set = (key: keyof InvoiceData, value: string) => setInvoiceData((current) => ({ ...current, [key]: value }));
@@ -81,6 +131,28 @@ export function BusinessInvoice() {
   );
   const itemAmount = (value: string) => Number(value) || 0;
   const filename = `Invoice_${current.number.replace(/[^a-zA-Z0-9_-]/g, '_') || 'draft'}.pdf`;
+  const shareUrl = () => {
+    const url = new URL(window.location.href);
+    url.hash = `invoice=${encodeInvoiceForLink({ invoiceData: current, lines })}`;
+    return url.toString();
+  };
+  const copyInvoiceLink = async () => {
+    const link = shareUrl();
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(link);
+    } else {
+      const textarea = document.createElement('textarea');
+      textarea.value = link;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const copied = document.execCommand('copy');
+      textarea.remove();
+      if (!copied) throw new Error('Clipboard access is unavailable.');
+    }
+    toast.success(labels.shared);
+  };
   async function createPdf() {
     if (!printRef.current) throw new Error('Invoice preview is not ready.');
     setPreview(true);
@@ -105,21 +177,25 @@ export function BusinessInvoice() {
     setBusy(true);
     try {
       const blob = await createPdf();
-      const native = await shareGeneratedFileWithNative(blob, { fileName: filename, mimeType: 'application/pdf', title: `${labels.title} ${current.number}`, shareText: text });
+      const link = shareUrl();
+      const shareText = `${text}\n${link}`;
+      const native = await shareGeneratedFileWithNative(blob, { fileName: filename, mimeType: 'application/pdf', title: `${labels.title} ${current.number}`, shareText });
       if (native) return;
       const file = new File([blob], filename, { type: 'application/pdf' });
       if (typeof navigator.share === 'function' && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: `${labels.title} ${current.number}`, text });
+        await navigator.share({ files: [file], title: `${labels.title} ${current.number}`, text, url: link });
       } else if (typeof navigator.share === 'function') {
-        await navigator.share({ title: `${labels.title} ${current.number}`, text });
-      } else if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-        toast.success(labels.shared);
+        await navigator.share({ title: `${labels.title} ${current.number}`, text, url: link });
       } else {
-        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+        await copyInvoiceLink();
       }
     } catch (error) {
-      if ((error as DOMException)?.name !== 'AbortError') toast.error(labels.shareError);
+      if ((error as DOMException)?.name === 'AbortError') return;
+      try {
+        await copyInvoiceLink();
+      } catch {
+        toast.error(labels.shareError);
+      }
     } finally {
       setBusy(false);
     }
@@ -128,15 +204,14 @@ export function BusinessInvoice() {
     setBusy(true);
     try {
       const blob = await createPdf();
-      const native = await shareGeneratedFileWithNative(blob, { fileName: filename, mimeType: 'application/pdf', title: `${labels.title} ${current.number}` });
-      if (!native) {
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        link.click();
-        URL.revokeObjectURL(url);
-      }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) {
       console.error('Invoice PDF generation failed:', error);
       toast.error(labels.shareError);
@@ -257,7 +332,7 @@ export function BusinessInvoice() {
             </div>
             <div className="mt-6 grid grid-cols-2 gap-4">
               <div className="border-l-[3px] border-[#8da4c3] pl-3">
-                <p className="mb-2 text-[9px] font-bold uppercase tracking-[.16em] text-[#75869d]">{labels.billTo}</p>
+                <p className="mb-2 bg-[#1B3A6B] px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-[.16em] text-white">{labels.billTo}</p>
                 <p className="font-bold text-[#263e60]">{current.customer || '—'}</p>
                 <p className="mt-1 whitespace-pre-line text-[10px] leading-[1.7] text-[#6e7e93]">{[current.customerAddress, current.customerPhone].filter(Boolean).join('\n') || '—'}</p>
               </div>
@@ -267,7 +342,7 @@ export function BusinessInvoice() {
               </div>
             </div>
             <table className="mt-7 w-full border-collapse text-[10px]">
-              <thead><tr className="border-y border-[#cbd7e5] bg-[#f2f5f9] text-[#405875]">
+              <thead><tr className="bg-[#1B3A6B] text-white">
                 <th className="px-3 py-2.5 text-left font-bold uppercase tracking-[.09em]">{labels.description}</th>
                 <th className="w-[74px] px-2 py-2.5 text-center font-bold uppercase tracking-[.05em]">{labels.taxed}</th>
                 <th className="w-[130px] px-3 py-2.5 text-right font-bold uppercase tracking-[.09em]">{labels.amount}</th>
