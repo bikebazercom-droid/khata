@@ -361,8 +361,8 @@ export function SettingsDrawer({
         <div className="flex min-h-0 flex-1 flex-col">
           <main className="min-h-0 min-w-0 flex-1">
             {activeDetailsModule === 'profile' && <BusinessProfile />}
-            {activeDetailsModule === 'invoice' && <BusinessInvoice historyRecord={selectedInvoice} autoAction={invoiceAction} viewOnly={!!selectedInvoice && invoiceAction === 'open'} />}
-            {activeDetailsModule === 'gold' && <GoldInvoice historyRecord={selectedInvoice} autoAction={invoiceAction} viewOnly={!!selectedInvoice && invoiceAction === 'open'} />}
+            {activeDetailsModule === 'invoice' && <BusinessInvoice historyRecord={selectedInvoice} autoAction={invoiceAction} viewOnly={!!selectedInvoice && invoiceAction === 'open'} onGenerated={() => setActiveDetailsModule('list')} />}
+            {activeDetailsModule === 'gold' && <GoldInvoice historyRecord={selectedInvoice} autoAction={invoiceAction} viewOnly={!!selectedInvoice && invoiceAction === 'open'} onGenerated={() => setActiveDetailsModule('list')} />}
             {activeDetailsModule === 'list' && <InvoiceList onOpen={openInvoice} />}
           </main>
           <footer className="z-20 flex shrink-0 justify-start border-t border-slate-200 bg-white px-4 pt-2 pb-[calc(.5rem+env(safe-area-inset-bottom))]">

@@ -116,7 +116,7 @@ function resizeStamp(file: File): Promise<string> {
   });
 }
 
-export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = false }: { historyRecord?: InvoiceHistoryRecord; autoAction?: InvoiceHistoryAction; viewOnly?: boolean }) {
+export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = false, onGenerated }: { historyRecord?: InvoiceHistoryRecord; autoAction?: InvoiceHistoryAction; viewOnly?: boolean; onGenerated?: () => void }) {
   const { lang } = useLanguage();
   const en = lang === 'en';
   const printRef = useRef<HTMLDivElement>(null);
@@ -216,13 +216,15 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
       return `${chosenCurrency.symbol} ${number} ${chosenCurrency.code}`;
     } catch { return `${chosenCurrency.code} ${safeValue.toFixed(2)}`; }
   };
-  const persistHistory = (): boolean => {
+  const persistHistory = (generated = false): boolean => {
     if (!data.customerName.trim()) {
       toast.error(en ? 'Enter the customer name before saving this invoice.' : 'ইনভয়েস সংরক্ষণের আগে গ্রাহকের নাম লিখুন।');
       return false;
     }
     saveInvoiceHistory({ type: 'Gold', number: data.number, date: data.date, customerName: data.customerName, customerPhone: data.customerPhone, total: calculations.total, currency: data.currency, itemCount: lines.length, payload: { data, lines } });
-    toast.success(en ? 'Invoice saved to history.' : 'ইনভয়েস ইতিহাসে সংরক্ষণ হয়েছে।');
+    toast.success(generated
+      ? (en ? 'Invoice Generated Successfully!' : 'ইনভয়েস সফলভাবে তৈরি হয়েছে!')
+      : (en ? 'Invoice saved to history.' : 'ইনভয়েস ইতিহাসে সংরক্ষণ হয়েছে।'));
     return true;
   };
   const number = (value: number, digits = 2) => new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number.isFinite(value) ? value : 0);
@@ -391,7 +393,7 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
       <header className="z-10 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#e7e2d5] bg-white px-4 py-3.5 md:px-6">
         <div className="flex min-w-0 items-center gap-3"><span className="hidden h-10 w-10 items-center justify-center rounded-xl bg-[#f7f0dc] text-[#9b751b] sm:flex"><ReceiptText className="h-5 w-5" /></span><div><h2 className="truncate text-[17px] font-bold tracking-tight text-[#1b2f4d]">{labels.title}</h2><p className="hidden text-xs text-[#77869a] sm:block">{labels.subtitle}</p></div></div>
         <div className="flex items-center gap-2">
-          <button type="button" aria-label={en ? 'Save invoice' : 'ইনভয়েস সংরক্ষণ'} data-testid="button-gold-save-history" onClick={persistHistory} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#ded8c9] bg-white px-3 text-[13px] font-bold text-[#53627a]"><FileText className="h-4 w-4" /><span className="hidden sm:inline">{en ? 'Save invoice' : 'ইনভয়েস সংরক্ষণ'}</span></button>
+          <button type="button" aria-label={en ? 'Generate Invoice' : 'ইনভয়েস তৈরি করুন'} data-testid="button-gold-save-history" onClick={() => { if (persistHistory(true)) onGenerated?.(); }} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#ded8c9] bg-white px-3 text-[13px] font-bold text-[#53627a]"><FileText className="h-4 w-4" /><span>{en ? 'Generate Invoice' : 'ইনভয়েস তৈরি করুন'}</span></button>
           {readOnlyPreview && <button type="button" data-testid="button-gold-preview-edit" onClick={() => setReadOnlyPreview(false)} className="inline-flex min-h-10 items-center rounded-xl border border-[#ded8c9] bg-white px-3 text-[13px] font-bold text-[#53627a]">{en ? 'Edit' : 'সম্পাদনা'}</button>}
           <button type="button" data-testid="button-gold-share" disabled={busy} onClick={() => void shareInvoice()} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#ded8c9] bg-white px-3 text-[13px] font-bold text-[#53627a] transition hover:bg-[#faf7ef] disabled:opacity-60"><Share2 className="h-4 w-4" /><span className="hidden sm:inline">{labels.share}</span></button>
           <button type="button" data-testid="button-gold-download" disabled={busy} onClick={() => void downloadPdf()} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#1b365b] px-3.5 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#142b49] disabled:opacity-60 sm:px-4"><Download className="h-4 w-4" /><span className="hidden sm:inline">{busy ? (en ? 'Preparing…' : 'তৈরি হচ্ছে…') : labels.download}</span></button>

@@ -216,7 +216,7 @@ const money = (value: number, currency: string, lang: string) => {
 const dateLabel = (value: string, lang: string) =>
   value ? new Date(`${value}T12:00:00`).toLocaleDateString(localeForLanguage(lang)) : '—';
 
-export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly = false }: { historyRecord?: InvoiceHistoryRecord; autoAction?: InvoiceHistoryAction; viewOnly?: boolean }) {
+export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly = false, onGenerated }: { historyRecord?: InvoiceHistoryRecord; autoAction?: InvoiceHistoryAction; viewOnly?: boolean; onGenerated?: () => void }) {
   const { lang } = useLanguage();
   const en = lang === 'en';
   const printRef = useRef<HTMLDivElement>(null);
@@ -353,13 +353,15 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
   );
   const itemAmount = (value: string) => Number(value) || 0;
   const filename = `Invoice_${current.number.replace(/[^a-zA-Z0-9_-]/g, '_') || 'download'}.pdf`;
-  const persistHistory = (): boolean => {
+  const persistHistory = (generated = false): boolean => {
     if (!current.customer.trim()) {
       toast.error(en ? 'Enter the customer name before saving this invoice.' : 'ইনভয়েস সংরক্ষণের আগে গ্রাহকের নাম লিখুন।');
       return false;
     }
     saveInvoiceHistory({ type: 'Business', number: current.number, date: current.date, customerName: current.customer, customerPhone: current.customerPhone, total: totals.total, currency: current.currency, itemCount: lines.length, payload: { invoiceData: current, lines } });
-    toast.success(en ? 'Invoice saved to history.' : 'ইনভয়েস ইতিহাসে সংরক্ষণ হয়েছে।');
+    toast.success(generated
+      ? (en ? 'Invoice Generated Successfully!' : 'ইনভয়েস সফলভাবে তৈরি হয়েছে!')
+      : (en ? 'Invoice saved to history.' : 'ইনভয়েস ইতিহাসে সংরক্ষণ হয়েছে।'));
     return true;
   };
   const shareUrl = () => {
@@ -478,8 +480,8 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
         </div>
         <div className="flex items-center gap-2">
           {readOnlyPreview && <button type="button" data-testid="button-invoice-preview-edit" onClick={() => setReadOnlyPreview(false)} className="inline-flex min-h-10 items-center rounded-xl border border-[#d8e1ed] bg-white px-3 text-[13px] font-bold text-[#365273]">{en ? 'Edit' : 'সম্পাদনা'}</button>}
-          <button type="button" aria-label={en ? 'Save invoice' : 'ইনভয়েস সংরক্ষণ'} data-testid="button-invoice-save-history" onClick={persistHistory} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#d8e1ed] bg-white px-3 text-[13px] font-bold text-[#365273]">
-            <Save className="h-4 w-4" /><span className="hidden sm:inline">{en ? 'Save invoice' : 'ইনভয়েস সংরক্ষণ'}</span>
+          <button type="button" aria-label={en ? 'Generate Invoice' : 'ইনভয়েস তৈরি করুন'} data-testid="button-invoice-save-history" onClick={() => { if (persistHistory(true)) onGenerated?.(); }} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#d8e1ed] bg-white px-3 text-[13px] font-bold text-[#365273]">
+            <Save className="h-4 w-4" /><span>{en ? 'Generate Invoice' : 'ইনভয়েস তৈরি করুন'}</span>
           </button>
           <button type="button" data-testid="button-invoice-share" disabled={busy} onClick={shareInvoice} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#d8e1ed] bg-white px-3 text-[13px] font-bold text-[#365273] transition hover:bg-[#f5f8fc] disabled:opacity-60">
             <Share2 className="h-4 w-4" /><span className="hidden sm:inline">{labels.share}</span>

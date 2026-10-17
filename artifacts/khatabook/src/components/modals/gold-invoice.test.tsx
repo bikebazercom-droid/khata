@@ -52,9 +52,12 @@ describe('gold invoice', () => {
   });
 
   it('saves gold invoices with the full calculation payload', () => {
-    render(<GoldInvoice />);
+    const onGenerated = vi.fn();
+    render(<GoldInvoice onGenerated={onGenerated} />);
     fireEvent.change(screen.getByTestId('input-gold-customerName'), { target: { value: 'Gold Customer' } });
     fireEvent.click(screen.getByTestId('button-gold-save-history'));
+    expect(screen.getByRole('button', { name: 'Generate Invoice' })).toBeInTheDocument();
+    expect(onGenerated).toHaveBeenCalledOnce();
     const history = JSON.parse(localStorage.getItem('banglakhata_invoice_history_v1:default') || '[]');
     expect(history[0]).toMatchObject({ type: 'Gold', customerName: 'Gold Customer', currency: 'AED', itemCount: 1 });
     expect(history[0].payload.data.number).toMatch(/^GOLD-/);

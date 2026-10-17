@@ -82,6 +82,25 @@ describe('settings drawer language selection', () => {
     expect(screen.getByTestId('button-gold-save-history')).toBeInTheDocument();
   });
 
+  it('generates Business and Gold invoices and redirects to the updated history list', () => {
+    localStorage.removeItem('banglakhata_invoice_history_v1:default');
+    render(<SettingsDrawer open onOpenChange={vi.fn()} />);
+
+    fireEvent.change(screen.getByTestId('input-invoice-customer'), { target: { value: 'Business Customer' } });
+    fireEvent.click(screen.getByTestId('button-invoice-save-history'));
+    expect(screen.getByRole('heading', { name: 'ইনভয়েস তালিকা' })).toBeInTheDocument();
+    expect(screen.getAllByText('Business Customer').length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByTestId('button-invoice-menu'));
+    fireEvent.click(screen.getByTestId('menu-option-gold'));
+    fireEvent.change(screen.getByTestId('input-gold-customerName'), { target: { value: 'Gold Customer' } });
+    fireEvent.click(screen.getByTestId('button-gold-save-history'));
+
+    expect(screen.getByRole('heading', { name: 'ইনভয়েস তালিকা' })).toBeInTheDocument();
+    expect(screen.getAllByText('Gold Customer').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Business Customer').length).toBeGreaterThan(0);
+  });
+
   it('opens the dedicated persistent business profile editor from the bottom sheet', () => {
     render(<SettingsDrawer open onOpenChange={vi.fn()} />);
     fireEvent.click(screen.getByTestId('button-invoice-menu'));
