@@ -4,7 +4,7 @@ import { useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { useClerk, useAuth, useUser } from '@clerk/react';
 import { useRemoveOwnerPushToken } from '@workspace/api-client-react';
-import { AlertTriangle, ArrowLeft, ChevronDown, EllipsisVertical, Globe2, LogIn, LogOut, Mail, Phone, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ChevronDown, EllipsisVertical, FileText, Globe2, LogIn, LogOut, Mail, Phone, Trash2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -87,9 +87,11 @@ export function SettingsDrawer({
   const [activeDetailsModule, setActiveDetailsModule] = useState<'invoice' | 'gold' | 'list'>('invoice');
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceHistoryRecord>();
   const [invoiceAction, setInvoiceAction] = useState<InvoiceHistoryAction>('open');
+  const [isInvoicesExpanded, setIsInvoicesExpanded] = useState(true);
   const openInvoice = (record: InvoiceHistoryRecord, action: InvoiceHistoryAction) => {
     setSelectedInvoice(record);
     setInvoiceAction(action);
+    setIsInvoicesExpanded(true);
     setActiveDetailsModule(record.type === 'Gold' ? 'gold' : 'invoice');
   };
 
@@ -350,39 +352,34 @@ export function SettingsDrawer({
         </DialogHeader>
 
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-          <nav aria-label={lang === 'en' ? 'Details modules' : 'বিস্তারিত মডিউল'} className="flex shrink-0 gap-2 overflow-x-auto border-b border-slate-200 bg-white p-3 md:w-60 md:flex-col md:gap-1 md:overflow-visible md:border-b-0 md:border-r md:p-4">
-            <p className="hidden px-3 pb-2 text-xs font-bold uppercase tracking-wide text-slate-400 md:block">
+          <nav aria-label={lang === 'en' ? 'Details modules' : 'বিস্তারিত মডিউল'} className="flex shrink-0 flex-col gap-2 overflow-y-auto border-b border-slate-800 bg-[#0F172A] p-3 md:w-60 md:border-b-0 md:border-r md:p-4">
+            <p className="px-3 pb-1 text-xs font-bold uppercase tracking-wide text-slate-400">
               {lang === 'en' ? 'Modules' : 'মডিউল'}
             </p>
-            <button
-              type="button"
-              aria-current={activeDetailsModule === 'invoice' ? 'page' : undefined}
-              onClick={() => { setSelectedInvoice(undefined); setActiveDetailsModule('invoice'); }}
-              className={`flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold transition-colors ${
-                activeDetailsModule === 'invoice'
-                  ? 'bg-[#1B3A6B] text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-              }`}
-            >
-              {lang === 'en' ? 'Business Invoice' : 'বিজনেস ইনভয়েস'}
+            <button type="button" data-testid="button-invoices-menu" aria-expanded={isInvoicesExpanded} aria-controls="invoice-module-links"
+              onClick={() => setIsInvoicesExpanded((expanded) => !expanded)}
+              className={`flex min-h-11 items-center gap-2 rounded-xl px-3 text-left text-sm font-bold text-white transition-colors ${isInvoicesExpanded ? 'bg-[#1E293B]' : 'bg-transparent hover:bg-[#1E293B]'}`}>
+              <FileText className="h-4 w-4 text-amber-300" />
+              <span className="flex-1">{lang === 'en' ? 'Invoices' : 'ইনভয়েস'}</span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${isInvoicesExpanded ? 'rotate-180' : ''}`} />
             </button>
-            <button
-              type="button"
-              aria-current={activeDetailsModule === 'gold' ? 'page' : undefined}
-              onClick={() => { setSelectedInvoice(undefined); setActiveDetailsModule('gold'); }}
-              className={`flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold transition-colors ${
-                activeDetailsModule === 'gold'
-                  ? 'bg-[#1B3A6B] text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-              }`}
-            >
-              {lang === 'en' ? 'Gold Invoice' : 'গোল্ড ইনভয়েস'}
-            </button>
-            <button type="button" aria-current={activeDetailsModule === 'list' ? 'page' : undefined}
-              onClick={() => setActiveDetailsModule('list')}
-              className={`flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold transition-colors ${activeDetailsModule === 'list' ? 'bg-[#1B3A6B] text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}>
-              {lang === 'en' ? 'Invoice List' : 'ইনভয়েস তালিকা'}
-            </button>
+            {isInvoicesExpanded && <div id="invoice-module-links" className="ml-3 flex flex-col gap-1 border-l border-slate-700 pl-3">
+              <button type="button" data-testid="nav-business-invoice" aria-current={activeDetailsModule === 'invoice' ? 'page' : undefined}
+                onClick={() => { setSelectedInvoice(undefined); setActiveDetailsModule('invoice'); setIsInvoicesExpanded(true); }}
+                className={`flex min-h-10 items-center rounded-lg px-3 text-left text-sm font-semibold transition-colors ${activeDetailsModule === 'invoice' ? 'bg-amber-400 text-slate-950 shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                {lang === 'en' ? 'Business Invoice' : 'বিজনেস ইনভয়েস'}
+              </button>
+              <button type="button" data-testid="nav-gold-invoice" aria-current={activeDetailsModule === 'gold' ? 'page' : undefined}
+                onClick={() => { setSelectedInvoice(undefined); setActiveDetailsModule('gold'); setIsInvoicesExpanded(true); }}
+                className={`flex min-h-10 items-center rounded-lg px-3 text-left text-sm font-semibold transition-colors ${activeDetailsModule === 'gold' ? 'bg-amber-400 text-slate-950 shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                {lang === 'en' ? 'Gold Invoice' : 'গোল্ড ইনভয়েস'}
+              </button>
+              <button type="button" data-testid="nav-invoice-list" aria-current={activeDetailsModule === 'list' ? 'page' : undefined}
+                onClick={() => { setSelectedInvoice(undefined); setActiveDetailsModule('list'); setIsInvoicesExpanded(true); }}
+                className={`flex min-h-10 items-center rounded-lg px-3 text-left text-sm font-semibold transition-colors ${activeDetailsModule === 'list' ? 'bg-amber-400 text-slate-950 shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                {lang === 'en' ? 'Invoice List' : 'ইনভয়েস তালিকা'}
+              </button>
+            </div>}
           </nav>
           <main className="min-h-0 min-w-0 flex-1">
             {activeDetailsModule === 'invoice' && <BusinessInvoice historyRecord={selectedInvoice} autoAction={invoiceAction} />}

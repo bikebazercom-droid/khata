@@ -67,6 +67,24 @@ describe('settings drawer language selection', () => {
     expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
   });
 
+  it('groups invoice modules under a collapsible menu and keeps the selected module expanded', () => {
+    render(<SettingsDrawer open onOpenChange={vi.fn()} />);
+    const invoices = screen.getByTestId('button-invoices-menu');
+    expect(invoices).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('nav-business-invoice')).toBeInTheDocument();
+    expect(screen.getByTestId('nav-gold-invoice')).toBeInTheDocument();
+    expect(screen.getByTestId('nav-invoice-list')).toBeInTheDocument();
+
+    fireEvent.click(invoices);
+    expect(invoices).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('nav-gold-invoice')).not.toBeInTheDocument();
+    fireEvent.click(invoices);
+    fireEvent.click(screen.getByTestId('nav-gold-invoice'));
+
+    expect(invoices).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('nav-gold-invoice')).toHaveAttribute('aria-current', 'page');
+  });
+
   it('expands language choices underneath the row and switches language on selection', () => {
     render(<SettingsDrawer open onOpenChange={vi.fn()} />);
 
