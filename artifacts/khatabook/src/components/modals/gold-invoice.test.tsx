@@ -56,6 +56,16 @@ describe('gold invoice', () => {
     expect(screen.getByText(/Metal rate \/ gram \(৳ BDT\/g\)/)).toBeInTheDocument();
   });
 
+  it('uses the saved Business Profile stamp in the invoice and omits the duplicate uploader', () => {
+    const stamp = 'data:image/png;base64,c3RhbXA=';
+    localStorage.setItem('banglakhata_gold_invoice_stamp_v1:default', stamp);
+    render(<GoldInvoice viewOnly />);
+
+    expect(screen.queryByTestId('button-gold-upload-stamp')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('input-gold-stamp')).not.toBeInTheDocument();
+    expect(screen.getByTestId('gold-company-stamp')).toHaveAttribute('src', stamp);
+  });
+
   it('adds and removes line items without removing the last row', () => {
     render(<GoldInvoice />);
     fireEvent.click(screen.getByTestId('button-gold-add-item'));
