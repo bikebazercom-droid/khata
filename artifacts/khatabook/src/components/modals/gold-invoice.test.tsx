@@ -80,8 +80,10 @@ describe('gold invoice', () => {
     const onGenerated = vi.fn();
     render(<GoldInvoice onGenerated={onGenerated} />);
     fireEvent.change(screen.getByTestId('input-gold-customerName'), { target: { value: 'Gold Customer' } });
-    fireEvent.click(screen.getByTestId('button-gold-save-history'));
-    expect(screen.getByRole('button', { name: 'Generate Invoice' })).toBeInTheDocument();
+    const generateButton = screen.getByRole('button', { name: 'Generate Invoice' });
+    expect(generateButton.closest('header')).toBeNull();
+    expect(generateButton).toHaveClass('w-full');
+    fireEvent.click(generateButton);
     expect(onGenerated).toHaveBeenCalledOnce();
     const history = JSON.parse(localStorage.getItem('banglakhata_invoice_history_v1:default') || '[]');
     expect(history[0]).toMatchObject({ type: 'Gold', customerName: 'Gold Customer', currency: 'AED', itemCount: 1 });

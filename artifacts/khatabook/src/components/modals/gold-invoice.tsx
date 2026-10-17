@@ -362,7 +362,6 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
       <header className="z-10 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#e7e2d5] bg-white px-4 py-3.5 md:px-6">
         <div className="flex min-w-0 items-center gap-3"><span className="hidden h-10 w-10 items-center justify-center rounded-xl bg-[#f7f0dc] text-[#9b751b] sm:flex"><ReceiptText className="h-5 w-5" /></span><div><h2 className="truncate text-[17px] font-bold tracking-tight text-[#1b2f4d]">{labels.title}</h2><p className="hidden text-xs text-[#77869a] sm:block">{labels.subtitle}</p></div></div>
         <div className="flex items-center gap-2">
-          <button type="button" aria-label={en ? 'Generate Invoice' : 'ইনভয়েস তৈরি করুন'} data-testid="button-gold-save-history" onClick={() => { if (persistHistory(true)) onGenerated?.(); }} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#ded8c9] bg-white px-3 text-[13px] font-bold text-[#53627a]"><FileText className="h-4 w-4" /><span>{en ? 'Generate Invoice' : 'ইনভয়েস তৈরি করুন'}</span></button>
           {readOnlyPreview && <button type="button" data-testid="button-gold-preview-edit" onClick={() => setReadOnlyPreview(false)} className="inline-flex min-h-10 items-center rounded-xl border border-[#ded8c9] bg-white px-3 text-[13px] font-bold text-[#53627a]">{en ? 'Edit' : 'সম্পাদনা'}</button>}
           <button type="button" data-testid="button-gold-share" disabled={busy} onClick={() => void shareInvoice()} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#ded8c9] bg-white px-3 text-[13px] font-bold text-[#53627a] transition hover:bg-[#faf7ef] disabled:opacity-60"><Share2 className="h-4 w-4" /><span className="hidden sm:inline">{labels.share}</span></button>
           <button type="button" data-testid="button-gold-download" disabled={busy} onClick={() => void downloadPdf()} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#1b365b] px-3.5 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#142b49] disabled:opacity-60 sm:px-4"><Download className="h-4 w-4" /><span className="hidden sm:inline">{busy ? (en ? 'Preparing…' : 'তৈরি হচ্ছে…') : labels.download}</span></button>
@@ -438,6 +437,9 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
                 <p className="mt-2 text-[9px] leading-relaxed text-[#7e8793]">{labels.words}: <span data-testid="text-gold-amount-words" className="font-semibold text-[#485a72]">{numberToWords(calculations.total, lang)} {chosenCurrency.name}</span></p>
               </div>
             </section>
+            <button type="button" aria-label={en ? 'Generate Invoice' : 'ইনভয়েস তৈরি করুন'} data-testid="button-gold-save-history" onClick={() => { if (persistHistory(true)) onGenerated?.(); }} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#d9aa1f] px-5 text-sm font-extrabold text-[#1b2f4d] shadow-sm transition hover:bg-[#c99a12] active:scale-[.99]">
+              <FileText className="h-5 w-5" />{en ? 'Generate Invoice' : 'ইনভয়েস তৈরি করুন'}
+            </button>
           </div>
         </section>
         {(readOnlyPreview || pdfMode) && <section className={readOnlyPreview ? 'h-full min-h-0 overflow-auto bg-[#edece7] p-3 md:p-5' : 'fixed left-[-10000px] top-0 z-[-1] block w-[794px]'}>

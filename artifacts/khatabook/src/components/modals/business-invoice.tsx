@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Building2, CalendarDays, Check, ChevronDown, Download, FileText, ImagePlus, Plus, ReceiptText, Save, Share2, Trash2, UserRound, X } from 'lucide-react';
+import { Building2, CalendarDays, Check, ChevronDown, Download, FileText, ImagePlus, Plus, ReceiptText, Share2, Trash2, UserRound, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -480,9 +480,6 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
         </div>
         <div className="flex items-center gap-2">
           {readOnlyPreview && <button type="button" data-testid="button-invoice-preview-edit" onClick={() => setReadOnlyPreview(false)} className="inline-flex min-h-10 items-center rounded-xl border border-[#d8e1ed] bg-white px-3 text-[13px] font-bold text-[#365273]">{en ? 'Edit' : 'সম্পাদনা'}</button>}
-          <button type="button" aria-label={en ? 'Generate Invoice' : 'ইনভয়েস তৈরি করুন'} data-testid="button-invoice-save-history" onClick={() => { if (persistHistory(true)) onGenerated?.(); }} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#d8e1ed] bg-white px-3 text-[13px] font-bold text-[#365273]">
-            <Save className="h-4 w-4" /><span>{en ? 'Generate Invoice' : 'ইনভয়েস তৈরি করুন'}</span>
-          </button>
           <button type="button" data-testid="button-invoice-share" disabled={busy} onClick={shareInvoice} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#d8e1ed] bg-white px-3 text-[13px] font-bold text-[#365273] transition hover:bg-[#f5f8fc] disabled:opacity-60">
             <Share2 className="h-4 w-4" /><span className="hidden sm:inline">{labels.share}</span>
           </button>
@@ -581,6 +578,9 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
             <label className="block rounded-2xl border border-[#e2e8f0] bg-white p-4 text-[12px] font-semibold text-[#55657b] shadow-[0_2px_10px_rgba(37,61,92,.035)] md:p-5">{labels.comments}
               <textarea data-testid="textarea-invoice-comments" value={current.comments} onChange={(e) => set('comments', e.target.value)} rows={3} placeholder={en ? 'Payment details, thanks, or other notes…' : 'পেমেন্টের তথ্য বা অন্য কোনো নোট…'} className={`${inputClass} min-h-[92px] resize-y py-3`} />
             </label>
+            <button type="button" aria-label={en ? 'Generate Invoice' : 'ইনভয়েস তৈরি করুন'} data-testid="button-invoice-save-history" onClick={() => { if (persistHistory(true)) onGenerated?.(); }} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#1B3A6B] px-5 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#17315a] active:scale-[.99]">
+              <FileText className="h-5 w-5" />{en ? 'Generate Invoice' : 'ইনভয়েস তৈরি করুন'}
+            </button>
           </div>
         </section>
         {(readOnlyPreview || pdfMode) && <section className={readOnlyPreview ? 'h-full min-h-0 overflow-auto bg-[#e9eef5] px-3 py-5 md:px-6 md:py-7' : 'fixed left-[-10000px] top-0 z-[-1] block w-[794px]'}>
