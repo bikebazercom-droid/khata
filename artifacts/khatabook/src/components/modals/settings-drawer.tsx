@@ -30,6 +30,7 @@ import { useLanguage } from '@/lib/i18n';
 import { markLanguageSelection, saveLanguagePreference } from '@/lib/language-preference';
 import { useAppAuth } from '@/App';
 import { BusinessInvoice } from './business-invoice';
+import { GoldInvoice } from './gold-invoice';
 import { revokeNetworkWrites } from '@/lib/useAuthConnectivity';
 import {
   NATIVE_AUTH_LOGOUT_MESSAGE,
@@ -81,7 +82,7 @@ export function SettingsDrawer({
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isLanguageMenuExpanded, setIsLanguageMenuExpanded] = useState(false);
-  const [activeDetailsModule, setActiveDetailsModule] = useState<'invoice'>('invoice');
+  const [activeDetailsModule, setActiveDetailsModule] = useState<'invoice' | 'gold'>('invoice');
 
   const loginIdentity = authMethod === 'phone'
     ? phone || readOfflineIdentity()?.phone
@@ -356,9 +357,22 @@ export function SettingsDrawer({
             >
               {lang === 'en' ? 'Business Invoice' : 'বিজনেস ইনভয়েস'}
             </button>
+            <button
+              type="button"
+              aria-current={activeDetailsModule === 'gold' ? 'page' : undefined}
+              onClick={() => setActiveDetailsModule('gold')}
+              className={`flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold transition-colors ${
+                activeDetailsModule === 'gold'
+                  ? 'bg-[#1B3A6B] text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              {lang === 'en' ? 'Gold Invoice' : 'গোল্ড ইনভয়েস'}
+            </button>
           </nav>
           <main className="min-h-0 min-w-0 flex-1">
             {activeDetailsModule === 'invoice' && <BusinessInvoice />}
+            {activeDetailsModule === 'gold' && <GoldInvoice />}
           </main>
         </div>
       </DialogContent>

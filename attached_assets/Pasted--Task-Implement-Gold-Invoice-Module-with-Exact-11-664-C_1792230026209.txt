@@ -1,0 +1,68 @@
+### Task: Implement "Gold Invoice" Module with Exact 11.664 Conversion Factor, Multi-Currency Selector & Printable Gold Tax Invoice Layout
+
+Please update the Details view (`/dashboard/details`) to add a dedicated **"Gold Invoice"** option under the sidebar, accompanied by a precise Gold Calculation Form and a print-ready A4 Tax Invoice template.
+
+---
+
+#### 1. Sidebar Navigation Update (Screen 1 Alignment)
+- Inside the left sidebar (`MODULES`), add two tab items:
+  - `Business Invoice`
+  - `Gold Invoice`
+- Clicking `Gold Invoice` opens the specialized Gold Ledger input form (Screen 2) and live updates the Gold Tax Invoice preview (Screen 3).
+
+---
+
+#### 2. Gold Calculation Logic & Standard Factor (11.664 Grams)
+Implement exact gold calculations inside the form state using the following mathematical logic:
+- **Conversion Factor:** `1 Vori / Tola = 11.664 grams`.
+- **Line Item Formulas:**
+  - `Gross Wt. (grams)`: Total weight entered by user.
+  - `Purity`: Purity decimal value (e.g., `0.916` for 22K, `0.875` for 21K, `0.750` for 18K, `0.999` for 24K).
+  - `Pure Wt. (grams)` = `Gross Wt. × Purity` (rounded to 3 decimal places).
+  - `Making Rate & Amt.`: Making charges added per gram or total amount.
+  - `Line Total` = `(Pure Wt. × Metal Rate per Gram)` + `Making Amt.`.
+- **Summary Calculation Block:**
+  - `Total Gross Wt.` = Sum of item Gross Weights.
+  - `Total Pure Wt.` = Sum of item Pure Weights.
+  - `GOLD VALUE` = `Total Pure Wt. × Metal Rate per Gram`.
+  - `Total Amount Before VAT` = `GOLD VALUE + Total Making Charges`.
+  - `VAT Amount (5%)` = `Total Amount Before VAT × 0.05`.
+  - `Total Amount Including VAT` = `Total Amount Before VAT + VAT Amount - Round Off Discount`.
+  - Auto-convert total number to words (e.g., "Forty Six Thousand Eight Hundred...").
+
+---
+
+#### 3. Searchable Multi-Currency Selector Integration
+- In the `Payment & Summary` section, add a Searchable Currency Dropdown/Combobox.
+- Users can search any global currency by name, symbol, or code (e.g., `AED - UAE Dirham`, `BDT - Bangladeshi Taka`, `USD - US Dollar`, `SAR - Saudi Riyal`, `INR - Indian Rupee`).
+- Dynamically update all currency symbols across the form (`Metal Rate (AED/g)`, `Total (AED)`) and printable template.
+
+---
+
+#### 4. Gold Tax Invoice Template Layout (Exact Match to Screen 3)
+Build a pixel-perfect A4 printable wrapper matching Screen 3:
+- **Outer Frame:** Gold border outline (`#D4AF37` / `#C5A059`) with white padding.
+- **Header Section (3-Column Layout):**
+  - **Left:** Shop Logo + Shop Name (`Hazari Gold L.L.C`) + Address, Phone, Email, TRN.
+  - **Center:** Bismillah Arabic Calligraphy + Dark Navy `TAX INVOICE` Diamond Badge + Dynamic QR Code (`Scan to find us`).
+  - **Right:** `PARTY COPY` header + underlined `Invoice No:`, `Date:`, `Payment Terms:`, `Metal Rate:`, `Place of Supply:`.
+- **Customer Buyer Block (`CUSTOMER DETAILS (BUYER)`):**
+  - Dark Navy Header bar.
+  - Grid items: `Name`, `Phone`, `Email`, `Passport/ID No.`, `Address`, `Nationality`, `Country`.
+- **Gold Item Table:**
+  - Dark Navy Header row: `S.No | Stock Description | Gross Wt. | Purity | Pure Wt. | Making Rate | Making Amt. | Total`
+  - Render numbered rows and a summary total row at the bottom of the table.
+- **Financial Breakdown Table (Bottom Right):**
+  - Rows for `GOLD VALUE @ rate`, `Total Amount Before VAT`, `Total VAT Amount (5%)`, `Round Off Discount`.
+  - Final Row (Dark Navy background, white bold text): `Total Amount Including VAT`.
+- **Footer, Stamp & Signatures:**
+  - `Amount In Words` box and `Payment Mode: CASH PAYMENT`.
+  - Three signature lines: `Customer's Signature`, `Checked By`, and `Authorised Signature`.
+  - Overlay the uploaded **Company Stamp Image** right above `Authorised Signature`.
+  - Bottom Navy Bar with text: `"Thank you for your business!"`.
+
+---
+
+#### 5. PDF Generation & Native Share Feature
+- **Download PDF:** Capture the locked `794px` A4 template container using `html2pdf.js` / `jspdf` (`scale: 2`) so zero content overflows the right margin.
+- **Share Option:** Use Web Share API (`navigator.share()`) on mobile browsers to send the PDF file directly via WhatsApp, Messaging, or Email.
