@@ -29,6 +29,7 @@ import { clearAllPendingUploads } from '@/lib/pendingUploads';
 import { useLanguage } from '@/lib/i18n';
 import { markLanguageSelection, saveLanguagePreference } from '@/lib/language-preference';
 import { useAppAuth } from '@/App';
+import { BusinessInvoice } from './business-invoice';
 import { revokeNetworkWrites } from '@/lib/useAuthConnectivity';
 import {
   NATIVE_AUTH_LOGOUT_MESSAGE,
@@ -80,6 +81,7 @@ export function SettingsDrawer({
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isLanguageMenuExpanded, setIsLanguageMenuExpanded] = useState(false);
+  const [activeDetailsModule, setActiveDetailsModule] = useState<'invoice'>('invoice');
 
   const loginIdentity = authMethod === 'phone'
     ? phone || readOfflineIdentity()?.phone
@@ -216,7 +218,7 @@ export function SettingsDrawer({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false} className="left-auto right-0 top-0 flex h-[100dvh] w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 border-l border-slate-200 bg-slate-50 p-0 shadow-2xl data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right sm:w-[420px] pt-[var(--safe-top)] pb-[var(--safe-bottom)]">
+      <DialogContent showCloseButton={false} className="left-auto right-0 top-0 flex h-[100dvh] w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 border-l border-slate-200 bg-slate-50 p-0 shadow-2xl data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right sm:w-full pt-[var(--safe-top)] pb-[var(--safe-bottom)]">
         <DialogHeader className="shrink-0 border-b border-slate-200 bg-[#1B3A6B] px-4 py-4 text-left">
           <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
             <button
@@ -337,7 +339,28 @@ export function SettingsDrawer({
           </div>
         </DialogHeader>
 
-        <div className="flex-1" />
+        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+          <nav aria-label={lang === 'en' ? 'Details modules' : 'বিস্তারিত মডিউল'} className="flex shrink-0 gap-2 overflow-x-auto border-b border-slate-200 bg-white p-3 md:w-60 md:flex-col md:gap-1 md:overflow-visible md:border-b-0 md:border-r md:p-4">
+            <p className="hidden px-3 pb-2 text-xs font-bold uppercase tracking-wide text-slate-400 md:block">
+              {lang === 'en' ? 'Modules' : 'মডিউল'}
+            </p>
+            <button
+              type="button"
+              aria-current={activeDetailsModule === 'invoice' ? 'page' : undefined}
+              onClick={() => setActiveDetailsModule('invoice')}
+              className={`flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold transition-colors ${
+                activeDetailsModule === 'invoice'
+                  ? 'bg-[#1B3A6B] text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              {lang === 'en' ? 'Business Invoice' : 'বিজনেস ইনভয়েস'}
+            </button>
+          </nav>
+          <main className="min-h-0 min-w-0 flex-1">
+            {activeDetailsModule === 'invoice' && <BusinessInvoice />}
+          </main>
+        </div>
       </DialogContent>
 
       {/* ── Confirmation dialog ──────────────────────────────────── */}

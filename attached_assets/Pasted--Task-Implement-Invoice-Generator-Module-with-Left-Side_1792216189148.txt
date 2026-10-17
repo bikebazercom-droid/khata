@@ -1,0 +1,36 @@
+### Task: Implement Invoice Generator Module with Left Sidebar in Details Page
+
+Please add a Business Invoice Generator feature inside the Details view (`/dashboard/details` or main details container).
+
+#### 1. Layout Structure (Left Sidebar + Dynamic Content Panel)
+- Inside the Details page container (below the top nav header), split the layout into a left navigation sidebar and a main content area:
+  - **Left Sidebar:** 
+    - Width: ~240px (responsive on desktop/tablet, collapsible or tabbed on mobile).
+    - Items: Include "Business Invoice" (বিজনেস ইনভয়েস) and other menu items if needed.
+    - Style: Navy/Slate theme matching the app's branding with hover and active tab highlighting.
+  - **Main Content Area:** Renders the active module based on sidebar selection.
+
+#### 2. Invoice Generator Form Component
+When "Business Invoice" is selected, display an interactive Invoice Creation Form with the following fields:
+- **Company / Business Details:** Company Name, Address, Phone, Website, Logo URL.
+- **Bill To (Customer Info):** Customer Name, Business/Personal Address, Phone.
+- **Invoice Metadata:** Invoice Number (auto-generated or editable), Invoice Date, Due Date.
+- **Itemized Table (Dynamic Rows):**
+  - Columns: Description, Taxed (checkbox), Amount.
+  - Button to dynamically "Add Item" or "Remove Item".
+- **Calculations & Notes:**
+  - Subtotal, Tax Rate (%), Tax Due, Total Amount ($ / ৳).
+  - Other Comments / Payment Terms field (e.g., "Total payment due in 30 days").
+
+#### 3. Invoice Preview & Template Layout (Matching Image Design)
+- Render a print-friendly Preview tab or modal matching the classical blue-accented invoice template structure:
+  - Header: Top-left Company Name/Address; Top-right bold "INVOICE" title with Date, Invoice #, Customer ID, Due Date.
+  - "BILL TO" dark blue block with customer address details.
+  - Dark blue table header `DESCRIPTION | TAXED | AMOUNT` with alternating striped rows.
+  - Right-aligned Subtotal, Taxable, Tax Rate, Tax Due, and bold TOTAL block.
+  - Bottom "OTHER COMMENTS" block and "Thank You For Your Business!" footer text.
+
+#### 4. Export & Sharing Capability
+- Use `html2pdf.js`, `jspdf`, or `@react-pdf/renderer` to convert the rendered template into a downloadable PDF document.
+- Add a **"Download PDF"** button to download the formatted invoice named `Invoice_[InvoiceNumber].pdf`.
+- Add a **"Share Invoice"** action using the Web Share API (or copy direct shareable link) to send via WhatsApp, Email, or Messaging apps.
