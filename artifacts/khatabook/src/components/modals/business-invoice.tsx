@@ -497,43 +497,6 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
               <span className="flex h-9 w-9 items-center justify-center rounded-full border border-[#d8e2ee] bg-white text-[#45668f]"><FileText className="h-4 w-4" /></span>
             </div>
             <section className="rounded-2xl border border-[#e2e8f0] bg-white p-4 shadow-[0_2px_10px_rgba(37,61,92,.035)] md:p-5">
-              {sectionHeading(Building2, en ? '01 · Seller' : '০১ · বিক্রেতা', labels.companyBlock)}
-              {businessProfile && !editingProfile ? (
-                <div className="flex items-start gap-4 rounded-xl border border-[#dce6f1] bg-[#f7f9fc] p-4">
-                  {businessProfile.logo && <img src={businessProfile.logo} alt="" className="h-20 w-[180px] shrink-0 rounded-lg border border-slate-200 bg-white object-contain p-2" />}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-[#1b2f4d]">{businessProfile.company || labels.company}</p>
-                    <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-slate-600">{[businessProfile.address, businessProfile.phone, businessProfile.email, businessProfile.trn].filter(Boolean).join('\n')}</p>
-                    <p className="mt-2 text-xs font-semibold text-emerald-700">{labels.profileSaved}</p>
-                  </div>
-                  <button type="button" data-testid="button-invoice-edit-profile" onClick={() => setEditingProfile(true)} className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700">{labels.editProfile}</button>
-                </div>
-              ) : (
-                <>
-                  <div className="grid gap-x-3.5 gap-y-3 sm:grid-cols-2">
-                    {field('company', labels.company)}{field('phone', labels.phone)}
-                    <label className="block min-w-0 text-[12px] font-semibold text-[#55657b]">{labels.address}
-                      <textarea data-testid="input-invoice-address" value={current.address} onChange={(event) => set('address', event.target.value)} rows={3} className={`${inputClass} resize-y py-3`} />
-                    </label>
-                    {field('email', labels.email)}{field('trn', labels.trn)}
-                    {field('website', labels.website)}{field('locationUrl', labels.locationUrl)}
-                  </div>
-                  <div className="mt-3">
-                    <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[#a9bad0] bg-[#f8fafc] px-3.5 text-sm font-semibold text-[#31578f]">
-                      <ImagePlus className="h-4 w-4" />{labels.uploadLogo}
-                      <input data-testid="input-invoice-logo-upload" type="file" accept="image/png,image/jpeg" className="sr-only" onChange={(event) => { void handleLogoUpload(event.target.files?.[0]); event.currentTarget.value = ''; }} />
-                    </label>
-                    <p className="mt-1 text-[11px] text-slate-500">{labels.logoLimit}</p>
-                    {current.logo && <div className="mt-2 flex items-center gap-3"><img src={current.logo} alt={labels.logo} className="h-20 w-[180px] rounded-lg border border-slate-200 bg-white object-contain p-2" /><button type="button" aria-label={en ? 'Remove logo' : 'লোগো সরান'} onClick={() => set('logo', '')} className="rounded-lg p-2 text-rose-600 hover:bg-rose-50"><X className="h-4 w-4" /></button></div>}
-                  </div>
-                  <div className="mt-4 flex justify-end gap-2">
-                    {businessProfile && <button type="button" onClick={cancelProfileEdit} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700">{labels.cancel}</button>}
-                    <button type="button" data-testid="button-invoice-save-profile" onClick={saveBusinessProfile} className="inline-flex items-center gap-2 rounded-lg bg-[#1B3A6B] px-4 py-2 text-sm font-bold text-white"><Save className="h-4 w-4" />{labels.saveProfile}</button>
-                  </div>
-                </>
-              )}
-            </section>
-            <section className="rounded-2xl border border-[#e2e8f0] bg-white p-4 shadow-[0_2px_10px_rgba(37,61,92,.035)] md:p-5">
               {sectionHeading(UserRound, en ? '02 · Customer' : '০২ · গ্রাহক', labels.billTo)}
               <div className="grid gap-x-3.5 gap-y-3 sm:grid-cols-2">
                 {field('customer', labels.customer)}{field('customerPhone', labels.customerPhone)}

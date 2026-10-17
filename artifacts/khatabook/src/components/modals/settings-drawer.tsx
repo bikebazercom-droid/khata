@@ -4,7 +4,7 @@ import { useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { useClerk, useAuth, useUser } from '@clerk/react';
 import { useRemoveOwnerPushToken } from '@workspace/api-client-react';
-import { AlertTriangle, ArrowLeft, ChevronDown, EllipsisVertical, Globe2, LogIn, LogOut, Mail, Phone, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Building2, ChevronDown, EllipsisVertical, FileText, Gem, Globe2, List, LogIn, LogOut, Mail, Menu, Phone, Trash2, X } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -31,6 +31,7 @@ import { markLanguageSelection, saveLanguagePreference } from '@/lib/language-pr
 import { useAppAuth } from '@/App';
 import { BusinessInvoice } from './business-invoice';
 import { GoldInvoice } from './gold-invoice';
+import { BusinessProfile } from './business-profile';
 import { InvoiceList } from './invoice-list';
 import type { InvoiceHistoryAction, InvoiceHistoryRecord } from './invoice-history';
 import { revokeNetworkWrites } from '@/lib/useAuthConnectivity';
@@ -84,13 +85,21 @@ export function SettingsDrawer({
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isLanguageMenuExpanded, setIsLanguageMenuExpanded] = useState(false);
-  const [activeDetailsModule, setActiveDetailsModule] = useState<'invoice' | 'gold' | 'list'>('invoice');
+  const [activeDetailsModule, setActiveDetailsModule] = useState<'profile' | 'invoice' | 'gold' | 'list'>('invoice');
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceHistoryRecord>();
   const [invoiceAction, setInvoiceAction] = useState<InvoiceHistoryAction>('open');
+  const [isInvoiceMenuOpen, setIsInvoiceMenuOpen] = useState(false);
+  const selectDetailsModule = (module: 'profile' | 'invoice' | 'gold' | 'list') => {
+    setSelectedInvoice(undefined);
+    setInvoiceAction('open');
+    setActiveDetailsModule(module);
+    setIsInvoiceMenuOpen(false);
+  };
   const openInvoice = (record: InvoiceHistoryRecord, action: InvoiceHistoryAction) => {
     setSelectedInvoice(record);
     setInvoiceAction(action);
     setActiveDetailsModule(record.type === 'Gold' ? 'gold' : 'invoice');
+    setIsInvoiceMenuOpen(false);
   };
 
   const loginIdentity = authMethod === 'phone'
@@ -349,32 +358,33 @@ export function SettingsDrawer({
           </div>
         </DialogHeader>
 
-        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-          <nav aria-label={lang === 'en' ? 'Details modules' : 'বিস্তারিত মডিউল'} className="flex shrink-0 flex-col gap-2 overflow-y-auto border-b border-slate-800 bg-[#0F172A] p-3 md:w-60 md:border-b-0 md:border-r md:p-4">
-            <p className="px-3 pb-1 text-xs font-bold uppercase tracking-wide text-slate-400">
-              {lang === 'en' ? 'Modules' : 'মডিউল'}
-            </p>
-            <button type="button" data-testid="nav-business-invoice" aria-current={activeDetailsModule === 'invoice' ? 'page' : undefined}
-              onClick={() => { setSelectedInvoice(undefined); setInvoiceAction('open'); setActiveDetailsModule('invoice'); }}
-              className={`flex min-h-11 items-center rounded-xl px-3 text-left text-sm font-semibold transition-colors ${activeDetailsModule === 'invoice' ? 'bg-amber-400 text-slate-950 shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
-              {lang === 'en' ? 'Business Invoice' : 'বিজনেস ইনভয়েস'}
-            </button>
-            <button type="button" data-testid="nav-gold-invoice" aria-current={activeDetailsModule === 'gold' ? 'page' : undefined}
-              onClick={() => { setSelectedInvoice(undefined); setInvoiceAction('open'); setActiveDetailsModule('gold'); }}
-              className={`flex min-h-11 items-center rounded-xl px-3 text-left text-sm font-semibold transition-colors ${activeDetailsModule === 'gold' ? 'bg-amber-400 text-slate-950 shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
-              {lang === 'en' ? 'Gold Invoice' : 'গোল্ড ইনভয়েস'}
-            </button>
-            <button type="button" data-testid="nav-invoice-list" aria-current={activeDetailsModule === 'list' ? 'page' : undefined}
-              onClick={() => { setSelectedInvoice(undefined); setInvoiceAction('open'); setActiveDetailsModule('list'); }}
-              className={`flex min-h-11 items-center rounded-xl px-3 text-left text-sm font-semibold transition-colors ${activeDetailsModule === 'list' ? 'bg-amber-400 text-slate-950 shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
-              {lang === 'en' ? 'Invoice List' : 'ইনভয়েস তালিকা'}
-            </button>
-          </nav>
+        <div className="flex min-h-0 flex-1 flex-col">
           <main className="min-h-0 min-w-0 flex-1">
+            {activeDetailsModule === 'profile' && <BusinessProfile />}
             {activeDetailsModule === 'invoice' && <BusinessInvoice historyRecord={selectedInvoice} autoAction={invoiceAction} viewOnly={!!selectedInvoice && invoiceAction === 'open'} />}
             {activeDetailsModule === 'gold' && <GoldInvoice historyRecord={selectedInvoice} autoAction={invoiceAction} viewOnly={!!selectedInvoice && invoiceAction === 'open'} />}
             {activeDetailsModule === 'list' && <InvoiceList onOpen={openInvoice} />}
           </main>
+          <footer className="z-20 flex shrink-0 justify-center border-t border-slate-200 bg-white px-4 pt-2 pb-[calc(.5rem+env(safe-area-inset-bottom))]">
+            <button type="button" data-testid="button-invoice-menu" aria-expanded={isInvoiceMenuOpen} onClick={() => setIsInvoiceMenuOpen(true)} className="flex min-h-12 min-w-36 items-center justify-center gap-2 rounded-2xl bg-[#1B3A6B] px-6 text-sm font-bold text-white shadow-lg transition active:scale-95">
+              <Menu className="h-5 w-5" />{lang === 'en' ? 'Menu' : 'মেনু'}
+            </button>
+          </footer>
+          {isInvoiceMenuOpen && <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/45" data-testid="invoice-menu-backdrop">
+            <button type="button" aria-label={lang === 'en' ? 'Close menu' : 'মেনু বন্ধ করুন'} className="absolute inset-0" onClick={() => setIsInvoiceMenuOpen(false)} />
+            <section role="dialog" aria-modal="true" aria-label={lang === 'en' ? 'Invoice menu' : 'ইনভয়েস মেনু'} className="relative w-full max-w-xl rounded-t-3xl border border-slate-200 bg-white px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-2xl animate-in slide-in-from-bottom-6 duration-200">
+              <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-slate-300" />
+              <div className="mb-4 flex items-center justify-between"><div><h3 className="font-bold text-slate-900">{lang === 'en' ? 'Invoices' : 'ইনভয়েস'}</h3><p className="text-xs text-slate-500">{lang === 'en' ? 'Choose a section' : 'একটি বিভাগ নির্বাচন করুন'}</p></div><button type="button" aria-label={lang === 'en' ? 'Close menu' : 'মেনু বন্ধ করুন'} onClick={() => setIsInvoiceMenuOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 active:scale-95"><X className="h-5 w-5" /></button></div>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  ['profile', lang === 'en' ? 'Business Profile' : 'বিজনেস প্রোফাইল', Building2],
+                  ['invoice', lang === 'en' ? 'Business Invoice' : 'বিজনেস ইনভয়েস', FileText],
+                  ['gold', lang === 'en' ? 'Gold Invoice' : 'গোল্ড ইনভয়েস', Gem],
+                  ['list', lang === 'en' ? 'Invoice List' : 'ইনভয়েস তালিকা', List],
+                ] as const).map(([module, label, Icon]) => <button key={module} type="button" data-testid={`menu-option-${module}`} aria-current={activeDetailsModule === module ? 'page' : undefined} onClick={() => selectDetailsModule(module)} className={`flex min-h-20 items-center gap-3 rounded-2xl border px-3 text-left text-sm font-bold transition active:scale-[.98] ${activeDetailsModule === module ? 'border-amber-400 bg-amber-50 text-[#1B3A6B]' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}><span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${activeDetailsModule === module ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}`}><Icon className="h-5 w-5" /></span>{label}</button>)}
+              </div>
+            </section>
+          </div>}
         </div>
       </DialogContent>
 

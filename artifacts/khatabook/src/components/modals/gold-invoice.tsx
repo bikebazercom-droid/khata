@@ -145,7 +145,6 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
   });
   const [lines, setLines] = useState<GoldLine[]>(restored?.lines ?? shared?.lines ?? [{ id: 1, description: '', gross: '', grossUnit: 'g', purity: '0.916', makingRate: '', makingAmount: '' }]);
   const [nextId, setNextId] = useState(2);
-  const [profileEditing, setProfileEditing] = useState(false);
   useEffect(() => {
     setReadOnlyPreview(viewOnly);
   }, [viewOnly]);
@@ -227,14 +226,6 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
     return true;
   };
   const number = (value: number, digits = 2) => new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number.isFinite(value) ? value : 0);
-  const saveProfile = () => {
-    try {
-      const { company, address, phone, email, trn, logo, locationUrl } = data;
-      localStorage.setItem(profileKey(), JSON.stringify({ company, address, phone, email, trn, logo, locationUrl, website: '' }));
-      setProfileEditing(false);
-      toast.success(en ? 'Shop profile saved on this device.' : 'এই ডিভাইসে দোকানের প্রোফাইল সংরক্ষিত হয়েছে।');
-    } catch { toast.error(en ? 'Could not save the shop profile.' : 'দোকানের প্রোফাইল সংরক্ষণ করা যায়নি।'); }
-  };
   const uploadStamp = async (file?: File) => {
     if (!file) return;
     try {
@@ -410,18 +401,6 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
         <section className={`${readOnlyPreview ? 'hidden' : ''} h-full min-h-0 overflow-y-auto px-4 py-5 md:px-6`}>
           <div className="w-full space-y-4 pb-8">
             <div className="mb-4 flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[.16em] text-[#a48a51]">{labels.details}</p><p className="mt-1 text-xs text-[#78869a]">{en ? 'Enter each piece once; calculations update as you type.' : 'প্রতিটি গয়নার তথ্য একবার দিন; টাইপ করার সঙ্গে হিসাব আপডেট হবে।'}</p></div><span className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e4dcc9] bg-white text-[#9a741b]"><CalendarDays className="h-4 w-4" /></span></div>
-            <section className="rounded-2xl border border-[#e6e1d5] bg-white p-4 shadow-[0_2px_12px_rgba(49,45,34,.035)] md:p-5">
-              {sectionTitle(Building2, en ? '01 · SELLER' : '০১ · বিক্রেতা', labels.shop)}
-              {!profileEditing ? <div className="flex items-center justify-between gap-3 rounded-xl border border-[#ece7dc] bg-[#fbfaf7] p-3">
-                <div className="flex min-w-0 items-center gap-3">{data.logo && <img src={data.logo} alt="" className="h-12 w-16 rounded-lg bg-white object-contain p-1" />}<div className="min-w-0"><p className="truncate text-sm font-bold text-[#1b2f4d]">{data.company || (en ? 'Shop profile not set' : 'দোকানের প্রোফাইল সেট করা নেই')}</p><p className="truncate text-xs text-[#77869a]">{data.address || labels.empty}</p></div></div>
-                <button type="button" data-testid="button-gold-edit-profile" onClick={() => setProfileEditing(true)} className="shrink-0 rounded-lg border border-[#ded7c8] px-3 py-2 text-xs font-bold text-[#526079]">{labels.editProfile}</button>
-              </div> : <div className="space-y-3">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{field('company', en ? 'Shop name' : 'দোকানের নাম')}{field('phone', labels.phone, 'tel')}{field('email', labels.email, 'email')}{field('trn', en ? 'TRN / Tax number' : 'টিআরএন / কর নম্বর')}{field('locationUrl', en ? 'Shop location URL' : 'দোকানের অবস্থানের লিংক', 'url')}</div>
-                <label className="block text-[11px] font-semibold text-[#58677a]">{labels.address}<textarea data-testid="input-gold-address" value={data.address} onChange={(event) => set('address', event.target.value)} className={`${inputClass} min-h-[66px] resize-y`} /></label>
-                <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[#d8cba8] bg-[#fdfbf6] px-3 py-2 text-xs font-bold text-[#7d641d]"><ImagePlus className="h-4 w-4" />{en ? 'Upload shop logo' : 'দোকানের লোগো আপলোড'}<input type="file" accept="image/png,image/jpeg" className="hidden" data-testid="input-gold-logo" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; if (!['image/png', 'image/jpeg'].includes(file.type) || file.size > 8 * 1024 * 1024) { toast.error(en ? 'Choose a PNG or JPG under 8 MB.' : '৮ MB-এর মধ্যে PNG বা JPG বেছে নিন।'); return; } try { const image = await resizeStamp(file); set('logo', image); } catch { toast.error(labels.shareError); } }} /></label>
-                <div className="flex gap-2"><button type="button" data-testid="button-gold-save-profile" onClick={saveProfile} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#1b365b] px-4 text-xs font-bold text-white"><Check className="h-4 w-4" />{labels.saveProfile}</button><span className="self-center text-[10px] text-[#8792a0]">{labels.profileSaved}</span></div>
-              </div>}
-            </section>
             <section className="rounded-2xl border border-[#e6e1d5] bg-white p-4 shadow-[0_2px_12px_rgba(49,45,34,.035)] md:p-5">
               {sectionTitle(UserRound, en ? '02 · BUYER' : '০২ · ক্রেতা', labels.customer)}
               <div className="grid grid-cols-1 gap-x-3 gap-y-2.5 sm:grid-cols-2">

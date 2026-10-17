@@ -108,7 +108,7 @@ describe('business invoice', () => {
 
     try {
       render(<BusinessInvoice />);
-      expect(screen.getByTestId('input-invoice-company')).toHaveValue('Sample shop');
+      expect(screen.getByTestId('input-invoice-customer')).toHaveValue('A customer');
       expect(screen.getByTestId('input-invoice-item-description-1')).toHaveValue('Rice');
       expect(screen.getByTestId('select-invoice-customer-id-type')).toHaveValue('nid');
       expect(screen.getByTestId('input-invoice-customerIdNumber')).toHaveValue('');
@@ -165,20 +165,11 @@ describe('business invoice', () => {
     click.mockRestore();
   });
 
-  it('saves the business profile and reuses it on the next invoice', () => {
-    const first = render(<BusinessInvoice />);
-    fireEvent.change(screen.getByTestId('input-invoice-company'), { target: { value: 'New Shop' } });
-    fireEvent.change(screen.getByTestId('input-invoice-email'), { target: { value: 'shop@example.com' } });
-    fireEvent.click(screen.getByTestId('button-invoice-save-profile'));
-    expect(JSON.parse(localStorage.getItem('banglakhata_business_invoice_profile_v1:default') || '{}')).toMatchObject({
-      company: 'New Shop',
-      email: 'shop@example.com',
-    });
-    first.unmount();
-
+  it('keeps seller profile fields out of the invoice creation form', () => {
     render(<BusinessInvoice />);
-    expect(screen.getByText('Business Details Saved')).toBeInTheDocument();
-    expect(screen.getAllByText('New Shop')).toHaveLength(1);
+    expect(screen.queryByTestId('input-invoice-company')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('input-invoice-logo-upload')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('button-invoice-save-profile')).not.toBeInTheDocument();
   });
 
   it('saves an invoice into searchable history', () => {

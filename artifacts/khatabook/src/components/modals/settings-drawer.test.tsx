@@ -67,14 +67,27 @@ describe('settings drawer language selection', () => {
     expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
   });
 
-  it('shows direct invoice module links and highlights the selected module', () => {
+  it('opens the floating module menu, switches views, and closes the sheet', () => {
     render(<SettingsDrawer open onOpenChange={vi.fn()} />);
-    expect(screen.queryByTestId('button-invoices-menu')).not.toBeInTheDocument();
-    expect(screen.getByTestId('nav-business-invoice')).toBeInTheDocument();
-    expect(screen.getByTestId('nav-gold-invoice')).toBeInTheDocument();
-    expect(screen.getByTestId('nav-invoice-list')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('nav-gold-invoice'));
-    expect(screen.getByTestId('nav-gold-invoice')).toHaveAttribute('aria-current', 'page');
+    fireEvent.click(screen.getByTestId('button-invoice-menu'));
+    expect(screen.getByTestId('menu-option-profile')).toBeInTheDocument();
+    expect(screen.getByTestId('menu-option-invoice')).toBeInTheDocument();
+    expect(screen.getByTestId('menu-option-gold')).toBeInTheDocument();
+    expect(screen.getByTestId('menu-option-list')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('menu-option-gold'));
+    expect(screen.queryByRole('dialog', { name: 'Invoice menu' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('button-gold-save-history')).toBeInTheDocument();
+  });
+
+  it('opens the dedicated persistent business profile editor from the bottom sheet', () => {
+    render(<SettingsDrawer open onOpenChange={vi.fn()} />);
+    fireEvent.click(screen.getByTestId('button-invoice-menu'));
+    fireEvent.click(screen.getByTestId('menu-option-profile'));
+    expect(screen.getByRole('heading', { name: 'বিজনেস প্রোফাইল' })).toBeInTheDocument();
+    expect(screen.getByText('কোম্পানির সিল আপলোড')).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId('input-business-profile-company'), { target: { value: 'Sample Shop' } });
+    fireEvent.click(screen.getByTestId('button-business-profile-save'));
+    expect(JSON.parse(localStorage.getItem('banglakhata_business_invoice_profile_v1:default') || '{}')).toMatchObject({ company: 'Sample Shop' });
   });
 
   it('expands language choices underneath the row and switches language on selection', () => {
