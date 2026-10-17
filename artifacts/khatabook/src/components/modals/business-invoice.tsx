@@ -1,7 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Building2, CalendarDays, Check, Download, Eye, FileText, ImagePlus, PencilLine, Plus, ReceiptText, Save, Share2, Trash2, UserRound, X } from 'lucide-react';
+import { Building2, CalendarDays, Check, ChevronDown, Download, Eye, FileText, ImagePlus, PencilLine, Plus, ReceiptText, Save, Share2, Trash2, UserRound, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useLanguage } from '@/lib/i18n';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
 
@@ -13,13 +15,56 @@ type InvoiceData = {
   email: string; trn: string; locationUrl: string;
   customer: string; customerAddress: string; customerPhone: string;
   customerIdType: CustomerDocumentType; customerIdNumber: string;
-  number: string; date: string; due: string; currency: 'BDT' | 'USD'; taxRate: string; comments: string;
+  number: string; date: string; currency: string; taxRate: string; comments: string;
   paymentTerms: string; metalRate: string; placeOfSupply: string;
 };
 
 type SharedInvoice = { invoiceData: InvoiceData; lines: InvoiceLine[] };
 type BusinessProfile = Pick<InvoiceData, 'company' | 'address' | 'phone' | 'website' | 'email' | 'trn' | 'locationUrl' | 'logo'>;
 const BUSINESS_PROFILE_KEY = 'banglakhata_business_invoice_profile_v1';
+const fallbackCurrencyCodes = 'AED AFN ALL AMD ANG AOA ARS AUD AWG AZN BAM BBD BDT BGN BHD BIF BMD BND BOB BRL BSD BTN BWP BYN BZD CAD CDF CHF CLP CNY COP CRC CUC CUP CVE CZK DJF DKK DOP DZD EGP ERN ETB EUR FJD FKP GBP GEL GHS GIP GMD GNF GTQ GYD HKD HNL HRK HTG HUF IDR ILS INR IQD IRR ISK JMD JOD JPY KES KGS KHR KMF KPW KRW KWD KYD KZT LAK LBP LKR LRD LSL LYD MAD MDL MGA MKD MMK MNT MOP MRU MUR MVR MWK MXN MYR MZN NAD NGN NIO NOK NPR NZD OMR PAB PEN PGK PHP PKR PLN PYG QAR RON RSD RUB RWF SAR SBD SCR SDG SEK SGD SHP SLE SLL SOS SRD SSP STN SVC SYP SZL THB TJS TMT TND TOP TRY TTD TWD TZS UAH UGX USD UYU UZS VES VND VUV WST XAF XCD XCG XDR XOF XPF XSU YER ZAR ZMW ZWG ZWL'.split(' ');
+const currencyCountryAliases: Record<string, string[]> = {
+  AED: ['UAE', 'United Arab Emirates', 'Dubai', 'Abu Dhabi'],
+  AUD: ['Australia'], BDT: ['Bangladesh'], BHD: ['Bahrain'], CAD: ['Canada'],
+  CHF: ['Switzerland'], CNY: ['China'], EUR: ['Eurozone', 'Europe'], GBP: ['United Kingdom', 'UK', 'Britain'],
+  HKD: ['Hong Kong'], IDR: ['Indonesia'], INR: ['India'], JPY: ['Japan'], KRW: ['South Korea', 'Korea'],
+  KWD: ['Kuwait'], LKR: ['Sri Lanka'], MYR: ['Malaysia'], NPR: ['Nepal'], NZD: ['New Zealand'],
+  OMR: ['Oman'], PHP: ['Philippines'], PKR: ['Pakistan'], QAR: ['Qatar'], RUB: ['Russia'],
+  SAR: ['Saudi Arabia'], SGD: ['Singapore'], THB: ['Thailand'], TRY: ['Turkey', 'Türkiye'], USD: ['United States', 'USA', 'America'], ZAR: ['South Africa'],
+  EGP: ['Egypt'], MXN: ['Mexico'], BRL: ['Brazil'], SEK: ['Sweden'], NOK: ['Norway'], DKK: ['Denmark'],
+  PLN: ['Poland'], CZK: ['Czechia', 'Czech Republic'], HUF: ['Hungary'], UAH: ['Ukraine'], VND: ['Vietnam'],
+};
+const currencySymbolOverrides: Record<string, string> = {
+  AED: 'د.إ', BDT: '৳', BHD: '.د.ب', EUR: '€', GBP: '£', INR: '₹', KWD: 'د.ك',
+  OMR: 'ر.ع.', QAR: 'ر.ق', SAR: '﷼', USD: '$',
+};
+
+function supportedCurrencyCodes(): string[] {
+  try {
+    const values = Intl.supportedValuesOf('currency');
+    return [...new Set([...values, ...fallbackCurrencyCodes])].sort();
+  } catch {
+    return fallbackCurrencyCodes;
+  }
+}
+
+function currencyName(code: string, locale: string): string {
+  try {
+    return new Intl.DisplayNames([locale], { type: 'currency' }).of(code) || code;
+  } catch {
+    return code;
+  }
+}
+
+function currencySymbol(code: string, locale: string): string {
+  if (currencySymbolOverrides[code]) return currencySymbolOverrides[code];
+  try {
+    return new Intl.NumberFormat(locale, { style: 'currency', currency: code, currencyDisplay: 'narrowSymbol' })
+      .formatToParts(1).find((part) => part.type === 'currency')?.value || code;
+  } catch {
+    return code;
+  }
+}
 
 function businessProfileStorageKey(): string {
   if (typeof window === 'undefined') return `${BUSINESS_PROFILE_KEY}:default`;
@@ -93,11 +138,11 @@ function decodeInvoiceFromLink(): SharedInvoice | null {
     const parsed = JSON.parse(new TextDecoder().decode(bytes)) as Partial<SharedInvoice>;
     if (!parsed.invoiceData || !Array.isArray(parsed.lines)) return null;
     const data = parsed.invoiceData as Partial<InvoiceData>;
-    if (data.currency !== 'BDT' && data.currency !== 'USD') return null;
+    if (typeof data.currency !== 'string' || !supportedCurrencyCodes().includes(data.currency)) return null;
 
     const stringFields: (keyof InvoiceData)[] = [
       'company', 'address', 'phone', 'website', 'logo', 'customer',
-      'customerAddress', 'customerPhone', 'number', 'date', 'due', 'taxRate', 'comments',
+      'customerAddress', 'customerPhone', 'number', 'date', 'taxRate', 'comments',
     ];
     if (stringFields.some((field) => typeof data[field] !== 'string')) return null;
     const invoiceData = {
@@ -144,16 +189,31 @@ const today = () => {
   const date = new Date();
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
-const dueDate = () => {
-  const date = new Date();
-  date.setDate(date.getDate() + 30);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const newInvoiceNumber = () => {
+  try {
+    const businessId = typeof window === 'undefined' ? 'default' : (window.localStorage.getItem('selected_business_id') || 'default');
+    const key = `banglakhata_invoice_sequence:${businessId}:${today().replaceAll('-', '')}`;
+    const next = Number(window.localStorage.getItem(key) || 0) + 1;
+    window.localStorage.setItem(key, String(next));
+    return `INV-${today().replaceAll('-', '')}-${next}`;
+  } catch {
+    return `INV-${today().replaceAll('-', '')}-${Date.now().toString().slice(-4)}`;
+  }
 };
-const newInvoiceNumber = () => `INV-${today().replaceAll('-', '')}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-const money = (value: number, currency: string, lang: string) =>
-  new Intl.NumberFormat(lang === 'en' ? 'en-US' : 'bn-BD', { style: 'currency', currency, maximumFractionDigits: 2 }).format(value);
+const localeForLanguage = (lang: string) => lang === 'en' ? 'en-US' : 'bn-BD';
+const money = (value: number, currency: string, lang: string) => {
+  try {
+    const locale = localeForLanguage(lang);
+    const number = new Intl.NumberFormat(locale, { style: 'currency', currency }).formatToParts(value)
+      .filter((part) => ['integer', 'group', 'decimal', 'fraction'].includes(part.type))
+      .map((part) => part.value).join('');
+    return `${currencySymbol(currency, locale)} ${number} ${currency}`;
+  } catch {
+    return `${currency} ${new Intl.NumberFormat(localeForLanguage(lang), { maximumFractionDigits: 2 }).format(value)}`;
+  }
+};
 const dateLabel = (value: string, lang: string) =>
-  value ? new Date(`${value}T12:00:00`).toLocaleDateString(lang === 'en' ? 'en-US' : 'bn-BD') : '—';
+  value ? new Date(`${value}T12:00:00`).toLocaleDateString(localeForLanguage(lang)) : '—';
 
 export function BusinessInvoice() {
   const { lang } = useLanguage();
@@ -162,6 +222,7 @@ export function BusinessInvoice() {
   const [preview, setPreview] = useState(false);
   const [pdfMode, setPdfMode] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [currencyPopoverOpen, setCurrencyPopoverOpen] = useState(false);
   const sharedInvoice = useMemo(decodeInvoiceFromLink, []);
   const savedProfile = useMemo(loadBusinessProfile, []);
   const [businessProfile, setBusinessProfile] = useState(savedProfile);
@@ -170,7 +231,7 @@ export function BusinessInvoice() {
     company: '', address: '', phone: '', website: '', logo: '',
     email: '', trn: '', locationUrl: '',
     customer: '', customerAddress: '', customerPhone: '', customerIdType: 'nid', customerIdNumber: '',
-    number: newInvoiceNumber(), date: today(), due: dueDate(), currency: 'BDT', taxRate: '0', comments: '',
+    number: newInvoiceNumber(), date: today(), currency: 'BDT', taxRate: '0', comments: '',
     paymentTerms: 'Cash', metalRate: '', placeOfSupply: '',
     ...savedProfile,
   }));
@@ -189,7 +250,8 @@ export function BusinessInvoice() {
     customer: 'Customer name', customerAddress: 'Customer address', customerPhone: 'Customer phone',
     customerIdType: 'ID Type', customerIdNumber: 'ID / Document Number',
     customerPhoneLabel: 'Phone', customerAddressLabel: 'Address',
-    number: 'Invoice number', date: 'Invoice date', due: 'Payment due date', currency: 'Currency', tax: 'Tax rate (%)',
+    number: 'Invoice number', date: 'Invoice date', currency: 'Currency', tax: 'Tax rate (%)',
+    currencySearch: 'Search by country, symbol, or ISO code…', currencyNoResults: 'No currencies found.',
     paymentTerms: 'Payment terms', metalRate: 'Metal / unit rate', placeOfSupply: 'Place of supply',
     description: 'Item description', taxed: 'Taxable', amount: 'Amount', add: 'Add an item', comments: 'Notes or payment terms',
     edit: 'Edit details', preview: 'View invoice', download: 'Download PDF', share: 'Share',
@@ -207,7 +269,8 @@ export function BusinessInvoice() {
     customer: 'গ্রাহকের নাম', customerAddress: 'গ্রাহকের ঠিকানা', customerPhone: 'গ্রাহকের ফোন',
     customerIdType: 'পরিচয়পত্রের ধরন', customerIdNumber: 'আইডি / নথি নম্বর',
     customerPhoneLabel: 'ফোন', customerAddressLabel: 'ঠিকানা',
-    number: 'ইনভয়েস নম্বর', date: 'ইনভয়েসের তারিখ', due: 'পরিশোধের শেষ তারিখ', currency: 'মুদ্রা', tax: 'কর হার (%)',
+    number: 'ইনভয়েস নম্বর', date: 'ইনভয়েসের তারিখ', currency: 'মুদ্রা', tax: 'কর হার (%)',
+    currencySearch: 'দেশ, প্রতীক বা ISO কোড দিয়ে খুঁজুন…', currencyNoResults: 'কোনো মুদ্রা পাওয়া যায়নি।',
     paymentTerms: 'পেমেন্টের শর্ত', metalRate: 'ধাতু / একক মূল্য', placeOfSupply: 'সরবরাহের স্থান',
     description: 'পণ্যের বিবরণ', taxed: 'করযোগ্য', amount: 'পরিমাণ', add: 'আইটেম যোগ করুন', comments: 'নোট বা পেমেন্টের শর্ত',
     edit: 'তথ্য সম্পাদনা', preview: 'ইনভয়েস দেখুন', download: 'PDF ডাউনলোড', share: 'শেয়ার',
@@ -234,6 +297,14 @@ export function BusinessInvoice() {
   };
   const set = (key: keyof InvoiceData, value: string) => setInvoiceData((current) => ({ ...current, [key]: value }));
   const current = invoiceData;
+  const locale = localeForLanguage(lang);
+  const currencyOptions = useMemo(() => supportedCurrencyCodes().map((code) => {
+    const name = currencyName(code, locale);
+    const symbol = currencySymbol(code, locale);
+    const aliases = currencyCountryAliases[code] || [];
+    return { code, name, symbol, aliases, search: `${code} ${name} ${symbol} ${aliases.join(' ')}`.toLocaleLowerCase(locale) };
+  }), [locale]);
+  const selectedCurrency = currencyOptions.find((option) => option.code === current.currency);
   const customerDocumentOutputLabel: Record<CustomerDocumentType, string> = {
     nid: 'NID',
     passport: en ? 'Passport No' : 'পাসপোর্ট নম্বর',
@@ -326,7 +397,7 @@ export function BusinessInvoice() {
     }
   }
   async function shareInvoice() {
-    const text = `${labels.title} ${current.number}\n${labels.customer}: ${current.customer || '—'}\n${labels.total}: ${money(totals.total, current.currency, lang)}\n${labels.due}: ${dateLabel(current.due, lang)}`;
+    const text = `${labels.title} ${current.number}\n${labels.customer}: ${current.customer || '—'}\n${labels.total}: ${money(totals.total, current.currency, lang)}`;
     setBusy(true);
     try {
       const blob = await createPdf();
@@ -459,14 +530,35 @@ export function BusinessInvoice() {
             <section className="rounded-2xl border border-[#e2e8f0] bg-white p-4 shadow-[0_2px_10px_rgba(37,61,92,.035)] md:p-5">
               {sectionHeading(CalendarDays, en ? '03 · Reference' : '০৩ · তারিখ ও নম্বর', en ? 'Invoice information' : 'ইনভয়েসের তথ্য')}
               <div className="grid gap-x-3.5 gap-y-3 sm:grid-cols-2">
-                {field('number', labels.number)}{field('date', labels.date, 'date')}
-                {field('due', labels.due, 'date')}
+                {field('date', labels.date, 'date')}
                 {field('paymentTerms', labels.paymentTerms)}
-                {field('metalRate', labels.metalRate)}
+                {field('metalRate', `${labels.metalRate} (${currencySymbol(current.currency, locale)} ${current.currency})`)}
                 {field('placeOfSupply', labels.placeOfSupply)}
-                <label className="block text-[12px] font-semibold text-[#55657b]">{labels.currency}
-                  <select data-testid="select-invoice-currency" value={current.currency} onChange={(e) => set('currency', e.target.value)} className={inputClass}><option value="BDT">৳ BDT · Bangladeshi Taka</option><option value="USD">$ USD · US Dollar</option></select>
-                </label>
+                <div className="min-w-0 text-[12px] font-semibold text-[#55657b]">
+                  <span>{labels.currency}</span>
+                  <Popover open={currencyPopoverOpen} onOpenChange={setCurrencyPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <button type="button" data-testid="select-invoice-currency" aria-expanded={currencyPopoverOpen} className={`${inputClass} flex items-center justify-between gap-2 text-left`}>
+                        <span className="truncate">{selectedCurrency ? `${selectedCurrency.symbol} ${selectedCurrency.code} - ${selectedCurrency.name}` : current.currency}</span>
+                        <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
+                      <Command>
+                        <CommandInput data-testid="input-invoice-currency-search" placeholder={labels.currencySearch} />
+                        <CommandList>
+                          <CommandEmpty>{labels.currencyNoResults}</CommandEmpty>
+                          {currencyOptions.map((option) => (
+                            <CommandItem key={option.code} value={option.search} data-testid={`currency-option-${option.code}`} onSelect={() => { set('currency', option.code); setCurrencyPopoverOpen(false); }}>
+                              <Check className={`h-4 w-4 ${current.currency === option.code ? 'opacity-100' : 'opacity-0'}`} />
+                              <span className="min-w-0 truncate">{option.symbol} {option.code} - {option.name}</span>
+                            </CommandItem>
+                          ))}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
                 {field('taxRate', labels.tax, 'number')}
               </div>
             </section>
@@ -544,7 +636,7 @@ export function BusinessInvoice() {
                   [labels.number, current.number],
                   [labels.date, dateLabel(current.date, lang)],
                   [labels.paymentTerms, current.paymentTerms],
-                  [labels.metalRate, current.metalRate],
+                  [`${labels.metalRate} (${currencySymbol(current.currency, locale)} ${current.currency})`, current.metalRate || ''],
                   [labels.placeOfSupply, current.placeOfSupply],
                 ] as const).map(([label, value]) => (
                   <div key={label} className="grid grid-cols-[auto_minmax(0,1fr)] items-end gap-2 py-1">
@@ -554,7 +646,7 @@ export function BusinessInvoice() {
                 ))}
               </div>
             </div>
-            <div className="mt-5 grid grid-cols-2 gap-4">
+            <div className="mt-5 grid grid-cols-1 gap-4">
               <div className="border-l-[3px] border-[#8da4c3] pl-3">
                 <p className="mb-2 bg-[#1B3A6B] px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-[.16em] text-white">{labels.billTo}</p>
                 <p className="font-bold text-[#263e60]">{current.customer || '—'}</p>
@@ -565,7 +657,6 @@ export function BusinessInvoice() {
                   {!current.customerPhone && !current.customerIdNumber.trim() && !current.customerAddress && <p>—</p>}
                 </div>
               </div>
-              <div className="min-w-0 self-end text-right text-[10px] text-[#6e7e93]">{labels.due}: {dateLabel(current.due, lang)}</div>
             </div>
             <table className="mt-7 w-full table-fixed border-collapse text-[10px]" style={{ wordBreak: 'break-word' }}>
               <thead><tr className="bg-[#1B3A6B] text-white">

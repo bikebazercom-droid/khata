@@ -39,6 +39,14 @@ describe('business invoice', () => {
   beforeEach(() => {
     localStorage.removeItem('selected_business_id');
     localStorage.removeItem('banglakhata_business_invoice_profile_v1:default');
+    if (!globalThis.ResizeObserver) {
+      globalThis.ResizeObserver = class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      };
+    }
+    Element.prototype.scrollIntoView ??= vi.fn();
   });
 
   it('calculates tax only for taxable items and updates the preview total', () => {
@@ -49,6 +57,29 @@ describe('business invoice', () => {
     fireEvent.click(screen.getByTestId('button-invoice-mobile-view'));
 
     expect(screen.getByTestId('text-invoice-total')).toHaveTextContent('110');
+  });
+
+  it('hides generated invoice number and due date fields and searches currencies by country name', () => {
+    render(<BusinessInvoice />);
+    expect(screen.queryByTestId('input-invoice-number')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('input-invoice-due')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('select-invoice-currency'));
+    fireEvent.change(screen.getByTestId('input-invoice-currency-search'), { target: { value: 'Dubai' } });
+    expect(screen.getByTestId('currency-option-AED')).toBeInTheDocument();
+    expect(screen.queryByTestId('currency-option-USD')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('currency-option-AED'));
+    expect(screen.getByTestId('select-invoice-currency')).toHaveTextContent('AED');
+    expect(screen.getByText('Metal / unit rate (د.إ AED)')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('input-invoice-item-amount-1'), { target: { value: '100' } });
+    fireEvent.change(screen.getByTestId('input-invoice-metalRate'), { target: { value: '447/g' } });
+    fireEvent.click(screen.getByTestId('button-invoice-mobile-view'));
+    expect(screen.getByText(/^INV-\d{8}-\d+$/)).toBeInTheDocument();
+    expect(screen.getByTestId('text-invoice-total')).toHaveTextContent('د.إ');
+    expect(screen.getByTestId('text-invoice-total')).toHaveTextContent('AED');
+    expect(screen.queryByText(/Payment due date/)).not.toBeInTheDocument();
+    expect(screen.getByText('Metal / unit rate (د.إ AED):')).toBeInTheDocument();
   });
 
   it('adds and removes invoice rows without allowing the final row to disappear', () => {
