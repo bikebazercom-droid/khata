@@ -4,7 +4,7 @@ import { useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { useClerk, useAuth, useUser } from '@clerk/react';
 import { useRemoveOwnerPushToken } from '@workspace/api-client-react';
-import { ArrowLeft, ChevronDown, EllipsisVertical, Globe2, LogIn, LogOut, Mail, Phone, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ChevronDown, EllipsisVertical, Globe2, LogIn, LogOut, Mail, Phone, Trash2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -77,6 +77,7 @@ export function SettingsDrawer({
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isLanguageMenuExpanded, setIsLanguageMenuExpanded] = useState(false);
 
@@ -95,6 +96,8 @@ export function SettingsDrawer({
       const res = await fetch('/api/user/account', {
         method: 'DELETE',
         credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmation: deleteConfirmation }),
       });
       if (!res.ok) {
         const err = await res.text();
@@ -137,7 +140,10 @@ export function SettingsDrawer({
       toast.error(t('deleteError'));
       setIsDeleting(false);
     }
-  }, [isDeleting, isSignedIn, queryClient, onOpenChange, navigate, signOut, t]);
+  }, [deleteConfirmation, isDeleting, isSignedIn, queryClient, onOpenChange, navigate, signOut, t]);
+
+  const isDeleteConfirmationValid = deleteConfirmation.trim() === 'DELETE' ||
+    (!!loginIdentity && deleteConfirmation.trim().toLowerCase() === loginIdentity.trim().toLowerCase());
 
   async function handleLogout() {
     if (isLoggingOut) return;
@@ -235,7 +241,7 @@ export function SettingsDrawer({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  aria-label="আরও অপশন"
+                  aria-label={t('moreOptions')}
                   className="col-start-3 row-start-1 flex h-10 w-10 shrink-0 items-center justify-center justify-self-end rounded-xl bg-white/15 text-white transition-colors hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                 >
                   <EllipsisVertical className="h-5 w-5" />
@@ -244,7 +250,7 @@ export function SettingsDrawer({
               <DropdownMenuContent
                 align="end"
                 sideOffset={8}
-                className="max-h-[calc(100dvh-7rem)] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border-slate-200 bg-white p-1.5 shadow-xl"
+                className="max-h-[calc(100dvh-7rem)] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-slate-700 bg-[#0F172A] p-1.5 text-slate-50 shadow-xl"
               >
                 <DropdownMenuItem
                   aria-expanded={isLanguageMenuExpanded}
@@ -253,7 +259,7 @@ export function SettingsDrawer({
                     event.preventDefault();
                     setIsLanguageMenuExpanded((expanded) => !expanded);
                   }}
-                  className="min-h-11 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-700 focus:bg-slate-100"
+                   className="min-h-11 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-100 transition-colors hover:bg-slate-800/60 active:bg-slate-800/80 focus:bg-slate-800/80 focus:text-white data-[highlighted]:bg-slate-800/80 data-[highlighted]:text-white"
                 >
                   <Globe2 className="h-4 w-4" />
                   Language / ভাষা
@@ -266,8 +272,8 @@ export function SettingsDrawer({
                   <div
                     id="settings-language-options"
                     role="group"
-                    aria-label="Language options"
-                    className="ml-3 border-l border-slate-200 py-1 pl-2"
+                    aria-label={t('languageOptions')}
+                    className="ml-3 border-l border-slate-700 py-1 pl-2"
                   >
                     <DropdownMenuRadioGroup
                       value={lang}
@@ -281,21 +287,21 @@ export function SettingsDrawer({
                         });
                       }}
                     >
-                      <DropdownMenuRadioItem value="bn" className="min-h-10 rounded-lg text-sm">বাংলা</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="en" className="min-h-10 rounded-lg text-sm">English</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="bn" className="min-h-10 rounded-lg text-sm text-slate-100 transition-colors hover:bg-slate-800/60 active:bg-slate-800/80 focus:bg-slate-800/80 focus:text-white data-[highlighted]:bg-slate-800/80 data-[highlighted]:text-white">বাংলা</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="en" className="min-h-10 rounded-lg text-sm text-slate-100 transition-colors hover:bg-slate-800/60 active:bg-slate-800/80 focus:bg-slate-800/80 focus:text-white data-[highlighted]:bg-slate-800/80 data-[highlighted]:text-white">English</DropdownMenuRadioItem>
                     </DropdownMenuRadioGroup>
                   </div>
                 )}
                 <DropdownMenuItem
                   disabled
-                  className="cursor-default items-start rounded-lg px-3 py-3 opacity-100 data-[disabled]:opacity-100 focus:bg-transparent"
+                   className="cursor-default items-start rounded-lg px-3 py-3 opacity-100 data-[disabled]:opacity-100 focus:bg-transparent data-[highlighted]:bg-transparent"
                 >
                   <div className="flex min-w-0 flex-col gap-1">
-                    <span className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                    <span className="flex items-center gap-2 text-xs font-semibold text-slate-400">
                       {authMethod === 'phone' ? <Phone className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
                       {t('loginIdentity')}
                     </span>
-                    <span className="max-w-full truncate text-sm font-semibold text-slate-800">
+                    <span className="max-w-full truncate text-sm font-semibold text-slate-100">
                       {isAuthenticated ? loginIdentity || (authMethod === 'phone' ? t('phoneLoginFallback') : t('emailLoginFallback')) : t('noLogin')}
                     </span>
                   </div>
@@ -309,15 +315,18 @@ export function SettingsDrawer({
                       navigate('/sign-in');
                     }
                   }}
-                  className="min-h-11 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-700 focus:bg-slate-100"
+                  className="min-h-11 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-200 transition-colors hover:bg-slate-800 hover:text-white active:bg-slate-800 active:text-white focus:bg-slate-800 focus:text-white data-[highlighted]:bg-slate-800 data-[highlighted]:text-white"
                 >
                   {isAuthenticated ? <LogOut className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}
                   {isAuthenticated ? (isLoggingOut ? t('loggingOut') : t('logoutBtn')) : t('loginBtn')}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   disabled={role !== 'owner'}
-                  onSelect={() => setShowDeleteConfirm(true)}
-                  className="min-h-11 rounded-lg px-3 py-2.5 text-sm font-semibold text-red-600 focus:bg-red-50 focus:text-red-700"
+                  onSelect={() => {
+                    setDeleteConfirmation('');
+                    setShowDeleteConfirm(true);
+                  }}
+                  className="min-h-11 rounded-lg px-3 py-2.5 text-sm font-semibold text-rose-500 transition-colors hover:bg-rose-500/10 hover:text-rose-400 active:bg-rose-500/10 active:text-rose-400 focus:bg-rose-500/10 focus:text-rose-400 data-[highlighted]:bg-rose-500/10 data-[highlighted]:text-rose-400"
                   title={role === 'owner' ? undefined : (lang === 'en' ? 'Only the owner can delete a ledger' : 'শুধু মালিক খাতা ডিলিট করতে পারবেন')}
                 >
                   <Trash2 className="h-4 w-4" />
@@ -332,31 +341,61 @@ export function SettingsDrawer({
       </DialogContent>
 
       {/* ── Confirmation dialog ──────────────────────────────────── */}
-      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <AlertDialogContent className="max-w-sm rounded-2xl">
+      <AlertDialog
+        open={showDeleteConfirm}
+        onOpenChange={(nextOpen) => {
+          if (isDeleting) return;
+          setShowDeleteConfirm(nextOpen);
+          if (!nextOpen) setDeleteConfirmation('');
+        }}
+      >
+        <AlertDialogContent className="max-w-sm rounded-2xl border border-slate-200 p-5">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-center text-[17px]">{t('confirmDeleteTitle')}</AlertDialogTitle>
-            <AlertDialogDescription className="text-center text-slate-600 text-[14px] leading-relaxed">
-              {t('confirmDeleteLine1')}{'\n'}
-              {t('confirmDeleteLine2')}
+            <AlertDialogTitle className="flex items-center justify-center gap-2 text-center text-[17px] text-slate-900">
+              <AlertTriangle aria-hidden="true" className="h-5 w-5 shrink-0 text-rose-600" />
+              {t('confirmDeleteTitle')}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="whitespace-pre-line text-center text-[14px] leading-relaxed text-slate-600">
+              {t('confirmDeleteWarning')}
             </AlertDialogDescription>
+            <div className="space-y-2 text-sm">
+              <p className="text-slate-700">
+                {t('deleteAccountIdentity')} <span className="font-semibold text-slate-900">{loginIdentity || t('noLogin')}</span>
+              </p>
+              <label htmlFor="delete-account-confirmation" className="block font-medium text-slate-700">
+                {t('deleteAccountPrompt')}
+              </label>
+              <input
+                id="delete-account-confirmation"
+                value={deleteConfirmation}
+                onChange={(event) => setDeleteConfirmation(event.target.value)}
+                placeholder={t('deleteAccountPlaceholder')}
+                autoComplete="off"
+                spellCheck={false}
+                disabled={isDeleting}
+                className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-700/20 disabled:bg-slate-100"
+              />
+            </div>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-row gap-3 mt-2">
             <button
               type="button"
-              onClick={() => setShowDeleteConfirm(false)}
+              onClick={() => {
+                setShowDeleteConfirm(false);
+                setDeleteConfirmation('');
+              }}
               disabled={isDeleting}
-              className="flex-1 py-3 rounded-xl border border-slate-200 bg-slate-100 text-slate-700 font-bold text-[15px] active:scale-95 transition-transform disabled:opacity-50"
+              className="min-h-11 flex-1 rounded-xl border border-slate-200 bg-slate-100 py-3 text-[15px] font-bold text-slate-700 transition-colors hover:bg-slate-200 disabled:opacity-50"
             >
-              {t('no')}
+              {t('deleteCancel')}
             </button>
             <button
               type="button"
               onClick={() => { void handleConfirmDelete(); }}
-              disabled={isDeleting}
-              className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold text-[15px] active:scale-95 transition-transform disabled:opacity-60 disabled:cursor-not-allowed"
+              disabled={isDeleting || !isDeleteConfirmationValid}
+              className="min-h-11 flex-1 rounded-xl bg-rose-600 py-3 text-[15px] font-bold text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isDeleting ? t('deleting') : t('yesDelete')}
+              {isDeleting ? t('deleting') : t('deleteConfirm')}
             </button>
           </AlertDialogFooter>
         </AlertDialogContent>

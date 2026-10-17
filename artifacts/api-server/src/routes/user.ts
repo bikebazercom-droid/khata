@@ -97,6 +97,69 @@ router.delete(
         return;
       }
 
+      const parsed = z.object({ confirmation: z.string().trim().min(1).max(320) }).safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Account deletion confirmation is required." });
+        return;
+      }
+
+      const [account] = await db
+        .select({
+          verifiedEmail: appUsersTable.verifiedEmail,
+          phone: appUsersTable.phone,
+          clerkUserId: appUsersTable.clerkUserId,
+        })
+        .from(appUsersTable)
+        .where(eq(appUsersTable.id, userId))
+        .limit(1);
+      if (!account) {
+        res.status(404).json({ error: "User not found." });
+        return;
+      }
+
+      const currentIdentity = account.verifiedEmail ?? account.phone;
+      const typedConfirmation = parsed.data.confirmation;
+      const matchesIdentity = !!currentIdentity
+        && typedConfirmation.toLowerCase() === currentIdentity.trim().toLowerCase();
+      if (typedConfirmation !== "DELETE" && !matchesIdentity) {
+        res.status(400).json({ error: "The confirmation text does not match your account." });
+        return;
+      }
+
+      // Remove the Clerk identity before erasing app data so a provider failure
+      // leaves the account and its records intact for a safe retry.
+      if (account.clerkUserId) {
+        const clerkSecret = process.env.CLERK_SECRET_KEY;
+        if (!clerkSecret) {
+          res.status(503).json({ error: "Account deletion is temporarily unavailable." });
+          return;
+        }
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5_000);
+        let clerkResponse: Response;
+        try {
+          clerkResponse = await fetch(
+            `https://api.clerk.com/v1/users/${encodeURIComponent(account.clerkUserId)}`,
+            {
+              method: "DELETE",
+              headers: { Authorization: `Bearer ${clerkSecret}` },
+              signal: controller.signal,
+            },
+          );
+        } catch (error) {
+          console.error("[account-delete] Clerk identity deletion failed:", error);
+          res.status(502).json({ error: "Could not delete the sign-in account. Please try again." });
+          return;
+        } finally {
+          clearTimeout(timeout);
+        }
+        if (!clerkResponse.ok && clerkResponse.status !== 404) {
+          console.error(`[account-delete] Clerk identity deletion returned ${clerkResponse.status}.`);
+          res.status(502).json({ error: "Could not delete the sign-in account. Please try again." });
+          return;
+        }
+      }
+
       await db.transaction(async (tx) => {
         // 1. Collect all business IDs owned by this user.
         const userBizRows = await tx

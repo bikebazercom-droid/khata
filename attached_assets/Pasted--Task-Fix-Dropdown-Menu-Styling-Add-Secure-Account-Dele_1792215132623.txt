@@ -1,0 +1,34 @@
+### Task: Fix Dropdown Menu Styling & Add Secure Account Deletion Modal in Details Page
+
+Please update the top-right three-dot menu dropdown and the account deletion flow in the `/dashboard` details sidebar/page.
+
+#### 1. Fix Three-Dot Dropdown Styling & Theme Matching
+- Current issue: The dropdown menu has a stark white background and elements like "Log out" look washed out / unreadable on hover and touch.
+- Styling requirements:
+  - Match the overall BanglaKhata theme (Dark Navy / Clean Glassmorphism).
+  - Background: Use deep slate/navy (e.g., `#0F172A` or `#1E293B`) or a clean layered card with border `#334155`.
+  - Text & Icons: White/Off-white (`#F8FAFC`) with subtle gray subtitles (`#94A3B8`).
+  - Hover / Active states:
+    - Normal items (Language, Status): subtle background change on hover (`hover:bg-slate-800/60`).
+    - "Log out" item: clearly visible icon and text (`text-slate-200 hover:text-white hover:bg-slate-800`), not faded.
+    - "Delete account" item: distinct red accent (`text-rose-500 hover:bg-rose-500/10 hover:text-rose-400`).
+  - Ensure touch targets and hover states do not glitch or flash white on mobile touch or mouse hover.
+
+#### 2. Implement Confirmation Verification Modal for "Delete Account"
+When the user clicks "Delete account", do NOT delete immediately. Open a secure Confirmation Modal with the following logic:
+
+- **Modal UI:**
+  - Header: Warning icon with title "Delete Account Permanently" (অ্যাকাউন্ট স্থায়ীভাবে মুছে ফেলুন).
+  - Warning Text: "This action cannot be undone. All your khata ledger data, customers, and transactions will be permanently deleted."
+  - Verification Input:
+    - Display the user's current identity (e.g., current email: `{user.primaryEmailAddress}` or phone).
+    - Prompt: "To confirm, please enter your email/phone (`bickworld555@gmail.com`) or type the word `DELETE`".
+    - Text field where user must type the exact match.
+  - Action Buttons:
+    - `Cancel`: Closes modal and resets input.
+    - `Confirm Delete`: Disabled by default until the entered value matches the required confirmation string.
+- **Deletion Execution:**
+  - Once verified and confirmed:
+    1. Call the backend API / Clerk `user.delete()` method to permanently delete the user account.
+    2. Clear local storage / session tokens.
+    3. Redirect to the sign-in / landing page with a toast message: "Account deleted successfully".

@@ -1,6 +1,6 @@
 import express, { type NextFunction, type Request, type Response } from "express";
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { appUserLoginSessionsTable, appUsersTable, businessesTable, db, userBusinessesTable } from "@workspace/db";
 import { type AuthenticatedRequest } from "../middlewares/requireAuth";
@@ -45,10 +45,10 @@ describe("account deletion and client sign-out", () => {
 
   it("leaves no replacement user, business, or sign-in session after deletion", async () => {
     const [business] = await db.insert(businessesTable).values({ name: "Delete account regression" }).returning();
-    const clerkUserId = `delete-regression-${crypto.randomUUID()}`;
+    const phone = `+88017${Math.floor(Math.random() * 1_000_000_000).toString().padStart(9, "0")}`;
     const [user] = await db.insert(appUsersTable).values({
       businessId: business!.id,
-      clerkUserId,
+      phone,
       role: "owner",
     }).returning();
     await db.insert(userBusinessesTable).values({
@@ -61,19 +61,130 @@ describe("account deletion and client sign-out", () => {
     });
 
     const app = express();
+    app.use(express.json());
     app.use((req: Request, _res: Response, next: NextFunction) => {
       (req as AuthenticatedRequest).userId = user!.id;
       next();
     });
     app.use(userRouter);
 
-    const response = await request(app).delete("/user/account");
+    const response = await request(app).delete("/user/account").send({ confirmation: "DELETE" });
     expect(response.status).toBe(200);
-    // Clerk signOut is performed client-side after this response. No authenticated
-    // application API request (including logout-event) may run between the two.
-    expect(await db.select().from(appUsersTable).where(eq(appUsersTable.clerkUserId, clerkUserId))).toEqual([]);
+    expect(await db.select().from(appUsersTable).where(eq(appUsersTable.id, user!.id))).toEqual([]);
     expect(await db.select().from(businessesTable).where(eq(businessesTable.id, business!.id))).toEqual([]);
     expect(await db.select().from(appUserLoginSessionsTable).where(eq(appUserLoginSessionsTable.userId, user!.id))).toEqual([]);
+  });
+
+  it("requires an exact account identity or DELETE before removing any records", async () => {
+    const [business] = await db.insert(businessesTable).values({ name: "Delete confirmation regression" }).returning();
+    const [user] = await db.insert(appUsersTable).values({
+      businessId: business!.id,
+      phone: "+8801712345678",
+      role: "owner",
+    }).returning();
+
+    const app = express();
+    app.use(express.json());
+    app.use((req: Request, _res: Response, next: NextFunction) => {
+      (req as AuthenticatedRequest).userId = user!.id;
+      next();
+    });
+    app.use(userRouter);
+
+    try {
+      const mismatch = await request(app).delete("/user/account").send({ confirmation: "wrong" });
+      expect(mismatch.status).toBe(400);
+      expect(await db.select().from(appUsersTable).where(eq(appUsersTable.id, user!.id))).toHaveLength(1);
+
+      const identityMatch = await request(app).delete("/user/account").send({ confirmation: "+8801712345678" });
+      expect(identityMatch.status).toBe(200);
+      expect(await db.select().from(appUsersTable).where(eq(appUsersTable.id, user!.id))).toEqual([]);
+    } finally {
+      await db.delete(userBusinessesTable).where(eq(userBusinessesTable.userId, user!.id));
+      await db.delete(appUsersTable).where(eq(appUsersTable.id, user!.id));
+      await db.delete(businessesTable).where(eq(businessesTable.id, business!.id));
+    }
+  });
+
+  it("keeps account records intact when Clerk cannot delete the sign-in identity", async () => {
+    const [business] = await db.insert(businessesTable).values({ name: "Clerk delete failure regression" }).returning();
+    const clerkUserId = `delete-clerk-${crypto.randomUUID()}`;
+    const [user] = await db.insert(appUsersTable).values({
+      businessId: business!.id,
+      clerkUserId,
+      verifiedEmail: "delete-owner@example.test",
+      role: "owner",
+    }).returning();
+
+    const app = express();
+    app.use(express.json());
+    app.use((req: Request, _res: Response, next: NextFunction) => {
+      (req as AuthenticatedRequest).userId = user!.id;
+      next();
+    });
+    app.use(userRouter);
+
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 503 }));
+    vi.stubEnv("CLERK_SECRET_KEY", "test-secret");
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const response = await request(app).delete("/user/account").send({ confirmation: "DELETE" });
+      expect(response.status).toBe(502);
+      expect(fetchMock).toHaveBeenCalledWith(
+        `https://api.clerk.com/v1/users/${encodeURIComponent(clerkUserId)}`,
+        expect.objectContaining({ method: "DELETE" }),
+      );
+      expect(await db.select().from(appUsersTable).where(eq(appUsersTable.id, user!.id))).toHaveLength(1);
+      expect(await db.select().from(businessesTable).where(eq(businessesTable.id, business!.id))).toHaveLength(1);
+    } finally {
+      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
+      await db.delete(appUsersTable).where(eq(appUsersTable.id, user!.id));
+      await db.delete(businessesTable).where(eq(businessesTable.id, business!.id));
+    }
+  });
+
+  it("deletes the Clerk identity and app data after a valid confirmation", async () => {
+    const [business] = await db.insert(businessesTable).values({ name: "Clerk account deletion regression" }).returning();
+    const clerkUserId = `delete-clerk-success-${crypto.randomUUID()}`;
+    const [user] = await db.insert(appUsersTable).values({
+      businessId: business!.id,
+      clerkUserId,
+      verifiedEmail: "delete-success@example.test",
+      role: "owner",
+    }).returning();
+    await db.insert(userBusinessesTable).values({
+      userId: user!.id,
+      businessId: business!.id,
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use((req: Request, _res: Response, next: NextFunction) => {
+      (req as AuthenticatedRequest).userId = user!.id;
+      next();
+    });
+    app.use(userRouter);
+
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubEnv("CLERK_SECRET_KEY", "test-secret");
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const response = await request(app).delete("/user/account").send({ confirmation: "delete-success@example.test" });
+      expect(response.status).toBe(200);
+      expect(fetchMock).toHaveBeenCalledWith(
+        `https://api.clerk.com/v1/users/${encodeURIComponent(clerkUserId)}`,
+        expect.objectContaining({ method: "DELETE" }),
+      );
+      expect(await db.select().from(appUsersTable).where(eq(appUsersTable.id, user!.id))).toEqual([]);
+      expect(await db.select().from(businessesTable).where(eq(businessesTable.id, business!.id))).toEqual([]);
+    } finally {
+      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
+      await db.delete(userBusinessesTable).where(eq(userBusinessesTable.userId, user!.id));
+      await db.delete(appUsersTable).where(eq(appUsersTable.id, user!.id));
+      await db.delete(businessesTable).where(eq(businessesTable.id, business!.id));
+    }
   });
 
   it("rejects account deletion for staff without removing their business", async () => {
