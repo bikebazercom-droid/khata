@@ -1,9 +1,10 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Building2, CalendarDays, Check, ChevronDown, Download, Eye, FileText, ImagePlus, Plus, ReceiptText, Share2, Trash2, UserRound } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useLanguage } from '@/lib/i18n';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
+import { saveInvoiceHistory, type InvoiceHistoryAction, type InvoiceHistoryRecord } from './invoice-history';
 
 type GoldLine = { id: number; description: string; gross: string; grossUnit: 'g' | 'vori'; purity: string; makingRate: string; makingAmount: string };
 type GoldData = {
@@ -39,6 +40,18 @@ const invoiceNumber = () => {
     return `GOLD-${today().replaceAll('-', '')}-${Date.now().toString().slice(-4)}`;
   }
 };
+function decodeGoldLink(): { data: GoldData; lines: GoldLine[] } | null {
+  if (typeof window === 'undefined') return null;
+  const match = window.location.hash.match(/^#goldinvoice=([A-Za-z0-9_-]+)$/);
+  if (!match || match[1].length > 60000) return null;
+  try {
+    const token = match[1].replace(/-/g, '+').replace(/_/g, '/');
+    const bytes = Uint8Array.from(atob(token + '='.repeat((4 - token.length % 4) % 4)), (c) => c.charCodeAt(0));
+    const parsed = JSON.parse(new TextDecoder().decode(bytes)) as { data?: GoldData; lines?: GoldLine[] };
+    if (!parsed.data || !Array.isArray(parsed.lines) || typeof parsed.data.number !== 'string' || typeof parsed.data.currency !== 'string') return null;
+    return { data: parsed.data, lines: parsed.lines.slice(0, 100).map((line, index) => ({ ...line, id: index + 1 })) };
+  } catch { return null; }
+}
 const localeFor = (lang: string) => lang === 'en' ? 'en-US' : 'bn-BD';
 const currencyOptions = (): CurrencyOption[] => {
   const fallback = 'AED AFN ALL AMD ANG AOA ARS AUD AWG AZN BAM BBD BDT BGN BHD BIF BMD BND BOB BRL BSD BTN BWP BYN BZD CAD CDF CHF CLP CNY COP CRC CZK DJF DKK DOP DZD EGP ETB EUR FJD GBP GEL GHS HKD HUF IDR ILS INR IQD IRR ISK JMD JOD JPY KES KRW KWD KZT LKR MAD MMK MNT MXN MYR NGN NOK NPR NZD OMR PEN PHP PKR PLN QAR RON RUB SAR SEK SGD THB TRY TWD TZS UAH UGX USD UYU VND XAF XOF ZAR ZMW'.split(' ');
@@ -103,17 +116,21 @@ function resizeStamp(file: File): Promise<string> {
   });
 }
 
-export function GoldInvoice() {
+export function GoldInvoice({ historyRecord, autoAction = 'open' }: { historyRecord?: InvoiceHistoryRecord; autoAction?: InvoiceHistoryAction }) {
   const { lang } = useLanguage();
   const en = lang === 'en';
   const printRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const shared = useMemo(decodeGoldLink, []);
   const [preview, setPreview] = useState(false);
   const [busy, setBusy] = useState(false);
   const [currencyOpen, setCurrencyOpen] = useState(false);
   const [currencySearch, setCurrencySearch] = useState('');
   const [stamp, setStamp] = useState(() => { try { return localStorage.getItem(stampKey()) || ''; } catch { return ''; } });
+  const restored = historyRecord?.type === 'Gold' ? historyRecord.payload as { data?: GoldData; lines?: GoldLine[] } : undefined;
   const [data, setData] = useState<GoldData>(() => {
+    if (restored?.data) return restored.data;
+    if (shared?.data) return shared.data;
     let profile: Record<string, string> = {};
     try { profile = JSON.parse(localStorage.getItem(profileKey()) || '{}') as Record<string, string>; } catch {}
     return {
@@ -123,7 +140,7 @@ export function GoldInvoice() {
       number: invoiceNumber(), date: today(), currency: 'AED', metalRate: '', place: '', payment: 'Cash Payment', pending: false, notes: '', discount: '0',
     };
   });
-  const [lines, setLines] = useState<GoldLine[]>([{ id: 1, description: '', gross: '', grossUnit: 'g', purity: '0.916', makingRate: '', makingAmount: '' }]);
+  const [lines, setLines] = useState<GoldLine[]>(restored?.lines ?? shared?.lines ?? [{ id: 1, description: '', gross: '', grossUnit: 'g', purity: '0.916', makingRate: '', makingAmount: '' }]);
   const [nextId, setNextId] = useState(2);
   const [profileEditing, setProfileEditing] = useState(false);
   const currencies = useMemo(currencyOptions, []);
@@ -185,6 +202,10 @@ export function GoldInvoice() {
       return `${chosenCurrency.symbol} ${number} ${chosenCurrency.code}`;
     } catch { return `${chosenCurrency.code} ${safeValue.toFixed(2)}`; }
   };
+  const persistHistory = () => {
+    saveInvoiceHistory({ type: 'Gold', number: data.number, date: data.date, customerName: data.customerName, customerPhone: data.customerPhone, total: calculations.total, currency: data.currency, itemCount: lines.length, payload: { data, lines } });
+    toast.success(en ? 'Invoice saved to history.' : 'ইনভয়েস ইতিহাসে সংরক্ষণ হয়েছে।');
+  };
   const number = (value: number, digits = 2) => new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number.isFinite(value) ? value : 0);
   const saveProfile = () => {
     try {
@@ -226,10 +247,19 @@ export function GoldInvoice() {
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
     }).from(printRef.current).outputPdf('blob') as Blob;
   };
+  const shareUrl = () => {
+    const bytes = new TextEncoder().encode(JSON.stringify({ data, lines }));
+    let binary = '';
+    for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+    const url = new URL(window.location.href);
+    url.hash = `goldinvoice=${btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')}`;
+    return url.toString();
+  };
   const fileName = `Gold_Invoice_${data.number.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
   const downloadPdf = async () => {
     setBusy(true);
     try {
+      persistHistory();
       const blob = await createPdf();
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
@@ -242,21 +272,29 @@ export function GoldInvoice() {
     setBusy(true);
     try {
       const blob = await createPdf();
+      persistHistory();
       const text = `${labels.title} ${data.number} · ${labels.total}: ${money(calculations.total)}`;
-      const native = await shareGeneratedFileWithNative(blob, { fileName, mimeType: 'application/pdf', title: `${labels.title} ${data.number}`, shareText: text });
+      const link = shareUrl();
+      const native = await shareGeneratedFileWithNative(blob, { fileName, mimeType: 'application/pdf', title: `${labels.title} ${data.number}`, shareText: `${text}\n${link}` });
       if (native) return;
       const file = new File([blob], fileName, { type: 'application/pdf' });
       if (typeof navigator.share === 'function' && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: `${labels.title} ${data.number}`, text });
+        await navigator.share({ files: [file], title: `${labels.title} ${data.number}`, text, url: link });
       } else if (typeof navigator.share === 'function') {
-        await navigator.share({ title: `${labels.title} ${data.number}`, text, url: data.locationUrl || window.location.href });
+        await navigator.share({ title: `${labels.title} ${data.number}`, text, url: link });
       } else if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(data.locationUrl || window.location.href);
-        toast.success(en ? 'Shop link copied.' : 'দোকানের লিংক কপি হয়েছে।');
+        await navigator.clipboard.writeText(link);
+        toast.success(en ? 'Invoice link copied.' : 'ইনভয়েস লিংক কপি হয়েছে।');
       } else toast.info(labels.shareError);
     } catch (error) { if ((error as DOMException)?.name !== 'AbortError') toast.error(labels.shareError); }
     finally { setBusy(false); }
   };
+  useEffect(() => {
+    if (autoAction === 'download') void downloadPdf();
+    else if (autoAction === 'share') void shareInvoice();
+  // A history action is consumed once when its invoice editor mounts.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const sectionTitle = (Icon: typeof Building2, eyebrow: string, title: string) => (
     <div className="mb-4 flex items-center gap-3">
@@ -340,6 +378,7 @@ export function GoldInvoice() {
       <header className="z-10 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#e7e2d5] bg-white px-4 py-3.5 md:px-6">
         <div className="flex min-w-0 items-center gap-3"><span className="hidden h-10 w-10 items-center justify-center rounded-xl bg-[#f7f0dc] text-[#9b751b] sm:flex"><ReceiptText className="h-5 w-5" /></span><div><h2 className="truncate text-[17px] font-bold tracking-tight text-[#1b2f4d]">{labels.title}</h2><p className="hidden text-xs text-[#77869a] sm:block">{labels.subtitle}</p></div></div>
         <div className="flex items-center gap-2">
+          <button type="button" aria-label={en ? 'Save invoice' : 'ইনভয়েস সংরক্ষণ'} data-testid="button-gold-save-history" onClick={persistHistory} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#ded8c9] bg-white px-3 text-[13px] font-bold text-[#53627a]"><FileText className="h-4 w-4" /><span className="hidden sm:inline">{en ? 'Save invoice' : 'ইনভয়েস সংরক্ষণ'}</span></button>
           <button type="button" data-testid="button-gold-mobile-view" onClick={() => setPreview(!preview)} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#dce4ee] bg-white px-3 text-[13px] font-semibold text-[#3d526f] lg:hidden">{preview ? <FileText className="h-4 w-4" /> : <Eye className="h-4 w-4" />}{preview ? labels.edit : labels.preview}</button>
           <button type="button" data-testid="button-gold-share" disabled={busy} onClick={() => void shareInvoice()} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#ded8c9] bg-white px-3 text-[13px] font-bold text-[#53627a] transition hover:bg-[#faf7ef] disabled:opacity-60"><Share2 className="h-4 w-4" /><span className="hidden sm:inline">{labels.share}</span></button>
           <button type="button" data-testid="button-gold-download" disabled={busy} onClick={() => void downloadPdf()} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#1b365b] px-3.5 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#142b49] disabled:opacity-60 sm:px-4"><Download className="h-4 w-4" /><span className="hidden sm:inline">{busy ? (en ? 'Preparing…' : 'তৈরি হচ্ছে…') : labels.download}</span></button>

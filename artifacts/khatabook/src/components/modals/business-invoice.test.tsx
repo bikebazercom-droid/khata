@@ -174,4 +174,13 @@ describe('business invoice', () => {
     fireEvent.click(screen.getByTestId('button-invoice-mobile-view'));
     expect(screen.getAllByText('New Shop')).toHaveLength(2);
   });
+
+  it('saves an invoice into searchable history', () => {
+    render(<BusinessInvoice />);
+    fireEvent.change(screen.getByTestId('input-invoice-customer'), { target: { value: 'History Customer' } });
+    fireEvent.click(screen.getByTestId('button-invoice-save-history'));
+    const history = JSON.parse(localStorage.getItem('banglakhata_invoice_history_v1:default') || '[]');
+    expect(history[0]).toMatchObject({ type: 'Business', customerName: 'History Customer', currency: 'BDT', itemCount: 1 });
+    expect(history[0].payload.invoiceData.number).toMatch(/^INV-/);
+  });
 });

@@ -50,4 +50,14 @@ describe('gold invoice', () => {
     expect(screen.queryByTestId('input-gold-gross-2')).not.toBeInTheDocument();
     expect(screen.getByTestId('button-gold-remove-1')).toBeDisabled();
   });
+
+  it('saves gold invoices with the full calculation payload', () => {
+    render(<GoldInvoice />);
+    fireEvent.change(screen.getByTestId('input-gold-customerName'), { target: { value: 'Gold Customer' } });
+    fireEvent.click(screen.getByTestId('button-gold-save-history'));
+    const history = JSON.parse(localStorage.getItem('banglakhata_invoice_history_v1:default') || '[]');
+    expect(history[0]).toMatchObject({ type: 'Gold', customerName: 'Gold Customer', currency: 'AED', itemCount: 1 });
+    expect(history[0].payload.data.number).toMatch(/^GOLD-/);
+    expect(history[0].payload.lines[0].grossUnit).toBe('g');
+  });
 });

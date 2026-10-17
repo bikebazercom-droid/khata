@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Building2, CalendarDays, Check, ChevronDown, Download, Eye, FileText, ImagePlus, PencilLine, Plus, ReceiptText, Save, Share2, Trash2, UserRound, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -6,6 +6,7 @@ import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useLanguage } from '@/lib/i18n';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
+import { saveInvoiceHistory, type InvoiceHistoryAction, type InvoiceHistoryRecord } from './invoice-history';
 
 type InvoiceLine = { id: number; description: string; amount: string; taxed: boolean };
 type CustomerDocumentType = 'nid' | 'passport' | 'civil_id' | 'trade_license' | 'other';
@@ -215,7 +216,7 @@ const money = (value: number, currency: string, lang: string) => {
 const dateLabel = (value: string, lang: string) =>
   value ? new Date(`${value}T12:00:00`).toLocaleDateString(localeForLanguage(lang)) : '—';
 
-export function BusinessInvoice() {
+export function BusinessInvoice({ historyRecord, autoAction = 'open' }: { historyRecord?: InvoiceHistoryRecord; autoAction?: InvoiceHistoryAction }) {
   const { lang } = useLanguage();
   const en = lang === 'en';
   const printRef = useRef<HTMLDivElement>(null);
@@ -224,10 +225,11 @@ export function BusinessInvoice() {
   const [busy, setBusy] = useState(false);
   const [currencyPopoverOpen, setCurrencyPopoverOpen] = useState(false);
   const sharedInvoice = useMemo(decodeInvoiceFromLink, []);
+  const restored = historyRecord?.type === 'Business' ? historyRecord.payload as { invoiceData?: InvoiceData; lines?: InvoiceLine[] } : undefined;
   const savedProfile = useMemo(loadBusinessProfile, []);
   const [businessProfile, setBusinessProfile] = useState(savedProfile);
   const [editingProfile, setEditingProfile] = useState(() => !savedProfile);
-  const [invoiceData, setInvoiceData] = useState<InvoiceData>(() => sharedInvoice?.invoiceData ?? ({
+  const [invoiceData, setInvoiceData] = useState<InvoiceData>(() => sharedInvoice?.invoiceData ?? restored?.invoiceData ?? ({
     company: '', address: '', phone: '', website: '', logo: '',
     email: '', trn: '', locationUrl: '',
     customer: '', customerAddress: '', customerPhone: '', customerIdType: 'nid', customerIdNumber: '',
@@ -235,7 +237,7 @@ export function BusinessInvoice() {
     paymentTerms: 'Cash', metalRate: '', placeOfSupply: '',
     ...savedProfile,
   }));
-  const [lines, setLines] = useState<InvoiceLine[]>(() => sharedInvoice?.lines ?? [{ id: 1, description: '', amount: '', taxed: false }]);
+  const [lines, setLines] = useState<InvoiceLine[]>(() => sharedInvoice?.lines ?? restored?.lines ?? [{ id: 1, description: '', amount: '', taxed: false }]);
   const [nextId, setNextId] = useState(() => Math.max(1, ...(sharedInvoice?.lines ?? []).map((line) => line.id)) + 1);
   const totals = useMemo(() => {
     const subtotal = lines.reduce((sum, item) => sum + Math.max(0, Number(item.amount) || 0), 0);
@@ -348,6 +350,10 @@ export function BusinessInvoice() {
   );
   const itemAmount = (value: string) => Number(value) || 0;
   const filename = `Invoice_${current.number.replace(/[^a-zA-Z0-9_-]/g, '_') || 'download'}.pdf`;
+  const persistHistory = () => {
+    saveInvoiceHistory({ type: 'Business', number: current.number, date: current.date, customerName: current.customer, customerPhone: current.customerPhone, total: totals.total, currency: current.currency, itemCount: lines.length, payload: { invoiceData: current, lines } });
+    toast.success(en ? 'Invoice saved to history.' : 'ইনভয়েস ইতিহাসে সংরক্ষণ হয়েছে।');
+  };
   const shareUrl = () => {
     const url = new URL(window.location.href);
     url.hash = `invoice=${encodeInvoiceForLink({ invoiceData: current, lines })}`;
@@ -427,6 +433,7 @@ export function BusinessInvoice() {
   async function downloadPdf() {
     setBusy(true);
     try {
+      persistHistory();
       const blob = await createPdf();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -443,6 +450,12 @@ export function BusinessInvoice() {
       setBusy(false);
     }
   }
+  useEffect(() => {
+    if (autoAction === 'download') void downloadPdf();
+    else if (autoAction === 'share') void shareInvoice();
+  // A history action is consumed once when its invoice editor mounts.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const sectionHeading = (Icon: typeof Building2, eyebrow: string, title: string) => (
     <div className="mb-4 flex items-center gap-3">
       <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#edf3fb] text-[#31578f]"><Icon className="h-[18px] w-[18px]" /></span>
@@ -457,6 +470,9 @@ export function BusinessInvoice() {
           <div className="min-w-0"><h2 className="truncate text-[17px] font-bold tracking-tight text-[#1b2f4d]">{labels.title}</h2><p className="hidden text-xs text-[#77869a] sm:block">{labels.subtitle}</p></div>
         </div>
         <div className="flex items-center gap-2">
+          <button type="button" aria-label={en ? 'Save invoice' : 'ইনভয়েস সংরক্ষণ'} data-testid="button-invoice-save-history" onClick={persistHistory} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#d8e1ed] bg-white px-3 text-[13px] font-bold text-[#365273]">
+            <Save className="h-4 w-4" /><span className="hidden sm:inline">{en ? 'Save invoice' : 'ইনভয়েস সংরক্ষণ'}</span>
+          </button>
           <button type="button" data-testid="button-invoice-mobile-view" onClick={() => setPreview((value) => !value)} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#dce4ee] bg-white px-3 text-[13px] font-semibold text-[#3d526f] transition hover:bg-[#f5f8fc] lg:hidden">
             {preview ? <PencilLine className="h-4 w-4" /> : <Eye className="h-4 w-4" />}{preview ? labels.edit : labels.preview}
           </button>
