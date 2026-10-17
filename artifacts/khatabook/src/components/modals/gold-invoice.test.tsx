@@ -27,8 +27,23 @@ describe('gold invoice', () => {
     expect(screen.getByTestId('text-gold-pure-1')).toHaveTextContent('10.684 g');
     expect(screen.getByTestId('text-gold-gross-total')).toHaveTextContent('11.664 g');
     expect(screen.getByTestId('text-gold-line-total-1')).toHaveTextContent('AED');
-    expect(screen.getByTestId('text-gold-line-total-1')).toHaveTextContent('1,185.04');
-    expect(screen.getAllByTestId('text-gold-total')[0]).toHaveTextContent('1,244.29');
+    expect(screen.getByTestId('text-gold-line-total-1')).toHaveTextContent('1,283.04');
+    expect(screen.getAllByTestId('text-gold-total')[0]).toHaveTextContent('1,347.19');
+  });
+
+  it('values gold by gross weight and applies the editable VAT rate', () => {
+    render(<GoldInvoice />);
+    fireEvent.change(screen.getByTestId('input-gold-gross-1'), { target: { value: '99.71' } });
+    fireEvent.change(screen.getByTestId('input-gold-metal-rate'), { target: { value: '447' } });
+
+    expect(screen.getByTestId('text-gold-pure-1')).toHaveTextContent('91.334 g');
+    expect(screen.getByTestId('text-gold-line-total-1')).toHaveTextContent('44,570.37');
+    expect(screen.getByTestId('input-gold-vat-rate')).toHaveValue(5);
+    expect(screen.getByTestId('text-gold-total')).toHaveTextContent('46,798.89');
+    expect(screen.getByText(/Gold value \(99\.71g gross ×/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('input-gold-vat-rate'), { target: { value: '10' } });
+    expect(screen.getByTestId('text-gold-total')).toHaveTextContent('49,027.41');
   });
 
   it('searches currency by country alias and updates currency labels', () => {

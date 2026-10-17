@@ -11,7 +11,7 @@ type GoldData = {
   company: string; address: string; phone: string; email: string; trn: string; logo: string; locationUrl: string;
   customerName: string; customerPhone: string; customerEmail: string; customerId: string; customerAddress: string;
   nationality: string; country: string; number: string; date: string; currency: string; metalRate: string;
-  place: string; payment: string; pending: boolean; notes: string; discount: string;
+  place: string; payment: string; pending: boolean; notes: string; discount: string; vatRate: string;
 };
 type CurrencyOption = { code: string; name: string; symbol: string };
 
@@ -132,15 +132,15 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
   const [stamp, setStamp] = useState(() => { try { return localStorage.getItem(stampKey()) || ''; } catch { return ''; } });
   const restored = historyRecord?.type === 'Gold' ? historyRecord.payload as { data?: GoldData; lines?: GoldLine[] } : undefined;
   const [data, setData] = useState<GoldData>(() => {
-    if (restored?.data) return restored.data;
-    if (shared?.data) return shared.data;
+     if (restored?.data) return { ...restored.data, vatRate: restored.data.vatRate || '5' };
+     if (shared?.data) return { ...shared.data, vatRate: shared.data.vatRate || '5' };
     let profile: Record<string, string> = {};
     try { profile = JSON.parse(localStorage.getItem(profileKey()) || '{}') as Record<string, string>; } catch {}
     return {
       company: profile.company || '', address: profile.address || '', phone: profile.phone || '', email: profile.email || '',
       trn: profile.trn || '', logo: profile.logo || '', locationUrl: profile.locationUrl || '',
       customerName: '', customerPhone: '', customerEmail: '', customerId: '', customerAddress: '', nationality: '', country: '',
-      number: invoiceNumber(), date: today(), currency: 'AED', metalRate: '', place: '', payment: 'Cash Payment', pending: false, notes: '', discount: '0',
+       number: invoiceNumber(), date: today(), currency: 'AED', metalRate: '', place: '', payment: 'Cash Payment', pending: false, notes: '', discount: '0', vatRate: '5',
     };
   });
   const [lines, setLines] = useState<GoldLine[]>(restored?.lines ?? shared?.lines ?? [{ id: 1, description: '', gross: '', grossUnit: 'g', purity: '0.916', makingRate: '', makingAmount: '' }]);
@@ -176,7 +176,7 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
       const pure = round3(gross * purity);
       const makingRate = safeNumber(line.makingRate);
       const makingAmount = line.makingAmount.trim() ? safeNumber(line.makingAmount) : gross * makingRate;
-      const goldValue = pure * safeNumber(data.metalRate);
+      const goldValue = gross * safeNumber(data.metalRate);
       return { ...line, grossValue: gross, purityValue: purity, pure, makingRateValue: makingRate, makingAmountValue: makingAmount, goldValue, total: goldValue + makingAmount };
     });
     const gross = values.reduce((sum, line) => sum + line.grossValue, 0);
@@ -184,17 +184,17 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
     const gold = values.reduce((sum, line) => sum + line.goldValue, 0);
     const making = values.reduce((sum, line) => sum + line.makingAmountValue, 0);
     const beforeVat = gold + making;
-    const vat = beforeVat * 0.05;
+    const vat = beforeVat * (safeNumber(data.vatRate || '5') / 100);
     const discount = safeNumber(data.discount);
     return { values, gross, pure: round3(pure), gold, making, beforeVat, vat, discount, total: Math.max(0, beforeVat + vat - discount) };
-  }, [lines, data.metalRate, data.discount]);
+  }, [lines, data.metalRate, data.discount, data.vatRate]);
 
   const labels = en ? {
     title: 'Gold invoice', subtitle: 'Precise gold valuation. A formal customer copy, ready to print.',
     customer: 'Customer details', customerName: 'Name', phone: 'Phone', email: 'Email', id: 'Passport / ID No.', address: 'Address', nationality: 'Nationality', country: 'Country',
     items: 'Gold items', desc: 'Stock description', gross: 'Gross weight', grams: 'Grams', vori: 'Vori / Tola', purity: 'Purity', pure: 'Pure grams', makingRate: 'Making rate / g', makingAmount: 'Making amount', total: 'Line total',
     add: 'Add gold item', remove: 'Remove item', payment: 'Payment & summary', rate: 'Metal rate / gram', currency: 'Currency', date: 'Invoice date', place: 'Place of supply', method: 'Payment method',
-    pending: 'Payment pending', pendingHint: 'Mark if payment is not fully received', notes: 'Notes', discount: 'Round-off discount', goldValue: 'Gold value', making: 'Making total', beforeVat: 'Before VAT', vat: 'VAT (5%)', incl: 'Total including VAT', grossTotal: 'Total gross weight', pureTotal: 'Total pure weight',
+    pending: 'Payment pending', pendingHint: 'Mark if payment is not fully received', notes: 'Notes', discount: 'Round-off discount', goldValue: 'Gold value', making: 'Making total', beforeVat: 'Before VAT', vat: 'VAT', vatRate: 'VAT rate (%)', incl: 'Total including VAT', grossTotal: 'Total gross weight', pureTotal: 'Total pure weight',
     download: 'Download PDF', share: 'Share', shop: 'Shop profile', saveProfile: 'Save shop profile', editProfile: 'Edit shop profile', profileSaved: 'Using saved shop profile', uploadStamp: 'Upload company stamp', stampHint: 'PNG, JPG or WebP · max 5 MB · resized before saving', clearStamp: 'Remove stamp',
     details: 'Invoice details', party: 'Buyer', invoiceNo: 'Invoice No.', terms: 'Payment terms', words: 'Amount in words', mode: 'Payment mode', thank: 'Thank you for your business.', taxInvoice: 'TAX INVOICE', partyCopy: 'PARTY COPY', seller: 'From your shop', empty: 'Add your shop and customer details to complete the invoice.',
     currencySearch: 'Search currency name, symbol or ISO code', noCurrency: 'No matching currencies', downloadError: 'Could not prepare the invoice PDF.', shareError: 'Could not share the invoice.', pendingShort: 'Pending', cash: 'Cash Payment', bank: 'Bank Transfer', card: 'Card Payment', mobilePay: 'Mobile Payment',
@@ -203,11 +203,12 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
     customer: 'গ্রাহকের তথ্য', customerName: 'নাম', phone: 'ফোন', email: 'ইমেইল', id: 'পাসপোর্ট / আইডি নম্বর', address: 'ঠিকানা', nationality: 'জাতীয়তা', country: 'দেশ',
     items: 'স্বর্ণের আইটেম', desc: 'স্টকের বিবরণ', gross: 'মোট ওজন', grams: 'গ্রাম', vori: 'ভরি / তোলা', purity: 'বিশুদ্ধতা', pure: 'বিশুদ্ধ ওজন (গ্রাম)', makingRate: 'মেকিং রেট / গ্রাম', makingAmount: 'মেকিং চার্জ', total: 'লাইনের মোট',
     add: 'স্বর্ণের আইটেম যোগ করুন', remove: 'আইটেম সরান', payment: 'পেমেন্ট ও সারাংশ', rate: 'ধাতুর মূল্য / গ্রাম', currency: 'মুদ্রা', date: 'ইনভয়েসের তারিখ', place: 'সরবরাহের স্থান', method: 'পেমেন্ট পদ্ধতি',
-    pending: 'পেমেন্ট বাকি', pendingHint: 'সম্পূর্ণ টাকা না পেলে চালু করুন', notes: 'নোট', discount: 'রাউন্ড-অফ ছাড়', goldValue: 'স্বর্ণের মূল্য', making: 'মেকিং মোট', beforeVat: 'ভ্যাটের আগে', vat: 'ভ্যাট (৫%)', incl: 'ভ্যাটসহ মোট', grossTotal: 'মোট গ্রস ওজন', pureTotal: 'মোট বিশুদ্ধ ওজন',
+    pending: 'পেমেন্ট বাকি', pendingHint: 'সম্পূর্ণ টাকা না পেলে চালু করুন', notes: 'নোট', discount: 'রাউন্ড-অফ ছাড়', goldValue: 'স্বর্ণের মূল্য', making: 'মেকিং মোট', beforeVat: 'ভ্যাটের আগে', vat: 'ভ্যাট', vatRate: 'ভ্যাটের হার (%)', incl: 'ভ্যাটসহ মোট', grossTotal: 'মোট গ্রস ওজন', pureTotal: 'মোট বিশুদ্ধ ওজন',
     download: 'PDF ডাউনলোড', share: 'শেয়ার', shop: 'দোকানের প্রোফাইল', saveProfile: 'দোকানের প্রোফাইল সংরক্ষণ', editProfile: 'দোকানের প্রোফাইল সম্পাদনা', profileSaved: 'সংরক্ষিত দোকানের প্রোফাইল ব্যবহার হচ্ছে', uploadStamp: 'কোম্পানির সিল আপলোড', stampHint: 'PNG, JPG বা WebP · সর্বোচ্চ ৫ MB · সংরক্ষণের আগে ছোট করা হবে', clearStamp: 'সিল সরান',
     details: 'ইনভয়েসের তথ্য', party: 'ক্রেতা', invoiceNo: 'ইনভয়েস নম্বর', terms: 'পেমেন্টের শর্ত', words: 'কথায় পরিমাণ', mode: 'পেমেন্ট মোড', thank: 'আপনার ব্যবসার জন্য ধন্যবাদ।', taxInvoice: 'ট্যাক্স ইনভয়েস', partyCopy: 'পার্টি কপি', seller: 'আপনার দোকান থেকে', empty: 'ইনভয়েস সম্পূর্ণ করতে দোকান ও গ্রাহকের তথ্য দিন।',
     currencySearch: 'মুদ্রার নাম, প্রতীক বা ISO কোড খুঁজুন', noCurrency: 'কোনো মুদ্রা মেলেনি', downloadError: 'ইনভয়েস PDF তৈরি করা যায়নি।', shareError: 'ইনভয়েস শেয়ার করা যায়নি।', pendingShort: 'বাকি', cash: 'নগদ পেমেন্ট', bank: 'ব্যাংক ট্রান্সফার', card: 'কার্ড পেমেন্ট', mobilePay: 'মোবাইল পেমেন্ট',
   };
+  const vatSummaryLabel = `${labels.vat} (${data.vatRate || '5'}%)`;
   const locale = localeFor(lang);
   const money = (value: number) => {
     const safeValue = Number.isFinite(value) ? value : 0;
@@ -369,7 +370,7 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
         </section>
         <div className="mt-3 flex justify-end">
           <div className="w-[310px] text-[8px]">
-            {[[`${labels.goldValue} @ ${number(safeNumber(data.metalRate), 2)}/g`, money(calculations.gold)], [labels.beforeVat, money(calculations.beforeVat)], [labels.vat, money(calculations.vat)], [labels.discount, `− ${money(calculations.discount)}`]].map(([label, value]) => <div key={label} className="flex justify-between border-b border-[#ece7db] px-2 py-1"><span>{label}</span><span>{value}</span></div>)}
+            {[[`${labels.goldValue} (${number(calculations.gross, 2)}g gross × ${number(safeNumber(data.metalRate), 2)}/g)`, money(calculations.gold)], [labels.beforeVat, money(calculations.beforeVat)], [vatSummaryLabel, money(calculations.vat)], [labels.discount, `− ${money(calculations.discount)}`]].map(([label, value]) => <div key={label} className="flex justify-between border-b border-[#ece7db] px-2 py-1"><span>{label}</span><span>{value}</span></div>)}
             <div className="flex justify-between bg-[#1b365b] px-2 py-2 text-[9px] font-extrabold text-white"><span>{labels.incl}</span><span data-testid="text-gold-total">{money(calculations.total)}</span></div>
           </div>
         </div>
@@ -457,7 +458,14 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
                   <div className="rounded-lg bg-white p-2.5"><p className="text-[9px] font-semibold text-[#8893a2]">{labels.grossTotal}</p><p data-testid="text-gold-gross-total" className="mt-1 text-[15px] font-bold text-[#243954]">{number(calculations.gross, 3)} <small className="text-[10px]">g</small></p></div>
                   <div className="rounded-lg bg-white p-2.5"><p className="text-[9px] font-semibold text-[#8893a2]">{labels.pureTotal}</p><p data-testid="text-gold-pure-total" className="mt-1 text-[15px] font-bold text-[#243954]">{number(calculations.pure, 3)} <small className="text-[10px]">g</small></p></div>
                 </div>
-                {[[`${labels.goldValue} · ${number(calculations.pure, 3)} g × ${chosenCurrency.symbol}${number(safeNumber(data.metalRate), 2)}/g`, calculations.gold], [labels.making, calculations.making], [labels.beforeVat, calculations.beforeVat], [labels.vat, calculations.vat], [labels.discount, -calculations.discount]].map(([label, value]) => <div key={String(label)} className="flex justify-between gap-3 py-1 text-[10px] text-[#68778a]"><span>{label}</span><b className="shrink-0 text-[#3c4d65]">{money(Number(value))}</b></div>)}
+                {[[`${labels.goldValue} (${number(calculations.gross, 2)}g gross × ${chosenCurrency.symbol}${number(safeNumber(data.metalRate), 2)}/g)`, calculations.gold], [labels.making, calculations.making], [labels.beforeVat, calculations.beforeVat], [labels.discount, -calculations.discount]].map(([label, value]) => <div key={String(label)} className="flex justify-between gap-3 py-1 text-[10px] text-[#68778a]"><span>{label}</span><b className="shrink-0 text-[#3c4d65]">{money(Number(value))}</b></div>)}
+                <div className="flex items-center justify-between gap-3 border-t border-[#e7e2d5] py-1.5 text-[10px] text-[#68778a]">
+                  <label htmlFor="input-gold-vat-rate" className="shrink-0">{labels.vatRate}</label>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="inline-flex shrink-0 items-center gap-1"><span className="w-16">{numericInput('input-gold-vat-rate', data.vatRate || '5', (value) => set('vatRate', value), '5', '0.01')}</span>%</span>
+                    <b data-testid="text-gold-vat" className="shrink-0 text-[#3c4d65]">{money(calculations.vat)}</b>
+                  </div>
+                </div>
                 <div className="mt-2 flex items-center justify-between rounded-lg bg-[#1b365b] px-3 py-2.5 text-[12px] font-bold text-white"><span>{labels.incl}</span><span data-testid="text-gold-total">{money(calculations.total)}</span></div>
                 <p className="mt-2 text-[9px] leading-relaxed text-[#7e8793]">{labels.words}: <span data-testid="text-gold-amount-words" className="font-semibold text-[#485a72]">{numberToWords(calculations.total, lang)} {chosenCurrency.name}</span></p>
               </div>
