@@ -1,8 +1,39 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { BusinessInvoice } from './business-invoice';
 
+const pdfCapture = vi.hoisted(() => ({
+  options: null as null | Record<string, unknown>,
+  elementId: '',
+  width: '',
+  padding: '',
+  boxSizing: '',
+  overflow: '',
+}));
+
 vi.mock('@/lib/i18n', () => ({ useLanguage: () => ({ lang: 'en' }) }));
+vi.mock('html2pdf.js', () => ({
+  default: () => {
+    const worker = {
+      set(options: Record<string, unknown>) {
+        pdfCapture.options = options;
+        return worker;
+      },
+      from(element: HTMLElement) {
+        pdfCapture.elementId = element.id;
+        pdfCapture.width = element.style.width;
+        pdfCapture.padding = element.style.padding;
+        pdfCapture.boxSizing = element.style.boxSizing;
+        pdfCapture.overflow = element.style.overflow;
+        return worker;
+      },
+      async outputPdf() {
+        return new Blob(['pdf'], { type: 'application/pdf' });
+      },
+    };
+    return worker;
+  },
+}));
 
 describe('business invoice', () => {
   it('calculates tax only for taxable items and updates the preview total', () => {
@@ -47,5 +78,26 @@ describe('business invoice', () => {
     } finally {
       window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
     }
+  });
+
+  it('exports using the fixed A4-width container and zero-scroll canvas', async () => {
+    pdfCapture.options = null;
+    const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:invoice');
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    render(<BusinessInvoice />);
+    fireEvent.click(screen.getByTestId('button-invoice-download'));
+
+    await waitFor(() => expect(pdfCapture.options).not.toBeNull());
+    expect(pdfCapture.elementId).toBe('printable-invoice');
+    expect(pdfCapture.width).toBe('794px');
+    expect(pdfCapture.padding).toBe('32px');
+    expect(pdfCapture.boxSizing).toBe('border-box');
+    expect(pdfCapture.overflow).toBe('hidden');
+    const options = pdfCapture.options as Record<string, unknown> | null;
+    expect(options?.margin).toEqual([10, 10, 10, 10]);
+    expect(options?.html2canvas).toMatchObject({ windowWidth: 794, scrollX: 0, scrollY: 0, scale: 2 });
+
+    createObjectUrl.mockRestore();
+    click.mockRestore();
   });
 });

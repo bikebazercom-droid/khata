@@ -130,7 +130,7 @@ export function BusinessInvoice() {
     </label>
   );
   const itemAmount = (value: string) => Number(value) || 0;
-  const filename = `Invoice_${current.number.replace(/[^a-zA-Z0-9_-]/g, '_') || 'draft'}.pdf`;
+  const filename = `Invoice_${current.number.replace(/[^a-zA-Z0-9_-]/g, '_') || 'download'}.pdf`;
   const shareUrl = () => {
     const url = new URL(window.location.href);
     url.hash = `invoice=${encodeInvoiceForLink({ invoiceData: current, lines })}`;
@@ -161,10 +161,17 @@ export function BusinessInvoice() {
       await new Promise((resolve) => window.setTimeout(resolve, 80));
       const { default: html2pdf } = await import('html2pdf.js');
       const worker = html2pdf().set({
-        margin: 10,
+        margin: [10, 10, 10, 10],
         filename,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: 816 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: 794,
+          backgroundColor: '#ffffff',
+        },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       }).from(printRef.current);
       return await worker.outputPdf('blob') as Blob;
@@ -316,16 +323,29 @@ export function BusinessInvoice() {
           <div className="mx-auto mb-3 flex max-w-[816px] items-center justify-between px-1 text-[10px] font-bold uppercase tracking-[.15em] text-[#79899e]">
             <span>{labels.live}</span><span className="flex items-center gap-1.5 normal-case tracking-normal"><span className="h-1.5 w-1.5 rounded-full bg-[#58816b]" />{en ? 'Updates as you type' : 'লেখার সঙ্গে সঙ্গে আপডেট'}</span>
           </div>
-          <div ref={printRef} style={pdfMode ? { width: 816, maxWidth: 'none' } : undefined} className="invoice-print relative mx-auto min-h-[800px] w-full max-w-[816px] overflow-hidden border border-[#dce2ea] bg-white px-6 py-7 text-[12px] text-[#233752] shadow-[0_14px_42px_rgba(35,55,82,.12)] sm:px-10 sm:py-10">
+          <div
+            id="printable-invoice"
+            ref={printRef}
+            style={pdfMode ? {
+              width: '794px',
+              minWidth: '794px',
+              maxWidth: '794px',
+              padding: '32px',
+              boxSizing: 'border-box',
+              overflow: 'hidden',
+              wordBreak: 'break-word',
+            } : undefined}
+            className="invoice-print relative mx-auto min-h-[800px] w-full max-w-[794px] overflow-hidden border border-[#dce2ea] bg-white px-6 py-7 text-[12px] text-[#233752] shadow-[0_14px_42px_rgba(35,55,82,.12)] sm:px-10 sm:py-10"
+          >
             <div className="absolute inset-x-0 top-0 h-[7px] bg-[#33578a]" />
-            <div className="relative flex justify-between gap-5 border-b border-[#d7e0eb] pb-7 pt-1">
+            <div className="relative flex justify-between gap-5 border-b border-[#d7e0eb] pb-7 pt-1" style={{ wordBreak: 'break-word' }}>
               <div className="min-w-0">
                 {current.logo && <img src={current.logo} crossOrigin="anonymous" alt="" className="mb-3 max-h-14 max-w-36 object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
                 <p className="mb-1 text-[9px] font-bold uppercase tracking-[.19em] text-[#71829a]">{labels.companyBlock}</p>
                 <h1 className="break-words text-xl font-bold tracking-tight text-[#203a5c] sm:text-[25px]">{current.company || labels.company}</h1>
                 <p className="mt-2 whitespace-pre-line text-[11px] leading-[1.75] text-[#66778e]">{[current.address, current.phone, current.website].filter(Boolean).join('\n')}</p>
               </div>
-              <div className="shrink-0 pt-1 text-right">
+              <div className="min-w-0 shrink-0 pt-1 pr-5 text-right" style={{ wordBreak: 'break-word' }}>
                 <h2 className="text-[27px] font-bold tracking-[.12em] text-[#31578f] sm:text-[32px]">INVOICE</h2>
                 <p className="mt-1 text-[9px] font-semibold uppercase tracking-[.17em] text-[#8a98aa]">{current.number || '—'}</p>
               </div>
@@ -341,23 +361,23 @@ export function BusinessInvoice() {
                 <div><p className="text-[9px] font-bold uppercase tracking-[.12em] text-[#8492a5]">{labels.due}</p><p className="mt-1 font-semibold text-[#304866]">{dateLabel(current.due, lang)}</p></div>
               </div>
             </div>
-            <table className="mt-7 w-full border-collapse text-[10px]">
+            <table className="mt-7 w-full table-fixed border-collapse text-[10px]" style={{ wordBreak: 'break-word' }}>
               <thead><tr className="bg-[#1B3A6B] text-white">
-                <th className="px-3 py-2.5 text-left font-bold uppercase tracking-[.09em]">{labels.description}</th>
+                <th className="break-words px-3 py-2.5 text-left font-bold uppercase tracking-[.09em]">{labels.description}</th>
                 <th className="w-[74px] px-2 py-2.5 text-center font-bold uppercase tracking-[.05em]">{labels.taxed}</th>
                 <th className="w-[130px] px-3 py-2.5 text-right font-bold uppercase tracking-[.09em]">{labels.amount}</th>
               </tr></thead>
               <tbody>{lines.map((item, index) => <tr key={item.id} className={`border-b border-[#e3e8ef] ${index % 2 ? 'bg-[#fbfcfd]' : ''}`}>
-                <td className="min-h-9 px-3 py-3 font-medium text-[#344b68]">{item.description || '—'}</td>
+                <td className="break-words px-3 py-3 font-medium text-[#344b68]">{item.description || '—'}</td>
                 <td className="px-2 py-3 text-center text-[#476b9d]">{item.taxed ? <Check className="mx-auto h-3.5 w-3.5" /> : '—'}</td>
-                <td className="px-3 py-3 text-right tabular-nums text-[#344b68]">{money(itemAmount(item.amount), current.currency, lang)}</td>
+                <td className="break-words px-3 py-3 pr-5 text-right tabular-nums text-[#344b68]">{money(itemAmount(item.amount), current.currency, lang)}</td>
               </tr>)}</tbody>
             </table>
             <div className="ml-auto mt-5 w-full max-w-[260px] space-y-2 text-[10px]">
               <div className="flex justify-between text-[#718198]"><span>{labels.subtotal}</span><span className="tabular-nums text-[#3d526e]">{money(totals.subtotal, current.currency, lang)}</span></div>
               <div className="flex justify-between text-[#718198]"><span>{labels.taxable}</span><span className="tabular-nums text-[#3d526e]">{money(totals.taxable, current.currency, lang)}</span></div>
               <div className="flex justify-between text-[#718198]"><span>{labels.taxDue} ({Number(current.taxRate) || 0}%)</span><span className="tabular-nums text-[#3d526e]">{money(totals.tax, current.currency, lang)}</span></div>
-               <div className="mt-3 flex items-center justify-between border-t-2 border-[#33578a] pt-3 text-[12px] font-bold text-[#263f62]"><span>{labels.total}</span><span data-testid="text-invoice-total" className="text-[16px] tabular-nums">{money(totals.total, current.currency, lang)}</span></div>
+                <div className="mt-3 flex items-center justify-between gap-2 border-t-2 border-[#33578a] pt-3 pr-5 text-[12px] font-bold text-[#263f62]" style={{ wordBreak: 'break-word' }}><span>{labels.total}</span><span data-testid="text-invoice-total" className="min-w-0 text-right text-[16px] tabular-nums">{money(totals.total, current.currency, lang)}</span></div>
             </div>
             <div className="mt-7 border border-[#dbe3ed]">
               <div className="border-b border-[#dbe3ed] bg-[#f5f7fa] px-3 py-2 text-[9px] font-bold uppercase tracking-[.15em] text-[#536a89]">{labels.commentsBlock}</div>
