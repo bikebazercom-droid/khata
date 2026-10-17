@@ -1,17 +1,82 @@
 import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Building2, CalendarDays, Check, Download, Eye, FileText, Plus, ReceiptText, Share2, Trash2, UserRound, PencilLine } from 'lucide-react';
+import { Building2, CalendarDays, Check, Download, Eye, FileText, ImagePlus, PencilLine, Plus, ReceiptText, Save, Share2, Trash2, UserRound, X } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useLanguage } from '@/lib/i18n';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
 
 type InvoiceLine = { id: number; description: string; amount: string; taxed: boolean };
 type InvoiceData = {
   company: string; address: string; phone: string; website: string; logo: string;
+  email: string; trn: string; locationUrl: string;
   customer: string; customerAddress: string; customerPhone: string;
   number: string; date: string; due: string; currency: 'BDT' | 'USD'; taxRate: string; comments: string;
+  paymentTerms: string; metalRate: string; placeOfSupply: string;
 };
 
 type SharedInvoice = { invoiceData: InvoiceData; lines: InvoiceLine[] };
+type BusinessProfile = Pick<InvoiceData, 'company' | 'address' | 'phone' | 'website' | 'email' | 'trn' | 'locationUrl' | 'logo'>;
+const BUSINESS_PROFILE_KEY = 'banglakhata_business_invoice_profile_v1';
+
+function businessProfileStorageKey(): string {
+  if (typeof window === 'undefined') return `${BUSINESS_PROFILE_KEY}:default`;
+  return `${BUSINESS_PROFILE_KEY}:${window.localStorage.getItem('selected_business_id') || 'default'}`;
+}
+
+function loadBusinessProfile(): BusinessProfile | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const value: unknown = JSON.parse(window.localStorage.getItem(businessProfileStorageKey()) || 'null');
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const profile = value as Record<string, unknown>;
+    const fields: (keyof BusinessProfile)[] = ['company', 'address', 'phone', 'website', 'email', 'trn', 'locationUrl', 'logo'];
+    if (fields.some((field) => typeof profile[field] !== 'string')) return null;
+    return profile as BusinessProfile;
+  } catch {
+    return null;
+  }
+}
+
+function resizeLogoFile(file: File): Promise<string> {
+  if (!['image/png', 'image/jpeg'].includes(file.type)) {
+    return Promise.reject(new Error('Choose a PNG or JPG image.'));
+  }
+  if (file.size > 8 * 1024 * 1024) {
+    return Promise.reject(new Error('Logo image must be smaller than 8 MB.'));
+  }
+
+  return new Promise((resolve, reject) => {
+    const source = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 360;
+      canvas.height = 160;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        URL.revokeObjectURL(source);
+        reject(new Error('Could not process this logo image.'));
+        return;
+      }
+      const scale = Math.min(canvas.width / image.width, canvas.height / image.height);
+      const width = Math.round(image.width * scale);
+      const height = Math.round(image.height * scale);
+      context.drawImage(image, Math.round((canvas.width - width) / 2), Math.round((canvas.height - height) / 2), width, height);
+      try {
+        resolve(canvas.toDataURL(file.type, file.type === 'image/jpeg' ? 0.88 : undefined));
+      } catch (error) {
+        reject(error);
+      } finally {
+        URL.revokeObjectURL(source);
+      }
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(source);
+      reject(new Error('Could not read this logo image.'));
+    };
+    image.src = source;
+  });
+}
 
 function decodeInvoiceFromLink(): SharedInvoice | null {
   if (typeof window === 'undefined') return null;
@@ -32,7 +97,15 @@ function decodeInvoiceFromLink(): SharedInvoice | null {
       'customerAddress', 'customerPhone', 'number', 'date', 'due', 'taxRate', 'comments',
     ];
     if (stringFields.some((field) => typeof data[field] !== 'string')) return null;
-    const invoiceData = data as InvoiceData;
+    const invoiceData = {
+      ...data,
+      email: typeof data.email === 'string' ? data.email : '',
+      trn: typeof data.trn === 'string' ? data.trn : '',
+      locationUrl: typeof data.locationUrl === 'string' ? data.locationUrl : '',
+      paymentTerms: typeof data.paymentTerms === 'string' ? data.paymentTerms : 'Cash',
+      metalRate: typeof data.metalRate === 'string' ? data.metalRate : '',
+      placeOfSupply: typeof data.placeOfSupply === 'string' ? data.placeOfSupply : '',
+    } as InvoiceData;
     const lines = parsed.lines.slice(0, 100).filter((line): line is InvoiceLine =>
       Boolean(line) &&
       typeof line === 'object' &&
@@ -83,10 +156,16 @@ export function BusinessInvoice() {
   const [pdfMode, setPdfMode] = useState(false);
   const [busy, setBusy] = useState(false);
   const sharedInvoice = useMemo(decodeInvoiceFromLink, []);
+  const savedProfile = useMemo(loadBusinessProfile, []);
+  const [businessProfile, setBusinessProfile] = useState(savedProfile);
+  const [editingProfile, setEditingProfile] = useState(() => !savedProfile);
   const [invoiceData, setInvoiceData] = useState<InvoiceData>(() => sharedInvoice?.invoiceData ?? ({
     company: '', address: '', phone: '', website: '', logo: '',
+    email: '', trn: '', locationUrl: '',
     customer: '', customerAddress: '', customerPhone: '',
     number: newInvoiceNumber(), date: today(), due: dueDate(), currency: 'BDT', taxRate: '0', comments: '',
+    paymentTerms: 'Cash', metalRate: '', placeOfSupply: '',
+    ...savedProfile,
   }));
   const [lines, setLines] = useState<InvoiceLine[]>(() => sharedInvoice?.lines ?? [{ id: 1, description: '', amount: '', taxed: false }]);
   const [nextId, setNextId] = useState(() => Math.max(1, ...(sharedInvoice?.lines ?? []).map((line) => line.id)) + 1);
@@ -98,29 +177,65 @@ export function BusinessInvoice() {
   }, [lines, invoiceData.taxRate]);
   const labels = en ? {
     title: 'Business invoice', subtitle: 'A clear, professional bill for your customer.',
-    company: 'Shop details', address: 'Business address', phone: 'Phone number', website: 'Website', logo: 'Logo image URL',
+    company: 'Shop details', address: 'Business address', phone: 'Phone number', website: 'Website', logo: 'Business logo',
+    email: 'Email address', trn: 'TRN / Tax registration number', locationUrl: 'Google Maps / business location URL',
     customer: 'Customer name', customerAddress: 'Customer address', customerPhone: 'Customer phone',
     number: 'Invoice number', date: 'Invoice date', due: 'Payment due date', currency: 'Currency', tax: 'Tax rate (%)',
+    paymentTerms: 'Payment terms', metalRate: 'Metal / unit rate', placeOfSupply: 'Place of supply',
     description: 'Item description', taxed: 'Taxable', amount: 'Amount', add: 'Add an item', comments: 'Notes or payment terms',
     edit: 'Edit details', preview: 'View invoice', download: 'Download PDF', share: 'Share',
     subtotal: 'Subtotal', taxable: 'Taxable amount', taxDue: 'Tax', total: 'Total due', thank: 'Thank you for your business.',
     companyBlock: 'From your shop', billTo: 'Bill to', commentsBlock: 'Notes', empty: 'Add your shop and customer details to complete the invoice.',
     shared: 'Invoice link copied. Paste it into WhatsApp or email.', shareError: 'Could not share the invoice.',
     setup: 'Invoice details', live: 'Live preview', item: 'Item', remove: 'Remove item', taxHint: 'Tax is calculated only on items marked taxable.',
+    profileSaved: 'Business Details Saved', editProfile: 'Edit Profile', saveProfile: 'Save Business Profile',
+    cancel: 'Cancel', uploadLogo: 'Upload a PNG or JPG logo', logoLimit: 'Logo is resized to fit the invoice header.',
+    taxInvoice: 'TAX INVOICE', partyCopy: 'PARTY COPY', scanToFind: 'Scan to find us',
   } : {
     title: 'বিজনেস ইনভয়েস', subtitle: 'গ্রাহকের জন্য পরিষ্কার ও পেশাদার বিল তৈরি করুন।',
-    company: 'দোকানের নাম', address: 'ব্যবসার ঠিকানা', phone: 'ফোন নম্বর', website: 'ওয়েবসাইট', logo: 'লোগো ছবির URL',
+    company: 'দোকানের নাম', address: 'ব্যবসার ঠিকানা', phone: 'ফোন নম্বর', website: 'ওয়েবসাইট', logo: 'দোকানের লোগো',
+    email: 'ইমেইল ঠিকানা', trn: 'টিআরএন / কর নিবন্ধন নম্বর', locationUrl: 'গুগল ম্যাপ / ব্যবসার অবস্থানের লিংক',
     customer: 'গ্রাহকের নাম', customerAddress: 'গ্রাহকের ঠিকানা', customerPhone: 'গ্রাহকের ফোন',
     number: 'ইনভয়েস নম্বর', date: 'ইনভয়েসের তারিখ', due: 'পরিশোধের শেষ তারিখ', currency: 'মুদ্রা', tax: 'কর হার (%)',
+    paymentTerms: 'পেমেন্টের শর্ত', metalRate: 'ধাতু / একক মূল্য', placeOfSupply: 'সরবরাহের স্থান',
     description: 'পণ্যের বিবরণ', taxed: 'করযোগ্য', amount: 'পরিমাণ', add: 'আইটেম যোগ করুন', comments: 'নোট বা পেমেন্টের শর্ত',
     edit: 'তথ্য সম্পাদনা', preview: 'ইনভয়েস দেখুন', download: 'PDF ডাউনলোড', share: 'শেয়ার',
     subtotal: 'সাবটোটাল', taxable: 'করযোগ্য পরিমাণ', taxDue: 'কর', total: 'মোট পাওনা', thank: 'আপনার ব্যবসার জন্য ধন্যবাদ।',
     companyBlock: 'আপনার দোকান থেকে', billTo: 'যার নামে বিল', commentsBlock: 'নোট', empty: 'ইনভয়েস সম্পূর্ণ করতে দোকান ও গ্রাহকের তথ্য দিন।',
     shared: 'ইনভয়েসের লিংক কপি হয়েছে। WhatsApp বা ইমেইলে পেস্ট করুন।', shareError: 'ইনভয়েস শেয়ার করা যায়নি।',
     setup: 'ইনভয়েসের তথ্য', live: 'প্রিভিউ', item: 'আইটেম', remove: 'আইটেম মুছুন', taxHint: 'শুধু করযোগ্য হিসেবে চিহ্নিত আইটেমে কর হিসাব হবে।',
+    profileSaved: 'ব্যবসার তথ্য সংরক্ষিত', editProfile: 'প্রোফাইল সম্পাদনা', saveProfile: 'ব্যবসার প্রোফাইল সংরক্ষণ',
+    cancel: 'বাতিল', uploadLogo: 'PNG বা JPG লোগো আপলোড করুন', logoLimit: 'লোগো ইনভয়েসের হেডারে মানানসই করে ছোট করা হবে।',
+    taxInvoice: 'ট্যাক্স ইনভয়েস', partyCopy: 'পার্টি কপি', scanToFind: 'খুঁজে পেতে স্ক্যান করুন',
   };
   const set = (key: keyof InvoiceData, value: string) => setInvoiceData((current) => ({ ...current, [key]: value }));
   const current = invoiceData;
+  const saveBusinessProfile = () => {
+    const profile: BusinessProfile = {
+      company: current.company, address: current.address, phone: current.phone, website: current.website,
+      email: current.email, trn: current.trn, locationUrl: current.locationUrl, logo: current.logo,
+    };
+    try {
+      window.localStorage.setItem(businessProfileStorageKey(), JSON.stringify(profile));
+      setBusinessProfile(profile);
+      setEditingProfile(false);
+      toast.success(en ? 'Business profile saved on this device.' : 'এই ডিভাইসে ব্যবসার প্রোফাইল সংরক্ষিত হয়েছে।');
+    } catch {
+      toast.error(en ? 'Could not save the business profile.' : 'ব্যবসার প্রোফাইল সংরক্ষণ করা যায়নি।');
+    }
+  };
+  const cancelProfileEdit = () => {
+    if (businessProfile) setInvoiceData((data) => ({ ...data, ...businessProfile }));
+    setEditingProfile(false);
+  };
+  const handleLogoUpload = async (file?: File) => {
+    if (!file) return;
+    try {
+      set('logo', await resizeLogoFile(file));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : (en ? 'Could not process logo.' : 'লোগো প্রসেস করা যায়নি।'));
+    }
+  };
   const inputClass = 'mt-1.5 min-h-11 w-full rounded-xl border border-[#d9e1ed] bg-white px-3.5 text-[14px] font-medium text-[#192c49] outline-none transition focus:border-[#31578f] focus:ring-4 focus:ring-[#31578f]/10 placeholder:text-[#9aa8ba]';
   const field = (key: keyof InvoiceData, label: string, type = 'text') => (
     <label className="block min-w-0 text-[12px] font-semibold tracking-[.01em] text-[#55657b]" key={key}>
@@ -260,11 +375,40 @@ export function BusinessInvoice() {
             </div>
             <section className="rounded-2xl border border-[#e2e8f0] bg-white p-4 shadow-[0_2px_10px_rgba(37,61,92,.035)] md:p-5">
               {sectionHeading(Building2, en ? '01 · Seller' : '০১ · বিক্রেতা', labels.companyBlock)}
-              <div className="grid gap-x-3.5 gap-y-3 sm:grid-cols-2">
-                {field('company', labels.company)}{field('phone', labels.phone)}
-                {field('address', labels.address)}{field('website', labels.website)}
-                <div className="sm:col-span-2">{field('logo', labels.logo)}</div>
-              </div>
+              {businessProfile && !editingProfile ? (
+                <div className="flex items-start gap-4 rounded-xl border border-[#dce6f1] bg-[#f7f9fc] p-4">
+                  {businessProfile.logo && <img src={businessProfile.logo} alt="" className="h-20 w-[180px] shrink-0 rounded-lg border border-slate-200 bg-white object-contain p-2" />}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-[#1b2f4d]">{businessProfile.company || labels.company}</p>
+                    <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-slate-600">{[businessProfile.address, businessProfile.phone, businessProfile.email, businessProfile.trn].filter(Boolean).join('\n')}</p>
+                    <p className="mt-2 text-xs font-semibold text-emerald-700">{labels.profileSaved}</p>
+                  </div>
+                  <button type="button" data-testid="button-invoice-edit-profile" onClick={() => setEditingProfile(true)} className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700">{labels.editProfile}</button>
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-x-3.5 gap-y-3 sm:grid-cols-2">
+                    {field('company', labels.company)}{field('phone', labels.phone)}
+                    <label className="block min-w-0 text-[12px] font-semibold text-[#55657b]">{labels.address}
+                      <textarea data-testid="input-invoice-address" value={current.address} onChange={(event) => set('address', event.target.value)} rows={3} className={`${inputClass} resize-y py-3`} />
+                    </label>
+                    {field('email', labels.email)}{field('trn', labels.trn)}
+                    {field('website', labels.website)}{field('locationUrl', labels.locationUrl)}
+                  </div>
+                  <div className="mt-3">
+                    <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[#a9bad0] bg-[#f8fafc] px-3.5 text-sm font-semibold text-[#31578f]">
+                      <ImagePlus className="h-4 w-4" />{labels.uploadLogo}
+                      <input data-testid="input-invoice-logo-upload" type="file" accept="image/png,image/jpeg" className="sr-only" onChange={(event) => { void handleLogoUpload(event.target.files?.[0]); event.currentTarget.value = ''; }} />
+                    </label>
+                    <p className="mt-1 text-[11px] text-slate-500">{labels.logoLimit}</p>
+                    {current.logo && <div className="mt-2 flex items-center gap-3"><img src={current.logo} alt={labels.logo} className="h-20 w-[180px] rounded-lg border border-slate-200 bg-white object-contain p-2" /><button type="button" aria-label={en ? 'Remove logo' : 'লোগো সরান'} onClick={() => set('logo', '')} className="rounded-lg p-2 text-rose-600 hover:bg-rose-50"><X className="h-4 w-4" /></button></div>}
+                  </div>
+                  <div className="mt-4 flex justify-end gap-2">
+                    {businessProfile && <button type="button" onClick={cancelProfileEdit} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700">{labels.cancel}</button>}
+                    <button type="button" data-testid="button-invoice-save-profile" onClick={saveBusinessProfile} className="inline-flex items-center gap-2 rounded-lg bg-[#1B3A6B] px-4 py-2 text-sm font-bold text-white"><Save className="h-4 w-4" />{labels.saveProfile}</button>
+                  </div>
+                </>
+              )}
             </section>
             <section className="rounded-2xl border border-[#e2e8f0] bg-white p-4 shadow-[0_2px_10px_rgba(37,61,92,.035)] md:p-5">
               {sectionHeading(UserRound, en ? '02 · Customer' : '০২ · গ্রাহক', labels.billTo)}
@@ -278,6 +422,9 @@ export function BusinessInvoice() {
               <div className="grid gap-x-3.5 gap-y-3 sm:grid-cols-2">
                 {field('number', labels.number)}{field('date', labels.date, 'date')}
                 {field('due', labels.due, 'date')}
+                {field('paymentTerms', labels.paymentTerms)}
+                {field('metalRate', labels.metalRate)}
+                {field('placeOfSupply', labels.placeOfSupply)}
                 <label className="block text-[12px] font-semibold text-[#55657b]">{labels.currency}
                   <select data-testid="select-invoice-currency" value={current.currency} onChange={(e) => set('currency', e.target.value)} className={inputClass}><option value="BDT">৳ BDT · Bangladeshi Taka</option><option value="USD">$ USD · US Dollar</option></select>
                 </label>
@@ -338,28 +485,43 @@ export function BusinessInvoice() {
             className="invoice-print relative mx-auto min-h-[800px] w-full max-w-[794px] overflow-hidden border border-[#dce2ea] bg-white px-6 py-7 text-[12px] text-[#233752] shadow-[0_14px_42px_rgba(35,55,82,.12)] sm:px-10 sm:py-10"
           >
             <div className="absolute inset-x-0 top-0 h-[7px] bg-[#33578a]" />
-            <div className="relative flex justify-between gap-5 border-b border-[#d7e0eb] pb-7 pt-1" style={{ wordBreak: 'break-word' }}>
+            <div className={`grid gap-4 border-b border-[#d7e0eb] pb-6 pt-1 ${pdfMode ? 'grid-cols-[1.1fr_.9fr_1.1fr]' : 'grid-cols-1 sm:grid-cols-3'}`} style={{ wordBreak: 'break-word' }}>
               <div className="min-w-0">
-                {current.logo && <img src={current.logo} crossOrigin="anonymous" alt="" className="mb-3 max-h-14 max-w-36 object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
-                <p className="mb-1 text-[9px] font-bold uppercase tracking-[.19em] text-[#71829a]">{labels.companyBlock}</p>
-                <h1 className="break-words text-xl font-bold tracking-tight text-[#203a5c] sm:text-[25px]">{current.company || labels.company}</h1>
-                <p className="mt-2 whitespace-pre-line text-[11px] leading-[1.75] text-[#66778e]">{[current.address, current.phone, current.website].filter(Boolean).join('\n')}</p>
+                {current.logo && <img src={current.logo} crossOrigin="anonymous" alt="" className="mb-3 h-20 w-[180px] rounded-lg object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
+                <h1 className="break-words text-xl font-bold text-[#203a5c]">{current.company || labels.company}</h1>
+                <p className="mt-2 whitespace-pre-line text-[10px] leading-[1.6] text-[#66778e]">{[current.address, current.phone, current.email, current.trn].filter(Boolean).join('\n')}</p>
               </div>
-              <div className="min-w-0 shrink-0 pt-1 pr-5 text-right" style={{ wordBreak: 'break-word' }}>
-                <h2 className="text-[27px] font-bold tracking-[.12em] text-[#31578f] sm:text-[32px]">INVOICE</h2>
-                <p className="mt-1 text-[9px] font-semibold uppercase tracking-[.17em] text-[#8a98aa]">{current.number || '—'}</p>
+              <div className="flex min-w-0 flex-col items-center text-center">
+                <p className="mb-1 font-serif text-[11px] text-[#b99b45]">بسم الله الرحمن الرحيم</p>
+                <div className="w-full rounded-lg bg-[#1B3A6B] px-2 py-2.5 text-center text-[13px] font-bold tracking-[.14em] text-white">
+                  <span className="text-[#d6b85f]">◆</span> {labels.taxInvoice} <span className="text-[#d6b85f]">◆</span>
+                </div>
+                {current.locationUrl && <QRCodeSVG value={current.locationUrl} size={88} level="M" includeMargin className="mt-2 border border-slate-200 bg-white p-1" />}
+                <p className="mt-1 text-[9px] text-slate-500">{current.locationUrl ? labels.scanToFind : ''}</p>
+              </div>
+              <div className="min-w-0 text-[10px]">
+                <p className="mb-2 text-right text-[10px] font-bold tracking-[.14em] text-[#1B3A6B]">{labels.partyCopy}</p>
+                {([
+                  [labels.number, current.number],
+                  [labels.date, dateLabel(current.date, lang)],
+                  [labels.paymentTerms, current.paymentTerms],
+                  [labels.metalRate, current.metalRate],
+                  [labels.placeOfSupply, current.placeOfSupply],
+                ] as const).map(([label, value]) => (
+                  <div key={label} className="grid grid-cols-[auto_minmax(0,1fr)] items-end gap-2 py-1">
+                    <span className="font-semibold text-[#304866]">{label}:</span>
+                    <span className="min-w-0 break-words border-b border-slate-300 px-1 pb-0.5 text-right text-[#304866]">{value || '—'}</span>
+                  </div>
+                ))}
               </div>
             </div>
-            <div className="mt-6 grid grid-cols-2 gap-4">
+            <div className="mt-5 grid grid-cols-2 gap-4">
               <div className="border-l-[3px] border-[#8da4c3] pl-3">
                 <p className="mb-2 bg-[#1B3A6B] px-2.5 py-1.5 text-[9px] font-bold uppercase tracking-[.16em] text-white">{labels.billTo}</p>
                 <p className="font-bold text-[#263e60]">{current.customer || '—'}</p>
                 <p className="mt-1 whitespace-pre-line text-[10px] leading-[1.7] text-[#6e7e93]">{[current.customerAddress, current.customerPhone].filter(Boolean).join('\n') || '—'}</p>
               </div>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-3 text-right">
-                <div><p className="text-[9px] font-bold uppercase tracking-[.12em] text-[#8492a5]">{labels.date}</p><p className="mt-1 font-semibold text-[#304866]">{dateLabel(current.date, lang)}</p></div>
-                <div><p className="text-[9px] font-bold uppercase tracking-[.12em] text-[#8492a5]">{labels.due}</p><p className="mt-1 font-semibold text-[#304866]">{dateLabel(current.due, lang)}</p></div>
-              </div>
+              <div className="min-w-0 self-end text-right text-[10px] text-[#6e7e93]">{labels.due}: {dateLabel(current.due, lang)}</div>
             </div>
             <table className="mt-7 w-full table-fixed border-collapse text-[10px]" style={{ wordBreak: 'break-word' }}>
               <thead><tr className="bg-[#1B3A6B] text-white">

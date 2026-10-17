@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { BusinessInvoice } from './business-invoice';
 
@@ -36,6 +36,11 @@ vi.mock('html2pdf.js', () => ({
 }));
 
 describe('business invoice', () => {
+  beforeEach(() => {
+    localStorage.removeItem('selected_business_id');
+    localStorage.removeItem('banglakhata_business_invoice_profile_v1:default');
+  });
+
   it('calculates tax only for taxable items and updates the preview total', () => {
     render(<BusinessInvoice />);
     fireEvent.change(screen.getByTestId('input-invoice-item-amount-1'), { target: { value: '100' } });
@@ -99,5 +104,22 @@ describe('business invoice', () => {
 
     createObjectUrl.mockRestore();
     click.mockRestore();
+  });
+
+  it('saves the business profile and reuses it on the next invoice', () => {
+    const first = render(<BusinessInvoice />);
+    fireEvent.change(screen.getByTestId('input-invoice-company'), { target: { value: 'New Shop' } });
+    fireEvent.change(screen.getByTestId('input-invoice-email'), { target: { value: 'shop@example.com' } });
+    fireEvent.click(screen.getByTestId('button-invoice-save-profile'));
+    expect(JSON.parse(localStorage.getItem('banglakhata_business_invoice_profile_v1:default') || '{}')).toMatchObject({
+      company: 'New Shop',
+      email: 'shop@example.com',
+    });
+    first.unmount();
+
+    render(<BusinessInvoice />);
+    expect(screen.getByText('Business Details Saved')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('button-invoice-mobile-view'));
+    expect(screen.getAllByText('New Shop')).toHaveLength(2);
   });
 });

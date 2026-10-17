@@ -1,0 +1,34 @@
+### Task: Implement Persistent Business Profile, Image Upload, QR Code, and Custom Header Layout
+
+Please update the Invoice Generator module to store business details permanently, allow direct PNG/JPG logo uploads, generate a location QR code, and align the invoice header to match the exact template provided in the screenshot.
+
+#### 1. One-Time Persistent Business Profile & Collapsible View
+- **Data Fields to Persist (`localStorage` or Database):**
+  - Business/Shop Name (e.g., Hazari Gold L.L.C)
+  - Business Address (multi-line)
+  - Phone Number
+  - Email Address
+  - TRN / Tax Registration Number
+  - Location URL (Google Maps link or Business link for QR generation)
+  - Logo Image (Data URL / File Upload)
+- **Form State Logic:**
+  - If profile exists: Hide the full form by default. Show a summary badge "Business Details Saved" with an "Edit Profile" toggle button.
+  - Automatically supply the saved shop profile to all new invoices without requiring manual re-entry.
+
+#### 2. Image Upload Component (PNG/JPG Support)
+- Replace simple URL input with a file dropzone / upload input:
+  - Supports PNG and JPG images.
+  - Automatically crops/resizes and renders a clean preview inside a fixed aspect-ratio container (e.g., 180x80px with rounded corners) matching the logo style.
+
+#### 3. Invoice Header Layout & QR Code Integration
+Update the top section of the printable invoice template to match the exact 3-column header layout:
+- **Left Column (Logo & Company Info):**
+  - Render uploaded Logo image on top.
+  - Bold Business Name (e.g., `Hazari Gold L.L.C`).
+  - Formatted Address, Phone, Email, and TRN fields below it.
+- **Middle Column (Tax Badge & Location QR):**
+  - Calligraphic Arabic header / "TAX INVOICE" dark navy badge with gold accents.
+  - Generate a dynamic QR Code using `qrcode.react` or `qrcode` package pointing to the saved business location link, with text underneath: `"Scan to find us"`.
+- **Right Column (Invoice Metadata):**
+  - "PARTY COPY" header.
+  - Clean underlines for `Invoice No:`, `Date:`, `Payment Terms:`, `Metal/Unit Rate:`, `Place of Supply:`.

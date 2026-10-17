@@ -90,6 +90,7 @@
     "html2pdf.js": "^0.14.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
+    "qrcode.react": "^4.2.0",
     "sharp": "^0.35.3"
   }
 }
