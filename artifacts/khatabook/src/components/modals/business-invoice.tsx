@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Building2, CalendarDays, Check, ChevronDown, Download, Eye, FileText, ImagePlus, PencilLine, Plus, ReceiptText, Save, Share2, Trash2, UserRound, X } from 'lucide-react';
+import { Building2, CalendarDays, Check, ChevronDown, Download, FileText, ImagePlus, Plus, ReceiptText, Save, Share2, Trash2, UserRound, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -220,7 +220,6 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
   const { lang } = useLanguage();
   const en = lang === 'en';
   const printRef = useRef<HTMLDivElement>(null);
-  const [preview, setPreview] = useState(viewOnly);
   const [readOnlyPreview, setReadOnlyPreview] = useState(viewOnly);
   const [pdfMode, setPdfMode] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -257,11 +256,11 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
     currencySearch: 'Search by country, symbol, or ISO code…', currencyNoResults: 'No currencies found.',
     paymentTerms: 'Payment terms', metalRate: 'Metal / unit rate', placeOfSupply: 'Place of supply',
     description: 'Item description', taxed: 'Taxable', amount: 'Amount', add: 'Add an item', comments: 'Notes or payment terms',
-    edit: 'Edit details', preview: 'View invoice', download: 'Download PDF', share: 'Share',
+    download: 'Download PDF', share: 'Share',
     subtotal: 'Subtotal', taxable: 'Taxable amount', taxDue: 'Tax', total: 'Total due', thank: 'Thank you for your business.',
     companyBlock: 'From your shop', billTo: 'Bill to', commentsBlock: 'Notes', empty: 'Add your shop and customer details to complete the invoice.',
     shared: 'Invoice link copied. Paste it into WhatsApp or email.', shareError: 'Could not share the invoice.',
-    setup: 'Invoice details', live: 'Live preview', item: 'Item', remove: 'Remove item', taxHint: 'Tax is calculated only on items marked taxable.',
+    setup: 'Invoice details', item: 'Item', remove: 'Remove item', taxHint: 'Tax is calculated only on items marked taxable.',
     profileSaved: 'Business Details Saved', editProfile: 'Edit Profile', saveProfile: 'Save Business Profile',
     cancel: 'Cancel', uploadLogo: 'Upload a PNG or JPG logo', logoLimit: 'Logo is resized to fit the invoice header.',
     taxInvoice: 'TAX INVOICE', partyCopy: 'PARTY COPY', scanToFind: 'Scan to find us',
@@ -276,11 +275,11 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
     currencySearch: 'দেশ, প্রতীক বা ISO কোড দিয়ে খুঁজুন…', currencyNoResults: 'কোনো মুদ্রা পাওয়া যায়নি।',
     paymentTerms: 'পেমেন্টের শর্ত', metalRate: 'ধাতু / একক মূল্য', placeOfSupply: 'সরবরাহের স্থান',
     description: 'পণ্যের বিবরণ', taxed: 'করযোগ্য', amount: 'পরিমাণ', add: 'আইটেম যোগ করুন', comments: 'নোট বা পেমেন্টের শর্ত',
-    edit: 'তথ্য সম্পাদনা', preview: 'ইনভয়েস দেখুন', download: 'PDF ডাউনলোড', share: 'শেয়ার',
+    download: 'PDF ডাউনলোড', share: 'শেয়ার',
     subtotal: 'সাবটোটাল', taxable: 'করযোগ্য পরিমাণ', taxDue: 'কর', total: 'মোট পাওনা', thank: 'আপনার ব্যবসার জন্য ধন্যবাদ।',
     companyBlock: 'আপনার দোকান থেকে', billTo: 'যার নামে বিল', commentsBlock: 'নোট', empty: 'ইনভয়েস সম্পূর্ণ করতে দোকান ও গ্রাহকের তথ্য দিন।',
     shared: 'ইনভয়েসের লিংক কপি হয়েছে। WhatsApp বা ইমেইলে পেস্ট করুন।', shareError: 'ইনভয়েস শেয়ার করা যায়নি।',
-    setup: 'ইনভয়েসের তথ্য', live: 'প্রিভিউ', item: 'আইটেম', remove: 'আইটেম মুছুন', taxHint: 'শুধু করযোগ্য হিসেবে চিহ্নিত আইটেমে কর হিসাব হবে।',
+    setup: 'ইনভয়েসের তথ্য', item: 'আইটেম', remove: 'আইটেম মুছুন', taxHint: 'শুধু করযোগ্য হিসেবে চিহ্নিত আইটেমে কর হিসাব হবে।',
     profileSaved: 'ব্যবসার তথ্য সংরক্ষিত', editProfile: 'প্রোফাইল সম্পাদনা', saveProfile: 'ব্যবসার প্রোফাইল সংরক্ষণ',
     cancel: 'বাতিল', uploadLogo: 'PNG বা JPG লোগো আপলোড করুন', logoLimit: 'লোগো ইনভয়েসের হেডারে মানানসই করে ছোট করা হবে।',
     taxInvoice: 'ট্যাক্স ইনভয়েস', partyCopy: 'পার্টি কপি', scanToFind: 'খুঁজে পেতে স্ক্যান করুন',
@@ -309,7 +308,6 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
   }), [locale]);
   useEffect(() => {
     setReadOnlyPreview(viewOnly);
-    if (viewOnly) setPreview(true);
   }, [viewOnly]);
   const selectedCurrency = currencyOptions.find((option) => option.code === current.currency);
   const customerDocumentOutputLabel: Record<CustomerDocumentType, string> = {
@@ -387,11 +385,10 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
     toast.success(labels.shared);
   };
   async function createPdf() {
-    if (!printRef.current) throw new Error('Invoice preview is not ready.');
-    setPreview(true);
     setPdfMode(true);
     try {
       await new Promise((resolve) => window.setTimeout(resolve, 80));
+      if (!printRef.current) throw new Error('Invoice preview is not ready.');
       const { default: html2pdf } = await import('html2pdf.js');
       const worker = html2pdf().set({
         margin: [10, 10, 10, 10],
@@ -480,13 +477,10 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
           <div className="min-w-0"><h2 className="truncate text-[17px] font-bold tracking-tight text-[#1b2f4d]">{labels.title}</h2><p className="hidden text-xs text-[#77869a] sm:block">{labels.subtitle}</p></div>
         </div>
         <div className="flex items-center gap-2">
-          {readOnlyPreview && <button type="button" data-testid="button-invoice-preview-edit" onClick={() => { setReadOnlyPreview(false); setPreview(false); }} className="inline-flex min-h-10 items-center rounded-xl border border-[#d8e1ed] bg-white px-3 text-[13px] font-bold text-[#365273]">{en ? 'Edit' : 'সম্পাদনা'}</button>}
+          {readOnlyPreview && <button type="button" data-testid="button-invoice-preview-edit" onClick={() => setReadOnlyPreview(false)} className="inline-flex min-h-10 items-center rounded-xl border border-[#d8e1ed] bg-white px-3 text-[13px] font-bold text-[#365273]">{en ? 'Edit' : 'সম্পাদনা'}</button>}
           <button type="button" aria-label={en ? 'Save invoice' : 'ইনভয়েস সংরক্ষণ'} data-testid="button-invoice-save-history" onClick={persistHistory} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#d8e1ed] bg-white px-3 text-[13px] font-bold text-[#365273]">
             <Save className="h-4 w-4" /><span className="hidden sm:inline">{en ? 'Save invoice' : 'ইনভয়েস সংরক্ষণ'}</span>
           </button>
-          {!readOnlyPreview && <button type="button" data-testid="button-invoice-mobile-view" onClick={() => setPreview((value) => !value)} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#dce4ee] bg-white px-3 text-[13px] font-semibold text-[#3d526f] transition hover:bg-[#f5f8fc] lg:hidden">
-            {preview ? <PencilLine className="h-4 w-4" /> : <Eye className="h-4 w-4" />}{preview ? labels.edit : labels.preview}
-          </button>}
           <button type="button" data-testid="button-invoice-share" disabled={busy} onClick={shareInvoice} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#d8e1ed] bg-white px-3 text-[13px] font-bold text-[#365273] transition hover:bg-[#f5f8fc] disabled:opacity-60">
             <Share2 className="h-4 w-4" /><span className="hidden sm:inline">{labels.share}</span>
           </button>
@@ -495,9 +489,9 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
           </button>
         </div>
       </header>
-      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(360px,0.92fr)_minmax(470px,1.08fr)]">
-        <section className={`${readOnlyPreview ? 'hidden' : preview ? 'hidden lg:block' : ''} min-h-0 overflow-y-auto px-4 py-5 md:px-6`}>
-          <div className="mx-auto max-w-[650px] space-y-4 pb-8">
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <section className={`${readOnlyPreview ? 'hidden' : ''} h-full min-h-0 overflow-y-auto px-4 py-5 md:px-6`}>
+          <div className="w-full space-y-4 pb-8">
             <div className="mb-5 flex items-center justify-between">
               <div><p className="text-[10px] font-bold uppercase tracking-[.16em] text-[#8291a6]">{labels.setup}</p><p className="mt-1 text-sm text-[#697b92]">{en ? 'Fill in what you know. You can edit everything.' : 'প্রয়োজনীয় তথ্য দিন, সবকিছুই পরে সম্পাদনা করা যাবে।'}</p></div>
               <span className="flex h-9 w-9 items-center justify-center rounded-full border border-[#d8e2ee] bg-white text-[#45668f]"><FileText className="h-4 w-4" /></span>
@@ -624,9 +618,9 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
             </label>
           </div>
         </section>
-        <section className={`${preview ? '' : 'hidden lg:block'} min-h-0 overflow-auto border-l border-[#e2e8f0] bg-[#e9eef5] px-3 py-5 md:px-6 md:py-7`}>
+        {(readOnlyPreview || pdfMode) && <section className={readOnlyPreview ? 'h-full min-h-0 overflow-auto bg-[#e9eef5] px-3 py-5 md:px-6 md:py-7' : 'fixed left-[-10000px] top-0 z-[-1] block w-[794px]'}>
           <div className="mx-auto mb-3 flex max-w-[816px] items-center justify-between px-1 text-[10px] font-bold uppercase tracking-[.15em] text-[#79899e]">
-            <span>{labels.live}</span><span className="flex items-center gap-1.5 normal-case tracking-normal"><span className="h-1.5 w-1.5 rounded-full bg-[#58816b]" />{en ? 'Updates as you type' : 'লেখার সঙ্গে সঙ্গে আপডেট'}</span>
+            <span>{en ? 'Invoice preview' : 'ইনভয়েস প্রিভিউ'}</span><span className="rounded-full bg-white px-2.5 py-1 text-[#526783]">{current.number}</span>
           </div>
           <div
             id="printable-invoice"
@@ -713,7 +707,7 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
             </div>
           </div>
           {!current.company && <p data-testid="text-invoice-preview-hint" className="mx-auto mt-3 max-w-[816px] text-center text-[11px] text-[#75869b]">{labels.empty}</p>}
-        </section>
+        </section>}
       </div>
     </div>
   );

@@ -49,14 +49,15 @@ describe('business invoice', () => {
     Element.prototype.scrollIntoView ??= vi.fn();
   });
 
-  it('calculates tax only for taxable items and updates the preview total', () => {
+  it('keeps the full-width entry form active while editing invoice details', () => {
     render(<BusinessInvoice />);
     fireEvent.change(screen.getByTestId('input-invoice-item-amount-1'), { target: { value: '100' } });
     fireEvent.click(screen.getByTestId('checkbox-invoice-item-taxed-1'));
     fireEvent.change(screen.getByTestId('input-invoice-taxRate'), { target: { value: '10' } });
-    fireEvent.click(screen.getByTestId('button-invoice-mobile-view'));
-
-    expect(screen.getByTestId('text-invoice-total')).toHaveTextContent('110');
+    expect(screen.getByTestId('input-invoice-item-amount-1')).toHaveValue(100);
+    expect(screen.getByTestId('checkbox-invoice-item-taxed-1')).toBeChecked();
+    expect(screen.queryByTestId('printable-invoice')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('button-invoice-mobile-view')).not.toBeInTheDocument();
   });
 
   it('hides generated invoice number and due date fields and searches currencies by country name', () => {
@@ -74,12 +75,10 @@ describe('business invoice', () => {
 
     fireEvent.change(screen.getByTestId('input-invoice-item-amount-1'), { target: { value: '100' } });
     fireEvent.change(screen.getByTestId('input-invoice-metalRate'), { target: { value: '447/g' } });
-    fireEvent.click(screen.getByTestId('button-invoice-mobile-view'));
-    expect(screen.getByText(/^INV-\d{8}-\d+$/)).toBeInTheDocument();
-    expect(screen.getByTestId('text-invoice-total')).toHaveTextContent('د.إ');
-    expect(screen.getByTestId('text-invoice-total')).toHaveTextContent('AED');
+    expect(screen.queryByTestId('printable-invoice')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('button-invoice-mobile-view')).not.toBeInTheDocument();
     expect(screen.queryByText(/Payment due date/)).not.toBeInTheDocument();
-    expect(screen.getByText('Metal / unit rate (د.إ AED):')).toBeInTheDocument();
+    expect(screen.getByText('Metal / unit rate (د.إ AED)')).toBeInTheDocument();
   });
 
   it('adds and removes invoice rows without allowing the final row to disappear', () => {
@@ -118,23 +117,30 @@ describe('business invoice', () => {
     }
   });
 
-  it('shows customer phone, document number, and address on the invoice only when provided', () => {
-    render(<BusinessInvoice />);
-    fireEvent.click(screen.getByTestId('button-invoice-mobile-view'));
-    expect(screen.queryByText(/NID:/)).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId('button-invoice-mobile-view'));
-    fireEvent.change(screen.getByTestId('input-invoice-customer'), { target: { value: 'A. Customer' } });
-    fireEvent.change(screen.getByTestId('input-invoice-customerPhone'), { target: { value: '+971 50 123 4567' } });
-    fireEvent.change(screen.getByTestId('select-invoice-customer-id-type'), { target: { value: 'passport' } });
-    fireEvent.change(screen.getByTestId('input-invoice-customerIdNumber'), { target: { value: 'A98765432' } });
-    fireEvent.change(screen.getByTestId('input-invoice-customerAddress'), { target: { value: 'Dubai, UAE' } });
-    fireEvent.click(screen.getByTestId('button-invoice-mobile-view'));
-
+  it('opens a saved invoice as a dedicated preview and allows returning to edit', () => {
+    const historyRecord = {
+      id: 'Business:INV-SAVED', type: 'Business' as const, number: 'INV-SAVED', date: '2026-10-17',
+      customerName: 'A. Customer', customerPhone: '+971 50 123 4567', total: 100, currency: 'AED',
+      itemCount: 1, savedAt: '2026-10-17T00:00:00.000Z',
+      payload: {
+        invoiceData: {
+          company: 'Sample Shop', address: 'Main road', phone: '', website: '', logo: '', email: '', trn: '', locationUrl: '',
+          customer: 'A. Customer', customerAddress: 'Dubai, UAE', customerPhone: '+971 50 123 4567',
+          customerIdType: 'passport', customerIdNumber: 'A98765432', number: 'INV-SAVED', date: '2026-10-17',
+          currency: 'AED', taxRate: '0', comments: '', paymentTerms: 'Cash', metalRate: '', placeOfSupply: '',
+        },
+        lines: [{ id: 1, description: 'Gold chain', amount: '100', taxed: false }],
+      },
+    };
+    render(<BusinessInvoice historyRecord={historyRecord} viewOnly />);
+    expect(screen.getByTestId('input-invoice-customer').closest('.hidden')).not.toBeNull();
     expect(screen.getByText('A. Customer')).toBeInTheDocument();
     expect(screen.getByText('Phone: +971 50 123 4567')).toBeInTheDocument();
     expect(screen.getByText('Passport No: A98765432')).toBeInTheDocument();
     expect(screen.getByText('Address: Dubai, UAE')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('button-invoice-preview-edit'));
+    expect(screen.getByTestId('input-invoice-customer')).toHaveValue('A. Customer');
+    expect(screen.getByTestId('input-invoice-customer').closest('.hidden')).toBeNull();
   });
 
   it('exports using the fixed A4-width container and zero-scroll canvas', async () => {
@@ -172,8 +178,7 @@ describe('business invoice', () => {
 
     render(<BusinessInvoice />);
     expect(screen.getByText('Business Details Saved')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('button-invoice-mobile-view'));
-    expect(screen.getAllByText('New Shop')).toHaveLength(2);
+    expect(screen.getAllByText('New Shop')).toHaveLength(1);
   });
 
   it('saves an invoice into searchable history', () => {

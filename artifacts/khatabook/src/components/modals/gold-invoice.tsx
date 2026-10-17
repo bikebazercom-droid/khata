@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Building2, CalendarDays, Check, ChevronDown, Download, Eye, FileText, ImagePlus, Plus, ReceiptText, Share2, Trash2, UserRound } from 'lucide-react';
+import { Building2, CalendarDays, Check, ChevronDown, Download, FileText, ImagePlus, Plus, ReceiptText, Share2, Trash2, UserRound } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useLanguage } from '@/lib/i18n';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
@@ -123,7 +123,6 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
   const previewShellRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const shared = useMemo(decodeGoldLink, []);
-  const [preview, setPreview] = useState(viewOnly);
   const [readOnlyPreview, setReadOnlyPreview] = useState(viewOnly);
   const [pdfMode, setPdfMode] = useState(false);
   const [previewScale, setPreviewScale] = useState(1);
@@ -149,7 +148,6 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
   const [profileEditing, setProfileEditing] = useState(false);
   useEffect(() => {
     setReadOnlyPreview(viewOnly);
-    if (viewOnly) setPreview(true);
   }, [viewOnly]);
   useEffect(() => {
     const shell = previewShellRef.current;
@@ -198,7 +196,7 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
     items: 'Gold items', desc: 'Stock description', gross: 'Gross weight', grams: 'Grams', vori: 'Vori / Tola', purity: 'Purity', pure: 'Pure grams', makingRate: 'Making rate / g', makingAmount: 'Making amount', total: 'Line total',
     add: 'Add gold item', remove: 'Remove item', payment: 'Payment & summary', rate: 'Metal rate / gram', currency: 'Currency', date: 'Invoice date', place: 'Place of supply', method: 'Payment method',
     pending: 'Payment pending', pendingHint: 'Mark if payment is not fully received', notes: 'Notes', discount: 'Round-off discount', goldValue: 'Gold value', making: 'Making total', beforeVat: 'Before VAT', vat: 'VAT (5%)', incl: 'Total including VAT', grossTotal: 'Total gross weight', pureTotal: 'Total pure weight',
-    edit: 'Edit details', preview: 'Preview invoice', download: 'Download PDF', share: 'Share', shop: 'Shop profile', saveProfile: 'Save shop profile', editProfile: 'Edit shop profile', profileSaved: 'Using saved shop profile', uploadStamp: 'Upload company stamp', stampHint: 'PNG, JPG or WebP · max 5 MB · resized before saving', clearStamp: 'Remove stamp',
+    download: 'Download PDF', share: 'Share', shop: 'Shop profile', saveProfile: 'Save shop profile', editProfile: 'Edit shop profile', profileSaved: 'Using saved shop profile', uploadStamp: 'Upload company stamp', stampHint: 'PNG, JPG or WebP · max 5 MB · resized before saving', clearStamp: 'Remove stamp',
     details: 'Invoice details', party: 'Buyer', invoiceNo: 'Invoice No.', terms: 'Payment terms', words: 'Amount in words', mode: 'Payment mode', thank: 'Thank you for your business.', taxInvoice: 'TAX INVOICE', partyCopy: 'PARTY COPY', seller: 'From your shop', empty: 'Add your shop and customer details to complete the invoice.',
     currencySearch: 'Search currency name, symbol or ISO code', noCurrency: 'No matching currencies', downloadError: 'Could not prepare the invoice PDF.', shareError: 'Could not share the invoice.', pendingShort: 'Pending', cash: 'Cash Payment', bank: 'Bank Transfer', card: 'Card Payment', mobilePay: 'Mobile Payment',
   } : {
@@ -207,7 +205,7 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
     items: 'স্বর্ণের আইটেম', desc: 'স্টকের বিবরণ', gross: 'মোট ওজন', grams: 'গ্রাম', vori: 'ভরি / তোলা', purity: 'বিশুদ্ধতা', pure: 'বিশুদ্ধ ওজন (গ্রাম)', makingRate: 'মেকিং রেট / গ্রাম', makingAmount: 'মেকিং চার্জ', total: 'লাইনের মোট',
     add: 'স্বর্ণের আইটেম যোগ করুন', remove: 'আইটেম সরান', payment: 'পেমেন্ট ও সারাংশ', rate: 'ধাতুর মূল্য / গ্রাম', currency: 'মুদ্রা', date: 'ইনভয়েসের তারিখ', place: 'সরবরাহের স্থান', method: 'পেমেন্ট পদ্ধতি',
     pending: 'পেমেন্ট বাকি', pendingHint: 'সম্পূর্ণ টাকা না পেলে চালু করুন', notes: 'নোট', discount: 'রাউন্ড-অফ ছাড়', goldValue: 'স্বর্ণের মূল্য', making: 'মেকিং মোট', beforeVat: 'ভ্যাটের আগে', vat: 'ভ্যাট (৫%)', incl: 'ভ্যাটসহ মোট', grossTotal: 'মোট গ্রস ওজন', pureTotal: 'মোট বিশুদ্ধ ওজন',
-    edit: 'তথ্য সম্পাদনা', preview: 'ইনভয়েস প্রিভিউ', download: 'PDF ডাউনলোড', share: 'শেয়ার', shop: 'দোকানের প্রোফাইল', saveProfile: 'দোকানের প্রোফাইল সংরক্ষণ', editProfile: 'দোকানের প্রোফাইল সম্পাদনা', profileSaved: 'সংরক্ষিত দোকানের প্রোফাইল ব্যবহার হচ্ছে', uploadStamp: 'কোম্পানির সিল আপলোড', stampHint: 'PNG, JPG বা WebP · সর্বোচ্চ ৫ MB · সংরক্ষণের আগে ছোট করা হবে', clearStamp: 'সিল সরান',
+    download: 'PDF ডাউনলোড', share: 'শেয়ার', shop: 'দোকানের প্রোফাইল', saveProfile: 'দোকানের প্রোফাইল সংরক্ষণ', editProfile: 'দোকানের প্রোফাইল সম্পাদনা', profileSaved: 'সংরক্ষিত দোকানের প্রোফাইল ব্যবহার হচ্ছে', uploadStamp: 'কোম্পানির সিল আপলোড', stampHint: 'PNG, JPG বা WebP · সর্বোচ্চ ৫ MB · সংরক্ষণের আগে ছোট করা হবে', clearStamp: 'সিল সরান',
     details: 'ইনভয়েসের তথ্য', party: 'ক্রেতা', invoiceNo: 'ইনভয়েস নম্বর', terms: 'পেমেন্টের শর্ত', words: 'কথায় পরিমাণ', mode: 'পেমেন্ট মোড', thank: 'আপনার ব্যবসার জন্য ধন্যবাদ।', taxInvoice: 'ট্যাক্স ইনভয়েস', partyCopy: 'পার্টি কপি', seller: 'আপনার দোকান থেকে', empty: 'ইনভয়েস সম্পূর্ণ করতে দোকান ও গ্রাহকের তথ্য দিন।',
     currencySearch: 'মুদ্রার নাম, প্রতীক বা ISO কোড খুঁজুন', noCurrency: 'কোনো মুদ্রা মেলেনি', downloadError: 'ইনভয়েস PDF তৈরি করা যায়নি।', shareError: 'ইনভয়েস শেয়ার করা যায়নি।', pendingShort: 'বাকি', cash: 'নগদ পেমেন্ট', bank: 'ব্যাংক ট্রান্সফার', card: 'কার্ড পেমেন্ট', mobilePay: 'মোবাইল পেমেন্ট',
   };
@@ -258,12 +256,11 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
     </label>
   );
   const createPdf = async () => {
-    if (!printRef.current) throw new Error('Invoice preview is not ready');
-    setPreview(true);
     setPdfMode(true);
-    await new Promise((resolve) => window.setTimeout(resolve, 80));
-    const { default: html2pdf } = await import('html2pdf.js');
     try {
+      await new Promise((resolve) => window.setTimeout(resolve, 80));
+      const { default: html2pdf } = await import('html2pdf.js');
+      if (!printRef.current) throw new Error('Invoice preview is not ready');
       return await html2pdf().set({
         margin: [10, 10, 10, 10], filename: `Gold_Invoice_${data.number.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
@@ -404,15 +401,14 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
         <div className="flex min-w-0 items-center gap-3"><span className="hidden h-10 w-10 items-center justify-center rounded-xl bg-[#f7f0dc] text-[#9b751b] sm:flex"><ReceiptText className="h-5 w-5" /></span><div><h2 className="truncate text-[17px] font-bold tracking-tight text-[#1b2f4d]">{labels.title}</h2><p className="hidden text-xs text-[#77869a] sm:block">{labels.subtitle}</p></div></div>
         <div className="flex items-center gap-2">
           <button type="button" aria-label={en ? 'Save invoice' : 'ইনভয়েস সংরক্ষণ'} data-testid="button-gold-save-history" onClick={persistHistory} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#ded8c9] bg-white px-3 text-[13px] font-bold text-[#53627a]"><FileText className="h-4 w-4" /><span className="hidden sm:inline">{en ? 'Save invoice' : 'ইনভয়েস সংরক্ষণ'}</span></button>
-          {readOnlyPreview && <button type="button" data-testid="button-gold-preview-edit" onClick={() => { setReadOnlyPreview(false); setPreview(false); }} className="inline-flex min-h-10 items-center rounded-xl border border-[#ded8c9] bg-white px-3 text-[13px] font-bold text-[#53627a]">{en ? 'Edit' : 'সম্পাদনা'}</button>}
-          {!readOnlyPreview && <button type="button" data-testid="button-gold-mobile-view" onClick={() => setPreview(!preview)} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#dce4ee] bg-white px-3 text-[13px] font-semibold text-[#3d526f] lg:hidden">{preview ? <FileText className="h-4 w-4" /> : <Eye className="h-4 w-4" />}{preview ? labels.edit : labels.preview}</button>}
+          {readOnlyPreview && <button type="button" data-testid="button-gold-preview-edit" onClick={() => setReadOnlyPreview(false)} className="inline-flex min-h-10 items-center rounded-xl border border-[#ded8c9] bg-white px-3 text-[13px] font-bold text-[#53627a]">{en ? 'Edit' : 'সম্পাদনা'}</button>}
           <button type="button" data-testid="button-gold-share" disabled={busy} onClick={() => void shareInvoice()} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#ded8c9] bg-white px-3 text-[13px] font-bold text-[#53627a] transition hover:bg-[#faf7ef] disabled:opacity-60"><Share2 className="h-4 w-4" /><span className="hidden sm:inline">{labels.share}</span></button>
           <button type="button" data-testid="button-gold-download" disabled={busy} onClick={() => void downloadPdf()} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#1b365b] px-3.5 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#142b49] disabled:opacity-60 sm:px-4"><Download className="h-4 w-4" /><span className="hidden sm:inline">{busy ? (en ? 'Preparing…' : 'তৈরি হচ্ছে…') : labels.download}</span></button>
         </div>
       </header>
-      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(440px,.95fr)_minmax(470px,1.05fr)]">
-        <section className={`${readOnlyPreview ? 'hidden' : preview ? 'hidden lg:block' : ''} min-h-0 overflow-y-auto px-4 py-5 md:px-6`}>
-          <div className="mx-auto max-w-[760px] space-y-4 pb-8">
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <section className={`${readOnlyPreview ? 'hidden' : ''} h-full min-h-0 overflow-y-auto px-4 py-5 md:px-6`}>
+          <div className="w-full space-y-4 pb-8">
             <div className="mb-4 flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[.16em] text-[#a48a51]">{labels.details}</p><p className="mt-1 text-xs text-[#78869a]">{en ? 'Enter each piece once; calculations update as you type.' : 'প্রতিটি গয়নার তথ্য একবার দিন; টাইপ করার সঙ্গে হিসাব আপডেট হবে।'}</p></div><span className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e4dcc9] bg-white text-[#9a741b]"><CalendarDays className="h-4 w-4" /></span></div>
             <section className="rounded-2xl border border-[#e6e1d5] bg-white p-4 shadow-[0_2px_12px_rgba(49,45,34,.035)] md:p-5">
               {sectionTitle(Building2, en ? '01 · SELLER' : '০১ · বিক্রেতা', labels.shop)}
@@ -491,10 +487,10 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
             </section>
           </div>
         </section>
-        <section className={`${preview ? '' : 'hidden lg:block'} min-h-0 overflow-auto border-l border-[#e6e0d2] bg-[#edece7] p-3 md:p-5`}>
-          <div className="mx-auto mb-3 flex max-w-[794px] items-center justify-between text-[10px] font-bold uppercase tracking-[.12em] text-[#82817b]"><span>{en ? 'Live A4 preview' : 'লাইভ A4 প্রিভিউ'}</span><span className="rounded-full bg-white px-2.5 py-1">{data.number}</span></div>
+        {(readOnlyPreview || pdfMode) && <section className={readOnlyPreview ? 'h-full min-h-0 overflow-auto bg-[#edece7] p-3 md:p-5' : 'fixed left-[-10000px] top-0 z-[-1] block w-[794px]'}>
+          <div className="mx-auto mb-3 flex max-w-[794px] items-center justify-between text-[10px] font-bold uppercase tracking-[.12em] text-[#82817b]"><span>{en ? 'Invoice preview' : 'ইনভয়েস প্রিভিউ'}</span><span className="rounded-full bg-white px-2.5 py-1">{data.number}</span></div>
           <div ref={previewShellRef} className="gold-preview-shell mx-auto w-full max-w-[794px] overflow-hidden rounded-sm shadow-[0_8px_35px_rgba(30,37,48,.16)]" style={{ height: `${1123 * (pdfMode ? 1 : previewScale)}px` }}>{invoice}</div>
-        </section>
+        </section>}
       </div>
     </div>
   );
