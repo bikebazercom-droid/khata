@@ -365,7 +365,7 @@ export function SettingsDrawer({
             {activeDetailsModule === 'gold' && <GoldInvoice historyRecord={selectedInvoice} autoAction={invoiceAction} viewOnly={!!selectedInvoice && invoiceAction === 'open'} />}
             {activeDetailsModule === 'list' && <InvoiceList onOpen={openInvoice} />}
           </main>
-          <footer className="z-20 flex shrink-0 justify-center border-t border-slate-200 bg-white px-4 pt-2 pb-[calc(.5rem+env(safe-area-inset-bottom))]">
+          <footer className="z-20 flex shrink-0 justify-start border-t border-slate-200 bg-white px-4 pt-2 pb-[calc(.5rem+env(safe-area-inset-bottom))]">
             <button type="button" data-testid="button-invoice-menu" aria-expanded={isInvoiceMenuOpen} onClick={() => setIsInvoiceMenuOpen(true)} className="flex min-h-12 min-w-36 items-center justify-center gap-2 rounded-2xl bg-[#1B3A6B] px-6 text-sm font-bold text-white shadow-lg transition active:scale-95">
               <Menu className="h-5 w-5" />{lang === 'en' ? 'Menu' : 'মেনু'}
             </button>

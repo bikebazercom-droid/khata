@@ -69,7 +69,10 @@ describe('settings drawer language selection', () => {
 
   it('opens the floating module menu, switches views, and closes the sheet', () => {
     render(<SettingsDrawer open onOpenChange={vi.fn()} />);
-    fireEvent.click(screen.getByTestId('button-invoice-menu'));
+    const menuButton = screen.getByTestId('button-invoice-menu');
+    const footer = menuButton.closest('footer');
+    expect(footer).toHaveClass('justify-start', 'px-4', 'z-20');
+    fireEvent.click(menuButton);
     expect(screen.getByTestId('menu-option-profile')).toBeInTheDocument();
     expect(screen.getByTestId('menu-option-invoice')).toBeInTheDocument();
     expect(screen.getByTestId('menu-option-gold')).toBeInTheDocument();
