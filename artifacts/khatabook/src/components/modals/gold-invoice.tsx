@@ -332,12 +332,12 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
             <thead className="bg-[#1b365b] text-white"><tr>{['S.No', labels.desc, 'Gross Wt.', labels.purity, 'Pure Wt.', labels.makingRate, labels.makingAmount, labels.total].map((text, index) => <th key={index} className="border border-[#294568] px-1 py-2 text-left font-bold">{text}</th>)}</tr></thead>
             <tbody>
               {printableRows.map((line, index) => <tr key={line?.id ?? `empty-${index + 1}`} data-testid="gold-printable-item-row" className="h-5 border-b border-[#e7e8eb]">
-                <td className="px-1 py-1">{index + 1}</td>
+                <td className="border-r border-[#edf0f4] px-1 py-1">{index + 1}</td>
                 {line ? <>
-                  <td className="truncate px-1 py-1">{line.description || '—'}</td><td className="px-1 py-1">{number(line.grossValue, 3)}</td>
-                  <td className="px-1 py-1">{line.purityValue.toFixed(3)}</td><td className="px-1 py-1">{number(line.pure, 3)}</td>
-                  <td className="truncate px-1 py-1">{money(line.makingRateValue)}</td><td className="truncate px-1 py-1">{money(line.makingAmountValue)}</td><td className="truncate px-1 py-1 text-right font-semibold">{money(line.total)}</td>
-                </> : <td colSpan={7} aria-hidden="true" />}
+                  <td className="truncate border-r border-[#edf0f4] px-1 py-1">{line.description || '—'}</td><td className="border-r border-[#edf0f4] px-1 py-1">{number(line.grossValue, 3)}</td>
+                  <td className="border-r border-[#edf0f4] px-1 py-1">{line.purityValue.toFixed(3)}</td><td className="border-r border-[#edf0f4] px-1 py-1">{number(line.pure, 3)}</td>
+                  <td className="truncate border-r border-[#edf0f4] px-1 py-1">{money(line.makingRateValue)}</td><td className="truncate border-r border-[#edf0f4] px-1 py-1">{money(line.makingAmountValue)}</td><td className="truncate px-1 py-1 text-right font-semibold">{money(line.total)}</td>
+                </> : Array.from({ length: 7 }, (_, cellIndex) => <td key={`empty-cell-${cellIndex}`} aria-hidden="true" className={`${cellIndex < 6 ? 'border-r border-[#edf0f4] ' : ''}px-1 py-1`} />)}
               </tr>)}
               <tr className="border-t border-[#c9b26e] bg-[#fbf8ef] font-bold"><td colSpan={2} className="px-1.5 py-2">{en ? 'Total weight' : 'মোট ওজন'}</td><td className="px-1 py-2">{number(calculations.gross, 3)}</td><td></td><td className="px-1 py-2">{number(calculations.pure, 3)}</td><td></td><td className="px-1 py-2">{money(calculations.making)}</td><td className="px-1 py-2 text-right">{money(calculations.values.reduce((sum, item) => sum + item.total, 0))}</td></tr>
             </tbody>
