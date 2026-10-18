@@ -1,12 +1,42 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { GoldInvoice } from './gold-invoice';
 
+const pdfCapture = vi.hoisted(() => ({ elementId: '', options: null as null | Record<string, unknown> }));
+
 vi.mock('@/lib/i18n', () => ({ useLanguage: () => ({ lang: 'en' }) }));
+vi.mock('html2pdf.js', () => ({
+  default: () => {
+    const worker = {
+      set(options: Record<string, unknown>) {
+        pdfCapture.options = options;
+        return worker;
+      },
+      from(element: HTMLElement) {
+        pdfCapture.elementId = element.id;
+        return worker;
+      },
+      async outputPdf() {
+        return new Blob(['gold-invoice-pdf'], { type: 'application/pdf' });
+      },
+    };
+    return worker;
+  },
+}));
 
 describe('gold invoice', () => {
+  const originalCreateObjectURL = URL.createObjectURL;
+  const originalRevokeObjectURL = URL.revokeObjectURL;
+  const originalClipboard = navigator.clipboard;
+  const originalShare = navigator.share;
+  const originalCanShare = navigator.canShare;
+
   beforeEach(() => {
     localStorage.clear();
+    pdfCapture.elementId = '';
+    pdfCapture.options = null;
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:gold-invoice') });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
     if (!globalThis.ResizeObserver) {
       globalThis.ResizeObserver = class {
         observe() {}
@@ -14,6 +44,23 @@ describe('gold invoice', () => {
         disconnect() {}
       };
     }
+  });
+
+  afterEach(() => {
+    for (const [key, original] of Object.entries({
+      createObjectURL: originalCreateObjectURL,
+      revokeObjectURL: originalRevokeObjectURL,
+    })) {
+      if (original) Object.defineProperty(URL, key, { configurable: true, value: original });
+      else delete (URL as unknown as Record<string, unknown>)[key];
+    }
+    if (originalClipboard) Object.defineProperty(navigator, 'clipboard', { configurable: true, value: originalClipboard });
+    else delete (navigator as unknown as Record<string, unknown>).clipboard;
+    if (originalShare) Object.defineProperty(navigator, 'share', { configurable: true, value: originalShare });
+    else delete (navigator as unknown as Record<string, unknown>).share;
+    if (originalCanShare) Object.defineProperty(navigator, 'canShare', { configurable: true, value: originalCanShare });
+    else delete (navigator as unknown as Record<string, unknown>).canShare;
+    vi.restoreAllMocks();
   });
 
   it('converts Vori to grams using 11.664 and calculates purity, making charge, and VAT', () => {
@@ -75,6 +122,34 @@ describe('gold invoice', () => {
     expect(getRows().map((row) => row.querySelectorAll('td').length)).toEqual([8, 8, 8, 8, 8, 8, 8]);
     expect(screen.getByTestId('gold-printable-customer-grid').children).toHaveLength(16);
     expect(screen.getByTestId('gold-printable-payment-box')).toHaveClass('justify-center', 'min-h-[64px]');
+  });
+
+  it('downloads a generated PDF from the fixed A4 template', async () => {
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    render(<GoldInvoice />);
+    fireEvent.change(screen.getByTestId('input-gold-customerName'), { target: { value: 'Gold Customer' } });
+    fireEvent.click(screen.getByTestId('button-gold-download'));
+
+    await waitFor(() => expect(anchorClick).toHaveBeenCalledOnce());
+    expect(pdfCapture.elementId).toBe('printable-gold-invoice');
+    expect(pdfCapture.options).toMatchObject({
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      html2canvas: { windowWidth: 794, scale: 2 },
+    });
+  });
+
+  it('falls back to copying the invoice link if browser sharing rejects the PDF', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const share = vi.fn().mockRejectedValue(new DOMException('Not allowed', 'NotAllowedError'));
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    Object.defineProperty(navigator, 'share', { configurable: true, value: share });
+    render(<GoldInvoice />);
+    fireEvent.change(screen.getByTestId('input-gold-customerName'), { target: { value: 'Gold Customer' } });
+    fireEvent.click(screen.getByTestId('button-gold-share'));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
+    expect(share).toHaveBeenCalledOnce();
+    expect(writeText.mock.calls[0][0]).toContain('#goldinvoice=');
   });
 
   it('adds and removes line items without removing the last row', () => {

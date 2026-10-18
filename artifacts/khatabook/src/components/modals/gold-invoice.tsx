@@ -220,15 +220,29 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
   const createPdf = async () => {
     setPdfMode(true);
     try {
-      await new Promise((resolve) => window.setTimeout(resolve, 80));
       const { default: html2pdf } = await import('html2pdf.js');
-      if (!printRef.current) throw new Error('Invoice preview is not ready');
-      return await html2pdf().set({
+      const element = printRef.current;
+      if (!element || !element.isConnected) throw new Error('Invoice preview is not ready');
+
+      // Let React apply print-mode sizing before html2canvas measures the fixed A4 page.
+      await new Promise<void>((resolve) => {
+        if (typeof window.requestAnimationFrame === 'function') {
+          window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+        } else window.setTimeout(resolve, 100);
+      });
+      if (document.fonts?.ready) await document.fonts.ready;
+      await Promise.all(Array.from(element.querySelectorAll('img')).map((image) =>
+        image.decode().catch(() => undefined),
+      ));
+
+      const blob = await html2pdf().set({
         margin: [10, 10, 10, 10], filename: `Gold_Invoice_${data.number.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0, windowWidth: 794, backgroundColor: '#fff' },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      }).from(printRef.current).outputPdf('blob') as Blob;
+      }).from(element).outputPdf('blob') as Blob;
+      if (!(blob instanceof Blob) || blob.size === 0) throw new Error('PDF renderer returned an empty file');
+      return blob;
     } finally { setPdfMode(false); }
   };
   const shareUrl = () => {
@@ -252,13 +266,30 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
     } catch (error) { console.error('Gold invoice PDF failed:', error); toast.error(labels.downloadError); }
     finally { setBusy(false); }
   };
+  const copyInvoiceLink = async (link: string) => {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(link);
+    } else {
+      const textarea = document.createElement('textarea');
+      textarea.value = link;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const copied = document.execCommand('copy');
+      textarea.remove();
+      if (!copied) throw new Error('Clipboard access is unavailable');
+    }
+    toast.success(en ? 'Invoice link copied.' : 'ইনভয়েস লিংক কপি হয়েছে।');
+  };
   const shareInvoice = async () => {
     setBusy(true);
+    let link = '';
     try {
       if (!persistHistory()) return;
+      link = shareUrl();
       const blob = await createPdf();
       const text = `${labels.title} ${data.number} · ${labels.total}: ${money(calculations.total)}`;
-      const link = shareUrl();
       const native = await shareGeneratedFileWithNative(blob, { fileName, mimeType: 'application/pdf', title: `${labels.title} ${data.number}`, shareText: `${text}\n${link}` });
       if (native) return;
       const file = new File([blob], fileName, { type: 'application/pdf' });
@@ -266,11 +297,14 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
         await navigator.share({ files: [file], title: `${labels.title} ${data.number}`, text, url: link });
       } else if (typeof navigator.share === 'function') {
         await navigator.share({ title: `${labels.title} ${data.number}`, text, url: link });
-      } else if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(link);
-        toast.success(en ? 'Invoice link copied.' : 'ইনভয়েস লিংক কপি হয়েছে।');
-      } else toast.info(labels.shareError);
-    } catch (error) { if ((error as DOMException)?.name !== 'AbortError') toast.error(labels.shareError); }
+      } else {
+        await copyInvoiceLink(link);
+      }
+    } catch (error) {
+      if ((error as DOMException)?.name === 'AbortError') return;
+      console.error('Gold invoice sharing failed:', error);
+      try { await copyInvoiceLink(link || shareUrl()); } catch { toast.error(labels.shareError); }
+    }
     finally { setBusy(false); }
   };
   useEffect(() => {
