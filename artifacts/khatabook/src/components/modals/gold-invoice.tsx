@@ -286,6 +286,10 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
       <div><p className="text-[9px] font-bold uppercase tracking-[.14em] text-[#9b8a61]">{eyebrow}</p><h3 className="text-[14px] font-bold text-[#1c304d]">{title}</h3></div>
     </div>
   );
+  const printableRows = Array.from(
+    { length: Math.max(7, calculations.values.length) },
+    (_, index) => calculations.values[index] ?? null,
+  );
   const invoice = (
     <div ref={printRef} id="printable-gold-invoice" data-testid="gold-printable-invoice" className="gold-print-root mx-auto bg-white text-[#172b49]"
       style={{ width: '794px', minHeight: '1123px', padding: '24px', boxSizing: 'border-box', overflow: 'hidden', border: '2px solid #c5a059', transform: pdfMode ? 'none' : `scale(${previewScale})`, transformOrigin: 'top left' }}>
@@ -327,10 +331,13 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
             <colgroup><col style={{ width: '5%' }} /><col style={{ width: '24%' }} /><col style={{ width: '10%' }} /><col style={{ width: '8%' }} /><col style={{ width: '10%' }} /><col style={{ width: '12%' }} /><col style={{ width: '14%' }} /><col style={{ width: '17%' }} /></colgroup>
             <thead className="bg-[#1b365b] text-white"><tr>{['S.No', labels.desc, 'Gross Wt.', labels.purity, 'Pure Wt.', labels.makingRate, labels.makingAmount, labels.total].map((text, index) => <th key={index} className="border border-[#294568] px-1 py-2 text-left font-bold">{text}</th>)}</tr></thead>
             <tbody>
-              {calculations.values.map((line, index) => <tr key={line.id} className="h-8 border-b border-[#e7e8eb]">
-                <td className="px-1 py-1">{index + 1}</td><td className="truncate px-1 py-1">{line.description || '—'}</td><td className="px-1 py-1">{number(line.grossValue, 3)}</td>
-                <td className="px-1 py-1">{line.purityValue.toFixed(3)}</td><td className="px-1 py-1">{number(line.pure, 3)}</td>
-                <td className="truncate px-1 py-1">{money(line.makingRateValue)}</td><td className="truncate px-1 py-1">{money(line.makingAmountValue)}</td><td className="truncate px-1 py-1 text-right font-semibold">{money(line.total)}</td>
+              {printableRows.map((line, index) => <tr key={line?.id ?? `empty-${index + 1}`} data-testid="gold-printable-item-row" className="h-5 border-b border-[#e7e8eb]">
+                <td className="px-1 py-1">{index + 1}</td>
+                {line ? <>
+                  <td className="truncate px-1 py-1">{line.description || '—'}</td><td className="px-1 py-1">{number(line.grossValue, 3)}</td>
+                  <td className="px-1 py-1">{line.purityValue.toFixed(3)}</td><td className="px-1 py-1">{number(line.pure, 3)}</td>
+                  <td className="truncate px-1 py-1">{money(line.makingRateValue)}</td><td className="truncate px-1 py-1">{money(line.makingAmountValue)}</td><td className="truncate px-1 py-1 text-right font-semibold">{money(line.total)}</td>
+                </> : <td colSpan={7} aria-hidden="true" />}
               </tr>)}
               <tr className="border-t border-[#c9b26e] bg-[#fbf8ef] font-bold"><td colSpan={2} className="px-1.5 py-2">{en ? 'Total weight' : 'মোট ওজন'}</td><td className="px-1 py-2">{number(calculations.gross, 3)}</td><td></td><td className="px-1 py-2">{number(calculations.pure, 3)}</td><td></td><td className="px-1 py-2">{money(calculations.making)}</td><td className="px-1 py-2 text-right">{money(calculations.values.reduce((sum, item) => sum + item.total, 0))}</td></tr>
             </tbody>

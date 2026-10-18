@@ -66,6 +66,14 @@ describe('gold invoice', () => {
     expect(screen.getByTestId('gold-company-stamp')).toHaveAttribute('src', stamp);
   });
 
+  it('prints seven numbered item rows when the invoice has fewer items', () => {
+    render(<GoldInvoice viewOnly />);
+
+    const getRows = () => screen.getAllByTestId('gold-printable-item-row');
+    expect(getRows()).toHaveLength(7);
+    expect(getRows().map((row) => row.querySelector('td')?.textContent)).toEqual(['1', '2', '3', '4', '5', '6', '7']);
+  });
+
   it('adds and removes line items without removing the last row', () => {
     render(<GoldInvoice />);
     fireEvent.click(screen.getByTestId('button-gold-add-item'));
