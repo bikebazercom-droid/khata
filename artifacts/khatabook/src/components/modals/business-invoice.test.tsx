@@ -70,6 +70,8 @@ describe('business invoice', () => {
 
   it('keeps the full-width entry form active while editing invoice details', () => {
     render(<BusinessInvoice />);
+    expect(screen.getByTestId('grid-invoice-customer-fields')).toHaveClass('grid', 'md:grid-cols-2');
+    expect(screen.getByTestId('grid-invoice-reference-fields')).toHaveClass('grid', 'md:grid-cols-2');
     fireEvent.change(screen.getByTestId('input-invoice-item-amount-1'), { target: { value: '100' } });
     fireEvent.click(screen.getByTestId('checkbox-invoice-item-taxed-1'));
     fireEvent.change(screen.getByTestId('input-invoice-taxRate'), { target: { value: '10' } });

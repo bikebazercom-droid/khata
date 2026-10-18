@@ -181,6 +181,14 @@ describe('gold invoice', () => {
     expect(writeText.mock.calls[0][0]).toContain('#goldinvoice=');
   });
 
+  it('stacks gold invoice fields on mobile and restores columns at tablet width', () => {
+    render(<GoldInvoice />);
+
+    expect(screen.getByTestId('grid-gold-customer-fields')).toHaveClass('grid-cols-1', 'md:grid-cols-2');
+    expect(screen.getByTestId('grid-gold-item-fields-1')).toHaveClass('grid-cols-1', 'md:grid-cols-3');
+    expect(screen.getByTestId('grid-gold-payment-fields')).toHaveClass('grid-cols-1', 'md:grid-cols-2');
+  });
+
   it('adds and removes line items without removing the last row', () => {
     render(<GoldInvoice />);
     fireEvent.click(screen.getByTestId('button-gold-add-item'));

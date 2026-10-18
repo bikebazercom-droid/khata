@@ -23,10 +23,10 @@ export function InvoiceList({ onOpen }: { onOpen: (record: InvoiceHistoryRecord,
     try { return new Intl.NumberFormat(lang === 'en' ? 'en-US' : 'bn-BD', { style: 'currency', currency: record.currency }).format(record.total); }
     catch { return `${record.total.toFixed(2)} ${record.currency}`; }
   };
-  return <main className="h-full overflow-auto bg-slate-50 p-4 md:p-6">
+  return <main className="h-full overflow-auto bg-slate-50 p-3 md:p-6">
     <div className="mx-auto max-w-6xl">
       <h2 className="text-xl font-bold text-slate-900">{en ? 'Invoice List' : 'ইনভয়েস তালিকা'}</h2>
-      <div className="my-4 flex flex-col gap-2 sm:flex-row">
+      <div className="my-4 flex flex-col gap-2 md:flex-row">
         <label className="relative flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" /><input data-testid="input-invoice-history-search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={en ? 'Search customer, phone, or invoice number' : 'গ্রাহক, ফোন বা ইনভয়েস নম্বর খুঁজুন'} className="min-h-10 w-full rounded-lg border bg-white pl-9 pr-3 text-sm" /></label>
         <select data-testid="select-invoice-history-type" value={filter} onChange={(e) => setFilter(e.target.value)} className="min-h-10 rounded-lg border bg-white px-3 text-sm">
           <option value="all">{en ? 'All Invoices' : 'সব ইনভয়েস'}</option><option value="Business">{en ? 'Business Invoices' : 'বিজনেস ইনভয়েস'}</option><option value="Gold">{en ? 'Gold Invoices' : 'গোল্ড ইনভয়েস'}</option>

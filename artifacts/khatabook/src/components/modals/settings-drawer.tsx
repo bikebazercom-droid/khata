@@ -238,18 +238,18 @@ export function SettingsDrawer({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showCloseButton={false} className="left-auto right-0 top-0 flex h-[100dvh] w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 border-l border-slate-200 bg-slate-50 p-0 shadow-2xl data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right sm:w-full pt-[var(--safe-top)] pb-[var(--safe-bottom)]">
-        <DialogHeader className="shrink-0 border-b border-slate-200 bg-[#1B3A6B] px-4 py-4 text-left">
+        <DialogHeader className="shrink-0 border-b border-slate-200 bg-[#1B3A6B] px-3 py-3 text-left sm:px-4 md:py-4">
           <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
             <button
               type="button"
               onClick={() => onOpenChange(false)}
               aria-label={t('back')}
-              className="justify-self-start flex h-10 shrink-0 items-center gap-2 rounded-xl bg-white/15 px-3 text-sm font-bold text-white transition-colors hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              className="justify-self-start flex h-10 shrink-0 items-center gap-2 rounded-xl bg-white/15 px-2.5 text-[13px] font-bold text-white transition-colors hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:px-3 sm:text-sm"
             >
               <ArrowLeft className="h-5 w-5" />
               <span>{t('back')}</span>
             </button>
-            <DialogTitle className="col-start-2 row-start-1 whitespace-nowrap text-center text-lg font-bold text-white">
+            <DialogTitle className="col-start-2 row-start-1 whitespace-nowrap text-center text-base font-bold text-white md:text-lg">
               {t('moreTitle')}
             </DialogTitle>
             <DropdownMenu

@@ -583,31 +583,31 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
   );
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#f3f6fa] text-[#1d2e47]">
-      <header className="z-10 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#e1e7ef] bg-white px-4 py-3.5 md:px-6">
+      <header className="z-10 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[#e1e7ef] bg-white px-3 py-2.5 sm:px-4 md:gap-3 md:px-6 md:py-3.5">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="hidden h-10 w-10 items-center justify-center rounded-xl bg-[#eaf0f8] text-[#284c80] sm:flex"><ReceiptText className="h-5 w-5" /></span>
-          <div className="min-w-0"><h2 className="truncate text-[17px] font-bold tracking-tight text-[#1b2f4d]">{labels.title}</h2><p className="hidden text-xs text-[#77869a] sm:block">{labels.subtitle}</p></div>
+          <span className="hidden h-10 w-10 items-center justify-center rounded-xl bg-[#eaf0f8] text-[#284c80] md:flex"><ReceiptText className="h-5 w-5" /></span>
+          <div className="min-w-0"><h2 className="truncate text-base font-bold tracking-tight text-[#1b2f4d] md:text-[17px]">{labels.title}</h2><p className="hidden text-xs text-[#77869a] md:block">{labels.subtitle}</p></div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           {readOnlyPreview && <button type="button" data-testid="button-invoice-preview-edit" onClick={() => setReadOnlyPreview(false)} className="inline-flex min-h-10 items-center rounded-xl border border-[#d8e1ed] bg-white px-3 text-[13px] font-bold text-[#365273]">{en ? 'Edit' : 'সম্পাদনা'}</button>}
-          <button type="button" data-testid="button-invoice-share" disabled={busy} onClick={shareInvoice} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#d8e1ed] bg-white px-3 text-[13px] font-bold text-[#365273] transition hover:bg-[#f5f8fc] disabled:opacity-60">
-            <Share2 className="h-4 w-4" /><span className="hidden sm:inline">{labels.share}</span>
+          <button type="button" data-testid="button-invoice-share" aria-label={labels.share} disabled={busy} onClick={shareInvoice} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#d8e1ed] bg-white px-2.5 text-[13px] font-bold text-[#365273] transition hover:bg-[#f5f8fc] disabled:opacity-60 sm:px-3">
+            <Share2 className="h-4 w-4" /><span className="hidden md:inline">{labels.share}</span>
           </button>
-          <button type="button" data-testid="button-invoice-download" disabled={busy} onClick={downloadPdf} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#244878] px-3.5 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#1c3b66] disabled:opacity-60 sm:px-4">
-            <Download className="h-4 w-4" /><span className="hidden sm:inline">{busy ? (en ? 'Preparing…' : 'তৈরি হচ্ছে…') : labels.download}</span>
+          <button type="button" data-testid="button-invoice-download" aria-label={busy ? (en ? 'Preparing invoice PDF' : 'ইনভয়েস PDF তৈরি হচ্ছে') : labels.download} disabled={busy} onClick={downloadPdf} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#244878] px-2.5 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#1c3b66] disabled:opacity-60 sm:px-3.5 md:px-4">
+            <Download className="h-4 w-4" /><span className="hidden md:inline">{busy ? (en ? 'Preparing…' : 'তৈরি হচ্ছে…') : labels.download}</span>
           </button>
         </div>
       </header>
       <div className="min-h-0 flex-1 overflow-hidden">
-        <section className={`${readOnlyPreview ? 'hidden' : ''} h-full min-h-0 overflow-y-auto px-4 py-5 md:px-6`}>
+        <section className={`${readOnlyPreview ? 'hidden' : ''} h-full min-h-0 overflow-y-auto px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-5`}>
           <div className="w-full space-y-4 pb-8">
             <div className="mb-5 flex items-center justify-between">
               <div><p className="text-[10px] font-bold uppercase tracking-[.16em] text-[#8291a6]">{labels.setup}</p><p className="mt-1 text-sm text-[#697b92]">{en ? 'Fill in what you know. You can edit everything.' : 'প্রয়োজনীয় তথ্য দিন, সবকিছুই পরে সম্পাদনা করা যাবে।'}</p></div>
               <span className="flex h-9 w-9 items-center justify-center rounded-full border border-[#d8e2ee] bg-white text-[#45668f]"><FileText className="h-4 w-4" /></span>
             </div>
-            <section className="rounded-2xl border border-[#e2e8f0] bg-white p-4 shadow-[0_2px_10px_rgba(37,61,92,.035)] md:p-5">
+            <section className="rounded-2xl border border-[#e2e8f0] bg-white p-3 shadow-[0_2px_10px_rgba(37,61,92,.035)] md:p-5">
               {sectionHeading(UserRound, en ? '02 · Customer' : '০২ · গ্রাহক', labels.billTo)}
-              <div className="grid gap-x-3.5 gap-y-3 sm:grid-cols-2">
+              <div data-testid="grid-invoice-customer-fields" className="grid gap-x-3.5 gap-y-3 md:grid-cols-2">
                 {field('customer', labels.customer)}{field('customerPhone', labels.customerPhone)}
                 <label className="block min-w-0 text-[12px] font-semibold text-[#55657b]">{labels.customerIdType}
                   <select data-testid="select-invoice-customer-id-type" value={current.customerIdType} onChange={(event) => set('customerIdType', event.target.value as CustomerDocumentType)} className={inputClass}>
@@ -615,14 +615,14 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
                   </select>
                 </label>
                 {field('customerIdNumber', labels.customerIdNumber)}
-                <label className="block min-w-0 text-[12px] font-semibold text-[#55657b] sm:col-span-2">{labels.customerAddress}
+                <label className="col-span-full block min-w-0 text-[12px] font-semibold text-[#55657b]">{labels.customerAddress}
                   <textarea data-testid="input-invoice-customerAddress" value={current.customerAddress} onChange={(event) => set('customerAddress', event.target.value)} rows={3} className={`${inputClass} resize-y py-3`} />
                 </label>
               </div>
             </section>
-            <section className="rounded-2xl border border-[#e2e8f0] bg-white p-4 shadow-[0_2px_10px_rgba(37,61,92,.035)] md:p-5">
+            <section className="rounded-2xl border border-[#e2e8f0] bg-white p-3 shadow-[0_2px_10px_rgba(37,61,92,.035)] md:p-5">
               {sectionHeading(CalendarDays, en ? '03 · Reference' : '০৩ · তারিখ ও নম্বর', en ? 'Invoice information' : 'ইনভয়েসের তথ্য')}
-              <div className="grid gap-x-3.5 gap-y-3 sm:grid-cols-2">
+              <div data-testid="grid-invoice-reference-fields" className="grid gap-x-3.5 gap-y-3 md:grid-cols-2">
                 {field('date', labels.date, 'date')}
                 {field('paymentTerms', labels.paymentTerms)}
                 {field('metalRate', `${labels.metalRate} (${currencySymbol(current.currency, locale)} ${current.currency})`)}
@@ -655,7 +655,7 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
                 {field('taxRate', labels.tax, 'number')}
               </div>
             </section>
-            <section className="rounded-2xl border border-[#e2e8f0] bg-white p-4 shadow-[0_2px_10px_rgba(37,61,92,.035)] md:p-5">
+            <section className="rounded-2xl border border-[#e2e8f0] bg-white p-3 shadow-[0_2px_10px_rgba(37,61,92,.035)] md:p-5">
               <div className="mb-4 flex items-center justify-between gap-3">
                 {sectionHeading(ReceiptText, en ? '04 · Items' : '০৪ · পণ্য', en ? 'What are you billing?' : 'কোন পণ্যের বিল?')}
                 <span className="mb-4 rounded-full bg-[#f0f4f9] px-2.5 py-1 text-[11px] font-bold text-[#6a7c94]">{lines.length} {labels.item}</span>
@@ -667,8 +667,8 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
                       <span className="text-[11px] font-bold uppercase tracking-[.1em] text-[#8a98aa]">{labels.item} {index + 1}</span>
                       <button type="button" data-testid={`button-invoice-remove-${line.id}`} aria-label={labels.remove} disabled={lines.length === 1} onClick={() => setLines((items) => items.filter((item) => item.id !== line.id))} className="flex h-8 w-8 items-center justify-center rounded-lg text-[#8b5b63] transition hover:bg-[#f9ecee] disabled:opacity-30"><Trash2 className="h-4 w-4" /></button>
                     </div>
-                    <div className="grid grid-cols-[minmax(0,1fr)_110px] items-end gap-2.5">
-                      <label className="text-[12px] font-semibold text-[#55657b]">{labels.description}
+                    <div className="grid grid-cols-1 items-end gap-2.5 md:grid-cols-[minmax(0,1fr)_110px]">
+                      <label className="min-w-0 text-[12px] font-semibold text-[#55657b]">{labels.description}
                         <input data-testid={`input-invoice-item-description-${line.id}`} value={line.description} onChange={(e) => setLines((items) => items.map((item) => item.id === line.id ? { ...item, description: e.target.value } : item))} placeholder={en ? 'e.g. Rice, 5 kg' : 'যেমন: চাল, ৫ কেজি'} className={inputClass} />
                       </label>
                       <label className="text-[12px] font-semibold text-[#55657b]">{labels.amount}
@@ -685,7 +685,7 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
               <button type="button" data-testid="button-invoice-add-item" onClick={() => { setLines((items) => [...items, { id: nextId, description: '', amount: '', taxed: false }]); setNextId((id) => id + 1); }} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-xl border border-dashed border-[#a9bad0] px-3.5 text-[13px] font-bold text-[#31578f] transition hover:border-[#31578f] hover:bg-[#f4f7fb]"><Plus className="h-4 w-4" />{labels.add}</button>
               <p className="mt-2 text-[11px] leading-relaxed text-[#8391a3]">{labels.taxHint}</p>
             </section>
-            <label className="block rounded-2xl border border-[#e2e8f0] bg-white p-4 text-[12px] font-semibold text-[#55657b] shadow-[0_2px_10px_rgba(37,61,92,.035)] md:p-5">{labels.comments}
+            <label className="block rounded-2xl border border-[#e2e8f0] bg-white p-3 text-[12px] font-semibold text-[#55657b] shadow-[0_2px_10px_rgba(37,61,92,.035)] md:p-5">{labels.comments}
               <textarea data-testid="textarea-invoice-comments" value={current.comments} onChange={(e) => set('comments', e.target.value)} rows={3} placeholder={en ? 'Payment details, thanks, or other notes…' : 'পেমেন্টের তথ্য বা অন্য কোনো নোট…'} className={`${inputClass} min-h-[92px] resize-y py-3`} />
             </label>
             <button type="button" aria-label={en ? 'Generate Invoice' : 'ইনভয়েস তৈরি করুন'} data-testid="button-invoice-save-history" onClick={() => { if (persistHistory(true)) onGenerated?.(); }} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#1B3A6B] px-5 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#17315a] active:scale-[.99]">
