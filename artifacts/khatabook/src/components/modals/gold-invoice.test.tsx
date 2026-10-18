@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { GoldInvoice } from './gold-invoice';
 
-const pdfCapture = vi.hoisted(() => ({ elementId: '', options: null as null | Record<string, unknown> }));
+const pdfCapture = vi.hoisted(() => ({ elementId: '', options: null as null | Record<string, unknown>, fail: false }));
 
 vi.mock('@/lib/i18n', () => ({ useLanguage: () => ({ lang: 'en' }) }));
 vi.mock('html2pdf.js', () => ({
@@ -17,6 +17,7 @@ vi.mock('html2pdf.js', () => ({
         return worker;
       },
       async outputPdf() {
+        if (pdfCapture.fail) throw new Error('Simulated renderer failure');
         return new Blob(['gold-invoice-pdf'], { type: 'application/pdf' });
       },
     };
@@ -35,6 +36,7 @@ describe('gold invoice', () => {
     localStorage.clear();
     pdfCapture.elementId = '';
     pdfCapture.options = null;
+    pdfCapture.fail = false;
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:gold-invoice') });
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
     if (!globalThis.ResizeObserver) {
@@ -136,6 +138,17 @@ describe('gold invoice', () => {
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       html2canvas: { windowWidth: 794, scale: 2 },
     });
+    expect((pdfCapture.options?.html2canvas as { onclone?: unknown }).onclone).toEqual(expect.any(Function));
+  });
+
+  it('opens the browser print dialog when the PDF renderer fails', async () => {
+    pdfCapture.fail = true;
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+    render(<GoldInvoice />);
+    fireEvent.change(screen.getByTestId('input-gold-customerName'), { target: { value: 'Gold Customer' } });
+    fireEvent.click(screen.getByTestId('button-gold-download'));
+
+    await waitFor(() => expect(print).toHaveBeenCalledOnce());
   });
 
   it('falls back to copying the invoice link if browser sharing rejects the PDF', async () => {

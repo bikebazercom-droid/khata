@@ -94,6 +94,56 @@ function numberToWords(input: number, lang: string): string {
   return parts.join(' ');
 }
 
+function oklchToRgb(value: string): string | null {
+  const match = value.match(/oklch\(\s*([+-]?(?:\d*\.)?\d+%?)\s+([+-]?(?:\d*\.)?\d+%?)\s+([+-]?(?:\d*\.)?\d+(?:deg|rad|turn)?)\s*(?:\/\s*([+-]?(?:\d*\.)?\d+%?))?\s*\)/i);
+  if (!match) return null;
+
+  const lightness = parseFloat(match[1]) / (match[1].endsWith('%') ? 100 : 1);
+  const chroma = parseFloat(match[2]) * (match[2].endsWith('%') ? 0.004 : 1);
+  const hueText = match[3].toLowerCase();
+  const hueValue = parseFloat(hueText);
+  const hue = hueText.endsWith('turn') ? hueValue * 2 * Math.PI
+    : hueText.endsWith('rad') ? hueValue
+      : hueValue * Math.PI / 180;
+  const alpha = match[4] ? parseFloat(match[4]) / (match[4].endsWith('%') ? 100 : 1) : 1;
+  const a = chroma * Math.cos(hue);
+  const b = chroma * Math.sin(hue);
+  const lRoot = lightness + 0.3963377774 * a + 0.2158037573 * b;
+  const mRoot = lightness - 0.1055613458 * a - 0.0638541728 * b;
+  const sRoot = lightness - 0.0894841775 * a - 1.291485548 * b;
+  const l = lRoot ** 3;
+  const m = mRoot ** 3;
+  const s = sRoot ** 3;
+  const channels = [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  ].map((channel) => {
+    const linear = Math.max(0, Math.min(1, channel));
+    const srgb = linear <= 0.0031308 ? 12.92 * linear : 1.055 * linear ** (1 / 2.4) - 0.055;
+    return Math.round(srgb * 255);
+  });
+  return alpha < 1 ? `rgba(${channels.join(', ')}, ${Math.max(0, Math.min(1, alpha))})` : `rgb(${channels.join(', ')})`;
+}
+
+function normalizePdfColors(clonedDocument: Document) {
+  const root = clonedDocument.getElementById('printable-gold-invoice');
+  const view = clonedDocument.defaultView;
+  if (!root || !view) throw new Error('Invoice element was not present in the PDF capture clone');
+
+  const elements = [root, ...Array.from(root.querySelectorAll<HTMLElement | SVGElement>('*'))];
+  for (const element of elements) {
+    const styles = view.getComputedStyle(element);
+    for (let index = 0; index < styles.length; index += 1) {
+      const property = styles[index];
+      const value = styles.getPropertyValue(property);
+      if (!value.includes('oklch(')) continue;
+      const normalized = value.replace(/oklch\([^)]*\)/gi, (color) => oklchToRgb(color) || color);
+      element.style.setProperty(property, normalized, 'important');
+    }
+  }
+}
+
 export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = false, onGenerated }: { historyRecord?: InvoiceHistoryRecord; autoAction?: InvoiceHistoryAction; viewOnly?: boolean; onGenerated?: () => void }) {
   const { lang } = useLanguage();
   const en = lang === 'en';
@@ -234,16 +284,45 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
       await Promise.all(Array.from(element.querySelectorAll('img')).map((image) =>
         image.decode().catch(() => undefined),
       ));
+      normalizePdfColors(document);
 
       const blob = await html2pdf().set({
         margin: [10, 10, 10, 10], filename: `Gold_Invoice_${data.number.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0, windowWidth: 794, backgroundColor: '#fff' },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: 794,
+          backgroundColor: '#fff',
+          onclone: normalizePdfColors,
+        },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       }).from(element).outputPdf('blob') as Blob;
       if (!(blob instanceof Blob) || blob.size === 0) throw new Error('PDF renderer returned an empty file');
       return blob;
     } finally { setPdfMode(false); }
+  };
+  const printInvoiceFallback = async () => {
+    if (typeof window.print !== 'function') throw new Error('This WebView does not provide a print dialog');
+    const root = printRef.current;
+    const host = root?.closest('section');
+    if (!root?.isConnected || !host) throw new Error('Invoice preview is not available for printing');
+    document.body.classList.add('gold-invoice-print-fallback');
+    const ancestors: HTMLElement[] = [];
+    for (let parent = host.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
+      parent.classList.add('gold-invoice-print-ancestor');
+      ancestors.push(parent);
+    }
+    const cleanup = () => {
+      document.body.classList.remove('gold-invoice-print-fallback');
+      for (const ancestor of ancestors) ancestor.classList.remove('gold-invoice-print-ancestor');
+    };
+    window.addEventListener('afterprint', cleanup, { once: true });
+    await new Promise<void>((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve())));
+    window.print();
+    window.setTimeout(cleanup, 1000);
   };
   const shareUrl = () => {
     const bytes = new TextEncoder().encode(JSON.stringify({ data, lines }));
@@ -263,7 +342,17 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
       const anchor = document.createElement('a');
       anchor.href = url; anchor.download = fileName; document.body.appendChild(anchor); anchor.click(); anchor.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (error) { console.error('Gold invoice PDF failed:', error); toast.error(labels.downloadError); }
+    } catch (error) {
+      console.error('Gold invoice PDF failed:', error);
+      try {
+        await printInvoiceFallback();
+        toast.info(en ? 'PDF rendering failed. Choose “Save as PDF” in the print dialog.' : 'PDF তৈরি হয়নি। প্রিন্ট ডায়ালগে “Save as PDF” বেছে নিন।');
+      } catch (printError) {
+        console.error('Gold invoice print fallback failed:', printError);
+        const detail = printError instanceof Error ? ` ${printError.message}` : '';
+        toast.error(`${labels.downloadError}${detail}`);
+      }
+    }
     finally { setBusy(false); }
   };
   const copyInvoiceLink = async (link: string) => {
@@ -490,7 +579,7 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
             </button>
           </div>
         </section>
-        {(readOnlyPreview || pdfMode) && <section className={readOnlyPreview ? 'h-full min-h-0 overflow-auto bg-[#edece7] p-3 md:p-5' : 'fixed left-[-10000px] top-0 z-[-1] block w-[794px]'}>
+        {(readOnlyPreview || pdfMode) && <section className={`gold-invoice-print-host ${readOnlyPreview ? 'h-full min-h-0 overflow-auto bg-[#edece7] p-3 md:p-5' : 'fixed left-[-10000px] top-0 z-[-1] block w-[794px]'}`}>
           <div className="mx-auto mb-3 flex max-w-[794px] items-center justify-between text-[10px] font-bold uppercase tracking-[.12em] text-[#82817b]"><span>{en ? 'Invoice preview' : 'ইনভয়েস প্রিভিউ'}</span><span className="rounded-full bg-white px-2.5 py-1">{data.number}</span></div>
           <div ref={previewShellRef} className="gold-preview-shell mx-auto w-full max-w-[794px] overflow-hidden rounded-sm shadow-[0_8px_35px_rgba(30,37,48,.16)]" style={{ height: `${1123 * (pdfMode ? 1 : previewScale)}px` }}>{invoice}</div>
         </section>}

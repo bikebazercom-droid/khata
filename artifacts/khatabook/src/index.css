@@ -243,6 +243,57 @@ textarea {
     width: 100%;
     height: auto;
   }
+
+  body.gold-invoice-print-fallback * {
+    visibility: hidden !important;
+  }
+  body.gold-invoice-print-fallback .gold-invoice-print-host,
+  body.gold-invoice-print-fallback .gold-invoice-print-host * {
+    visibility: visible !important;
+  }
+  body.gold-invoice-print-fallback .gold-invoice-print-ancestor {
+    position: static !important;
+    overflow: visible !important;
+    width: auto !important;
+    height: auto !important;
+    max-height: none !important;
+    transform: none !important;
+    contain: none !important;
+  }
+  body.gold-invoice-print-fallback .gold-invoice-print-host {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    display: block !important;
+    width: 794px !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #fff !important;
+  }
+  body.gold-invoice-print-fallback .gold-preview-shell {
+    width: 794px !important;
+    max-width: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  body.gold-invoice-print-fallback .gold-print-root {
+    width: 794px !important;
+    min-height: 1123px !important;
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    transform: none !important;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
 }
 
 @layer components {
