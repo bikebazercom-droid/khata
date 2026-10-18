@@ -4,6 +4,7 @@ import { Building2, CalendarDays, Check, ChevronDown, Download, FileText, Plus, 
 import { QRCodeSVG } from 'qrcode.react';
 import { useLanguage } from '@/lib/i18n';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
+import { normalizePdfColors } from '@/lib/pdf-color-normalization';
 import { saveInvoiceHistory, type InvoiceHistoryAction, type InvoiceHistoryRecord } from './invoice-history';
 
 type GoldLine = { id: number; description: string; gross: string; grossUnit: 'g' | 'vori'; purity: string; makingRate: string; makingAmount: string };
@@ -92,56 +93,6 @@ function numberToWords(input: number, lang: string): string {
     if (count) { parts.push(`${chunk(count)}${name ? ` ${name}` : ''}`); input %= size; }
   }
   return parts.join(' ');
-}
-
-function oklchToRgb(value: string): string | null {
-  const match = value.match(/oklch\(\s*([+-]?(?:\d*\.)?\d+%?)\s+([+-]?(?:\d*\.)?\d+%?)\s+([+-]?(?:\d*\.)?\d+(?:deg|rad|turn)?)\s*(?:\/\s*([+-]?(?:\d*\.)?\d+%?))?\s*\)/i);
-  if (!match) return null;
-
-  const lightness = parseFloat(match[1]) / (match[1].endsWith('%') ? 100 : 1);
-  const chroma = parseFloat(match[2]) * (match[2].endsWith('%') ? 0.004 : 1);
-  const hueText = match[3].toLowerCase();
-  const hueValue = parseFloat(hueText);
-  const hue = hueText.endsWith('turn') ? hueValue * 2 * Math.PI
-    : hueText.endsWith('rad') ? hueValue
-      : hueValue * Math.PI / 180;
-  const alpha = match[4] ? parseFloat(match[4]) / (match[4].endsWith('%') ? 100 : 1) : 1;
-  const a = chroma * Math.cos(hue);
-  const b = chroma * Math.sin(hue);
-  const lRoot = lightness + 0.3963377774 * a + 0.2158037573 * b;
-  const mRoot = lightness - 0.1055613458 * a - 0.0638541728 * b;
-  const sRoot = lightness - 0.0894841775 * a - 1.291485548 * b;
-  const l = lRoot ** 3;
-  const m = mRoot ** 3;
-  const s = sRoot ** 3;
-  const channels = [
-    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
-  ].map((channel) => {
-    const linear = Math.max(0, Math.min(1, channel));
-    const srgb = linear <= 0.0031308 ? 12.92 * linear : 1.055 * linear ** (1 / 2.4) - 0.055;
-    return Math.round(srgb * 255);
-  });
-  return alpha < 1 ? `rgba(${channels.join(', ')}, ${Math.max(0, Math.min(1, alpha))})` : `rgb(${channels.join(', ')})`;
-}
-
-function normalizePdfColors(clonedDocument: Document) {
-  const root = clonedDocument.getElementById('printable-gold-invoice');
-  const view = clonedDocument.defaultView;
-  if (!root || !view) throw new Error('Invoice element was not present in the PDF capture clone');
-
-  const elements = [root, ...Array.from(root.querySelectorAll<HTMLElement | SVGElement>('*'))];
-  for (const element of elements) {
-    const styles = view.getComputedStyle(element);
-    for (let index = 0; index < styles.length; index += 1) {
-      const property = styles[index];
-      const value = styles.getPropertyValue(property);
-      if (!value.includes('oklch(')) continue;
-      const normalized = value.replace(/oklch\([^)]*\)/gi, (color) => oklchToRgb(color) || color);
-      element.style.setProperty(property, normalized, 'important');
-    }
-  }
 }
 
 export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = false, onGenerated }: { historyRecord?: InvoiceHistoryRecord; autoAction?: InvoiceHistoryAction; viewOnly?: boolean; onGenerated?: () => void }) {
@@ -284,7 +235,7 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
       await Promise.all(Array.from(element.querySelectorAll('img')).map((image) =>
         image.decode().catch(() => undefined),
       ));
-      normalizePdfColors(document);
+      normalizePdfColors(document, 'printable-gold-invoice');
 
       const blob = await html2pdf().set({
         margin: [10, 10, 10, 10], filename: `Gold_Invoice_${data.number.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
@@ -296,7 +247,7 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
           scrollY: 0,
           windowWidth: 794,
           backgroundColor: '#fff',
-          onclone: normalizePdfColors,
+          onclone: (clonedDocument: Document) => normalizePdfColors(clonedDocument, 'printable-gold-invoice'),
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       }).from(element).outputPdf('blob') as Blob;
@@ -320,9 +271,14 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
       for (const ancestor of ancestors) ancestor.classList.remove('gold-invoice-print-ancestor');
     };
     window.addEventListener('afterprint', cleanup, { once: true });
-    await new Promise<void>((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve())));
-    window.print();
-    window.setTimeout(cleanup, 1000);
+    try {
+      await new Promise<void>((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve())));
+      window.print();
+      window.setTimeout(cleanup, 1000);
+    } catch (error) {
+      cleanup();
+      throw error;
+    }
   };
   const shareUrl = () => {
     const bytes = new TextEncoder().encode(JSON.stringify({ data, lines }));
@@ -374,14 +330,15 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
   const shareInvoice = async () => {
     setBusy(true);
     let link = '';
+    let generatedBlob: Blob | null = null;
     try {
       if (!persistHistory()) return;
       link = shareUrl();
-      const blob = await createPdf();
+      generatedBlob = await createPdf();
       const text = `${labels.title} ${data.number} · ${labels.total}: ${money(calculations.total)}`;
-      const native = await shareGeneratedFileWithNative(blob, { fileName, mimeType: 'application/pdf', title: `${labels.title} ${data.number}`, shareText: `${text}\n${link}` });
+      const native = await shareGeneratedFileWithNative(generatedBlob, { fileName, mimeType: 'application/pdf', title: `${labels.title} ${data.number}`, shareText: `${text}\n${link}` });
       if (native) return;
-      const file = new File([blob], fileName, { type: 'application/pdf' });
+      const file = new File([generatedBlob], fileName, { type: 'application/pdf' });
       if (typeof navigator.share === 'function' && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], title: `${labels.title} ${data.number}`, text, url: link });
       } else if (typeof navigator.share === 'function') {
@@ -392,7 +349,35 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
     } catch (error) {
       if ((error as DOMException)?.name === 'AbortError') return;
       console.error('Gold invoice sharing failed:', error);
-      try { await copyInvoiceLink(link || shareUrl()); } catch { toast.error(labels.shareError); }
+      try {
+        await copyInvoiceLink(link || shareUrl());
+      } catch (copyError) {
+        console.error('Gold invoice link fallback failed:', copyError);
+        if (generatedBlob) {
+          try {
+            const url = URL.createObjectURL(generatedBlob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = fileName;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+            toast.info(en ? 'Could not share. The invoice PDF was downloaded instead.' : 'শেয়ার করা যায়নি। ইনভয়েস PDF ডাউনলোড করা হয়েছে।');
+          } catch (downloadError) {
+            console.error('Gold invoice download fallback failed:', downloadError);
+            toast.error(labels.shareError);
+          }
+        } else {
+          try {
+            await printInvoiceFallback();
+            toast.info(en ? 'The PDF could not be shared. Choose “Save as PDF” in the print dialog.' : 'PDF শেয়ার করা যায়নি। প্রিন্ট ডায়ালগে “Save as PDF” বেছে নিন।');
+          } catch (printError) {
+            console.error('Gold invoice print fallback failed:', printError);
+            toast.error(labels.shareError);
+          }
+        }
+      }
     }
     finally { setBusy(false); }
   };

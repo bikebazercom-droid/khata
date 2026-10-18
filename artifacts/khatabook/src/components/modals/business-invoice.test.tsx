@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { BusinessInvoice } from './business-invoice';
 
@@ -9,6 +9,7 @@ const pdfCapture = vi.hoisted(() => ({
   padding: '',
   boxSizing: '',
   overflow: '',
+  fail: false,
 }));
 
 vi.mock('@/lib/i18n', () => ({ useLanguage: () => ({ lang: 'en' }) }));
@@ -28,6 +29,7 @@ vi.mock('html2pdf.js', () => ({
         return worker;
       },
       async outputPdf() {
+        if (pdfCapture.fail) throw new Error('Simulated renderer failure');
         return new Blob(['pdf'], { type: 'application/pdf' });
       },
     };
@@ -36,7 +38,12 @@ vi.mock('html2pdf.js', () => ({
 }));
 
 describe('business invoice', () => {
+  const originalClipboard = navigator.clipboard;
+  const originalShare = navigator.share;
+  const originalCanShare = navigator.canShare;
+
   beforeEach(() => {
+    pdfCapture.fail = false;
     localStorage.removeItem('selected_business_id');
     localStorage.removeItem('banglakhata_business_invoice_profile_v1:default');
     if (!globalThis.ResizeObserver) {
@@ -47,6 +54,16 @@ describe('business invoice', () => {
       };
     }
     Element.prototype.scrollIntoView ??= vi.fn();
+  });
+
+  afterEach(() => {
+    if (originalClipboard) Object.defineProperty(navigator, 'clipboard', { configurable: true, value: originalClipboard });
+    else delete (navigator as unknown as Record<string, unknown>).clipboard;
+    if (originalShare) Object.defineProperty(navigator, 'share', { configurable: true, value: originalShare });
+    else delete (navigator as unknown as Record<string, unknown>).share;
+    if (originalCanShare) Object.defineProperty(navigator, 'canShare', { configurable: true, value: originalCanShare });
+    else delete (navigator as unknown as Record<string, unknown>).canShare;
+    vi.restoreAllMocks();
   });
 
   it('keeps the full-width entry form active while editing invoice details', () => {
@@ -160,9 +177,34 @@ describe('business invoice', () => {
     const options = pdfCapture.options as Record<string, unknown> | null;
     expect(options?.margin).toEqual([10, 10, 10, 10]);
     expect(options?.html2canvas).toMatchObject({ windowWidth: 794, scrollX: 0, scrollY: 0, scale: 2 });
+    expect((options?.html2canvas as { onclone?: unknown }).onclone).toEqual(expect.any(Function));
 
     createObjectUrl.mockRestore();
     click.mockRestore();
+  });
+
+  it('copies the invoice link when browser PDF sharing is rejected', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const share = vi.fn().mockRejectedValue(new DOMException('Not allowed', 'NotAllowedError'));
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    Object.defineProperty(navigator, 'share', { configurable: true, value: share });
+    render(<BusinessInvoice />);
+    fireEvent.change(screen.getByTestId('input-invoice-customer'), { target: { value: 'Share Customer' } });
+    fireEvent.click(screen.getByTestId('button-invoice-share'));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
+    expect(share).toHaveBeenCalledOnce();
+    expect(writeText.mock.calls[0][0]).toContain('#invoice=');
+  });
+
+  it('opens the browser print dialog when the PDF renderer fails', async () => {
+    pdfCapture.fail = true;
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+    render(<BusinessInvoice />);
+    fireEvent.change(screen.getByTestId('input-invoice-customer'), { target: { value: 'Print Customer' } });
+    fireEvent.click(screen.getByTestId('button-invoice-download'));
+
+    await waitFor(() => expect(print).toHaveBeenCalledOnce());
   });
 
   it('keeps seller profile fields out of the invoice creation form', () => {

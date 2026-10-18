@@ -6,6 +6,7 @@ import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useLanguage } from '@/lib/i18n';
 import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
+import { normalizePdfColors } from '@/lib/pdf-color-normalization';
 import { saveInvoiceHistory, type InvoiceHistoryAction, type InvoiceHistoryRecord } from './invoice-history';
 
 type InvoiceLine = { id: number; description: string; amount: string; taxed: boolean };
@@ -260,6 +261,7 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
     subtotal: 'Subtotal', taxable: 'Taxable amount', taxDue: 'Tax', total: 'Total due', thank: 'Thank you for your business.',
     companyBlock: 'From your shop', billTo: 'Bill to', commentsBlock: 'Notes', empty: 'Add your shop and customer details to complete the invoice.',
     shared: 'Invoice link copied. Paste it into WhatsApp or email.', shareError: 'Could not share the invoice.',
+    downloadError: 'Could not prepare the invoice PDF.',
     setup: 'Invoice details', item: 'Item', remove: 'Remove item', taxHint: 'Tax is calculated only on items marked taxable.',
     profileSaved: 'Business Details Saved', editProfile: 'Edit Profile', saveProfile: 'Save Business Profile',
     cancel: 'Cancel', uploadLogo: 'Upload a PNG or JPG logo', logoLimit: 'Logo is resized to fit the invoice header.',
@@ -279,6 +281,7 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
     subtotal: 'সাবটোটাল', taxable: 'করযোগ্য পরিমাণ', taxDue: 'কর', total: 'মোট পাওনা', thank: 'আপনার ব্যবসার জন্য ধন্যবাদ।',
     companyBlock: 'আপনার দোকান থেকে', billTo: 'যার নামে বিল', commentsBlock: 'নোট', empty: 'ইনভয়েস সম্পূর্ণ করতে দোকান ও গ্রাহকের তথ্য দিন।',
     shared: 'ইনভয়েসের লিংক কপি হয়েছে। WhatsApp বা ইমেইলে পেস্ট করুন।', shareError: 'ইনভয়েস শেয়ার করা যায়নি।',
+    downloadError: 'ইনভয়েস PDF তৈরি করা যায়নি।',
     setup: 'ইনভয়েসের তথ্য', item: 'আইটেম', remove: 'আইটেম মুছুন', taxHint: 'শুধু করযোগ্য হিসেবে চিহ্নিত আইটেমে কর হিসাব হবে।',
     profileSaved: 'ব্যবসার তথ্য সংরক্ষিত', editProfile: 'প্রোফাইল সম্পাদনা', saveProfile: 'ব্যবসার প্রোফাইল সংরক্ষণ',
     cancel: 'বাতিল', uploadLogo: 'PNG বা JPG লোগো আপলোড করুন', logoLimit: 'লোগো ইনভয়েসের হেডারে মানানসই করে ছোট করা হবে।',
@@ -389,9 +392,19 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
   async function createPdf() {
     setPdfMode(true);
     try {
-      await new Promise((resolve) => window.setTimeout(resolve, 80));
-      if (!printRef.current) throw new Error('Invoice preview is not ready.');
       const { default: html2pdf } = await import('html2pdf.js');
+      const element = printRef.current;
+      if (!element?.isConnected) throw new Error('Invoice preview is not ready.');
+      await new Promise<void>((resolve) => {
+        if (typeof window.requestAnimationFrame === 'function') {
+          window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+        } else window.setTimeout(resolve, 100);
+      });
+      if (document.fonts?.ready) await document.fonts.ready;
+      await Promise.all(Array.from(element.querySelectorAll('img')).map((image) =>
+        image.decode().catch(() => undefined),
+      ));
+      normalizePdfColors(document, 'printable-invoice');
       const worker = html2pdf().set({
         margin: [10, 10, 10, 10],
         filename,
@@ -403,24 +416,54 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
           scrollY: 0,
           windowWidth: 794,
           backgroundColor: '#ffffff',
+          onclone: (clonedDocument: Document) => normalizePdfColors(clonedDocument, 'printable-invoice'),
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      }).from(printRef.current);
-      return await worker.outputPdf('blob') as Blob;
+      }).from(element);
+      const blob = await worker.outputPdf('blob') as Blob;
+      if (!(blob instanceof Blob) || blob.size === 0) throw new Error('PDF renderer returned an empty file.');
+      return blob;
     } finally {
       setPdfMode(false);
     }
   }
-  async function shareInvoice() {
-    const text = `${labels.title} ${current.number}\n${labels.customer}: ${current.customer || '—'}\n${labels.total}: ${money(totals.total, current.currency, lang)}`;
-    setBusy(true);
+  async function printInvoiceFallback() {
+    if (typeof window.print !== 'function') throw new Error('This WebView does not provide a print dialog.');
+    const root = printRef.current;
+    const host = root?.closest('section');
+    if (!root?.isConnected || !host) throw new Error('Invoice preview is not available for printing.');
+    document.body.classList.add('business-invoice-print-fallback');
+    const ancestors: HTMLElement[] = [];
+    for (let parent = host.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
+      parent.classList.add('business-invoice-print-ancestor');
+      ancestors.push(parent);
+    }
+    const cleanup = () => {
+      document.body.classList.remove('business-invoice-print-fallback');
+      for (const ancestor of ancestors) ancestor.classList.remove('business-invoice-print-ancestor');
+    };
+    window.addEventListener('afterprint', cleanup, { once: true });
     try {
-      const blob = await createPdf();
-      const link = shareUrl();
+      await new Promise<void>((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve())));
+      window.print();
+      window.setTimeout(cleanup, 1000);
+    } catch (error) {
+      cleanup();
+      throw error;
+    }
+  }
+  async function shareInvoice() {
+    setBusy(true);
+    let generatedBlob: Blob | null = null;
+    let link = '';
+    try {
+      const text = `${labels.title} ${current.number}\n${labels.customer}: ${current.customer || '—'}\n${labels.total}: ${money(totals.total, current.currency, lang)}`;
+      generatedBlob = await createPdf();
+      link = shareUrl();
       const shareText = `${text}\n${link}`;
-      const native = await shareGeneratedFileWithNative(blob, { fileName: filename, mimeType: 'application/pdf', title: `${labels.title} ${current.number}`, shareText });
+      const native = await shareGeneratedFileWithNative(generatedBlob, { fileName: filename, mimeType: 'application/pdf', title: `${labels.title} ${current.number}`, shareText });
       if (native) return;
-      const file = new File([blob], filename, { type: 'application/pdf' });
+      const file = new File([generatedBlob], filename, { type: 'application/pdf' });
       if (typeof navigator.share === 'function' && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file], title: `${labels.title} ${current.number}`, text, url: link });
       } else if (typeof navigator.share === 'function') {
@@ -430,10 +473,36 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
       }
     } catch (error) {
       if ((error as DOMException)?.name === 'AbortError') return;
+      console.error('Business invoice sharing failed:', error);
       try {
+        if (!link) link = shareUrl();
         await copyInvoiceLink();
-      } catch {
-        toast.error(labels.shareError);
+      } catch (copyError) {
+        console.error('Business invoice link fallback failed:', copyError);
+        if (generatedBlob) {
+          try {
+            const url = URL.createObjectURL(generatedBlob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = filename;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+            toast.info(en ? 'Could not share. The invoice PDF was downloaded instead.' : 'শেয়ার করা যায়নি। ইনভয়েস PDF ডাউনলোড করা হয়েছে।');
+          } catch (downloadError) {
+            console.error('Business invoice download fallback failed:', downloadError);
+            toast.error(labels.shareError);
+          }
+        } else {
+          try {
+            await printInvoiceFallback();
+            toast.info(en ? 'The PDF could not be shared. Choose “Save as PDF” in the print dialog.' : 'PDF শেয়ার করা যায়নি। প্রিন্ট ডায়ালগে “Save as PDF” বেছে নিন।');
+          } catch (printError) {
+            console.error('Business invoice print fallback failed:', printError);
+            toast.error(labels.shareError);
+          }
+        }
       }
     } finally {
       setBusy(false);
@@ -454,7 +523,14 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) {
       console.error('Invoice PDF generation failed:', error);
-      toast.error(labels.shareError);
+      try {
+        await printInvoiceFallback();
+        toast.info(en ? 'PDF rendering failed. Choose “Save as PDF” in the print dialog.' : 'PDF তৈরি হয়নি। প্রিন্ট ডায়ালগে “Save as PDF” বেছে নিন।');
+      } catch (printError) {
+        console.error('Business invoice print fallback failed:', printError);
+        const detail = printError instanceof Error ? ` ${printError.message}` : '';
+        toast.error(`${labels.downloadError}${detail}`);
+      }
     } finally {
       setBusy(false);
     }
@@ -583,7 +659,7 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
             </button>
           </div>
         </section>
-        {(readOnlyPreview || pdfMode) && <section className={readOnlyPreview ? 'h-full min-h-0 overflow-auto bg-[#e9eef5] px-3 py-5 md:px-6 md:py-7' : 'fixed left-[-10000px] top-0 z-[-1] block w-[794px]'}>
+        {(readOnlyPreview || pdfMode) && <section className={`business-invoice-print-host ${readOnlyPreview ? 'h-full min-h-0 overflow-auto bg-[#e9eef5] px-3 py-5 md:px-6 md:py-7' : 'fixed left-[-10000px] top-0 z-[-1] block w-[794px]'}`}>
           <div className="mx-auto mb-3 flex max-w-[816px] items-center justify-between px-1 text-[10px] font-bold uppercase tracking-[.15em] text-[#79899e]">
             <span>{en ? 'Invoice preview' : 'ইনভয়েস প্রিভিউ'}</span><span className="rounded-full bg-white px-2.5 py-1 text-[#526783]">{current.number}</span>
           </div>
