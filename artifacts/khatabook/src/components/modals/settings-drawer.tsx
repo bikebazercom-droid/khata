@@ -34,7 +34,7 @@ import { GoldInvoice } from './gold-invoice';
 import { BusinessProfile } from './business-profile';
 import { InvoiceList } from './invoice-list';
 import type { InvoiceHistoryAction, InvoiceHistoryRecord } from './invoice-history';
-import { revokeNetworkWrites } from '@/lib/useAuthConnectivity';
+import { isOfflineMode, revokeNetworkWrites } from '@/lib/useAuthConnectivity';
 import {
   NATIVE_AUTH_LOGOUT_MESSAGE,
   postNativeAuthMessage,
@@ -170,7 +170,7 @@ export function SettingsDrawer({
     if (isLoggingOut) return;
     setIsLoggingOut(true);
     const offlineIdentity = readOfflineIdentity();
-    if (!navigator.onLine) {
+    if (isOfflineMode()) {
       markLocalLogoutPending();
       clearOfflineIdentity();
       void clearPersistedQueries(offlineIdentity?.userId).catch(() => {});

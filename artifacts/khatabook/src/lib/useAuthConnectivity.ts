@@ -6,7 +6,7 @@ export type AuthConnectivity = 'probing' | 'online' | 'offline';
 export const AUTH_PROBE_TIMEOUT_MS = 6000;
 const CLERK_BOOT_TIMEOUT_MS = 8000;
 let networkWritesAuthorized = false;
-let offlineMode = typeof navigator !== 'undefined' && !navigator.onLine;
+let offlineMode = false;
 export function isNetworkWriteAuthorized() { return networkWritesAuthorized; }
 export function isOfflineMode() { return offlineMode; }
 export function markServerReauthenticated() { networkWritesAuthorized = true; offlineMode = false; }
@@ -18,7 +18,7 @@ export function revokeNetworkWrites() { networkWritesAuthorized = false; }
  * still report true. Without the server, browser ledger routes stay unavailable.
  */
 export function useAuthConnectivity(clearQueries: () => void) {
-  const [phase, setPhase] = useState<AuthConnectivity>(() => navigator.onLine ? 'probing' : 'offline');
+  const [phase, setPhase] = useState<AuthConnectivity>('probing');
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
   const settled = useRef(false);
@@ -36,7 +36,6 @@ export function useAuthConnectivity(clearQueries: () => void) {
   }, []);
 
   const probe = useCallback(async () => {
-    if (!navigator.onLine) { goOffline(); return; }
     revokeNetworkWrites();
     const id = ++attempt.current;
     activeProbe.current?.abort();
@@ -61,6 +60,7 @@ export function useAuthConnectivity(clearQueries: () => void) {
       const me = await fetchMe(controller.signal);
       if (id !== attempt.current) return;
       if (!me.userId || !me.businessId || (me.role !== 'owner' && me.role !== 'staff')) throw new Error('Invalid identity response');
+      offlineMode = false;
       settled.current = false;
       setPhase('online');
     } catch (error) {
@@ -82,20 +82,22 @@ export function useAuthConnectivity(clearQueries: () => void) {
   }, [clearQueries, goOffline]);
 
   useEffect(() => {
-    if (navigator.onLine) void probe();
+    // WebViews can report navigator.onLine=false while their HTTPS connection
+    // is working. Let the authenticated server probe determine connectivity.
+    void probe();
     const online = () => { void probe(); };
     window.addEventListener('online', online);
-    window.addEventListener('offline', goOffline);
+    window.addEventListener('offline', online);
     const retry = window.setInterval(() => {
-      if (navigator.onLine && phaseRef.current === 'offline') void probe();
+      if (phaseRef.current === 'offline') void probe();
     }, 10_000);
     const visible = () => {
-      if (document.visibilityState === 'visible' && navigator.onLine && phaseRef.current === 'offline') void probe();
+      if (document.visibilityState === 'visible' && phaseRef.current === 'offline') void probe();
     };
     document.addEventListener('visibilitychange', visible);
     return () => {
       window.removeEventListener('online', online);
-      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('offline', online);
       document.removeEventListener('visibilitychange', visible);
       window.clearInterval(retry);
       attempt.current++;

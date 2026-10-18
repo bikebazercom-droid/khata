@@ -15,7 +15,6 @@ export function isTransientNetworkError(error: unknown): boolean {
   // and validation rejections must be shown to the user, not replayed as if
   // they were caused by lost connectivity.
   if (status !== undefined) return status === 0;
-  if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
   if (!record) {
     return error instanceof Error && /network|fetch|offline|timeout|connection/i.test(error.message);
   }

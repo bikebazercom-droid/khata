@@ -37,6 +37,21 @@ describe('cold auth connectivity gate', () => {
     unmount();
   });
 
+  it('trusts a successful server probe when WebView reports navigator.onLine=false', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => me });
+    vi.stubGlobal('fetch', fetchMock);
+    const { result, unmount } = renderHook(() => useAuthConnectivity(vi.fn()));
+    expect(result.current.phase).toBe('probing');
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(fetchMock).toHaveBeenCalledWith('/api/auth/me', expect.objectContaining({
+      credentials: 'include',
+      cache: 'no-store',
+    }));
+    expect(result.current.phase).toBe('online');
+    unmount();
+  });
+
   it.each([401, 403])('keeps legacy local data untouched after definitive HTTP %i', async (status) => {
     const oldSnapshot = JSON.stringify({ ts: 1, entries: { '["/api/parties"]': [{ id: 'old-party' }] } });
     const oldIdentity = JSON.stringify({ userId: 'old-actor', businessId: 'old-business' });

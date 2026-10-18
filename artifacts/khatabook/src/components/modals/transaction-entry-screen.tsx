@@ -618,7 +618,7 @@ export function TransactionEntryScreen({
    */
   const handleUpdate = useCallback(() => {
     if (!initialEntry) return;
-    if (!queuedEntry && (!navigator.onLine || !isOnline)) {
+    if (!queuedEntry && !isOnline) {
       toast.error('অফলাইনে এন্ট্রি পরিবর্তন করা যায় না', { description: 'ইন্টারনেট ফিরে এলে আবার চেষ্টা করুন। আপনার লেখা ফর্মে আছে।' });
       return;
     }
@@ -922,7 +922,7 @@ export function TransactionEntryScreen({
       toast.error('পরিচয় যাচাই করা যায়নি। আবার লগইন করুন।');
       return;
     }
-    if (selectedBillFile && !navigator.onLine) {
+    if (selectedBillFile && !isOnline) {
       toast.error('ফাইল সংযুক্ত করতে ইন্টারনেট সংযোগ প্রয়োজন');
       return;
     }
@@ -939,7 +939,7 @@ export function TransactionEntryScreen({
           return;
         }
         billImage = uploaded.objectPath;
-      } else if (capturedBase64 && navigator.onLine) {
+      } else if (capturedBase64 && isOnline) {
         const cachedUpload = uploadedCreateImageRef.current;
         if (cachedUpload?.source === capturedBase64) {
           billImage = cachedUpload.objectPath;

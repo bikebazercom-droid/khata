@@ -190,7 +190,7 @@ export function TransactionDetailPage() {
       });
       return;
     }
-    if (!navigator.onLine || !isOnline) {
+    if (!isOnline) {
       toast.error('অফলাইনে এন্ট্রি মুছতে পারবেন না', { description: 'ইন্টারনেট ফিরে এলে আবার চেষ্টা করুন।' });
       return;
     }

@@ -259,7 +259,6 @@ export async function drainEntries(
   stillCurrent: () => boolean,
   onConfirmed: (entry: QueuedEntry) => void,
 ): Promise<void> {
-  if (!navigator.onLine) return;
   if (draining) {
     pendingDrain = { actorId, businessId, stillCurrent, onConfirmed };
     return;
@@ -271,7 +270,7 @@ export async function drainEntries(
       // removed an entry while this tab was waiting.
       const entries = await listEntries(actorId, businessId);
       for (const entry of entries) {
-        if (!stillCurrent() || !navigator.onLine) break;
+        if (!stillCurrent()) break;
         if (entry.status === 'rejected') continue;
         try {
           let billImage = entry.data.billImage;

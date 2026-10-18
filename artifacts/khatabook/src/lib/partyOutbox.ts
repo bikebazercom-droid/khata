@@ -367,12 +367,12 @@ export async function drainPartyOperations(
   onConfirmed: (operation: QueuedPartyOperation) => void,
   mode: 'upserts' | 'deletes',
 ): Promise<void> {
-  if (draining || !businessId || !navigator.onLine) return;
+  if (draining || !businessId) return;
   draining = true;
   try {
     const replay = async () => {
       for (const operation of await listPartyOperations(actorId, businessId)) {
-        if (!stillCurrent() || !navigator.onLine) break;
+        if (!stillCurrent()) break;
         if (operation.status === 'rejected') continue;
         if ((mode === 'upserts') !== (operation.kind !== 'delete')) continue;
         try {
