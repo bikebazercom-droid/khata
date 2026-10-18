@@ -112,6 +112,8 @@ describe('gold invoice', () => {
     localStorage.setItem('banglakhata_gold_invoice_stamp_v1:default', stamp);
     render(<GoldInvoice viewOnly />);
 
+    expect(screen.getByTestId('button-gold-share')).toBeInTheDocument();
+    expect(screen.getByTestId('button-gold-download')).toBeInTheDocument();
     expect(screen.queryByTestId('button-gold-upload-stamp')).not.toBeInTheDocument();
     expect(screen.queryByTestId('input-gold-stamp')).not.toBeInTheDocument();
     expect(screen.getByTestId('gold-company-stamp')).toHaveAttribute('src', stamp);
@@ -142,7 +144,7 @@ describe('gold invoice', () => {
 
   it('downloads a generated PDF from the fixed A4 template', async () => {
     const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
-    render(<GoldInvoice />);
+    render(<GoldInvoice viewOnly />);
     fireEvent.change(screen.getByTestId('input-gold-customerName'), { target: { value: 'Gold Customer' } });
     fireEvent.click(screen.getByTestId('button-gold-download'));
 
@@ -160,7 +162,7 @@ describe('gold invoice', () => {
   it('opens the browser print dialog when the PDF renderer fails', async () => {
     pdfCapture.fail = true;
     const print = vi.spyOn(window, 'print').mockImplementation(() => {});
-    render(<GoldInvoice />);
+    render(<GoldInvoice viewOnly />);
     fireEvent.change(screen.getByTestId('input-gold-customerName'), { target: { value: 'Gold Customer' } });
     fireEvent.click(screen.getByTestId('button-gold-download'));
 
@@ -172,7 +174,7 @@ describe('gold invoice', () => {
     const share = vi.fn().mockRejectedValue(new DOMException('Not allowed', 'NotAllowedError'));
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
     Object.defineProperty(navigator, 'share', { configurable: true, value: share });
-    render(<GoldInvoice />);
+    render(<GoldInvoice viewOnly />);
     fireEvent.change(screen.getByTestId('input-gold-customerName'), { target: { value: 'Gold Customer' } });
     fireEvent.click(screen.getByTestId('button-gold-share'));
 
@@ -184,6 +186,8 @@ describe('gold invoice', () => {
   it('stacks gold invoice fields on mobile and restores columns at tablet width', () => {
     render(<GoldInvoice />);
 
+    expect(screen.queryByTestId('button-gold-share')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('button-gold-download')).not.toBeInTheDocument();
     expect(screen.getByTestId('grid-gold-customer-fields')).toHaveClass('grid-cols-1', 'md:grid-cols-2');
     expect(screen.getByTestId('grid-gold-item-fields-1')).toHaveClass('grid-cols-1', 'md:grid-cols-3');
     expect(screen.getByTestId('grid-gold-payment-fields')).toHaveClass('grid-cols-1', 'md:grid-cols-2');

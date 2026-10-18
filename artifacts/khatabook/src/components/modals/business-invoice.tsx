@@ -588,15 +588,17 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
           <span className="hidden h-10 w-10 items-center justify-center rounded-xl bg-[#eaf0f8] text-[#284c80] md:flex"><ReceiptText className="h-5 w-5" /></span>
           <div className="min-w-0"><h2 className="truncate text-base font-bold tracking-tight text-[#1b2f4d] md:text-[17px]">{labels.title}</h2><p className="hidden text-xs text-[#77869a] md:block">{labels.subtitle}</p></div>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-          {readOnlyPreview && <button type="button" data-testid="button-invoice-preview-edit" onClick={() => setReadOnlyPreview(false)} className="inline-flex min-h-10 items-center rounded-xl border border-[#d8e1ed] bg-white px-3 text-[13px] font-bold text-[#365273]">{en ? 'Edit' : 'সম্পাদনা'}</button>}
-          <button type="button" data-testid="button-invoice-share" aria-label={labels.share} disabled={busy} onClick={shareInvoice} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#d8e1ed] bg-white px-2.5 text-[13px] font-bold text-[#365273] transition hover:bg-[#f5f8fc] disabled:opacity-60 sm:px-3">
-            <Share2 className="h-4 w-4" /><span className="hidden md:inline">{labels.share}</span>
-          </button>
-          <button type="button" data-testid="button-invoice-download" aria-label={busy ? (en ? 'Preparing invoice PDF' : 'ইনভয়েস PDF তৈরি হচ্ছে') : labels.download} disabled={busy} onClick={downloadPdf} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#244878] px-2.5 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#1c3b66] disabled:opacity-60 sm:px-3.5 md:px-4">
-            <Download className="h-4 w-4" /><span className="hidden md:inline">{busy ? (en ? 'Preparing…' : 'তৈরি হচ্ছে…') : labels.download}</span>
-          </button>
-        </div>
+        {readOnlyPreview && (
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <button type="button" data-testid="button-invoice-preview-edit" onClick={() => setReadOnlyPreview(false)} className="inline-flex min-h-10 items-center rounded-xl border border-[#d8e1ed] bg-white px-3 text-[13px] font-bold text-[#365273]">{en ? 'Edit' : 'সম্পাদনা'}</button>
+            <button type="button" data-testid="button-invoice-share" aria-label={labels.share} disabled={busy} onClick={shareInvoice} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#d8e1ed] bg-white px-2.5 text-[13px] font-bold text-[#365273] transition hover:bg-[#f5f8fc] disabled:opacity-60 sm:px-3">
+              <Share2 className="h-4 w-4" /><span className="hidden md:inline">{labels.share}</span>
+            </button>
+            <button type="button" data-testid="button-invoice-download" aria-label={busy ? (en ? 'Preparing invoice PDF' : 'ইনভয়েস PDF তৈরি হচ্ছে') : labels.download} disabled={busy} onClick={downloadPdf} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#244878] px-2.5 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#1c3b66] disabled:opacity-60 sm:px-3.5 md:px-4">
+              <Download className="h-4 w-4" /><span className="hidden md:inline">{busy ? (en ? 'Preparing…' : 'তৈরি হচ্ছে…') : labels.download}</span>
+            </button>
+          </div>
+        )}
       </header>
       <div className="min-h-0 flex-1 overflow-hidden">
         <section className={`${readOnlyPreview ? 'hidden' : ''} h-full min-h-0 overflow-y-auto px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-5`}>

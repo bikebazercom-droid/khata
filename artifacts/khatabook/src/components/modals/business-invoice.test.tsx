@@ -72,6 +72,8 @@ describe('business invoice', () => {
     render(<BusinessInvoice />);
     expect(screen.getByTestId('grid-invoice-customer-fields')).toHaveClass('grid', 'md:grid-cols-2');
     expect(screen.getByTestId('grid-invoice-reference-fields')).toHaveClass('grid', 'md:grid-cols-2');
+    expect(screen.queryByTestId('button-invoice-share')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('button-invoice-download')).not.toBeInTheDocument();
     fireEvent.change(screen.getByTestId('input-invoice-item-amount-1'), { target: { value: '100' } });
     fireEvent.click(screen.getByTestId('checkbox-invoice-item-taxed-1'));
     fireEvent.change(screen.getByTestId('input-invoice-taxRate'), { target: { value: '10' } });
@@ -157,12 +159,16 @@ describe('business invoice', () => {
       },
     };
     render(<BusinessInvoice historyRecord={historyRecord} viewOnly />);
+    expect(screen.getByTestId('button-invoice-share')).toBeInTheDocument();
+    expect(screen.getByTestId('button-invoice-download')).toBeInTheDocument();
     expect(screen.getByTestId('input-invoice-customer').closest('.hidden')).not.toBeNull();
     expect(screen.getByText('A. Customer')).toBeInTheDocument();
     expect(screen.getByText('Phone: +971 50 123 4567')).toBeInTheDocument();
     expect(screen.getByText('Passport No: A98765432')).toBeInTheDocument();
     expect(screen.getByText('Address: Dubai, UAE')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('button-invoice-preview-edit'));
+    expect(screen.queryByTestId('button-invoice-share')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('button-invoice-download')).not.toBeInTheDocument();
     expect(screen.getByTestId('input-invoice-customer')).toHaveValue('A. Customer');
     expect(screen.getByTestId('input-invoice-customer').closest('.hidden')).toBeNull();
   });
@@ -171,7 +177,7 @@ describe('business invoice', () => {
     pdfCapture.options = null;
     const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:invoice');
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
-    render(<BusinessInvoice />);
+    render(<BusinessInvoice viewOnly />);
     fireEvent.change(screen.getByTestId('input-invoice-customer'), { target: { value: 'Export Customer' } });
     fireEvent.click(screen.getByTestId('button-invoice-download'));
 
@@ -196,7 +202,7 @@ describe('business invoice', () => {
     const share = vi.fn().mockRejectedValue(new DOMException('Not allowed', 'NotAllowedError'));
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
     Object.defineProperty(navigator, 'share', { configurable: true, value: share });
-    render(<BusinessInvoice />);
+    render(<BusinessInvoice viewOnly />);
     fireEvent.change(screen.getByTestId('input-invoice-customer'), { target: { value: 'Share Customer' } });
     fireEvent.click(screen.getByTestId('button-invoice-share'));
 
@@ -208,7 +214,7 @@ describe('business invoice', () => {
   it('opens the browser print dialog when the PDF renderer fails', async () => {
     pdfCapture.fail = true;
     const print = vi.spyOn(window, 'print').mockImplementation(() => {});
-    render(<BusinessInvoice />);
+    render(<BusinessInvoice viewOnly />);
     fireEvent.change(screen.getByTestId('input-invoice-customer'), { target: { value: 'Print Customer' } });
     fireEvent.click(screen.getByTestId('button-invoice-download'));
 
