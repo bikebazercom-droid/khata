@@ -15,7 +15,7 @@ import router from "./routes";
 import { logger } from "./lib/logger";
 import { ensureDefaultBusiness } from "./middlewares/requireAuth";
 import { migrateBillImages } from "./lib/migrateBillImages";
-import { mountFrontendHosting } from "./lib/frontend-hosting";
+import { mountFrontendHosting, shouldServeFrontends } from "./lib/frontend-hosting";
 import { trustedProxyCidrs } from "./middlewares/ipBlock";
 import { isDatabaseNumericOverflow } from "./lib/apiValidation";
 
@@ -101,7 +101,7 @@ app.use((error: unknown, req: Request, res: Response, next: NextFunction) => {
 // Hostinger's single Node app can serve the two built Vite apps on the same
 // origin. Replit keeps serving these as separate artifacts unless explicitly
 // enabled by the root production start command.
-if (process.env.SERVE_FRONTENDS === "true") {
+if (shouldServeFrontends(process.env.NODE_ENV, process.env.SERVE_FRONTENDS)) {
   mountFrontendHosting(app, {
     websiteDir: path.resolve(__dirname_app, "../../khatabook/dist/public"),
     adminDir: path.resolve(__dirname_app, "../../banglakhata-admin/dist/public"),

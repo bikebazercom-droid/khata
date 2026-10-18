@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { isNetworkWriteAuthorized, markServerReauthenticated, revokeNetworkWrites, useAuthConnectivity } from '../lib/useAuthConnectivity';
 
-const me = { userId: 'actor', businessId: 'biz', authMethod: 'phone' as const, role: 'owner' as const };
+const healthy = { status: 'ok' };
 function online() { Object.defineProperty(navigator, 'onLine', { configurable: true, value: true }); }
 
 describe('cold auth connectivity gate', () => {
@@ -26,8 +26,7 @@ describe('cold auth connectivity gate', () => {
     expect(result.current.phase).toBe('probing'); // no Clerk, SSE, or mutations mounted
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(result.current.phase).toBe('offline');
-    expect(fetchMock).toHaveBeenCalledWith('/api/auth/me', expect.objectContaining({
-      credentials: 'include',
+    expect(fetchMock).toHaveBeenCalledWith('/api/healthz', expect.objectContaining({
       cache: 'no-store',
     }));
     expect(isNetworkWriteAuthorized()).toBe(false);
@@ -39,29 +38,28 @@ describe('cold auth connectivity gate', () => {
 
   it('trusts a successful server probe when WebView reports navigator.onLine=false', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => me });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => healthy });
     vi.stubGlobal('fetch', fetchMock);
     const { result, unmount } = renderHook(() => useAuthConnectivity(vi.fn()));
     expect(result.current.phase).toBe('probing');
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    expect(fetchMock).toHaveBeenCalledWith('/api/auth/me', expect.objectContaining({
-      credentials: 'include',
+    expect(fetchMock).toHaveBeenCalledWith('/api/healthz', expect.objectContaining({
       cache: 'no-store',
     }));
     expect(result.current.phase).toBe('online');
     unmount();
   });
 
-  it.each([401, 403])('keeps legacy local data untouched after definitive HTTP %i', async (status) => {
+  it('keeps legacy local data untouched when the API is healthy without an auth session', async () => {
     const oldSnapshot = JSON.stringify({ ts: 1, entries: { '["/api/parties"]': [{ id: 'old-party' }] } });
     const oldIdentity = JSON.stringify({ userId: 'old-actor', businessId: 'old-business' });
     localStorage.setItem('dkhata_offline_view_v2:old', oldSnapshot);
     localStorage.setItem('dkhata_offline_identity_v2', oldIdentity);
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => healthy }));
     const clear = vi.fn();
     const { result, unmount } = renderHook(() => useAuthConnectivity(clear));
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    expect(result.current.phase).toBe('online'); // public Clerk/sign-in only
+    expect(result.current.phase).toBe('online'); // auth/session state is handled after connectivity
     expect(localStorage.getItem('dkhata_offline_view_v2:old')).toBe(oldSnapshot);
     expect(localStorage.getItem('dkhata_offline_identity_v2')).toBe(oldIdentity);
     expect(isNetworkWriteAuthorized()).toBe(false);
@@ -70,7 +68,7 @@ describe('cold auth connectivity gate', () => {
 
   it('requires a successful new server probe before reconnecting and times out stalled Clerk bootstrap', async () => {
     const fetch = vi.fn().mockRejectedValueOnce(new TypeError('offline')).mockResolvedValue({
-      ok: true, json: async () => me,
+      ok: true, json: async () => healthy,
     });
     vi.stubGlobal('fetch', fetch);
     const clear = vi.fn();

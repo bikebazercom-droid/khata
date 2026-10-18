@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchMe, phoneLogout } from './phoneAuth';
+import { phoneLogout } from './phoneAuth';
 import { clearLocalLogoutPending, isLocalLogoutPending } from './offlineSession';
 
 export type AuthConnectivity = 'probing' | 'online' | 'offline';
@@ -13,9 +13,9 @@ export function markServerReauthenticated() { networkWritesAuthorized = true; of
 export function revokeNetworkWrites() { networkWritesAuthorized = false; }
 
 /**
- * Probe our own server before mounting Clerk or any mutating application UI.
- * navigator.onLine is advisory: captive portals and dead upstream connections
- * still report true. Without the server, browser ledger routes stay unavailable.
+ * Probe the API process before mounting Clerk or any mutating application UI.
+ * Keep server reachability separate from session authentication: an expired or
+ * misconfigured auth session must not be reported as a network outage.
  */
 export function useAuthConnectivity(clearQueries: () => void) {
   const [phase, setPhase] = useState<AuthConnectivity>('probing');
@@ -57,9 +57,18 @@ export function useAuthConnectivity(clearQueries: () => void) {
         await phoneLogout();
         clearLocalLogoutPending();
       }
-      const me = await fetchMe(controller.signal);
+      const response = await fetch('/api/healthz', {
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        const error = new Error('The API server health check failed') as Error & { status: number };
+        error.status = response.status;
+        throw error;
+      }
+      const health = await response.json() as { status?: unknown };
+      if (health.status !== 'ok') throw new Error('Invalid API health response');
       if (id !== attempt.current) return;
-      if (!me.userId || !me.businessId || (me.role !== 'owner' && me.role !== 'staff')) throw new Error('Invalid identity response');
       offlineMode = false;
       settled.current = false;
       setPhase('online');

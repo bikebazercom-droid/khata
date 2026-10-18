@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { mountFrontendHosting } from "./frontend-hosting";
+import { mountFrontendHosting, shouldServeFrontends } from "./frontend-hosting";
 
 let tempRoot: string;
 let websiteDir: string;
@@ -39,6 +39,13 @@ function makeApp() {
 describe("combined Hostinger frontend hosting", () => {
   beforeEach(createFrontendFiles);
   afterEach(() => rmSync(tempRoot, { recursive: true, force: true }));
+
+  it("enables combined hosting by default in production but allows an explicit opt-out", () => {
+    expect(shouldServeFrontends("production", undefined)).toBe(true);
+    expect(shouldServeFrontends("production", "false")).toBe(false);
+    expect(shouldServeFrontends("development", undefined)).toBe(false);
+    expect(shouldServeFrontends("development", "true")).toBe(true);
+  });
 
   it("serves the public website and admin panel at their base paths", async () => {
     const app = makeApp();

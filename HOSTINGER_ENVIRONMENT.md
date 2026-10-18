@@ -10,10 +10,11 @@ in Replit does not mean the same variable exists on Hostinger.
 - pnpm: 10.26+ or 11.x. The root package accepts both instead of pinning a
   single patch release, so Hostinger's pnpm 11 runtime is supported.
 - Build command: `pnpm run build:hostinger`
-- Required build-time variable: `HOSTINGER_EXTERNAL_CLERK_PUBLISHABLE_KEY`.
-  Set it to the publishable key for the external Clerk instance used by this
-  deployment. It is public configuration, not a secret. The build script maps
-  it to the web app's `VITE_CLERK_PUBLISHABLE_KEY`.
+- Required build-time variable: `HOSTINGER_EXTERNAL_CLERK_PUBLISHABLE_KEY` or
+  `VITE_CLERK_PUBLISHABLE_KEY`. Set either to the publishable key for the
+  external Clerk instance used by this deployment. It is public configuration,
+  not a secret. Vite embeds it in the frontend during build; changing a runtime
+  variable alone does not update an already-built frontend.
 - Entry File: `artifacts/api-server/dist/index.mjs`
 - Runtime start command, if Hostinger asks for one:
   `node --enable-source-maps artifacts/api-server/dist/index.mjs`
@@ -33,7 +34,7 @@ in Replit does not mean the same variable exists on Hostinger.
 | --- | --- |
 | `PORT` | Hostinger-provided listening port. The server exits with a clear error if it is absent or invalid. |
 | `NODE_ENV=production` | Enables production security behavior. |
-| `SERVE_FRONTENDS=true` | Serves the built web and admin apps from the API server. |
+| `SERVE_FRONTENDS=true` | Serves the built web and admin apps from the API server. This is the production default unless explicitly set to `false`. |
 | `DATABASE_URL` | PostgreSQL connection string. Use a persistent/session-capable connection; Supabase transaction-pooler connections do not support this server's persistent `LISTEN`/`NOTIFY` event bus. |
 | `SESSION_SECRET` | Long, random server secret used for phone sessions, OTP hashing, and persistent rate limits. |
 | `ADMIN_USERNAME` | Admin-panel login name. |
@@ -44,6 +45,14 @@ For Clerk sign-in, also set `CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` at
 runtime to keys from the same external Clerk instance as the build-time
 `HOSTINGER_EXTERNAL_CLERK_PUBLISHABLE_KEY`. Keep the secret key in Hostinger's
 secret-variable settings.
+
+The Node entry point is `artifacts/api-server/dist/index.mjs`; the repository
+root `main.py` is an unrelated placeholder and must not be used to start this
+application. The Node server listens on Hostinger's `PORT` and serves the web
+app, `/api/*`, and `/admin/*` from that same origin. Same-origin browser API
+requests do not require CORS; `CORS_ALLOWED_ORIGINS` is for cross-origin
+object-storage uploads and should contain only exact web origins when that
+feature is configured.
 
 Before deploying code that requires a schema change, run
 `pnpm run db:migrate:hostinger-supabase` with `DATABASE_URL` set to the intended

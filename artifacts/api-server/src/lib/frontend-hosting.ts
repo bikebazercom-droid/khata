@@ -8,6 +8,11 @@ type FrontendHostingOptions = {
   reservedPrefixes?: string[];
 };
 
+export function shouldServeFrontends(nodeEnv: string | undefined, serveFrontends: string | undefined): boolean {
+  return serveFrontends === "true" ||
+    (nodeEnv === "production" && serveFrontends !== "false");
+}
+
 function isPageRequest(req: Request): boolean {
   return (req.method === "GET" || req.method === "HEAD") && Boolean(req.accepts("html"));
 }
