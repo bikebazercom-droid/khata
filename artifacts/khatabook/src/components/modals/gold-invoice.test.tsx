@@ -93,8 +93,22 @@ describe('gold invoice', () => {
     expect(screen.getByTestId('text-gold-total')).toHaveTextContent('46,798.89');
     expect(screen.getByText(/Gold value \(99\.71g gross ×/i)).toBeInTheDocument();
 
-    fireEvent.change(screen.getByTestId('input-gold-vat-rate'), { target: { value: '10' } });
+    const vatRateInput = screen.getByTestId('input-gold-vat-rate');
+    fireEvent.change(vatRateInput, { target: { value: '3' } });
+    expect(screen.getByTestId('text-gold-vat')).toHaveTextContent('1,337.11');
+    expect(screen.getByTestId('text-gold-total')).toHaveTextContent('45,907.48');
+
+    fireEvent.change(vatRateInput, { target: { value: '10' } });
     expect(screen.getByTestId('text-gold-total')).toHaveTextContent('49,027.41');
+
+    fireEvent.change(vatRateInput, { target: { value: '0' } });
+    expect(screen.getByTestId('text-gold-vat')).toHaveTextContent('0.00');
+    expect(screen.getByTestId('text-gold-total')).toHaveTextContent('44,570.37');
+
+    fireEvent.change(vatRateInput, { target: { value: '' } });
+    expect((vatRateInput as HTMLInputElement).value).toBe('');
+    expect(screen.getByTestId('text-gold-vat')).toHaveTextContent('0.00');
+    expect(screen.getByTestId('text-gold-total')).toHaveTextContent('44,570.37');
   });
 
   it('searches currency by country alias and updates currency labels', () => {

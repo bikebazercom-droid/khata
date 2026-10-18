@@ -112,8 +112,8 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
   const [stamp, setStamp] = useState(() => { try { return localStorage.getItem(stampKey()) || ''; } catch { return ''; } });
   const restored = historyRecord?.type === 'Gold' ? historyRecord.payload as { data?: GoldData; lines?: GoldLine[] } : undefined;
   const [data, setData] = useState<GoldData>(() => {
-     if (restored?.data) return { ...restored.data, vatRate: restored.data.vatRate || '5' };
-     if (shared?.data) return { ...shared.data, vatRate: shared.data.vatRate || '5' };
+     if (restored?.data) return { ...restored.data, vatRate: typeof restored.data.vatRate === 'string' ? restored.data.vatRate : '5' };
+     if (shared?.data) return { ...shared.data, vatRate: typeof shared.data.vatRate === 'string' ? shared.data.vatRate : '5' };
     let profile: Record<string, string> = {};
     try { profile = JSON.parse(localStorage.getItem(profileKey()) || '{}') as Record<string, string>; } catch {}
     return {
@@ -164,7 +164,7 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
     const gold = values.reduce((sum, line) => sum + line.goldValue, 0);
     const making = values.reduce((sum, line) => sum + line.makingAmountValue, 0);
     const beforeVat = gold + making;
-    const vat = beforeVat * (safeNumber(data.vatRate || '5') / 100);
+    const vat = beforeVat * (safeNumber(data.vatRate) / 100);
     const discount = safeNumber(data.discount);
     return { values, gross, pure: round3(pure), gold, making, beforeVat, vat, discount, total: Math.max(0, beforeVat + vat - discount) };
   }, [lines, data.metalRate, data.discount, data.vatRate]);
@@ -188,7 +188,7 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
     details: 'ইনভয়েসের তথ্য', party: 'ক্রেতা', invoiceNo: 'ইনভয়েস নম্বর', terms: 'পেমেন্টের শর্ত', words: 'কথায় পরিমাণ', mode: 'পেমেন্ট মোড', thank: 'আপনার ব্যবসার জন্য ধন্যবাদ।', taxInvoice: 'ট্যাক্স ইনভয়েস', partyCopy: 'পার্টি কপি', seller: 'আপনার দোকান থেকে', empty: 'ইনভয়েস সম্পূর্ণ করতে দোকান ও গ্রাহকের তথ্য দিন।',
     currencySearch: 'মুদ্রার নাম, প্রতীক বা ISO কোড খুঁজুন', noCurrency: 'কোনো মুদ্রা মেলেনি', downloadError: 'ইনভয়েস PDF তৈরি করা যায়নি।', shareError: 'ইনভয়েস শেয়ার করা যায়নি।', pendingShort: 'বাকি', cash: 'নগদ পেমেন্ট', bank: 'ব্যাংক ট্রান্সফার', card: 'কার্ড পেমেন্ট', mobilePay: 'মোবাইল পেমেন্ট',
   };
-  const vatSummaryLabel = `${labels.vat} (${data.vatRate || '5'}%)`;
+  const vatSummaryLabel = `${labels.vat} (${data.vatRate.trim() || '0'}%)`;
   const locale = localeFor(lang);
   const money = (value: number) => {
     const safeValue = Number.isFinite(value) ? value : 0;
@@ -594,7 +594,7 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
                 <div className="flex items-center justify-between gap-3 border-t border-[#e7e2d5] py-1.5 text-[10px] text-[#68778a]">
                   <label htmlFor="input-gold-vat-rate" className="shrink-0">{labels.vatRate}</label>
                   <div className="flex min-w-0 items-center gap-2">
-                    <span className="inline-flex shrink-0 items-center gap-1"><span className="w-16">{numericInput('input-gold-vat-rate', data.vatRate || '5', (value) => set('vatRate', value), '5', '0.01')}</span>%</span>
+                    <span className="inline-flex shrink-0 items-center gap-1"><span className="w-16">{numericInput('input-gold-vat-rate', data.vatRate, (value) => set('vatRate', value), '', '0.01')}</span>%</span>
                     <b data-testid="text-gold-vat" className="shrink-0 text-[#3c4d65]">{money(calculations.vat)}</b>
                   </div>
                 </div>
