@@ -356,10 +356,10 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
             <div className="flex justify-between bg-[#1b365b] px-2 py-2 text-[9px] font-extrabold text-white"><span>{labels.incl}</span><span data-testid="text-gold-total">{money(calculations.total)}</span></div>
           </div>
         </div>
-        <div className="mt-3 border border-[#e6dfce] p-2 text-[8px]">
+        <div data-testid="gold-printable-payment-box" className="mt-3 flex min-h-[64px] flex-col justify-center gap-1 border border-[#e6dfce] px-3 py-3 text-[8px] leading-relaxed">
           <p><span className="font-bold">{labels.words}: </span>{numberToWords(calculations.total, lang)} {chosenCurrency.name}</p>
-          <p className="mt-1"><span className="font-bold">{labels.mode}: </span>{data.payment}{data.pending ? ` · ${labels.pendingShort}` : ''}</p>
-          {data.notes && <p className="mt-1"><span className="font-bold">{labels.notes}: </span>{data.notes}</p>}
+          <p><span className="font-bold">{labels.mode}: </span>{data.payment}{data.pending ? ` · ${labels.pendingShort}` : ''}</p>
+          {data.notes && <p><span className="font-bold">{labels.notes}: </span>{data.notes}</p>}
         </div>
         <div className="mt-auto grid grid-cols-3 gap-8 px-3 pb-2 pt-10 text-center text-[8px] font-semibold">
           {[(en ? "Customer's Signature" : 'গ্রাহকের স্বাক্ষর'), (en ? 'Checked By' : 'যাচাই করেছেন'), (en ? 'Authorised Signature' : 'অনুমোদিত স্বাক্ষর')].map((label, index) => (

@@ -74,6 +74,7 @@ describe('gold invoice', () => {
     expect(getRows().map((row) => row.querySelector('td')?.textContent)).toEqual(['1', '2', '3', '4', '5', '6', '7']);
     expect(getRows().map((row) => row.querySelectorAll('td').length)).toEqual([8, 8, 8, 8, 8, 8, 8]);
     expect(screen.getByTestId('gold-printable-customer-grid').children).toHaveLength(16);
+    expect(screen.getByTestId('gold-printable-payment-box')).toHaveClass('justify-center', 'min-h-[64px]');
   });
 
   it('adds and removes line items without removing the last row', () => {
