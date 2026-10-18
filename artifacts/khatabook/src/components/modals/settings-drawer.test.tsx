@@ -84,8 +84,10 @@ describe('settings drawer language selection', () => {
     expect(sheet).not.toBeNull();
     expect(sheet).toHaveClass(
       'absolute',
-      'max-w-md',
-      'rounded-t-3xl',
+      'left-3',
+      'w-80',
+      'max-w-[calc(100vw_-_1.5rem)]',
+      'rounded-2xl',
       'max-h-[calc(100dvh_-_6rem_-_var(--safe-bottom))]',
     );
     expect(options).toHaveClass('flex', 'flex-col');
@@ -96,7 +98,7 @@ describe('settings drawer language selection', () => {
       'ইনভয়েস তালিকা',
     ]);
     for (const button of within(options).getAllByRole('button')) {
-      expect(button).toHaveClass('w-full', 'justify-start');
+      expect(button).toHaveClass('w-full', 'min-h-12', 'justify-start');
     }
     fireEvent.click(screen.getByTestId('menu-option-gold'));
     expect(screen.queryByRole('dialog', { name: 'Invoice menu' })).not.toBeInTheDocument();
