@@ -320,10 +320,17 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
         </div>
         <section className="mt-3">
           <div className="bg-[#1b365b] px-2.5 py-1.5 text-[9px] font-bold tracking-wide text-white">{en ? 'CUSTOMER DETAILS (BUYER)' : 'গ্রাহকের তথ্য (ক্রেতা)'}</div>
-          <div className="grid grid-cols-2 gap-x-5 gap-y-1 border border-t-0 border-[#d8dee6] p-2 text-[8px]">
-            {[[labels.customerName, data.customerName], [labels.phone, data.customerPhone], [labels.email, data.customerEmail], [labels.id, data.customerId], [labels.address, data.customerAddress], [labels.nationality, data.nationality], [labels.country, data.country]].map(([key, value]) => (
-              <p key={key} className="min-w-0 truncate"><span className="font-semibold text-slate-500">{key}: </span>{value || '—'}</p>
-            ))}
+          <div data-testid="gold-printable-customer-grid" className="grid grid-cols-[52px_minmax(0,1fr)_66px_minmax(0,1fr)] border border-t-0 border-[#d8dee6] text-[8px]">
+            {Array.from({ length: 4 }, (_, index) => {
+              const leftDetails = [[labels.customerName, data.customerName], [labels.phone, data.customerPhone], [labels.email, data.customerEmail], [labels.id, data.customerId]];
+              const rightDetails = [[labels.address, data.customerAddress], [labels.nationality, data.nationality], [labels.country, data.country], ['', '']];
+              return [
+                <div key={`left-label-${index}`} className="border-b border-r border-[#d8dee6] bg-[#fafbfd] px-1.5 py-1 font-semibold text-slate-500">{leftDetails[index][0]}</div>,
+                <div key={`left-value-${index}`} className="min-w-0 break-words border-b border-r border-[#d8dee6] px-1.5 py-1">{leftDetails[index][1] || '—'}</div>,
+                <div key={`right-label-${index}`} className="border-b border-r border-[#d8dee6] bg-[#fafbfd] px-1.5 py-1 font-semibold text-slate-500">{rightDetails[index][0]}</div>,
+                <div key={`right-value-${index}`} className="min-w-0 break-words border-b border-[#d8dee6] px-1.5 py-1">{rightDetails[index][1] || '—'}</div>,
+              ];
+            })}
           </div>
         </section>
         <section className="mt-3">
@@ -344,7 +351,7 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
           </table>
         </section>
         <div className="mt-3 flex justify-end">
-          <div className="w-[310px] text-[8px]">
+          <div className="w-[420px] max-w-full text-[8px]">
             {[[`${labels.goldValue} (${number(calculations.gross, 2)}g gross × ${number(safeNumber(data.metalRate), 2)}/g)`, money(calculations.gold)], [labels.beforeVat, money(calculations.beforeVat)], [vatSummaryLabel, money(calculations.vat)], [labels.discount, `− ${money(calculations.discount)}`]].map(([label, value]) => <div key={label} className="flex justify-between border-b border-[#ece7db] px-2 py-1"><span>{label}</span><span>{value}</span></div>)}
             <div className="flex justify-between bg-[#1b365b] px-2 py-2 text-[9px] font-extrabold text-white"><span>{labels.incl}</span><span data-testid="text-gold-total">{money(calculations.total)}</span></div>
           </div>
