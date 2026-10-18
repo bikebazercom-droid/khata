@@ -78,6 +78,16 @@ describe('settings drawer language selection', () => {
     expect(screen.getByTestId('menu-option-gold')).toBeInTheDocument();
     expect(screen.getByTestId('menu-option-list')).toBeInTheDocument();
     const options = screen.getByTestId('invoice-menu-options');
+    const backdrop = screen.getByTestId('invoice-menu-backdrop');
+    const sheet = backdrop.querySelector<HTMLElement>('[role="dialog"]');
+    expect(backdrop).toHaveClass('absolute', 'inset-0');
+    expect(sheet).not.toBeNull();
+    expect(sheet).toHaveClass(
+      'absolute',
+      'max-w-md',
+      'rounded-t-3xl',
+      'max-h-[calc(100dvh_-_6rem_-_var(--safe-bottom))]',
+    );
     expect(options).toHaveClass('flex', 'flex-col');
     expect(within(options).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual([
       'বিজনেস প্রোফাইল',

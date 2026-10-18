@@ -370,9 +370,9 @@ export function SettingsDrawer({
               <Menu className="h-5 w-5" />{lang === 'en' ? 'Menu' : 'মেনু'}
             </button>
           </footer>
-          {isInvoiceMenuOpen && <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/45" data-testid="invoice-menu-backdrop">
-            <button type="button" aria-label={lang === 'en' ? 'Close menu' : 'মেনু বন্ধ করুন'} className="absolute inset-0" onClick={() => setIsInvoiceMenuOpen(false)} />
-            <section role="dialog" aria-modal="true" aria-label={lang === 'en' ? 'Invoice menu' : 'ইনভয়েস মেনু'} className="relative max-h-[85dvh] w-full max-w-xl overflow-y-auto overscroll-contain rounded-t-3xl border border-slate-200 bg-white px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-2xl animate-in slide-in-from-bottom-6 duration-200">
+          {isInvoiceMenuOpen && <div className="absolute inset-0 z-[70] bg-slate-950/45" data-testid="invoice-menu-backdrop">
+            <button type="button" aria-label={lang === 'en' ? 'Close menu' : 'মেনু বন্ধ করুন'} className="absolute inset-0 h-full w-full" onClick={() => setIsInvoiceMenuOpen(false)} />
+            <section role="dialog" aria-modal="true" aria-label={lang === 'en' ? 'Invoice menu' : 'ইনভয়েস মেনু'} className="absolute bottom-[calc(4.25rem_+_var(--safe-bottom))] left-3 right-3 mx-auto max-h-[calc(100dvh_-_6rem_-_var(--safe-bottom))] max-w-md overflow-y-auto overscroll-contain rounded-t-3xl rounded-b-2xl border border-slate-200 bg-white px-4 pt-3 pb-4 shadow-2xl animate-in slide-in-from-bottom-6 duration-200">
               <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-slate-300" />
               <div className="mb-4 flex items-center justify-between"><div><h3 className="font-bold text-slate-900">{lang === 'en' ? 'Invoices' : 'ইনভয়েস'}</h3><p className="text-xs text-slate-500">{lang === 'en' ? 'Choose a section' : 'একটি বিভাগ নির্বাচন করুন'}</p></div><button type="button" aria-label={lang === 'en' ? 'Close menu' : 'মেনু বন্ধ করুন'} onClick={() => setIsInvoiceMenuOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 active:scale-95"><X className="h-5 w-5" /></button></div>
               <div className="flex flex-col gap-2" data-testid="invoice-menu-options">
