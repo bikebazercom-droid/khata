@@ -421,9 +421,12 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
           </div>
           <div className="text-right">
             <p className="mb-2 text-[9px] font-extrabold tracking-[.12em] text-[#a27b22]">{labels.partyCopy}</p>
-            <div className="space-y-1.5 text-[8px]">
+            <div className="min-w-0 space-y-1.5 text-[8px] leading-[1.25]">
               {[[labels.invoiceNo, data.number], [labels.date, data.date ? new Date(`${data.date}T12:00:00`).toLocaleDateString(locale) : '—'], [labels.terms, data.payment], [labels.rate, `${chosenCurrency.symbol} ${number(safeNumber(data.metalRate), 2)} /g`], [labels.place, data.place || '—']].map(([name, value]) => (
-                <p key={name} className="flex justify-between gap-2 border-b border-dotted border-slate-300 pb-0.5 text-left"><span className="shrink-0 text-slate-500">{name}:</span><span className="max-w-[125px] truncate text-right font-semibold">{value}</span></p>
+                <p key={name} data-testid="gold-header-meta-row" className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-baseline gap-x-2 border-b border-dotted border-slate-300 pb-1 text-left">
+                  <span className="min-w-0 break-words text-slate-500">{name}:</span>
+                  <span className="min-w-0 break-words text-right font-semibold">{value}</span>
+                </p>
               ))}
             </div>
           </div>

@@ -128,6 +128,18 @@ describe('gold invoice', () => {
     expect(screen.getByTestId('gold-printable-payment-box')).toHaveClass('justify-center', 'min-h-[64px]');
   });
 
+  it('keeps party-copy metadata labels and values in separate wrapping columns', () => {
+    render(<GoldInvoice viewOnly />);
+
+    const rows = screen.getAllByTestId('gold-header-meta-row');
+    expect(rows).toHaveLength(5);
+    for (const row of rows) {
+      expect(row).toHaveClass('grid', 'min-w-0', 'grid-cols-[minmax(0,1fr)_minmax(0,1fr)]');
+      expect(row.children[0]).toHaveClass('min-w-0', 'break-words');
+      expect(row.children[1]).toHaveClass('min-w-0', 'break-words', 'text-right');
+    }
+  });
+
   it('downloads a generated PDF from the fixed A4 template', async () => {
     const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     render(<GoldInvoice />);
