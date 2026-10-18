@@ -238,7 +238,9 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
       normalizePdfColors(document, 'printable-gold-invoice');
 
       const blob = await html2pdf().set({
-        margin: [10, 10, 10, 10], filename: `Gold_Invoice_${data.number.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
+        // The template is already a full A4 sheet. Extra html2pdf margins
+        // shrink the printable canvas and push the bottom footer to page 2.
+        margin: 0, filename: `Gold_Invoice_${data.number.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: {
           scale: 2,
@@ -400,7 +402,7 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
   );
   const invoice = (
     <div ref={printRef} id="printable-gold-invoice" data-testid="gold-printable-invoice" className="gold-print-root mx-auto bg-white text-[#172b49]"
-      style={{ width: '794px', minHeight: '1123px', padding: '24px', boxSizing: 'border-box', overflow: 'hidden', border: '2px solid #c5a059', transform: pdfMode ? 'none' : `scale(${previewScale})`, transformOrigin: 'top left' }}>
+      style={{ width: '210mm', height: '297mm', padding: '24px', boxSizing: 'border-box', overflow: 'hidden', border: '2px solid #c5a059', transform: pdfMode ? 'none' : `scale(${previewScale})`, transformOrigin: 'top left' }}>
       <div className="flex h-full min-h-[1068px] flex-col border border-[#d7bd79] p-[22px] text-[9px] leading-[1.35]">
         <div className="grid grid-cols-[1.12fr_.76fr_1fr] gap-3 border-b border-[#e8dfc8] pb-3">
           <div className="min-w-0">

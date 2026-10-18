@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { GoldInvoice } from './gold-invoice';
 
-const pdfCapture = vi.hoisted(() => ({ elementId: '', options: null as null | Record<string, unknown>, fail: false }));
+const pdfCapture = vi.hoisted(() => ({ elementId: '', elementStyle: null as null | { width: string; height: string }, options: null as null | Record<string, unknown>, fail: false }));
 
 vi.mock('@/lib/i18n', () => ({ useLanguage: () => ({ lang: 'en' }) }));
 vi.mock('html2pdf.js', () => ({
@@ -14,6 +14,7 @@ vi.mock('html2pdf.js', () => ({
       },
       from(element: HTMLElement) {
         pdfCapture.elementId = element.id;
+        pdfCapture.elementStyle = { width: element.style.width, height: element.style.height };
         return worker;
       },
       async outputPdf() {
@@ -35,6 +36,7 @@ describe('gold invoice', () => {
   beforeEach(() => {
     localStorage.clear();
     pdfCapture.elementId = '';
+    pdfCapture.elementStyle = null;
     pdfCapture.options = null;
     pdfCapture.fail = false;
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:gold-invoice') });
@@ -135,9 +137,11 @@ describe('gold invoice', () => {
     await waitFor(() => expect(anchorClick).toHaveBeenCalledOnce());
     expect(pdfCapture.elementId).toBe('printable-gold-invoice');
     expect(pdfCapture.options).toMatchObject({
+      margin: 0,
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       html2canvas: { windowWidth: 794, scale: 2 },
     });
+    expect(pdfCapture.elementStyle).toEqual({ width: '210mm', height: '297mm' });
     expect((pdfCapture.options?.html2canvas as { onclone?: unknown }).onclone).toEqual(expect.any(Function));
   });
 
