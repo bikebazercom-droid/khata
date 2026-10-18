@@ -38,6 +38,7 @@ import { useOptionalAuth } from '@/contexts/AuthContext';
 import {
   NATIVE_FILE_EXPORT_RESULT_EVENT,
   parseNativeFileExportRequest,
+  saveNativeWebViewFile,
   shareNativeWebViewFile,
   type NativeFileExportResult,
 } from '@/lib/nativeFileExport';
@@ -384,12 +385,15 @@ export function WebAppScreen() {
         webViewRef.current?.injectJavaScript(script);
       };
 
-      void shareNativeWebViewFile(request).then(
-        ({ copiedText }) => sendResult({
+      const exportTask = request.action === 'download'
+        ? saveNativeWebViewFile(request)
+        : shareNativeWebViewFile(request);
+      void exportTask.then(
+        (result) => sendResult({
           type: request.type,
           requestId: request.requestId,
           ok: true,
-          copiedText,
+          ...result,
         }),
         (error: unknown) => {
           console.error('WebView file export failed:', error);

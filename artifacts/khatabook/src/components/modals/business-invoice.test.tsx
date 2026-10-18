@@ -6,6 +6,7 @@ const pdfCapture = vi.hoisted(() => ({
   options: null as null | Record<string, unknown>,
   elementId: '',
   width: '',
+  height: '',
   padding: '',
   boxSizing: '',
   overflow: '',
@@ -23,6 +24,7 @@ vi.mock('html2pdf.js', () => ({
       from(element: HTMLElement) {
         pdfCapture.elementId = element.id;
         pdfCapture.width = element.style.width;
+        pdfCapture.height = element.style.height;
         pdfCapture.padding = element.style.padding;
         pdfCapture.boxSizing = element.style.boxSizing;
         pdfCapture.overflow = element.style.overflow;
@@ -170,12 +172,13 @@ describe('business invoice', () => {
 
     await waitFor(() => expect(pdfCapture.options).not.toBeNull());
     expect(pdfCapture.elementId).toBe('printable-invoice');
-    expect(pdfCapture.width).toBe('794px');
+    expect(pdfCapture.width).toBe('210mm');
+    expect(pdfCapture.height).toBe('296mm');
     expect(pdfCapture.padding).toBe('32px');
     expect(pdfCapture.boxSizing).toBe('border-box');
     expect(pdfCapture.overflow).toBe('hidden');
     const options = pdfCapture.options as Record<string, unknown> | null;
-    expect(options?.margin).toEqual([10, 10, 10, 10]);
+    expect(options?.margin).toBe(0);
     expect(options?.html2canvas).toMatchObject({ windowWidth: 794, scrollX: 0, scrollY: 0, scale: 2 });
     expect((options?.html2canvas as { onclone?: unknown }).onclone).toEqual(expect.any(Function));
 

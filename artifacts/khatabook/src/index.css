@@ -247,6 +247,14 @@ textarea {
   body.gold-invoice-print-fallback * {
     visibility: hidden !important;
   }
+  @page invoice-a4 {
+    size: A4 portrait;
+    margin: 0;
+  }
+  body.gold-invoice-print-fallback .gold-print-root,
+  body.business-invoice-print-fallback .invoice-print {
+    page: invoice-a4;
+  }
   body.gold-invoice-print-fallback .gold-invoice-print-host,
   body.gold-invoice-print-fallback .gold-invoice-print-host * {
     visibility: visible !important;
@@ -264,7 +272,7 @@ textarea {
     position: absolute !important;
     inset: 0 auto auto 0 !important;
     display: block !important;
-    width: 794px !important;
+    width: 210mm !important;
     height: auto !important;
     min-height: 0 !important;
     max-height: none !important;
@@ -274,7 +282,7 @@ textarea {
     background: #fff !important;
   }
   body.gold-invoice-print-fallback .gold-preview-shell {
-    width: 794px !important;
+    width: 210mm !important;
     max-width: none !important;
     height: auto !important;
     overflow: visible !important;
@@ -283,10 +291,13 @@ textarea {
     box-shadow: none !important;
   }
   body.gold-invoice-print-fallback .gold-print-root {
-    width: 794px !important;
-    min-height: 1123px !important;
-    height: auto !important;
-    overflow: visible !important;
+    width: 210mm !important;
+    min-width: 210mm !important;
+    max-width: 210mm !important;
+    min-height: 296mm !important;
+    max-height: 296mm !important;
+    height: 296mm !important;
+    overflow: hidden !important;
     margin: 0 !important;
     transform: none !important;
   }
@@ -310,7 +321,7 @@ textarea {
     position: absolute !important;
     inset: 0 auto auto 0 !important;
     display: block !important;
-    width: 794px !important;
+    width: 210mm !important;
     height: auto !important;
     min-height: 0 !important;
     max-height: none !important;
@@ -321,12 +332,13 @@ textarea {
   }
   body.business-invoice-print-fallback .invoice-print {
     position: relative !important;
-    width: 794px !important;
-    min-width: 794px !important;
-    max-width: 794px !important;
-    min-height: 800px !important;
-    height: auto !important;
-    overflow: visible !important;
+    width: 210mm !important;
+    min-width: 210mm !important;
+    max-width: 210mm !important;
+    min-height: 296mm !important;
+    max-height: 296mm !important;
+    height: 296mm !important;
+    overflow: hidden !important;
     margin: 0 !important;
     transform: none !important;
     box-shadow: none !important;

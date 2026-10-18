@@ -3,8 +3,9 @@ import { toast } from 'sonner';
 import { Building2, CalendarDays, Check, ChevronDown, Download, FileText, Plus, ReceiptText, Share2, Trash2, UserRound } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useLanguage } from '@/lib/i18n';
-import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
+import { saveGeneratedFileWithNative, shareGeneratedFileWithNative } from '@/lib/native-file-export';
 import { normalizePdfColors } from '@/lib/pdf-color-normalization';
+import { fitA4Content } from '@/lib/fit-a4-content';
 import { saveInvoiceHistory, type InvoiceHistoryAction, type InvoiceHistoryRecord } from './invoice-history';
 
 type GoldLine = { id: number; description: string; gross: string; grossUnit: 'g' | 'vori'; purity: string; makingRate: string; makingAmount: string };
@@ -99,6 +100,7 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
   const { lang } = useLanguage();
   const en = lang === 'en';
   const printRef = useRef<HTMLDivElement>(null);
+  const pdfContentRef = useRef<HTMLDivElement>(null);
   const previewShellRef = useRef<HTMLDivElement>(null);
   const shared = useMemo(decodeGoldLink, []);
   const [readOnlyPreview, setReadOnlyPreview] = useState(viewOnly);
@@ -220,6 +222,7 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
   );
   const createPdf = async () => {
     setPdfMode(true);
+    let restoreFit = () => {};
     try {
       const { default: html2pdf } = await import('html2pdf.js');
       const element = printRef.current;
@@ -235,6 +238,9 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
       await Promise.all(Array.from(element.querySelectorAll('img')).map((image) =>
         image.decode().catch(() => undefined),
       ));
+      const content = pdfContentRef.current;
+      if (!content) throw new Error('Invoice content is not available');
+      restoreFit = fitA4Content(element, content);
       normalizePdfColors(document, 'printable-gold-invoice');
 
       const blob = await html2pdf().set({
@@ -255,28 +261,47 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
       }).from(element).outputPdf('blob') as Blob;
       if (!(blob instanceof Blob) || blob.size === 0) throw new Error('PDF renderer returned an empty file');
       return blob;
-    } finally { setPdfMode(false); }
+    } finally {
+      restoreFit();
+      setPdfMode(false);
+    }
   };
   const printInvoiceFallback = async () => {
     if (typeof window.print !== 'function') throw new Error('This WebView does not provide a print dialog');
+    setPdfMode(true);
+    await new Promise<void>((resolve) => {
+      if (typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+      } else window.setTimeout(resolve, 100);
+    });
     const root = printRef.current;
     const host = root?.closest('section');
-    if (!root?.isConnected || !host) throw new Error('Invoice preview is not available for printing');
+    const content = pdfContentRef.current;
+    if (!root?.isConnected || !host || !content) {
+      setPdfMode(false);
+      throw new Error('Invoice preview is not available for printing');
+    }
+    const restoreFit = fitA4Content(root, content);
     document.body.classList.add('gold-invoice-print-fallback');
     const ancestors: HTMLElement[] = [];
     for (let parent = host.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
       parent.classList.add('gold-invoice-print-ancestor');
       ancestors.push(parent);
     }
+    let cleaned = false;
     const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      restoreFit();
       document.body.classList.remove('gold-invoice-print-fallback');
       for (const ancestor of ancestors) ancestor.classList.remove('gold-invoice-print-ancestor');
+      setPdfMode(false);
     };
     window.addEventListener('afterprint', cleanup, { once: true });
     try {
       await new Promise<void>((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve())));
       window.print();
-      window.setTimeout(cleanup, 1000);
+      window.setTimeout(cleanup, 10_000);
     } catch (error) {
       cleanup();
       throw error;
@@ -296,6 +321,17 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
     try {
       if (!persistHistory()) return;
       const blob = await createPdf();
+      const native = await saveGeneratedFileWithNative(blob, {
+        fileName,
+        mimeType: 'application/pdf',
+        title: `${labels.title} ${data.number}`,
+      });
+      if (native) {
+        if (native.saved) toast.success(en ? 'Invoice PDF saved.' : 'ইনভয়েস PDF সংরক্ষণ হয়েছে।');
+        else if (native.shareSheet) toast.info(en ? 'Choose “Save to Files” in the sharing options.' : 'শেয়ার অপশন থেকে “Save to Files” বেছে নিন।');
+        else if (native.cancelled) toast.info(en ? 'Folder selection was cancelled; the PDF was not saved.' : 'ফোল্ডার নির্বাচন বাতিল হয়েছে; PDF সংরক্ষণ হয়নি।');
+        return;
+      }
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url; anchor.download = fileName; document.body.appendChild(anchor); anchor.click(); anchor.remove();
@@ -402,8 +438,8 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
   );
   const invoice = (
     <div ref={printRef} id="printable-gold-invoice" data-testid="gold-printable-invoice" className="gold-print-root mx-auto bg-white text-[#172b49]"
-      style={{ width: '210mm', height: '297mm', padding: '24px', boxSizing: 'border-box', overflow: 'hidden', border: '2px solid #c5a059', transform: pdfMode ? 'none' : `scale(${previewScale})`, transformOrigin: 'top left' }}>
-      <div className="flex h-full min-h-[1068px] flex-col border border-[#d7bd79] p-[22px] text-[9px] leading-[1.35]">
+      style={{ width: '210mm', height: '296mm', padding: '24px', boxSizing: 'border-box', overflow: 'hidden', border: '2px solid #c5a059', transform: pdfMode ? 'none' : `scale(${previewScale})`, transformOrigin: 'top left' }}>
+      <div ref={pdfContentRef} className="flex h-full min-h-[1058px] flex-col border border-[#d7bd79] p-[22px] text-[9px] leading-[1.35]">
         <div className="grid grid-cols-[1.12fr_.76fr_1fr] gap-3 border-b border-[#e8dfc8] pb-3">
           <div className="min-w-0">
             {data.logo && <img src={data.logo} alt="" className="mb-1 h-11 max-w-[145px] object-contain object-left" />}

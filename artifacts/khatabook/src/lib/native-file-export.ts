@@ -1,6 +1,7 @@
 const FILE_EXPORT_MESSAGE = 'banglakhata:file-export';
 export const FILE_EXPORT_RESULT_EVENT = 'banglakhata-file-export-result';
-const RESPONSE_TIMEOUT_MS = 60_000;
+// Folder pickers and native share sheets remain open while the user chooses a destination.
+const RESPONSE_TIMEOUT_MS = 180_000;
 
 type ReactNativeWebViewBridge = {
   postMessage: (message: string) => void;
@@ -11,12 +12,16 @@ type NativeFileExportResult = {
   requestId: string;
   ok: boolean;
   copiedText?: boolean;
+  saved?: boolean;
+  shareSheet?: boolean;
+  cancelled?: boolean;
   error?: string;
 };
 
 type NativeFileExportRequest = {
   type: typeof FILE_EXPORT_MESSAGE;
   requestId: string;
+  action?: 'share' | 'download';
   fileName: string;
   mimeType: string;
   title: string;
@@ -26,6 +31,9 @@ type NativeFileExportRequest = {
 
 export type NativeFileShareResult = {
   copiedText: boolean;
+  saved?: boolean;
+  shareSheet?: boolean;
+  cancelled?: boolean;
 };
 
 export type GeneratedFileOptions = {
@@ -75,7 +83,12 @@ function postRequestAndWait(
         reject(new Error(result.error || 'ফাইল তৈরি বা শেয়ার করা যায়নি।'));
         return;
       }
-      resolve({ copiedText: Boolean(result.copiedText) });
+      resolve({
+        copiedText: Boolean(result.copiedText),
+        ...(result.saved ? { saved: true } : {}),
+        ...(result.shareSheet ? { shareSheet: true } : {}),
+        ...(result.cancelled ? { cancelled: true } : {}),
+      });
     };
 
     const timeout = window.setTimeout(() => {
@@ -101,12 +114,28 @@ export async function shareGeneratedFileWithNative(
   blob: Blob,
   options: GeneratedFileOptions,
 ): Promise<NativeFileShareResult | null> {
+  return sendGeneratedFileToNative(blob, options, 'share');
+}
+
+export async function saveGeneratedFileWithNative(
+  blob: Blob,
+  options: GeneratedFileOptions,
+): Promise<NativeFileShareResult | null> {
+  return sendGeneratedFileToNative(blob, options, 'download');
+}
+
+async function sendGeneratedFileToNative(
+  blob: Blob,
+  options: GeneratedFileOptions,
+  action: 'share' | 'download',
+): Promise<NativeFileShareResult | null> {
   const bridge = getNativeBridge();
   if (!bridge) return null;
 
   const request: NativeFileExportRequest = {
     type: FILE_EXPORT_MESSAGE,
     requestId: `${Date.now()}-${++requestSequence}`,
+    action,
     fileName: options.fileName,
     mimeType: options.mimeType,
     title: options.title,

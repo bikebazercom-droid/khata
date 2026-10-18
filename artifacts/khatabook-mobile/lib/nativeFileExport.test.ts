@@ -6,9 +6,13 @@ const mocks = vi.hoisted(() => ({
   isAvailableAsync: vi.fn(),
   shareAsync: vi.fn(),
   setStringAsync: vi.fn(),
+  requestDirectoryPermissionsAsync: vi.fn(),
+  createFileAsync: vi.fn(),
+  writeAsStringAsync: vi.fn(),
+  platformOS: 'ios',
 }));
 
-vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
+vi.mock('react-native', () => ({ Platform: { get OS() { return mocks.platformOS; } } }));
 vi.mock('expo-file-system', () => ({
   Paths: { cache: 'file:///cache' },
   File: class {
@@ -19,6 +23,14 @@ vi.mock('expo-file-system', () => ({
     constructor(...parts: string[]) {
       this.uri = parts.join('/');
     }
+  },
+}));
+vi.mock('expo-file-system/legacy', () => ({
+  EncodingType: { Base64: 'base64' },
+  StorageAccessFramework: {
+    requestDirectoryPermissionsAsync: mocks.requestDirectoryPermissionsAsync,
+    createFileAsync: mocks.createFileAsync,
+    writeAsStringAsync: mocks.writeAsStringAsync,
   },
 }));
 vi.mock('expo-sharing', () => ({
@@ -34,11 +46,13 @@ import * as Sharing from 'expo-sharing';
 import {
   NATIVE_FILE_EXPORT_MESSAGE,
   parseNativeFileExportRequest,
+  saveNativeWebViewFile,
   shareNativeWebViewFile,
 } from '@/lib/nativeFileExport';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.platformOS = 'ios';
   mocks.isAvailableAsync.mockResolvedValue(true);
   mocks.shareAsync.mockResolvedValue(undefined);
   mocks.setStringAsync.mockResolvedValue(undefined);
@@ -88,6 +102,64 @@ describe('native WebView file export', () => {
     );
   });
 
+  it('saves a downloaded PDF to the Android folder selected by the user', async () => {
+    mocks.platformOS = 'android';
+    mocks.requestDirectoryPermissionsAsync.mockResolvedValue({ granted: true, directoryUri: 'content://downloads' });
+    mocks.createFileAsync.mockResolvedValue('content://downloads/invoice.pdf');
+    mocks.writeAsStringAsync.mockResolvedValue(undefined);
+
+    await expect(saveNativeWebViewFile({
+      type: NATIVE_FILE_EXPORT_MESSAGE,
+      requestId: 'download-1',
+      action: 'download',
+      fileName: 'invoice.pdf',
+      mimeType: 'application/pdf',
+      title: 'Invoice',
+      base64: 'AQID',
+    })).resolves.toEqual({ saved: true });
+
+    expect(mocks.createFileAsync).toHaveBeenCalledWith('content://downloads', 'invoice', 'application/pdf');
+    expect(mocks.writeAsStringAsync).toHaveBeenCalledWith(
+      'content://downloads/invoice.pdf',
+      'AQID',
+      { encoding: 'base64' },
+    );
+  });
+
+  it('reports a cancelled Android folder picker without throwing', async () => {
+    mocks.platformOS = 'android';
+    mocks.requestDirectoryPermissionsAsync.mockResolvedValue({ granted: false });
+
+    await expect(saveNativeWebViewFile({
+      type: NATIVE_FILE_EXPORT_MESSAGE,
+      requestId: 'download-2',
+      action: 'download',
+      fileName: 'invoice.pdf',
+      mimeType: 'application/pdf',
+      title: 'Invoice',
+      base64: 'AQID',
+    })).resolves.toEqual({ cancelled: true });
+
+    expect(mocks.createFileAsync).not.toHaveBeenCalled();
+  });
+
+  it('opens the iOS share sheet so the user can save the PDF to Files', async () => {
+    await expect(saveNativeWebViewFile({
+      type: NATIVE_FILE_EXPORT_MESSAGE,
+      requestId: 'download-ios-1',
+      action: 'download',
+      fileName: 'invoice.pdf',
+      mimeType: 'application/pdf',
+      title: 'Save invoice PDF',
+      base64: 'AQID',
+    })).resolves.toEqual({ shareSheet: true });
+
+    expect(vi.mocked(Sharing.shareAsync)).toHaveBeenCalledWith(
+      'file:///cache/invoice.pdf',
+      { mimeType: 'application/pdf', UTI: 'com.adobe.pdf', dialogTitle: 'Save invoice PDF' },
+    );
+  });
+
   it('rejects unsupported file types before writing or sharing', async () => {
     await expect(shareNativeWebViewFile({
       type: NATIVE_FILE_EXPORT_MESSAGE,
@@ -107,6 +179,7 @@ describe('native WebView file export', () => {
     expect(parseNativeFileExportRequest(JSON.stringify({
       type: NATIVE_FILE_EXPORT_MESSAGE,
       requestId: 'export-3',
+      action: 'download',
       fileName: 'transactions.csv',
       mimeType: 'text/csv',
       title: 'Transactions',
@@ -114,6 +187,7 @@ describe('native WebView file export', () => {
     }))).toMatchObject({
       type: NATIVE_FILE_EXPORT_MESSAGE,
       requestId: 'export-3',
+      action: 'download',
       fileName: 'transactions.csv',
       mimeType: 'text/csv',
     });

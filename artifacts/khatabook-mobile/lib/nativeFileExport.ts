@@ -1,4 +1,5 @@
 import { File, Paths } from 'expo-file-system';
+import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Clipboard from 'expo-clipboard';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
@@ -9,6 +10,7 @@ export const NATIVE_FILE_EXPORT_RESULT_EVENT = 'banglakhata-file-export-result';
 export type NativeFileExportRequest = {
   type: typeof NATIVE_FILE_EXPORT_MESSAGE;
   requestId: string;
+  action?: 'share' | 'download';
   fileName: string;
   mimeType: string;
   title: string;
@@ -21,6 +23,9 @@ export type NativeFileExportResult = {
   requestId: string;
   ok: boolean;
   copiedText?: boolean;
+  saved?: boolean;
+  shareSheet?: boolean;
+  cancelled?: boolean;
   error?: string;
 };
 
@@ -68,6 +73,7 @@ export function parseNativeFileExportRequest(rawMessage: string): NativeFileExpo
   return {
     type: NATIVE_FILE_EXPORT_MESSAGE,
     requestId: value.requestId,
+    ...(value.action === 'download' || value.action === 'share' ? { action: value.action } : {}),
     fileName: typeof value.fileName === 'string' ? value.fileName : '',
     mimeType: typeof value.mimeType === 'string' ? value.mimeType : '',
     title: typeof value.title === 'string' ? value.title : '',
@@ -130,4 +136,47 @@ export async function shareNativeWebViewFile(
   });
 
   return { copiedText };
+}
+
+export async function saveNativeWebViewFile(
+  request: NativeFileExportRequest,
+): Promise<{ saved?: boolean; shareSheet?: boolean; cancelled?: boolean }> {
+  if (Platform.OS === 'web') {
+    throw new Error('এই ফাইল সেভ করার সুবিধা শুধু Android ও iOS-এ পাওয়া যায়।');
+  }
+  if (!request.requestId || !request.fileName || !request.title) throw new Error('ফাইলের তথ্য অসম্পূর্ণ।');
+  if (!ALLOWED_MIME_TYPES.has(request.mimeType)) throw new Error('এই ধরনের ফাইল সেভ করা যাবে না।');
+  if (!request.base64 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(request.base64)) {
+    throw new Error('ফাইলের ডেটা পড়া যায়নি।');
+  }
+
+  const fileName = safeFileName(request.fileName, request.mimeType);
+  if (Platform.OS === 'android') {
+    const permission = await LegacyFileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+    if (!permission.granted) return { cancelled: true };
+    const baseName = fileName.replace(/\.[^.]+$/, '');
+    const destination = await LegacyFileSystem.StorageAccessFramework.createFileAsync(
+      permission.directoryUri,
+      baseName,
+      request.mimeType,
+    );
+    await LegacyFileSystem.StorageAccessFramework.writeAsStringAsync(
+      destination,
+      request.base64,
+      { encoding: LegacyFileSystem.EncodingType.Base64 },
+    );
+    return { saved: true };
+  }
+
+  if (Platform.OS !== 'ios') throw new Error('এই ডিভাইসে PDF সেভ করা সমর্থিত নয়।');
+  if (!(await Sharing.isAvailableAsync())) throw new Error('এই ডিভাইসে ফাইল শেয়ার করা যাচ্ছে না।');
+  const file = new File(Paths.cache, fileName);
+  file.create({ overwrite: true });
+  file.write(request.base64, { encoding: 'base64' });
+  await Sharing.shareAsync(file.uri, {
+    mimeType: request.mimeType,
+    ...(IOS_UTI_BY_MIME[request.mimeType] ? { UTI: IOS_UTI_BY_MIME[request.mimeType] } : {}),
+    dialogTitle: request.title,
+  });
+  return { shareSheet: true };
 }

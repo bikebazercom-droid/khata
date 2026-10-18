@@ -5,8 +5,9 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useLanguage } from '@/lib/i18n';
-import { shareGeneratedFileWithNative } from '@/lib/native-file-export';
+import { saveGeneratedFileWithNative, shareGeneratedFileWithNative } from '@/lib/native-file-export';
 import { normalizePdfColors } from '@/lib/pdf-color-normalization';
+import { fitA4Content } from '@/lib/fit-a4-content';
 import { saveInvoiceHistory, type InvoiceHistoryAction, type InvoiceHistoryRecord } from './invoice-history';
 
 type InvoiceLine = { id: number; description: string; amount: string; taxed: boolean };
@@ -221,6 +222,7 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
   const { lang } = useLanguage();
   const en = lang === 'en';
   const printRef = useRef<HTMLDivElement>(null);
+  const pdfContentRef = useRef<HTMLDivElement>(null);
   const [readOnlyPreview, setReadOnlyPreview] = useState(viewOnly);
   const [pdfMode, setPdfMode] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -391,6 +393,7 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
   };
   async function createPdf() {
     setPdfMode(true);
+    let restoreFit = () => {};
     try {
       const { default: html2pdf } = await import('html2pdf.js');
       const element = printRef.current;
@@ -404,9 +407,12 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
       await Promise.all(Array.from(element.querySelectorAll('img')).map((image) =>
         image.decode().catch(() => undefined),
       ));
+      const content = pdfContentRef.current;
+      if (!content) throw new Error('Invoice content is not available.');
+      restoreFit = fitA4Content(element, content);
       normalizePdfColors(document, 'printable-invoice');
       const worker = html2pdf().set({
-        margin: [10, 10, 10, 10],
+        margin: 0,
         filename,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: {
@@ -424,29 +430,46 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
       if (!(blob instanceof Blob) || blob.size === 0) throw new Error('PDF renderer returned an empty file.');
       return blob;
     } finally {
+      restoreFit();
       setPdfMode(false);
     }
   }
   async function printInvoiceFallback() {
     if (typeof window.print !== 'function') throw new Error('This WebView does not provide a print dialog.');
+    setPdfMode(true);
+    await new Promise<void>((resolve) => {
+      if (typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+      } else window.setTimeout(resolve, 100);
+    });
     const root = printRef.current;
     const host = root?.closest('section');
-    if (!root?.isConnected || !host) throw new Error('Invoice preview is not available for printing.');
+    const content = pdfContentRef.current;
+    if (!root?.isConnected || !host || !content) {
+      setPdfMode(false);
+      throw new Error('Invoice preview is not available for printing.');
+    }
+    const restoreFit = fitA4Content(root, content);
     document.body.classList.add('business-invoice-print-fallback');
     const ancestors: HTMLElement[] = [];
     for (let parent = host.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
       parent.classList.add('business-invoice-print-ancestor');
       ancestors.push(parent);
     }
+    let cleaned = false;
     const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      restoreFit();
       document.body.classList.remove('business-invoice-print-fallback');
       for (const ancestor of ancestors) ancestor.classList.remove('business-invoice-print-ancestor');
+      setPdfMode(false);
     };
     window.addEventListener('afterprint', cleanup, { once: true });
     try {
       await new Promise<void>((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve())));
       window.print();
-      window.setTimeout(cleanup, 1000);
+      window.setTimeout(cleanup, 10_000);
     } catch (error) {
       cleanup();
       throw error;
@@ -513,6 +536,17 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
     try {
       if (!persistHistory()) return;
       const blob = await createPdf();
+      const native = await saveGeneratedFileWithNative(blob, {
+        fileName: filename,
+        mimeType: 'application/pdf',
+        title: `${labels.title} ${current.number}`,
+      });
+      if (native) {
+        if (native.saved) toast.success(en ? 'Invoice PDF saved.' : 'ইনভয়েস PDF সংরক্ষণ হয়েছে।');
+        else if (native.shareSheet) toast.info(en ? 'Choose “Save to Files” in the sharing options.' : 'শেয়ার অপশন থেকে “Save to Files” বেছে নিন।');
+        else if (native.cancelled) toast.info(en ? 'Folder selection was cancelled; the PDF was not saved.' : 'ফোল্ডার নির্বাচন বাতিল হয়েছে; PDF সংরক্ষণ হয়নি।');
+        return;
+      }
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -667,9 +701,11 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
             id="printable-invoice"
             ref={printRef}
             style={pdfMode ? {
-              width: '794px',
-              minWidth: '794px',
-              maxWidth: '794px',
+              width: '210mm',
+              minWidth: '210mm',
+              maxWidth: '210mm',
+              height: '296mm',
+              minHeight: '296mm',
               padding: '32px',
               boxSizing: 'border-box',
               overflow: 'hidden',
@@ -677,6 +713,7 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
             } : undefined}
             className="invoice-print relative mx-auto min-h-[800px] w-full max-w-[794px] overflow-hidden border border-[#dce2ea] bg-white px-6 py-7 text-[12px] text-[#233752] shadow-[0_14px_42px_rgba(35,55,82,.12)] sm:px-10 sm:py-10"
           >
+            <div ref={pdfContentRef} className="invoice-print-content">
             <div className="absolute inset-x-0 top-0 h-[7px] bg-[#33578a]" />
             <div className={`grid gap-4 border-b border-[#d7e0eb] pb-6 pt-1 ${pdfMode ? 'grid-cols-[1.1fr_.9fr_1.1fr]' : 'grid-cols-1 sm:grid-cols-3'}`} style={{ wordBreak: 'break-word' }}>
               <div className="min-w-0">
@@ -745,6 +782,7 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
             <div className="mt-8 flex items-center justify-between border-t border-[#e1e6ed] pt-4">
               <p className="text-[10px] font-semibold italic text-[#526783]">{labels.thank}</p>
               <span className="text-[9px] font-bold uppercase tracking-[.14em] text-[#a0acbb]">BanglaKhata</span>
+            </div>
             </div>
           </div>
           {!current.company && <p data-testid="text-invoice-preview-hint" className="mx-auto mt-3 max-w-[816px] text-center text-[11px] text-[#75869b]">{labels.empty}</p>}

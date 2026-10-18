@@ -153,7 +153,7 @@ describe('gold invoice', () => {
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       html2canvas: { windowWidth: 794, scale: 2 },
     });
-    expect(pdfCapture.elementStyle).toEqual({ width: '210mm', height: '297mm' });
+    expect(pdfCapture.elementStyle).toEqual({ width: '210mm', height: '296mm' });
     expect((pdfCapture.options?.html2canvas as { onclone?: unknown }).onclone).toEqual(expect.any(Function));
   });
 

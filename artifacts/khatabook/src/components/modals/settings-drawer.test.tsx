@@ -77,6 +77,17 @@ describe('settings drawer language selection', () => {
     expect(screen.getByTestId('menu-option-invoice')).toBeInTheDocument();
     expect(screen.getByTestId('menu-option-gold')).toBeInTheDocument();
     expect(screen.getByTestId('menu-option-list')).toBeInTheDocument();
+    const options = screen.getByTestId('invoice-menu-options');
+    expect(options).toHaveClass('flex', 'flex-col');
+    expect(within(options).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual([
+      'বিজনেস প্রোফাইল',
+      'বিজনেস ইনভয়েস',
+      'গোল্ড ইনভয়েস',
+      'ইনভয়েস তালিকা',
+    ]);
+    for (const button of within(options).getAllByRole('button')) {
+      expect(button).toHaveClass('w-full', 'justify-start');
+    }
     fireEvent.click(screen.getByTestId('menu-option-gold'));
     expect(screen.queryByRole('dialog', { name: 'Invoice menu' })).not.toBeInTheDocument();
     expect(screen.getByTestId('button-gold-save-history')).toBeInTheDocument();
