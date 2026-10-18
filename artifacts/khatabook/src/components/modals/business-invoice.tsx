@@ -257,7 +257,7 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
     customerPhoneLabel: 'Phone', customerAddressLabel: 'Address',
     number: 'Invoice number', date: 'Invoice date', currency: 'Currency', tax: 'Tax rate (%)',
     currencySearch: 'Search by country, symbol, or ISO code…', currencyNoResults: 'No currencies found.',
-    paymentTerms: 'Payment terms', metalRate: 'Metal / unit rate', placeOfSupply: 'Place of supply',
+    paymentTerms: 'Payment terms', placeOfSupply: 'Place of supply',
     description: 'Item description', taxed: 'Taxable', amount: 'Amount', add: 'Add an item', comments: 'Notes or payment terms',
     download: 'Download PDF', share: 'Share',
     subtotal: 'Subtotal', taxable: 'Taxable amount', taxDue: 'Tax', total: 'Total due', thank: 'Thank you for your business.',
@@ -277,7 +277,7 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
     customerPhoneLabel: 'ফোন', customerAddressLabel: 'ঠিকানা',
     number: 'ইনভয়েস নম্বর', date: 'ইনভয়েসের তারিখ', currency: 'মুদ্রা', tax: 'কর হার (%)',
     currencySearch: 'দেশ, প্রতীক বা ISO কোড দিয়ে খুঁজুন…', currencyNoResults: 'কোনো মুদ্রা পাওয়া যায়নি।',
-    paymentTerms: 'পেমেন্টের শর্ত', metalRate: 'ধাতু / একক মূল্য', placeOfSupply: 'সরবরাহের স্থান',
+    paymentTerms: 'পেমেন্টের শর্ত', placeOfSupply: 'সরবরাহের স্থান',
     description: 'পণ্যের বিবরণ', taxed: 'করযোগ্য', amount: 'পরিমাণ', add: 'আইটেম যোগ করুন', comments: 'নোট বা পেমেন্টের শর্ত',
     download: 'PDF ডাউনলোড', share: 'শেয়ার',
     subtotal: 'সাবটোটাল', taxable: 'করযোগ্য পরিমাণ', taxDue: 'কর', total: 'মোট পাওনা', thank: 'আপনার ব্যবসার জন্য ধন্যবাদ।',
@@ -625,8 +625,6 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
               <div data-testid="grid-invoice-reference-fields" className="grid gap-x-3.5 gap-y-3 md:grid-cols-2">
                 {field('date', labels.date, 'date')}
                 {field('paymentTerms', labels.paymentTerms)}
-                {field('metalRate', `${labels.metalRate} (${currencySymbol(current.currency, locale)} ${current.currency})`)}
-                {field('placeOfSupply', labels.placeOfSupply)}
                 <div className="min-w-0 text-[12px] font-semibold text-[#55657b]">
                   <span>{labels.currency}</span>
                   <Popover open={currencyPopoverOpen} onOpenChange={setCurrencyPopoverOpen}>
@@ -636,15 +634,17 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
                         <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
-                      <Command>
+                    <PopoverContent data-testid="invoice-currency-popover" align="start" className="z-[100] w-[var(--radix-popover-trigger-width)] overflow-hidden border-slate-200 bg-white p-0 text-slate-900 shadow-xl">
+                      <Command className="bg-white text-slate-900">
                         <CommandInput data-testid="input-invoice-currency-search" placeholder={labels.currencySearch} />
                         <CommandList>
                           <CommandEmpty>{labels.currencyNoResults}</CommandEmpty>
                           {currencyOptions.map((option) => (
                             <CommandItem key={option.code} value={option.search} data-testid={`currency-option-${option.code}`} onSelect={() => { set('currency', option.code); setCurrencyPopoverOpen(false); }}>
                               <Check className={`h-4 w-4 ${current.currency === option.code ? 'opacity-100' : 'opacity-0'}`} />
-                              <span className="min-w-0 truncate">{option.symbol} {option.code} - {option.name}</span>
+                              <span className="w-7 shrink-0 text-sm font-medium text-slate-700">{option.symbol}</span>
+                              <span className="w-10 shrink-0 text-xs font-semibold tracking-wide text-slate-500">{option.code}</span>
+                              <span className="min-w-0 truncate text-sm text-slate-800">{option.name}</span>
                             </CommandItem>
                           ))}
                         </CommandList>
@@ -653,6 +653,7 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
                   </Popover>
                 </div>
                 {field('taxRate', labels.tax, 'number')}
+                <div className="md:col-span-2">{field('placeOfSupply', labels.placeOfSupply)}</div>
               </div>
             </section>
             <section className="rounded-2xl border border-[#e2e8f0] bg-white p-3 shadow-[0_2px_10px_rgba(37,61,92,.035)] md:p-5">
@@ -735,7 +736,6 @@ export function BusinessInvoice({ historyRecord, autoAction = 'open', viewOnly =
                   [labels.number, current.number],
                   [labels.date, dateLabel(current.date, lang)],
                   [labels.paymentTerms, current.paymentTerms],
-                  [`${labels.metalRate} (${currencySymbol(current.currency, locale)} ${current.currency})`, current.metalRate || ''],
                   [labels.placeOfSupply, current.placeOfSupply],
                 ] as const).map(([label, value]) => (
                   <div key={label} className="grid grid-cols-[auto_minmax(0,1fr)] items-end gap-2 py-1">

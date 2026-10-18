@@ -85,21 +85,24 @@ describe('business invoice', () => {
     render(<BusinessInvoice />);
     expect(screen.queryByTestId('input-invoice-number')).not.toBeInTheDocument();
     expect(screen.queryByTestId('input-invoice-due')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('input-invoice-metalRate')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('select-invoice-currency'));
     fireEvent.change(screen.getByTestId('input-invoice-currency-search'), { target: { value: 'Dubai' } });
-    expect(screen.getByTestId('currency-option-AED')).toBeInTheDocument();
+    const currencyPopover = screen.getByTestId('invoice-currency-popover');
+    expect(currencyPopover).toHaveClass('bg-white', 'z-[100]');
+    const aedOption = screen.getByTestId('currency-option-AED');
+    expect(aedOption).toBeInTheDocument();
+    expect(aedOption.querySelector('span.text-xs.text-slate-500')).toHaveTextContent('AED');
+    expect(aedOption).toHaveTextContent('United Arab Emirates Dirham');
     expect(screen.queryByTestId('currency-option-USD')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('currency-option-AED'));
     expect(screen.getByTestId('select-invoice-currency')).toHaveTextContent('AED');
-    expect(screen.getByText('Metal / unit rate (د.إ AED)')).toBeInTheDocument();
 
     fireEvent.change(screen.getByTestId('input-invoice-item-amount-1'), { target: { value: '100' } });
-    fireEvent.change(screen.getByTestId('input-invoice-metalRate'), { target: { value: '447/g' } });
     expect(screen.queryByTestId('printable-invoice')).not.toBeInTheDocument();
     expect(screen.queryByTestId('button-invoice-mobile-view')).not.toBeInTheDocument();
     expect(screen.queryByText(/Payment due date/)).not.toBeInTheDocument();
-    expect(screen.getByText('Metal / unit rate (د.إ AED)')).toBeInTheDocument();
   });
 
   it('adds and removes invoice rows without allowing the final row to disappear', () => {
