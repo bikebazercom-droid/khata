@@ -27,6 +27,9 @@ describe('service worker network exclusion and scope', () => {
     const build = readFileSync(join(process.cwd(), 'vite.config.ts'), 'utf8');
     expect(build).toContain('await cache.addAll(ASSETS.map');
     expect(build).not.toContain('await self.skipWaiting()');
+    expect(build).toContain("fetch(new Request(request, { cache: 'no-store' }))");
+    expect(build).toContain("entryFileNames: 'assets/[name]-[hash].js'");
+    expect(build).toContain("assetFileNames: 'assets/[name]-[hash][extname]'");
     expect(build).toContain('await caches.delete(CACHE)');
     expect(build).toContain('name.startsWith(CACHE_PREFIX) && name !== CACHE');
     expect(build).not.toContain('caches.delete("banglakhata-entry-outbox")');

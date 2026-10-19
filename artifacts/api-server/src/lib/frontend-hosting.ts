@@ -24,10 +24,36 @@ function sendIndex(indexPath: string) {
       return;
     }
 
+    setNoStoreHeaders(res);
     res.sendFile(indexPath, (error) => {
       if (error) next(error);
     });
   };
+}
+
+function setNoStoreHeaders(res: Response): void {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+}
+
+function setStaticCacheHeaders(res: Response, filePath: string): void {
+  const fileName = path.basename(filePath);
+  if (path.extname(fileName).toLowerCase() === ".html"
+    || fileName === "sw.js"
+    || fileName === "manifest.webmanifest") {
+    setNoStoreHeaders(res);
+    return;
+  }
+
+  // Vite emits content-hashed entry chunks and assets. Only these immutable
+  // files can safely be cached for a year; unhashed public files stay fresh.
+  if (/[-.][A-Za-z0-9_-]{8,}\.[^.]+$/.test(fileName)) {
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    return;
+  }
+
+  setNoStoreHeaders(res);
 }
 
 function matchesPrefix(requestPath: string, prefix: string): boolean {
@@ -55,6 +81,7 @@ export function mountFrontendHosting(
       dotfiles: "ignore",
       fallthrough: true,
       index: false,
+      setHeaders: (res, filePath) => setStaticCacheHeaders(res, filePath),
     }),
   );
 
@@ -64,6 +91,7 @@ export function mountFrontendHosting(
       dotfiles: "ignore",
       fallthrough: true,
       index: false,
+      setHeaders: (res, filePath) => setStaticCacheHeaders(res, filePath),
     }),
   );
 

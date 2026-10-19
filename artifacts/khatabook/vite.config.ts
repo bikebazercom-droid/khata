@@ -85,7 +85,7 @@ self.addEventListener('fetch', event => {
   if (request.method !== 'GET' || !isAppNavigation(request.url, self.location.origin, BASE) && !isShellRequest(request.url, self.location.origin, BASE, ASSETS)) return;
   if (request.mode === 'navigate') {
     if (!isAppNavigation(request.url, self.location.origin, BASE)) return;
-    event.respondWith(fetch(request).catch(async () => {
+     event.respondWith(fetch(new Request(request, { cache: 'no-store' })).catch(async () => {
       const cached = await caches.open(CACHE).then(cache => cache.match(SHELL));
       return cached || Response.error();
     }));
@@ -136,6 +136,13 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, 'dist/public'),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]',
+      },
+    },
   },
   server: {
     port,

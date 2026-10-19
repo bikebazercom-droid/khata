@@ -19,9 +19,11 @@ function createFrontendFiles() {
   mkdirSync(path.join(adminDir, "assets"), { recursive: true });
 
   writeFileSync(path.join(websiteDir, "index.html"), "<html>shop website</html>");
-  writeFileSync(path.join(websiteDir, "assets", "app.js"), "window.site = 'shop';");
+  writeFileSync(path.join(websiteDir, "assets", "app-CxM2A1b9.js"), "window.site = 'shop';");
+  writeFileSync(path.join(websiteDir, "assets", "legacy.js"), "window.site = 'legacy';");
+  writeFileSync(path.join(websiteDir, "sw.js"), "self.version = 'shop';");
   writeFileSync(path.join(adminDir, "index.html"), "<html>admin panel</html>");
-  writeFileSync(path.join(adminDir, "assets", "app.js"), "window.site = 'admin';");
+  writeFileSync(path.join(adminDir, "assets", "app-CxM2A1b9.js"), "window.site = 'admin';");
 }
 
 function makeApp() {
@@ -52,19 +54,29 @@ describe("combined Hostinger frontend hosting", () => {
 
     const website = await request(app).get("/").expect(200);
     const admin = await request(app).get("/admin/").expect(200);
+    const explicitIndex = await request(app).get("/index.html").expect(200);
 
     expect(website.text).toContain("shop website");
     expect(admin.text).toContain("admin panel");
+    expect(website.headers["cache-control"]).toBe("no-store, no-cache, must-revalidate");
+    expect(admin.headers["cache-control"]).toBe("no-store, no-cache, must-revalidate");
+    expect(explicitIndex.headers["cache-control"]).toBe("no-store, no-cache, must-revalidate");
   });
 
   it("serves each frontend's assets from its own URL prefix", async () => {
     const app = makeApp();
 
-    const websiteAsset = await request(app).get("/assets/app.js").expect(200);
-    const adminAsset = await request(app).get("/admin/assets/app.js").expect(200);
+    const websiteAsset = await request(app).get("/assets/app-CxM2A1b9.js").expect(200);
+    const adminAsset = await request(app).get("/admin/assets/app-CxM2A1b9.js").expect(200);
+    const unhashedAsset = await request(app).get("/assets/legacy.js").expect(200);
+    const serviceWorker = await request(app).get("/sw.js").expect(200);
 
     expect(websiteAsset.text).toContain("'shop'");
     expect(adminAsset.text).toContain("'admin'");
+    expect(websiteAsset.headers["cache-control"]).toBe("public, max-age=31536000, immutable");
+    expect(adminAsset.headers["cache-control"]).toBe("public, max-age=31536000, immutable");
+    expect(unhashedAsset.headers["cache-control"]).toBe("no-store, no-cache, must-revalidate");
+    expect(serviceWorker.headers["cache-control"]).toBe("no-store, no-cache, must-revalidate");
   });
 
   it("returns the correct app shell for deep links", async () => {
@@ -77,6 +89,8 @@ describe("combined Hostinger frontend hosting", () => {
     expect(websiteRoute.text).toContain("shop website");
     expect(adminRoute.text).toContain("admin panel");
     expect(adminDashboard.text).toContain("admin panel");
+    expect(websiteRoute.headers["cache-control"]).toBe("no-store, no-cache, must-revalidate");
+    expect(adminDashboard.headers["cache-control"]).toBe("no-store, no-cache, must-revalidate");
   });
 
   it("does not turn missing assets or API routes into HTML", async () => {
