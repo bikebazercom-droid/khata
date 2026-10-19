@@ -43,10 +43,14 @@ describe('native WebView auth bootstrap', () => {
     });
     window.__BKH_NATIVE_AUTH_BOOTSTRAP__ = Promise.resolve({
       ok: false,
-      status: 401,
+      status: 403,
+      code: 'STAFF_ACCESS_REVOKED',
     });
 
-    await expect(fetchMe()).rejects.toMatchObject({ status: 401 });
+    await expect(fetchMe()).rejects.toMatchObject({
+      status: 403,
+      code: 'STAFF_ACCESS_REVOKED',
+    });
     expect(postMessage).toHaveBeenCalledWith(
       JSON.stringify({ type: 'banglakhata-native-auth-rejected' }),
     );

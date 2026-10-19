@@ -392,13 +392,24 @@ router.post(
       }
       throw error;
     }
-    if (user.status !== "active" || user.workerAccessDeletedAt) {
+    if (user.workerAccessDeletedAt) {
       await recordFailedLoginAttempt(req, {
         identifier: normalized, authMethod: "phone", stage: "account_status",
-        errorCode: user.workerAccessDeletedAt ? "staff_access_removed" : "account_suspended",
+        errorCode: "staff_access_revoked",
       });
-      res.status(403).json({ error: user.workerAccessDeletedAt
-        ? "Staff access removed. Ask the owner for a new invitation." : "Account suspended" });
+      clearPhoneSession(res);
+      res.status(403).json({
+        error: "Staff access removed. Ask the owner for a new invitation.",
+        code: "STAFF_ACCESS_REVOKED",
+      });
+      return;
+    }
+    if (user.status !== "active") {
+      await recordFailedLoginAttempt(req, {
+        identifier: normalized, authMethod: "phone", stage: "account_status",
+        errorCode: "account_suspended",
+      });
+      res.status(403).json({ error: "Account suspended", code: "ACCOUNT_SUSPENDED" });
       return;
     }
     await db.transaction(async (tx) => {

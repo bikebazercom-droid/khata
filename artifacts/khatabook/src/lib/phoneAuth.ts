@@ -26,6 +26,7 @@ interface NativeAuthBootstrapResult {
   ok: boolean;
   status: number;
   data?: MeResponse;
+  code?: string;
 }
 
 declare global {
@@ -61,16 +62,27 @@ export async function fetchMe(signal?: AbortSignal): Promise<MeResponse> {
         nativeAuthRejectedNotified = true;
         postNativeAuthMessage(NATIVE_AUTH_REJECTED_MESSAGE);
       }
-      const error = new Error("Session expired or access denied") as Error & { status: number };
+      if (result.code === 'STAFF_ACCESS_REVOKED' && !nativeAuthRejectedNotified) {
+        nativeAuthRejectedNotified = true;
+        postNativeAuthMessage(NATIVE_AUTH_REJECTED_MESSAGE);
+      }
+      const error = new Error("Session expired or access denied") as Error & { status: number; code?: string };
       error.status = result.status;
+      error.code = result.code;
       throw error;
     }
   }
 
   const res = await fetch(`/api/auth/me`, { credentials: "include", cache: "no-store", signal });
   if (!res.ok) {
-    const error = new Error(res.status === 401 || res.status === 403 ? "Session expired or access denied" : "Authentication server unavailable") as Error & { status: number };
+    const body = await res.json().catch(() => null) as { code?: unknown } | null;
+    const error = new Error(res.status === 401 || res.status === 403 ? "Session expired or access denied" : "Authentication server unavailable") as Error & { status: number; code?: string };
     error.status = res.status;
+    if (typeof body?.code === 'string') error.code = body.code;
+    if (error.code === 'STAFF_ACCESS_REVOKED' && !nativeAuthRejectedNotified) {
+      nativeAuthRejectedNotified = true;
+      postNativeAuthMessage(NATIVE_AUTH_REJECTED_MESSAGE);
+    }
     throw error;
   }
   return res.json() as Promise<MeResponse>;

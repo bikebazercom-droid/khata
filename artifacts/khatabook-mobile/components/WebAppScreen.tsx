@@ -63,7 +63,10 @@ function createNativeAuthBootstrapScript(token: string): string {
       },
       signal: controller.signal
     }).then(async (response) => {
-      if (!response.ok) return { ok: false, status: response.status };
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        return { ok: false, status: response.status, code: body?.code };
+      }
       return { ok: true, status: response.status, data: await response.json() };
     }).catch(() => ({ ok: false, status: 0 })).finally(() => clearTimeout(timeout));
     Object.defineProperty(window, '__BKH_NATIVE_AUTH_BOOTSTRAP__', {

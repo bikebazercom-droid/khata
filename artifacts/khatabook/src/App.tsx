@@ -11,7 +11,7 @@ import { ConnectionStateProvider, useConnectionState } from '@/context/connectio
 import { LandingPage } from '@/pages/landing';
 import { PrivacyPolicyPage } from '@/pages/privacy-policy';
 import { SupportPage } from '@/pages/support';
-import { fetchMe } from '@/lib/phoneAuth';
+import { fetchMe, phoneLogout } from '@/lib/phoneAuth';
 import { authMeQueryKey } from '@/lib/authQueryKeys';
 import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import { useRetryPendingUploads } from '@/lib/useRetryPendingUploads';
@@ -425,10 +425,21 @@ function AuthCacheInvalidator() {
   });
   useEffect(() => {
     if (isError && [401, 403].includes((error as Error & { status?: number })?.status ?? 0)) {
-      qc.clear();
+      const accessRevoked = (error as Error & { code?: string })?.code === 'STAFF_ACCESS_REVOKED';
+      // Keep the failed identity query cached. Clearing it here causes an
+      // immediate refetch, which repeats this branch and leaves routes loading.
+      qc.removeQueries({
+        predicate: (query) =>
+          query.queryKey[0] !== 'auth-me' ||
+          query.queryKey[1] !== (clerkUserId ?? undefined),
+      });
       const cachedIdentity = readOfflineIdentity();
       clearOfflineIdentity();
       void clearPersistedQueries(cachedIdentity?.userId).catch(() => {});
+      if (accessRevoked) clearAllPendingUploads();
+      localStorage.removeItem('selected_business_id');
+      setBusinesses([]);
+      revokeNetworkWrites();
       previousAuthorization.current = null;
       return;
     }
@@ -505,6 +516,7 @@ export function useAppAuth() {
     retry: false,
   });
   const status = (error as Error & { status?: number } | undefined)?.status;
+  const authErrorCode = (error as Error & { code?: string } | undefined)?.code;
   const storedIdentity = isLocalLogoutPending() ? null : readOfflineIdentity();
   const offlineIdentity = storedIdentity &&
     status !== 401 &&
@@ -551,6 +563,7 @@ export function useAppAuth() {
     needsBookName: resolvedAuthData?.needsBookName ?? false,
     adjustmentPartyIds: (resolvedAuthData as (typeof resolvedAuthData & { adjustmentPartyIds?: string[] }) | undefined)?.adjustmentPartyIds ?? [],
     authError: isError ? (error as Error).message : null,
+    authErrorCode,
   };
 }
 
@@ -790,13 +803,16 @@ function LanguagePreferenceOnboarding() {
 }
 
 function AppRouter({ onNetworkFailure, onSettled }: { onNetworkFailure: () => void; onSettled: () => void }) {
+  const { authErrorCode } = useAppAuth();
+
   return (
     <>
       <AuthServerReporter onNetworkFailure={onNetworkFailure} onSettled={onSettled} />
+      <AuthCacheInvalidator />
+      {authErrorCode === 'STAFF_ACCESS_REVOKED' ? <StaffAccessRemovedScreen /> : (
       <LanguageProvider>
         <LanguagePreferenceOnboarding />
         <ConnectionStateProvider>
-        <AuthCacheInvalidator />
         <RealtimeSyncManager />
         <NativePushRegistrationManager />
         <TooltipProvider>
@@ -872,7 +888,55 @@ function AppRouter({ onNetworkFailure, onSettled }: { onNetworkFailure: () => vo
         <BusinessSwitcherDrawer />
         </ConnectionStateProvider>
       </LanguageProvider>
+      )}
     </>
+  );
+}
+
+function StaffAccessRemovedScreen() {
+  const { signOut } = useAuth();
+  const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
+  const [signingOut, setSigningOut] = useState(false);
+
+  const continueToSignIn = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    await Promise.all([
+      phoneLogout().catch(() => {}),
+      signOut().catch(() => {}),
+    ]);
+    clearOfflineIdentity();
+    clearAllPendingUploads();
+    localStorage.removeItem('selected_business_id');
+    queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== 'auth-me' });
+    setLocation('/sign-in');
+  };
+
+  return (
+    <main className="flex min-h-[100dvh] items-center justify-center bg-slate-50 px-5 py-10">
+      <section
+        role="alert"
+        className="w-full max-w-md rounded-2xl border border-amber-200 bg-white p-7 text-center shadow-sm"
+      >
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-amber-700" aria-hidden="true">
+          !
+        </div>
+        <h1 className="text-xl font-bold text-slate-900">Staff access removed</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-600">
+          You no longer have access to this shop’s books. Contact the owner if you need access again.
+          Sign out before using another account.
+        </p>
+        <button
+          type="button"
+          onClick={() => void continueToSignIn()}
+          disabled={signingOut}
+          className="mt-6 min-h-11 w-full rounded-xl bg-[#0A4384] px-4 font-semibold text-white hover:bg-[#08376d] disabled:opacity-60"
+        >
+          {signingOut ? 'Signing out…' : 'Continue to sign in'}
+        </button>
+      </section>
+    </main>
   );
 }
 

@@ -581,6 +581,18 @@ export async function requireAuth(
           );
 
         if (
+          user?.workerAccessDeletedAt
+          || (revokedWorkerAccess?.revokedAt && !workerSessionIsCurrent)
+        ) {
+          clearClerkWebViewSession(res);
+          res.status(401).json({
+            error: "Staff access removed. Ask the owner for a new invitation.",
+            code: "STAFF_ACCESS_REVOKED",
+          });
+          return;
+        }
+
+        if (
           user
           && user.clerkUserId === webViewSession.clerkUserId
           && user.status === "active"
@@ -635,15 +647,22 @@ export async function requireAuth(
           eq(appUserLoginSessionsTable.sessionId, "worker-access-revoked"))).limit(1);
       if (cutoff?.revokedAt) {
         if (!await verifyClerkSessionCreationTime(clerkAuth.sessionId, clerkAuth.userId, cutoff.revokedAt)) {
-          res.status(401).json({ error: "Staff access was removed. Please sign in with a new session." });
+          res.status(401).json({
+            error: "Staff access was removed. Please sign in with a new session.",
+            code: "STAFF_ACCESS_REVOKED",
+          });
           return;
         }
       }
       const verifiedEmail = await getVerifiedClerkEmail(clerkAuth.userId);
       const user = await getOrCreateClerkUser(clerkAuth.userId, verifiedEmail ?? undefined);
       if (user.status !== "active" || user.workerAccessDeletedAt) {
-        res.status(403).json({ error: user.workerAccessDeletedAt
-          ? "Staff access removed. Ask the owner for a new invitation." : "Account suspended" });
+        res.status(403).json(user.workerAccessDeletedAt
+          ? {
+              error: "Staff access removed. Ask the owner for a new invitation.",
+              code: "STAFF_ACCESS_REVOKED",
+            }
+          : { error: "Account suspended", code: "ACCOUNT_SUSPENDED" });
         return;
       }
       const sessionAllowed = await db.transaction(async (tx) => {
@@ -718,7 +737,15 @@ export async function requireAuth(
     const payload = verifyPhoneSession(token);
     if (payload) {
       const [user] = await db.select().from(appUsersTable).where(eq(appUsersTable.id, payload.userId)).limit(1);
-      if (!user || user.status !== "active" || user.workerAccessDeletedAt || user.phone !== payload.phone ||
+       if (user?.workerAccessDeletedAt) {
+         clearPhoneSession(res);
+         res.status(403).json({
+           error: "Staff access removed. Ask the owner for a new invitation.",
+           code: "STAFF_ACCESS_REVOKED",
+         });
+         return;
+       }
+       if (!user || user.status !== "active" || user.phone !== payload.phone ||
           user.phoneSessionVersion !== payload.sessionVersion) {
         res.status(401).json({ error: "Invalid or revoked session" });
         return;

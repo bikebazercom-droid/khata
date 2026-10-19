@@ -151,6 +151,13 @@ describe("phone worker invitation and verified first sign-in", () => {
     expect(recorded?.ip).toBeNull(); // No configured policy; never mistake the proxy socket for a user IP.
     const replay = await request(app).post("/auth/phone/verify-otp").send({ phone, code });
     expect(replay.status).toBe(401);
+
+    await db.update(appUsersTable).set({ workerAccessDeletedAt: new Date() })
+      .where(eq(appUsersTable.id, staff!.id));
+    const revokedIdentity = await request(app).get("/auth/me")
+      .set("Authorization", `Bearer ${verified.body.token}`);
+    expect(revokedIdentity.status).toBe(403);
+    expect(revokedIdentity.body).toMatchObject({ code: "STAFF_ACCESS_REVOKED" });
   });
 
   it("limits requests for the same phone across equivalent number formats", async () => {
