@@ -125,7 +125,12 @@ export function SettingsDrawer({
         throw new Error(err);
       }
 
+      // Start identity-provider sign-out immediately after deletion. Clearing
+      // the query cache while Clerk is still signed in can trigger /auth/me,
+      // which would otherwise provision a replacement account.
       postNativeAuthMessage(NATIVE_AUTH_LOGOUT_MESSAGE);
+      const clerkSignOut = isSignedIn ? signOut().catch(() => {}) : Promise.resolve();
+      await clerkSignOut;
       queryClient.clear();
       revokeNetworkWrites();
       clearAllPendingUploads();
@@ -147,15 +152,8 @@ export function SettingsDrawer({
         },
       });
 
-      setTimeout(async () => {
-        try {
-          // The account no longer exists; another authenticated API call here
-          // would provision a replacement account before Clerk signs out.
-          if (isSignedIn) await signOut();
-          await phoneLogout().catch(() => {});
-        } catch {}
-        navigate('/sign-in');
-      }, 1500);
+      await phoneLogout().catch(() => {});
+      navigate('/sign-in');
     } catch (err) {
       console.error('[account-nuke] failed:', err);
       toast.error(t('deleteError'));

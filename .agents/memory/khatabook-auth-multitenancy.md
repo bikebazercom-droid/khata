@@ -60,12 +60,12 @@ Do not treat removing a local credential or calling a client SDK's sign-out as s
 **Why:** Clearing storage affects only one device; old tokens can otherwise keep accessing a ledger until expiry, even though the UI says the user signed out.
 **How to apply:** Test an old bearer token against a protected API route after sign-out. Let retries complete if server revocation succeeded but client SDK sign-out failed.
 
-## Account deletion must be the final authenticated API action
+## Account deletion and re-registration
 
-After deleting an account, do not send any further authenticated app API requests while its Clerk session is still valid. Sign out with the client SDK directly.
+Account deletion removes business/profile data and provider access, but keeps a minimal app-user tombstone with HMAC-protected email, phone, and Clerk-subject markers. Do not erase this tombstone: it blocks stale credentials while allowing a verified identity to create a fresh, empty account without the normal preapproval gate. Preserve the reserved seed business row.
 
-**Why:** Auth middleware provisions a replacement identity when it sees a valid Clerk session without an app user.
-**How to apply:** When changing deletion or logout flows, keep logout reporting before deletion only, and assert deletion leaves no user or business behind.
+**Why:** Deleting every identity row can let a still-valid Clerk token trigger just-in-time account provisioning, while preapproval records are not guaranteed to exist in every deployed database.
+**How to apply:** Make account deletion the final authenticated app API action, sign out through Clerk immediately, reject old subjects via the tombstone, and test new verified Clerk/phone identities re-registering without old business data.
 
 ## Replit-managed to external Clerk migration
 

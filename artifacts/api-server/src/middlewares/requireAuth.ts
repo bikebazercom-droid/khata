@@ -18,6 +18,7 @@ import {
 } from "@workspace/db";
 import { clientIp } from "./ipBlock";
 import { deviceDescription, recordFailedLoginAttempt } from "../lib/authTelemetry";
+import { hashDeletedAccountIdentity } from "../lib/deletedAccountIdentity";
 
 // Fixed UUID for the seed business that owns all pre-auth legacy data.
 export const SEED_BUSINESS_ID = "00000000-0000-0000-0000-000000000001";
@@ -208,10 +209,16 @@ export async function getOrCreateClerkUser(
   clerkUserId: string,
   verifiedEmail?: string,
 ): Promise<AppUser> {
-  const [existing] = await db
+  let [existing] = await db
     .select()
     .from(appUsersTable)
     .where(eq(appUsersTable.clerkUserId, clerkUserId));
+  if (!existing) {
+    [existing] = await db.select().from(appUsersTable).where(and(
+      eq(appUsersTable.clerkUserId, hashDeletedAccountIdentity("clerk", clerkUserId)),
+      isNotNull(appUsersTable.workerAccessDeletedAt),
+    ));
+  }
   if (existing) {
     if (existing.workerAccessDeletedAt) {
       // Never turn a removed staff identity into an owner. Only a new owner-issued
@@ -234,13 +241,20 @@ export async function getOrCreateClerkUser(
     throw new Error("A verified Clerk email is required to provision a new account");
   }
 
+  const [deletedAccount] = await db.select({ id: appUsersTable.id }).from(appUsersTable)
+    .where(and(
+      eq(appUsersTable.verifiedEmail, hashDeletedAccountIdentity("email", verifiedEmail)),
+      eq(appUsersTable.role, "owner"),
+      isNotNull(appUsersTable.workerAccessDeletedAt),
+    )).limit(1);
+
   if (verifiedEmail) {
     const [existingEmail] = await db.select({ id: appUsersTable.id }).from(appUsersTable)
       .where(eq(appUsersTable.verifiedEmail, verifiedEmail)).limit(1);
     if (existingEmail) throw new Error("Verified email is already linked to another user");
     const staff = await claimWorkerInvite({ email: verifiedEmail, clerkUserId });
     if (staff) return staff;
-    if (!await isPreapproved("email", verifiedEmail.toLowerCase())) {
+    if (!deletedAccount && !await isPreapproved("email", verifiedEmail.toLowerCase())) {
       throw new PreapprovalRequiredError("email", verifiedEmail.toLowerCase());
     }
   }
@@ -248,7 +262,11 @@ export async function getOrCreateClerkUser(
   const [seedOwner] = await db
     .select()
     .from(appUsersTable)
-    .where(eq(appUsersTable.businessId, SEED_BUSINESS_ID))
+    .where(and(
+      eq(appUsersTable.businessId, SEED_BUSINESS_ID),
+      eq(appUsersTable.role, "owner"),
+      isNull(appUsersTable.workerAccessDeletedAt),
+    ))
     .limit(1);
 
   let businessId: string;
@@ -282,16 +300,27 @@ export async function getOrCreatePhoneUser(
     return existing;
   }
 
+  const [deletedAccount] = await db.select({ id: appUsersTable.id }).from(appUsersTable)
+    .where(and(
+      eq(appUsersTable.phone, hashDeletedAccountIdentity("phone", phone)),
+      eq(appUsersTable.role, "owner"),
+      isNotNull(appUsersTable.workerAccessDeletedAt),
+    )).limit(1);
+
   const staff = await claimWorkerInvite({ phone });
   if (staff) return staff;
-  if (!await isPreapproved("phone", phone)) {
+  if (!deletedAccount && !await isPreapproved("phone", phone)) {
     throw new PreapprovalRequiredError("phone", phone);
   }
 
   const [seedOwner] = await db
     .select()
     .from(appUsersTable)
-    .where(eq(appUsersTable.businessId, SEED_BUSINESS_ID))
+    .where(and(
+      eq(appUsersTable.businessId, SEED_BUSINESS_ID),
+      eq(appUsersTable.role, "owner"),
+      isNull(appUsersTable.workerAccessDeletedAt),
+    ))
     .limit(1);
 
   let businessId: string;

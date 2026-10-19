@@ -4,26 +4,35 @@
  * DELETE /user/account  — Total account nuke.
  * Atomically erases every database record that belongs to the authenticated
  * user: ledger entries → parties → business settings → staff tables →
- * user_businesses → businesses → app_users row.
+ * user_businesses → businesses. A keyed identity tombstone remains to reject
+ * stale credentials and permit a verified, empty re-registration.
  *
  * After this call succeeds the user can sign back in via Clerk / phone OTP
- * and receive a brand-new, freshly-provisioned empty account.
+ * and receive a freshly-provisioned empty account.
  */
 import { Router, type IRouter } from "express";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import {
   db,
   appUsersTable,
+  appUserLoginSessionsTable,
   businessesTable,
   businessSettingsTable,
   partiesTable,
   ledgerEntriesTable,
   userBusinessesTable,
+  userLoginEventsTable,
+  userPresenceTable,
+  ownerPushTokensTable,
+  notificationsTable,
+  workerInvitesTable,
+  workerPartyAssignmentsTable,
   staffPersonnelTable,
   staffDeploymentLogsTable,
   staffDestinationsTable,
 } from "@workspace/db";
-import { type AuthenticatedRequest } from "../middlewares/requireAuth";
+import { SEED_BUSINESS_ID, type AuthenticatedRequest } from "../middlewares/requireAuth";
+import { hashDeletedAccountIdentity } from "../lib/deletedAccountIdentity";
 import { z } from "zod";
 
 const router: IRouter = Router();
@@ -108,6 +117,7 @@ router.delete(
           verifiedEmail: appUsersTable.verifiedEmail,
           phone: appUsersTable.phone,
           clerkUserId: appUsersTable.clerkUserId,
+          businessId: appUsersTable.businessId,
         })
         .from(appUsersTable)
         .where(eq(appUsersTable.id, userId))
@@ -125,6 +135,16 @@ router.delete(
         res.status(400).json({ error: "The confirmation text does not match your account." });
         return;
       }
+
+      const deletedEmail = account.verifiedEmail
+        ? hashDeletedAccountIdentity("email", account.verifiedEmail)
+        : null;
+      const deletedPhone = account.phone
+        ? hashDeletedAccountIdentity("phone", account.phone)
+        : null;
+      const deletedClerkUserId = account.clerkUserId
+        ? hashDeletedAccountIdentity("clerk", account.clerkUserId)
+        : null;
 
       // Remove the Clerk identity before erasing app data so a provider failure
       // leaves the account and its records intact for a safe retry.
@@ -167,7 +187,10 @@ router.delete(
           .from(userBusinessesTable)
           .where(eq(userBusinessesTable.userId, userId));
 
-        const bizIds = userBizRows.map((r) => r.businessId);
+        const bizIds = [...new Set([
+          ...userBizRows.map((r) => r.businessId),
+          account.businessId,
+        ])];
 
         if (bizIds.length > 0) {
           // 2. Collect all party IDs across those businesses.
@@ -208,25 +231,71 @@ router.delete(
             .delete(staffDestinationsTable)
             .where(inArray(staffDestinationsTable.businessId, bizIds));
 
-          // 7. Wipe memberships and identities before businesses, since
-          // app_users.business_id has a restrictive foreign key.
+          // Preserve the reserved row for the next owner, and move the minimal
+          // identity tombstone before deleting the account's old business.
+          await tx.insert(businessesTable)
+            .values({ id: SEED_BUSINESS_ID, name: "আমার খাতা" })
+            .onConflictDoNothing({ target: businessesTable.id });
+
           await tx
             .delete(userBusinessesTable)
             .where(inArray(userBusinessesTable.businessId, bizIds));
 
+          await tx.delete(userBusinessesTable).where(eq(userBusinessesTable.userId, userId));
+          await tx.delete(appUserLoginSessionsTable).where(eq(appUserLoginSessionsTable.userId, userId));
+          await tx.delete(userLoginEventsTable).where(eq(userLoginEventsTable.userId, userId));
+          await tx.delete(userPresenceTable).where(eq(userPresenceTable.userId, userId));
+          await tx.delete(ownerPushTokensTable).where(eq(ownerPushTokensTable.userId, userId));
+          await tx.delete(notificationsTable).where(eq(notificationsTable.recipientUserId, userId));
+          await tx.delete(workerPartyAssignmentsTable).where(eq(workerPartyAssignmentsTable.userId, userId));
+          await tx.update(workerInvitesTable).set({ claimedUserId: null })
+            .where(eq(workerInvitesTable.claimedUserId, userId));
+
+          // phone is unique in app_users. Retire an older re-entry marker for
+          // this same verified number before storing the new marker.
+          if (deletedPhone) {
+            await tx.delete(appUsersTable).where(and(
+              eq(appUsersTable.phone, deletedPhone),
+              ne(appUsersTable.id, userId),
+              eq(appUsersTable.role, "owner"),
+            ));
+          }
+
+          await tx.update(appUsersTable).set({
+            businessId: SEED_BUSINESS_ID,
+            phone: deletedPhone,
+            clerkUserId: deletedClerkUserId,
+            verifiedEmail: deletedEmail,
+            displayName: null,
+            language: null,
+            adjustmentPartyIds: [],
+            status: "suspended",
+            workerAccessDeletedAt: new Date(),
+            lastLogin: null,
+            lastLogout: null,
+            deviceMeta: null,
+          }).where(eq(appUsersTable.id, userId));
+
           await tx
             .delete(appUsersTable)
-            .where(inArray(appUsersTable.businessId, bizIds));
+            .where(and(
+              inArray(appUsersTable.businessId, bizIds),
+              ne(appUsersTable.id, userId),
+            ));
 
-          await tx
-            .delete(businessesTable)
-            .where(inArray(businessesTable.id, bizIds));
+          // Keep the reserved seed business row. The next account created after
+          // its owner deletes their account reuses this empty row for onboarding.
+          const businessIdsToDelete = bizIds.filter((id) => id !== SEED_BUSINESS_ID);
+          if (businessIdsToDelete.length) {
+            await tx.delete(businessesTable)
+              .where(inArray(businessesTable.id, businessIdsToDelete));
+          }
+          if (bizIds.includes(SEED_BUSINESS_ID)) {
+            await tx.update(businessesTable).set({ name: "আমার খাতা" })
+              .where(eq(businessesTable.id, SEED_BUSINESS_ID));
+          }
         }
 
-        // 8. Finally, delete the user identity row itself.
-        await tx
-          .delete(appUsersTable)
-          .where(eq(appUsersTable.id, userId));
       });
 
       res.status(200).json({ success: true });
