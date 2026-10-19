@@ -172,7 +172,7 @@ describe("first-book name onboarding", () => {
 
   it("opens setup for a first-time phone owner and returns to the same named book on later sign-ins", async () => {
     vi.mocked(ensureSmsReady).mockReset().mockResolvedValue(undefined);
-    vi.mocked(sendOtpSms).mockReset().mockResolvedValue(undefined);
+    vi.mocked(sendOtpSms).mockReset().mockResolvedValue({});
 
     const sendCode = async () => {
       const sent = await request(app).post("/auth/phone/send-otp").send({ phone: ownerPhone });

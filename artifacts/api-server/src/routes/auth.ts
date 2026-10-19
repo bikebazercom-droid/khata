@@ -37,6 +37,7 @@ import { ensureSmsReady, sendOtpSms, SmsGatewayError } from "../services/sms";
 import { clientIp } from "../middlewares/ipBlock";
 import { deviceDescription, recordFailedLoginAttempt } from "../lib/authTelemetry";
 import { normalizeBdPhone } from "../lib/bdPhone";
+import { normalizeOtpCode, OTP_VALIDITY_MS } from "../lib/otp";
 import { PostgresRateLimitStore } from "../lib/postgresRateLimitStore";
 import {
   getNormalizedOtpPhoneRateLimitKey,
@@ -244,7 +245,7 @@ router.post(
         return tx.insert(otpCodesTable).values({
           phone: normalized,
           code: otpDigest(normalized, code),
-          expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+          expiresAt: new Date(Date.now() + OTP_VALIDITY_MS),
         }).returning({ id: otpCodesTable.id });
       });
       if (!record?.id) throw new Error("otp_record_not_returned");
@@ -262,7 +263,14 @@ router.post(
     }
 
     try {
-      await sendOtpSms(normalized, code);
+      const receipt = await sendOtpSms(normalized, code);
+      req.log.info({
+        stage: "sms_delivery",
+        providerStatus: "accepted",
+        ...(receipt?.providerRequestId !== undefined
+          ? { providerRequestId: receipt.providerRequestId }
+          : {}),
+      }, "Phone OTP SMS accepted by provider");
     } catch (error) {
       req.log.error({
         stage: "sms_delivery",
@@ -322,13 +330,22 @@ router.post(
       return;
     }
 
+    const normalizedCode = normalizeOtpCode(code);
+    if (!normalizedCode) {
+      await recordFailedLoginAttempt(req, {
+        identifier: normalized, authMethod: "phone", stage: "verify_otp", errorCode: "invalid_code_format",
+      });
+      res.status(400).json({ error: "Enter the 6-digit code from the SMS" });
+      return;
+    }
+
     const [record] = await db
       .select()
       .from(otpCodesTable)
       .where(
         and(
           eq(otpCodesTable.phone, normalized),
-          eq(otpCodesTable.code, otpDigest(normalized, code.trim())),
+          eq(otpCodesTable.code, otpDigest(normalized, normalizedCode)),
           eq(otpCodesTable.verified, false),
           gt(otpCodesTable.expiresAt, new Date()),
         ),

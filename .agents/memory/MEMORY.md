@@ -17,6 +17,7 @@
 - [Hostinger Node entry file](hostinger-node-entry-file.md) — Hostinger's Entry File must point to the compiled server file, not the package command `pnpm start`.
 - [Legacy download-channel compatibility](download-channel-compatibility.md) — retire inactive UI/API routes without dropping stored channel columns; static exports must keep their existing Clerk tenant and path settings.
 - [sms.net.bd API contract](sms-net-bd-contract.md) — provider docs now live at sms.bd/api; keep the API key in the POST body, not the URL.
+- [Phone OTP normalization and lifetime](phone-otp-normalization.md) — normalize phone and code input across Bengali/ASCII digits; keep the delivered-code text and server expiry synchronized.
 - [Filtered pnpm lockfile updates](pnpm-filtered-lockfile.md) — filtered lockfile-only installs prune unrelated snapshots from the shared workspace lock.
 - [Expo SDK 57 React versions](expo-sdk57-react-resolution.md) — keep the mobile app on React 19.2.3; do not restore a workspace-wide 19.1.0 override.
 - [Expo SecureStore on web](securestore-web-auth.md) — keep native-only SecureStore calls off web; use the server's HttpOnly session cookie for Expo web login.

@@ -38,7 +38,7 @@ describe("sms.net.bd OTP delivery", () => {
       ),
     );
 
-    await sendOtpSms("+880 (17) 1234-5678", "123456");
+    const receipt = await sendOtpSms("+880 (17) 1234-5678", "123456");
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0]!;
@@ -52,6 +52,8 @@ describe("sms.net.bd OTP delivery", () => {
     expect(body.api_key).toBe("test-api-key");
     expect(body.to).toBe("8801712345678");
     expect(body.msg).toContain("123456");
+    expect(body.msg).toContain("15 minutes");
+    expect(receipt.providerRequestId).toBe(1234);
     expect(String(url)).not.toContain("test-api-key");
   });
 
@@ -77,6 +79,14 @@ describe("sms.net.bd OTP delivery", () => {
     await sendOtpSms("+8801712345678", "123456");
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.sms.net.bd/sendsms");
+  });
+
+  it("accepts a string zero response code from the provider", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ error: "0" }), { status: 200 }));
+
+    await expect(sendOtpSms("+8801712345678", "123456")).resolves.toEqual({
+      providerRequestId: undefined,
+    });
   });
 
   it("rejects non-Bangladeshi numbers before making a provider request", async () => {

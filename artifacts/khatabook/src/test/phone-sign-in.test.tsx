@@ -62,6 +62,20 @@ describe('phone OTP sign-in auth cache', () => {
     expect(phoneAuthMocks.setLocation).toHaveBeenCalledWith('/');
   });
 
+  it('converts Bengali OTP digits to ASCII before verification', async () => {
+    phoneAuthMocks.verifyOtp.mockResolvedValue(verifiedSession);
+    renderPhoneSignIn();
+
+    fireEvent.change(screen.getByTestId('input-phone'), { target: { value: '০১৭১২৩৪৫৬৭৮' } });
+    fireEvent.click(screen.getByTestId('button-send-otp'));
+    fireEvent.change(await screen.findByTestId('input-otp-code'), { target: { value: '০১২৩৪৫' } });
+    fireEvent.click(screen.getByTestId('button-verify-otp'));
+
+    await waitFor(() => {
+      expect(phoneAuthMocks.verifyOtp).toHaveBeenCalledWith('০১৭১২৩৪৫৬৭৮', '012345');
+    });
+  });
+
   it('does not set an authenticated query or navigate when OTP verification fails', async () => {
     phoneAuthMocks.verifyOtp.mockRejectedValue(new Error('Invalid code'));
     const queryClient = renderPhoneSignIn();

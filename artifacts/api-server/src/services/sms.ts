@@ -1,8 +1,9 @@
 import { normalizeBdPhone } from "../lib/bdPhone";
+import { OTP_VALIDITY_MINUTES } from "../lib/otp";
 
 const DEFAULT_SMS_NET_BD_SEND_URL = "https://api.sms.net.bd/sendsms";
 const OTP_MESSAGE = (code: string) =>
-  `BanglaKhata verification code: ${code}. Expires in 10 minutes. Do not share it.`;
+  `BanglaKhata verification code: ${code}. Expires in ${OTP_VALIDITY_MINUTES} minutes. Do not share it.`;
 
 export type SmsGatewayFailureCode =
   | "missing_api_key"
@@ -100,7 +101,32 @@ export async function ensureSmsReady(): Promise<void> {
   }
 }
 
-export async function sendOtpSms(phone: string, code: string): Promise<void> {
+export type SmsGatewayReceipt = { providerRequestId?: number | string };
+
+function getProviderErrorCode(result: unknown): number | string | undefined {
+  if (typeof result !== "object" || result === null || !("error" in result)) return undefined;
+  const code = (result as { error?: unknown }).error;
+  if (typeof code === "number" && Number.isSafeInteger(code)) return code;
+  if (typeof code === "string" && /^\d{1,4}$/.test(code)) return code;
+  return undefined;
+}
+
+function getProviderRequestId(result: unknown): number | string | undefined {
+  if (typeof result !== "object" || result === null) return undefined;
+  const data = "data" in result ? (result as { data?: unknown }).data : undefined;
+  const requestId = typeof data === "object" && data !== null && "request_id" in data
+    ? (data as { request_id?: unknown }).request_id
+    : undefined;
+  if (typeof requestId === "number" && Number.isSafeInteger(requestId) && requestId >= 0) {
+    return requestId;
+  }
+  if (typeof requestId === "string" && /^\d{1,20}$/.test(requestId)) {
+    return requestId;
+  }
+  return undefined;
+}
+
+export async function sendOtpSms(phone: string, code: string): Promise<SmsGatewayReceipt> {
   await ensureSmsReady();
 
   const normalizedPhone = normalizeBdPhone(phone);
@@ -143,35 +169,29 @@ export async function sendOtpSms(phone: string, code: string): Promise<void> {
   }
 
   const result: unknown = await response.json().catch(() => null);
+  const providerCode = getProviderErrorCode(result);
   const accepted =
     typeof result === "object" &&
     result !== null &&
     "error" in result &&
-    (result as { error?: unknown }).error === 0;
+    providerCode !== undefined &&
+    Number(providerCode) === 0;
 
   if (!response.ok) {
     throw new SmsGatewayError(
       "http_error",
       "sms.net.bd did not accept the SMS request",
       response.status,
+      providerCode,
     );
   }
   if (!accepted) {
-    const rawProviderCode =
-      typeof result === "object" && result !== null && "error" in result
-        ? (result as { error?: unknown }).error
-        : undefined;
-    const providerErrorCode =
-      typeof rawProviderCode === "number" && Number.isSafeInteger(rawProviderCode)
-        ? rawProviderCode
-        : typeof rawProviderCode === "string" && /^\d{1,4}$/.test(rawProviderCode)
-          ? rawProviderCode
-          : undefined;
     throw new SmsGatewayError(
       result === null ? "invalid_response" : "provider_rejected",
       "sms.net.bd did not accept the SMS request",
       undefined,
-      providerErrorCode,
+      providerCode,
     );
   }
+  return { providerRequestId: getProviderRequestId(result) };
 }

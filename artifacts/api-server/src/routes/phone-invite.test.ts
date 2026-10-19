@@ -107,6 +107,7 @@ describe("phone worker invitation and verified first sign-in", () => {
     expect(send.body).toEqual({ success: true });
     const code = vi.mocked(sendOtpSms).mock.calls.at(-1)?.[1];
     expect(code).toMatch(/^\d{6}$/);
+    if (!code) throw new Error("Mock SMS request did not capture its OTP");
     const [storedCode] = await db.select().from(otpCodesTable).where(eq(otpCodesTable.phone, normalized));
     expect(storedCode?.code).not.toBe(code);
 
@@ -115,8 +116,11 @@ describe("phone worker invitation and verified first sign-in", () => {
     const wrongCode = code === "000000" ? "999999" : "000000";
     const wrong = await request(app).post("/auth/phone/verify-otp").send({ phone, code: wrongCode });
     expect(wrong.status).toBe(401);
+    const localizedCode = code.replace(/\d/g, (digit) =>
+      String.fromCharCode(0x09e6 + Number(digit)),
+    );
     const verified = await request(app).post("/auth/phone/verify-otp")
-      .set("X-Forwarded-For", "8.8.8.8").send({ phone, code });
+      .set("X-Forwarded-For", "8.8.8.8").send({ phone, code: localizedCode });
     expect(verified.status, verified.text).toBe(200);
     expect(verified.body.token).toEqual(expect.any(String));
     expect(jwt.decode(verified.body.token)).not.toHaveProperty("exp");
@@ -191,7 +195,10 @@ describe("phone worker invitation and verified first sign-in", () => {
 
     const proxiedApp = express();
     proxiedApp.set("trust proxy", trustedProxyCidrs());
-    proxiedApp.use(express.json(), authRouter);
+    proxiedApp.use(express.json(), (req, _res, next) => {
+      Object.assign(req, { log: { info: vi.fn(), error: vi.fn() } });
+      next();
+    }, authRouter);
 
     try {
       ipRateLimitKey = getVerifiedOtpIpRateLimitKey({
@@ -204,7 +211,7 @@ describe("phone worker invitation and verified first sign-in", () => {
       vi.mocked(ensureSmsReady).mockReset();
       vi.mocked(ensureSmsReady).mockResolvedValue(undefined);
       vi.mocked(sendOtpSms).mockReset();
-      vi.mocked(sendOtpSms).mockResolvedValue(undefined);
+      vi.mocked(sendOtpSms).mockResolvedValue({});
 
       const sendStatuses: number[] = [];
       for (const phone of sendPhones) {

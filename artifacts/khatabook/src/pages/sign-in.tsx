@@ -203,7 +203,7 @@ export function PhoneSignIn() {
             Enter the code
           </h2>
           <p className="text-sm text-slate-500 text-center mb-6">
-            Sent to {phone}
+            Sent to {phone}. The code is valid for 15 minutes.
           </p>
           <form onSubmit={handleVerifyOtp} className="space-y-4">
             <div>
@@ -217,7 +217,10 @@ export function PhoneSignIn() {
                 data-testid="input-otp-code"
                 maxLength={6}
                 value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                onChange={(e) => setCode(e.target.value
+                  .replace(/[০-৯]/g, (digit) => String(digit.charCodeAt(0) - 0x09e6))
+                  .replace(/\D/g, '')
+                  .slice(0, 6))}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 text-center tracking-widest text-lg bg-white focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
                 required
                 autoFocus
