@@ -32,6 +32,7 @@ import { clearAllPendingUploads } from '@/lib/pendingUploads';
 import { useBusinessContext } from '@/lib/businessContext';
 import { isNetworkWriteAuthorized, isOfflineMode, markServerReauthenticated, revokeNetworkWrites, useAuthConnectivity } from '@/lib/useAuthConnectivity';
 import { isPublicAuthRoute } from '@/lib/auth-route-policy';
+import { AuthConnectivityGate } from '@/components/auth-connectivity-gate';
 import { clearLocalLogoutPending, clearOfflineIdentity, isLocalLogoutPending, readOfflineIdentity, saveOfflineIdentity } from '@/lib/offlineSession';
 import { clearPersistedPartyQueries, clearPersistedQueries, persistCache, restorePersistedQueries, setQueryPersistenceScope } from '@/lib/queryPersister';
 import { EntrySavedFeedbackHost } from '@/components/ui/entry-saved-feedback';
@@ -976,36 +977,39 @@ function AppClient() {
     );
   }
 
-  if (phase === 'offline' && !cachedIdentity && !isAuthRoute) {
-    return <OnlineConnectionRequired onRetry={() => { void retry(); }} />;
-  }
-
   // Boot Clerk alongside the reachability probe, but keep authenticated routes,
   // realtime listeners, and mutation-capable providers behind the online gate.
   return (
-    <ClerkProvider
-      publishableKey={clerkPubKey}
-      proxyUrl={clerkProxyUrl}
-      appearance={clerkAppearance}
-      signInUrl={`${basePath}/sign-in`}
-      signUpUrl={`${basePath}/sign-up`}
-      localization={{
-        signIn: {
-          start: { title: 'Welcome back', subtitle: 'Sign in to your ledger account' },
-        },
-        signUp: {
-          start: { title: 'Create your account', subtitle: 'Start managing your business ledger' },
-        },
-      }}
-      routerPush={(to) => setLocation(stripBase(to))}
-      routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
+    <AuthConnectivityGate
+      path={location}
+      phase={phase}
+      hasOfflineIdentity={!!cachedIdentity}
+      onRetry={() => { void retry(); }}
     >
-      <QueryClientProvider client={queryClient}>
-        {phase === 'probing' && !cachedIdentity && !isAuthRoute
-          ? <AppSplash />
-          : <AppRouter onNetworkFailure={goOffline} onSettled={serverAuthSettled} />}
-      </QueryClientProvider>
-    </ClerkProvider>
+      <ClerkProvider
+        publishableKey={clerkPubKey}
+        proxyUrl={clerkProxyUrl}
+        appearance={clerkAppearance}
+        signInUrl={`${basePath}/sign-in`}
+        signUpUrl={`${basePath}/sign-up`}
+        localization={{
+          signIn: {
+            start: { title: 'Welcome back', subtitle: 'Sign in to your ledger account' },
+          },
+          signUp: {
+            start: { title: 'Create your account', subtitle: 'Start managing your business ledger' },
+          },
+        }}
+        routerPush={(to) => setLocation(stripBase(to))}
+        routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
+      >
+        <QueryClientProvider client={queryClient}>
+          {phase === 'probing' && !cachedIdentity && !isAuthRoute
+            ? <AppSplash />
+            : <AppRouter onNetworkFailure={goOffline} onSettled={serverAuthSettled} />}
+        </QueryClientProvider>
+      </ClerkProvider>
+    </AuthConnectivityGate>
   );
 }
 
@@ -1016,26 +1020,6 @@ function App() {
         <AppClient />
       </WouterRouter>
     </BusinessContextProvider>
-  );
-}
-
-function OnlineConnectionRequired({ onRetry }: { onRetry: () => void }) {
-  return (
-    <main className="min-h-[100dvh] bg-slate-50 px-6 flex items-center justify-center">
-      <section className="w-full max-w-sm rounded-2xl bg-white p-7 text-center shadow-sm border border-slate-100">
-        <h1 className="text-xl font-bold text-slate-900">সার্ভারের সাথে সংযোগ নেই</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-600">
-          ব্রাউজারে হিসাব দেখতে বা যোগ করতে সক্রিয় ইন্টারনেট সংযোগ দরকার। সংযোগ ফিরে এলে আবার চেষ্টা করুন।
-        </p>
-        <button
-          type="button"
-          onClick={onRetry}
-          className="mt-6 min-h-11 w-full rounded-xl bg-[#0b3d91] px-4 font-semibold text-white hover:bg-blue-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
-        >
-          আবার চেষ্টা করুন
-        </button>
-      </section>
-    </main>
   );
 }
 
