@@ -57,7 +57,8 @@ const BASE = ${JSON.stringify(base)};
 const ASSETS = ${JSON.stringify(urls)};
 const SHELL = BASE + 'index.html';
 const CACHE_PREFIX = 'banglakhata-shell:' + BASE + ':';
-const CACHE = CACHE_PREFIX + ${JSON.stringify(version)};
+const VERSION = ${JSON.stringify(version)};
+const CACHE = CACHE_PREFIX + VERSION;
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
@@ -79,6 +80,9 @@ self.addEventListener('activate', event => {
       if (name.startsWith(CACHE_PREFIX) && name !== CACHE) await caches.delete(name);
     }
     await self.clients.claim();
+    for (const client of await self.clients.matchAll({ type: 'window', includeUncontrolled: true })) {
+      client.postMessage({ type: 'banglakhata-shell-version', version: VERSION });
+    }
   })());
 });
 self.addEventListener('fetch', event => {

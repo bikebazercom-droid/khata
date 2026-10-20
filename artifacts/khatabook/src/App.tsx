@@ -31,6 +31,7 @@ import { applyQueuedPartyOperations, drainPartyOperations, PARTY_OUTBOX_CHANGED,
 import { clearAllPendingUploads } from '@/lib/pendingUploads';
 import { useBusinessContext } from '@/lib/businessContext';
 import { isNetworkWriteAuthorized, isOfflineMode, markServerReauthenticated, revokeNetworkWrites, useAuthConnectivity } from '@/lib/useAuthConnectivity';
+import { isPublicAuthRoute } from '@/lib/auth-route-policy';
 import { clearLocalLogoutPending, clearOfflineIdentity, isLocalLogoutPending, readOfflineIdentity, saveOfflineIdentity } from '@/lib/offlineSession';
 import { clearPersistedPartyQueries, clearPersistedQueries, persistCache, restorePersistedQueries, setQueryPersistenceScope } from '@/lib/queryPersister';
 import { EntrySavedFeedbackHost } from '@/components/ui/entry-saved-feedback';
@@ -945,6 +946,7 @@ function AppClient() {
   const { phase, goOffline, serverAuthSettled, retry } = useAuthConnectivity(clearQueries);
   const [location, setLocation] = useLocation();
   const cachedIdentity = isLocalLogoutPending() ? null : readOfflineIdentity();
+  const isAuthRoute = isPublicAuthRoute(location);
   const showPublicLandingWhileChecking = location === "/" && !cachedIdentity && phase !== "online";
 
   useEffect(() => {
@@ -974,7 +976,7 @@ function AppClient() {
     );
   }
 
-  if (phase === 'offline' && !cachedIdentity) {
+  if (phase === 'offline' && !cachedIdentity && !isAuthRoute) {
     return <OnlineConnectionRequired onRetry={() => { void retry(); }} />;
   }
 
@@ -999,7 +1001,7 @@ function AppClient() {
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
       <QueryClientProvider client={queryClient}>
-        {phase === 'probing' && !cachedIdentity
+        {phase === 'probing' && !cachedIdentity && !isAuthRoute
           ? <AppSplash />
           : <AppRouter onNetworkFailure={goOffline} onSettled={serverAuthSettled} />}
       </QueryClientProvider>

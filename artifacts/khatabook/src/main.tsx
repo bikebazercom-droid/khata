@@ -6,10 +6,16 @@ import { registerServiceWorker } from './lib/registerServiceWorker';
 
 import './index.css';
 
-let reloadedForServiceWorkerController = false;
-navigator.serviceWorker?.addEventListener('controllerchange', () => {
-  if (reloadedForServiceWorkerController) return;
-  reloadedForServiceWorkerController = true;
+let reloadedShellVersion: string | null = null;
+navigator.serviceWorker?.addEventListener('message', (event: MessageEvent<unknown>) => {
+  const message = event.data as { type?: unknown; version?: unknown } | null;
+  if (
+    message?.type !== 'banglakhata-shell-version' ||
+    typeof message.version !== 'string' ||
+    !message.version ||
+    message.version === reloadedShellVersion
+  ) return;
+  reloadedShellVersion = message.version;
   window.location.reload();
 });
 
