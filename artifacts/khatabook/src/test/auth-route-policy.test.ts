@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isPublicAuthRoute } from '../lib/auth-route-policy';
+import { isPublicAuthRoute, shouldUseOfflineIdentityFallback } from '../lib/auth-route-policy';
 
 describe('public authentication routing', () => {
   it('keeps sign-in and sign-up routes available during connectivity failures', () => {
@@ -12,5 +12,12 @@ describe('public authentication routing', () => {
     for (const path of ['/', '/dashboard', '/party/123', '/support', '/sign-in-help']) {
       expect(isPublicAuthRoute(path)).toBe(false);
     }
+  });
+
+  it('does not use a saved offline identity to redirect away from authentication routes', () => {
+    expect(shouldUseOfflineIdentityFallback('/sign-in')).toBe(false);
+    expect(shouldUseOfflineIdentityFallback('/sign-in/verify')).toBe(false);
+    expect(shouldUseOfflineIdentityFallback('/sign-up')).toBe(false);
+    expect(shouldUseOfflineIdentityFallback('/dashboard')).toBe(true);
   });
 });

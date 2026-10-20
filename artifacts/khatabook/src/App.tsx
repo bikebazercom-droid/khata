@@ -31,7 +31,7 @@ import { applyQueuedPartyOperations, drainPartyOperations, PARTY_OUTBOX_CHANGED,
 import { clearAllPendingUploads } from '@/lib/pendingUploads';
 import { useBusinessContext } from '@/lib/businessContext';
 import { isNetworkWriteAuthorized, isOfflineMode, markServerReauthenticated, revokeNetworkWrites, useAuthConnectivity } from '@/lib/useAuthConnectivity';
-import { isPublicAuthRoute } from '@/lib/auth-route-policy';
+import { isPublicAuthRoute, shouldUseOfflineIdentityFallback } from '@/lib/auth-route-policy';
 import { AuthConnectivityGate } from '@/components/auth-connectivity-gate';
 import { clearLocalLogoutPending, clearOfflineIdentity, isLocalLogoutPending, readOfflineIdentity, saveOfflineIdentity } from '@/lib/offlineSession';
 import { clearPersistedPartyQueries, clearPersistedQueries, persistCache, restorePersistedQueries, setQueryPersistenceScope } from '@/lib/queryPersister';
@@ -502,7 +502,7 @@ function AuthCacheInvalidator() {
  * is used only to open cached data and queue local changes; a server 401/403
  * always disables that fallback.
  */
-export function useAppAuth() {
+export function useAppAuth(options: { route?: string } = {}) {
   const { isLoaded, isSignedIn: clerkSignedIn, userId: clerkUserId } = useAuth();
 
   // Resolve the server-side role even in development; a Clerk session alone
@@ -519,7 +519,11 @@ export function useAppAuth() {
   });
   const status = (error as Error & { status?: number } | undefined)?.status;
   const authErrorCode = (error as Error & { code?: string } | undefined)?.code;
-  const storedIdentity = isLocalLogoutPending() ? null : readOfflineIdentity();
+  // An offline identity keeps ledger routes usable, but must never make the
+  // sign-in screen redirect away before the current Clerk/server session settles.
+  const storedIdentity = isLocalLogoutPending() || (options.route && !shouldUseOfflineIdentityFallback(options.route))
+    ? null
+    : readOfflineIdentity();
   const offlineIdentity = storedIdentity &&
     status !== 401 &&
     status !== 403 &&
@@ -651,7 +655,7 @@ function HomeRoute() {
 }
 
 function SignInRoute() {
-  const { isAuthenticated, isLoading } = useAppAuth();
+  const { isAuthenticated, isLoading } = useAppAuth({ route: '/sign-in' });
 
   if (isLoading) return <AppSplash />;
   if (isAuthenticated) return <Redirect to="/" />;
