@@ -6,6 +6,13 @@ import { registerServiceWorker } from './lib/registerServiceWorker';
 
 import './index.css';
 
+let reloadedForServiceWorkerController = false;
+navigator.serviceWorker?.addEventListener('controllerchange', () => {
+  if (reloadedForServiceWorkerController) return;
+  reloadedForServiceWorkerController = true;
+  window.location.reload();
+});
+
 createRoot(document.getElementById('root')!).render(
   <AppErrorBoundary>
     <App />

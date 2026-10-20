@@ -945,6 +945,7 @@ function AppClient() {
   const { phase, goOffline, serverAuthSettled, retry } = useAuthConnectivity(clearQueries);
   const [location, setLocation] = useLocation();
   const cachedIdentity = isLocalLogoutPending() ? null : readOfflineIdentity();
+  const showPublicLandingWhileChecking = location === "/" && !cachedIdentity && phase !== "online";
 
   useEffect(() => {
     if (!cachedIdentity) return;
@@ -956,6 +957,11 @@ function AppClient() {
   // Clerk configuration, or a successful server connectivity probe.
   if (location === "/privacy-policy") return <PrivacyPolicyPage />;
   if (location === "/support") return <SupportPage />;
+
+  // Keep the public entry point visible while a live probe or auth SDK starts.
+  // A transient health-check failure must not replace the landing page with an
+  // offline error; protected routes remain gated below.
+  if (showPublicLandingWhileChecking) return <LandingPage />;
 
   if (!clerkPubKey) {
     return (

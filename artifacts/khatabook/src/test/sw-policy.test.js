@@ -23,15 +23,24 @@ describe('service worker network exclusion and scope', () => {
     }
     expect(isAppNavigation(origin + '/admin/', origin, base)).toBe(false);
   });
-  it('requires atomic asset prefetch before activation and removes only old shell versions', () => {
+  it('requires atomic asset prefetch, promptly activates updated workers, and removes only old shell versions', () => {
     const build = readFileSync(join(process.cwd(), 'vite.config.ts'), 'utf8');
     expect(build).toContain('await cache.addAll(ASSETS.map');
-    expect(build).not.toContain('await self.skipWaiting()');
+    expect(build).toContain('await self.skipWaiting()');
     expect(build).toContain("fetch(new Request(request, { cache: 'no-store' }))");
     expect(build).toContain("entryFileNames: 'assets/[name]-[hash].js'");
     expect(build).toContain("assetFileNames: 'assets/[name]-[hash][extname]'");
     expect(build).toContain('await caches.delete(CACHE)');
     expect(build).toContain('name.startsWith(CACHE_PREFIX) && name !== CACHE');
     expect(build).not.toContain('caches.delete("banglakhata-entry-outbox")');
+  });
+
+  it('checks for a fresh worker after registration and reloads once on controller change', () => {
+    const registration = readFileSync(join(process.cwd(), 'src/lib/registerServiceWorker.ts'), 'utf8');
+    const main = readFileSync(join(process.cwd(), 'src/main.tsx'), 'utf8');
+    expect(registration).toContain('registration.update()');
+    expect(main).toContain("addEventListener('controllerchange'");
+    expect(main).toContain('window.location.reload()');
+    expect(main).toContain('reloadedForServiceWorkerController');
   });
 });

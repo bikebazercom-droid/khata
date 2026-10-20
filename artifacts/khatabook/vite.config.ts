@@ -64,8 +64,9 @@ self.addEventListener('install', event => {
     try {
       // All-or-nothing: never activate a worker with mismatched HTML and JS.
       await cache.addAll(ASSETS.map(url => new Request(url, { cache: 'reload' })));
-      // Do not skipWaiting: existing tabs may still need their old hashed
-      // dynamic chunks. Activate only when those tabs have closed.
+            // Replace stale workers promptly; the client reloads once when the
+            // new controller takes over so it never keeps an old offline bundle.
+            await self.skipWaiting();
     } catch (error) {
       await caches.delete(CACHE);
       throw error;
