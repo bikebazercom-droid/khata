@@ -34,6 +34,38 @@ describe('auth connectivity route gate', () => {
     expect(screen.getByText('Clerk sign-in interface')).toBeInTheDocument();
   });
 
+  it('keeps the Clerk sign-up interface available when connectivity is offline', () => {
+    render(
+      <AuthConnectivityGate
+        path="/sign-up"
+        phase="offline"
+        hasOfflineIdentity={false}
+        onRetry={vi.fn()}
+      >
+        <div>Clerk sign-up interface</div>
+      </AuthConnectivityGate>,
+    );
+
+    expect(screen.getByText('Clerk sign-up interface')).toBeInTheDocument();
+    expect(screen.queryByText('সার্ভারের সাথে সংযোগ নেই')).not.toBeInTheDocument();
+  });
+
+  it('keeps nested Clerk sign-up steps available while the health check is pending', () => {
+    render(
+      <AuthConnectivityGate
+        path="/sign-up/verify"
+        phase="probing"
+        hasOfflineIdentity={false}
+        onRetry={vi.fn()}
+      >
+        <div>Clerk sign-up verification</div>
+      </AuthConnectivityGate>,
+    );
+
+    expect(screen.getByText('Clerk sign-up verification')).toBeInTheDocument();
+    expect(screen.queryByText('সার্ভারের সাথে সংযোগ নেই')).not.toBeInTheDocument();
+  });
+
   it('shows the offline screen on a protected route and retries when requested', () => {
     const onRetry = vi.fn();
     render(
