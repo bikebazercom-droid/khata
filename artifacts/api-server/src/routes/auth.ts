@@ -453,6 +453,158 @@ router.post(
   },
 );
 
+// ─── Authenticated owner phone linking ────────────────────────────────────────
+// A Clerk/Google owner can add a verified phone to the existing BanglaKhata
+// account without creating a second owner or moving any ledger data.
+
+router.post(
+  "/auth/phone/link/send-otp",
+  requireAuth,
+  sendOtpIpLimiter,
+  sendOtpPhoneLimiter,
+  async (req: Request, res: Response): Promise<void> => {
+    const auth = req as AuthenticatedRequest;
+    if (auth.role !== "owner") {
+      res.status(403).json({ error: "Only the owner can link a phone number." });
+      return;
+    }
+    const { phone } = req.body ?? {};
+    const normalized = typeof phone === "string" ? normalizeBdPhone(phone.trim()) : null;
+    if (!normalized) {
+      res.status(400).json({ error: "Enter a valid Bangladeshi mobile number." });
+      return;
+    }
+    const [linkedUser] = await db.select({ id: appUsersTable.id })
+      .from(appUsersTable).where(eq(appUsersTable.phone, normalized)).limit(1);
+    if (linkedUser && linkedUser.id !== auth.userId) {
+      res.status(409).json({ error: "This phone number is already linked to another account." });
+      return;
+    }
+    const [config] = await db.select({ enabled: adminOtpConfigTable.enabled })
+      .from(adminOtpConfigTable).limit(1);
+    if (config?.enabled === false) {
+      res.status(503).json({ error: "Phone verification is temporarily disabled." });
+      return;
+    }
+    try {
+      await ensureSmsReady();
+    } catch {
+      res.status(503).json({ error: "Phone verification is temporarily unavailable." });
+      return;
+    }
+
+    const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
+    let recordId: string;
+    try {
+      const [record] = await db.transaction(async (tx) => {
+        await tx.delete(otpCodesTable).where(eq(otpCodesTable.phone, normalized));
+        return tx.insert(otpCodesTable).values({
+          phone: normalized,
+          code: otpDigest(normalized, code),
+          expiresAt: new Date(Date.now() + OTP_VALIDITY_MS),
+        }).returning({ id: otpCodesTable.id });
+      });
+      if (!record?.id) throw new Error("otp_record_not_returned");
+      recordId = record.id;
+    } catch {
+      res.status(503).json({ error: "Could not prepare a verification code." });
+      return;
+    }
+    try {
+      await sendOtpSms(normalized, code);
+    } catch {
+      await db.delete(otpCodesTable).where(eq(otpCodesTable.id, recordId)).catch((error) => {
+        req.log.error({ errorCode: safeFailureCode(error) }, "Undelivered phone-link OTP cleanup failed");
+      });
+      res.status(503).json({ error: "Could not send the verification SMS." });
+      return;
+    }
+    res.json({ success: true });
+  },
+);
+
+router.post(
+  "/auth/phone/link/verify-otp",
+  requireAuth,
+  verifyOtpIpLimiter,
+  verifyOtpPhoneLimiter,
+  async (req: Request, res: Response): Promise<void> => {
+    const auth = req as AuthenticatedRequest;
+    if (auth.role !== "owner") {
+      res.status(403).json({ error: "Only the owner can link a phone number." });
+      return;
+    }
+    const { phone, code } = req.body ?? {};
+    const normalized = typeof phone === "string" ? normalizeBdPhone(phone.trim()) : null;
+    const normalizedCode = typeof code === "string" ? normalizeOtpCode(code) : null;
+    if (!normalized) {
+      res.status(400).json({ error: "Enter a valid Bangladeshi mobile number." });
+      return;
+    }
+    if (!normalizedCode) {
+      res.status(400).json({ error: "Enter the 6-digit code from the SMS." });
+      return;
+    }
+
+    try {
+      const result = await db.transaction(async (tx) => {
+        const [otp] = await tx.select({ id: otpCodesTable.id })
+          .from(otpCodesTable)
+          .where(and(
+            eq(otpCodesTable.phone, normalized),
+            eq(otpCodesTable.code, otpDigest(normalized, normalizedCode)),
+            gt(otpCodesTable.expiresAt, new Date()),
+          ))
+          .limit(1)
+          .for("update");
+        if (!otp) return "invalid" as const;
+
+        const [linkedUser] = await tx.select({ id: appUsersTable.id })
+          .from(appUsersTable).where(eq(appUsersTable.phone, normalized)).limit(1);
+        if (linkedUser && linkedUser.id !== auth.userId) return "phone_in_use" as const;
+
+        const [updated] = await tx.update(appUsersTable)
+          .set({ phone: normalized })
+          .where(eq(appUsersTable.id, auth.userId))
+          .returning({ id: appUsersTable.id });
+        if (!updated) return "account_missing" as const;
+
+        const [consumed] = await tx.delete(otpCodesTable)
+          .where(and(eq(otpCodesTable.id, otp.id), gt(otpCodesTable.expiresAt, new Date())))
+          .returning({ id: otpCodesTable.id });
+        if (!consumed) return "invalid" as const;
+        return "linked" as const;
+      });
+
+      if (result === "invalid") {
+        await recordFailedLoginAttempt(req, {
+          identifier: normalized, authMethod: "phone", stage: "link_phone", errorCode: "invalid_or_expired_code",
+        });
+        res.status(401).json({ error: "Invalid or expired code. Request a new code and try again." });
+        return;
+      }
+      if (result === "phone_in_use") {
+        res.status(409).json({ error: "This phone number is already linked to another account." });
+        return;
+      }
+      if (result === "account_missing") {
+        res.status(404).json({ error: "Owner account not found." });
+        return;
+      }
+      res.json({ success: true, phone: normalized });
+    } catch (error) {
+      const databaseCode = (error as { code?: string; cause?: { code?: string } })?.code
+        ?? (error as { cause?: { code?: string } })?.cause?.code;
+      if (databaseCode === "23505") {
+        res.status(409).json({ error: "This phone number is already linked to another account." });
+        return;
+      }
+      req.log.error({ errorCode: safeFailureCode(error) }, "Phone could not be linked to owner account");
+      res.status(503).json({ error: "Phone number could not be linked. Please try again." });
+    }
+  },
+);
+
 // ─── POST /api/auth/phone/logout ──────────────────────────────────────────────
 
 router.post("/auth/phone/logout", async (req: Request, res: Response): Promise<void> => {

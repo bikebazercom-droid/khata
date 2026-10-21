@@ -109,10 +109,44 @@ export async function verifyOtp(phone: string, code: string): Promise<MeResponse
     body: JSON.stringify({ phone, code }),
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({})) as any;
-    throw new Error(body.error ?? "Invalid code");
+    const body = await res.json().catch(() => null) as { error?: string } | null;
+    if (typeof body?.error === 'string' && body.error.trim()) {
+      throw new Error(body.error);
+    }
+    if (res.status === 401) throw new Error('Invalid or expired code');
+    throw new Error(`Sign-in service error (HTTP ${res.status}). Use Google/email or try again later.`);
   }
   return res.json() as Promise<MeResponse>;
+}
+
+export async function sendPhoneLinkOtp(phone: string): Promise<void> {
+  const res = await fetch('/api/auth/phone/link/send-otp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ phone }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string };
+    throw new Error(body.error ?? 'Could not send the verification code.');
+  }
+}
+
+export async function verifyPhoneLinkOtp(
+  phone: string,
+  code: string,
+): Promise<{ success: true; phone: string }> {
+  const res = await fetch('/api/auth/phone/link/verify-otp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ phone, code }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string };
+    throw new Error(body.error ?? 'Could not verify the phone number.');
+  }
+  return res.json() as Promise<{ success: true; phone: string }>;
 }
 
 export async function phoneLogout(): Promise<void> {

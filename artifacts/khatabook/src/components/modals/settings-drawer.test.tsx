@@ -105,6 +105,18 @@ describe('settings drawer language selection', () => {
     expect(screen.getByTestId('button-gold-save-history')).toBeInTheDocument();
   });
 
+  it('lets an authenticated owner open the OTP phone-link flow', () => {
+    render(<SettingsDrawer open onOpenChange={vi.fn()} />);
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'আরও অপশন' }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    fireEvent.click(screen.getByTestId('menu-link-phone'));
+
+    expect(screen.getByRole('heading', { name: 'এই account-এ ফোন নম্বর যুক্ত করুন' })).toBeInTheDocument();
+    expect(screen.getByTestId('input-phone-link-number')).toBeInTheDocument();
+  });
+
   it('generates Business and Gold invoices and redirects to the updated history list', () => {
     localStorage.removeItem('banglakhata_invoice_history_v1:default');
     render(<SettingsDrawer open onOpenChange={vi.fn()} />);

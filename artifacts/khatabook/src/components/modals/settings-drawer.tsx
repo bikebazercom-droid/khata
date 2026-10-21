@@ -32,6 +32,7 @@ import { useAppAuth } from '@/App';
 import { BusinessInvoice } from './business-invoice';
 import { GoldInvoice } from './gold-invoice';
 import { BusinessProfile } from './business-profile';
+import { PhoneLinkDialog } from './phone-link-dialog';
 import { InvoiceList } from './invoice-list';
 import type { InvoiceHistoryAction, InvoiceHistoryRecord } from './invoice-history';
 import { isOfflineMode, revokeNetworkWrites } from '@/lib/useAuthConnectivity';
@@ -82,6 +83,7 @@ export function SettingsDrawer({
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showPhoneLinkDialog, setShowPhoneLinkDialog] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isLanguageMenuExpanded, setIsLanguageMenuExpanded] = useState(false);
@@ -325,6 +327,18 @@ export function SettingsDrawer({
                     </span>
                   </div>
                 </DropdownMenuItem>
+                {isAuthenticated && role === 'owner' && authMethod !== 'dev' && (
+                  <DropdownMenuItem
+                    data-testid="menu-link-phone"
+                    onSelect={() => setShowPhoneLinkDialog(true)}
+                    className="min-h-11 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-200 transition-colors hover:bg-slate-800 hover:text-white focus:bg-slate-800 focus:text-white"
+                  >
+                    <Phone className="h-4 w-4" />
+                    {lang === 'en'
+                      ? (phone ? 'Change OTP phone number' : 'Link phone for OTP sign-in')
+                      : (phone ? 'OTP ফোন নম্বর পরিবর্তন' : 'OTP লগইনের জন্য ফোন যুক্ত করুন')}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   disabled={isLoggingOut}
                   onSelect={() => {
@@ -446,6 +460,17 @@ export function SettingsDrawer({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PhoneLinkDialog
+        open={showPhoneLinkDialog}
+        onOpenChange={setShowPhoneLinkDialog}
+        currentPhone={phone}
+        lang={lang}
+        onLinked={() => {
+          void queryClient.invalidateQueries({ queryKey: ['auth-me'] });
+          toast.success(lang === 'en' ? 'Phone linked to this account.' : 'এই account-এ ফোন নম্বর যুক্ত হয়েছে।');
+        }}
+      />
 
     </Dialog>
   );
