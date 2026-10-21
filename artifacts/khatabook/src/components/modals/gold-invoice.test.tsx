@@ -147,7 +147,6 @@ describe('gold invoice', () => {
   it('keeps party-copy metadata labels and values in separate wrapping columns', () => {
     render(<GoldInvoice viewOnly />);
 
-    const header = screen.getByTestId('gold-printable-header');
     const taxQr = screen.getByTestId('gold-printable-tax-qr');
     expect(taxQr).toHaveClass('flex', 'flex-col', 'items-center');
     expect(taxQr).toHaveTextContent('TAX INVOICE');
@@ -155,9 +154,9 @@ describe('gold invoice', () => {
     const tableHeaders = [...screen.getByTestId('gold-printable-items-table').querySelectorAll('thead th')].map((cell) => cell.textContent);
     expect(tableHeaders).toEqual([
       'S.No', 'Stock Description', 'Gross Wt.', 'Purity', 'Pure Wt.',
-      'Making Rate /g', 'Making Amt. (AED)', 'Total (AED)',
+      'Making Rate', 'Making Amt. (AED)', 'Total (AED)',
     ]);
-    expect(screen.getByTestId('gold-printable-total-row')).toHaveTextContent('Total (1 item)');
+    expect(screen.getByTestId('gold-printable-total-row')).toHaveTextContent('Total (1 Item)');
     expect(screen.getByTestId('text-gold-printable-total-label')).toHaveTextContent('Total Amount Including VAT (AED)');
     const rows = screen.getAllByTestId('gold-header-meta-row');
     expect(rows).toHaveLength(5);
@@ -184,7 +183,7 @@ describe('gold invoice', () => {
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       html2canvas: { windowWidth: 794, scale: 2 },
     });
-    expect(pdfCapture.elementStyle).toEqual({ width: '210mm', height: '296mm' });
+    expect(pdfCapture.elementStyle).toEqual({ width: '210mm', height: '297mm' });
     expect((pdfCapture.options?.html2canvas as { onclone?: unknown }).onclone).toEqual(expect.any(Function));
   });
 

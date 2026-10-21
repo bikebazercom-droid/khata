@@ -442,19 +442,19 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
     'Gross Wt.',
     labels.purity,
     'Pure Wt.',
-    en ? 'Making Rate /g' : 'মেকিং রেট /গ্রাম',
+    en ? 'Making Rate' : 'মেকিং রেট',
     en ? `Making Amt. (${chosenCurrency.code})` : `মেকিং চার্জ (${chosenCurrency.code})`,
     en ? `Total (${chosenCurrency.code})` : `মোট (${chosenCurrency.code})`,
   ];
   const itemCountLabel = en
-    ? `Total (${lines.length} ${lines.length === 1 ? 'item' : 'items'})`
+    ? `Total (${lines.length} ${lines.length === 1 ? 'Item' : 'Items'})`
     : `মোট (${lines.length}টি আইটেম)`;
   const printableTotalLabel = en
     ? `Total Amount Including VAT (${chosenCurrency.code})`
     : `ভ্যাটসহ মোট (${chosenCurrency.code})`;
   const invoice = (
     <div ref={printRef} id="printable-gold-invoice" data-testid="gold-printable-invoice" className="gold-print-root mx-auto bg-white text-[#172b49]"
-      style={{ width: '210mm', height: '296mm', padding: '24px', boxSizing: 'border-box', overflow: 'hidden', border: '2px solid #c5a059', transform: pdfMode ? 'none' : `scale(${previewScale})`, transformOrigin: 'top left' }}>
+      style={{ width: '210mm', height: '297mm', padding: '24px', boxSizing: 'border-box', overflow: 'hidden', border: '1.5px solid #c5a059', transform: pdfMode ? 'none' : `scale(${previewScale})`, transformOrigin: 'top left' }}>
       <div ref={pdfContentRef} className="flex h-full min-h-[1058px] flex-col border border-[#d7bd79] p-[22px] text-[9px] leading-[1.35]">
         <div data-testid="gold-printable-header" className="grid grid-cols-[1.12fr_.76fr_1fr] items-start gap-3 border-b border-[#e8dfc8] pb-3">
           <div className="min-w-0">
@@ -510,7 +510,7 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
                   <td className="truncate border-r border-[#edf0f4] px-1 py-1">{number(line.makingRateValue)}</td><td className="truncate border-r border-[#edf0f4] px-1 py-1">{number(line.makingAmountValue)}</td><td className="truncate px-1 py-1 text-right font-semibold">{number(line.total)}</td>
                 </> : Array.from({ length: 7 }, (_, cellIndex) => <td key={`empty-cell-${cellIndex}`} aria-hidden="true" className={`${cellIndex < 6 ? 'border-r border-[#edf0f4] ' : ''}px-1 py-1`} />)}
               </tr>)}
-              <tr data-testid="gold-printable-total-row" className="border-t border-[#c9b26e] bg-[#fbf8ef] font-bold"><td colSpan={2} className="px-1.5 py-2">{itemCountLabel}</td><td className="px-1 py-2">{number(calculations.gross, 3)}</td><td></td><td className="px-1 py-2">{number(calculations.pure, 3)}</td><td></td><td className="px-1 py-2">{number(calculations.making)}</td><td className="px-1 py-2 text-right">{number(calculations.values.reduce((sum, item) => sum + item.total, 0))}</td></tr>
+              <tr data-testid="gold-printable-total-row" className="border-t border-[#c9b26e] bg-[#f1f3f5] font-bold"><td colSpan={2} className="px-1.5 py-2">{itemCountLabel}</td><td className="px-1 py-2">{number(calculations.gross, 3)}</td><td></td><td className="px-1 py-2">{number(calculations.pure, 3)}</td><td></td><td className="px-1 py-2">{number(calculations.making)}</td><td className="px-1 py-2 text-right">{number(calculations.values.reduce((sum, item) => sum + item.total, 0))}</td></tr>
             </tbody>
           </table>
         </section>
