@@ -436,6 +436,22 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
     { length: Math.max(7, calculations.values.length) },
     (_, index) => calculations.values[index] ?? null,
   );
+  const printableColumnLabels = [
+    'S.No',
+    en ? 'Stock Description' : 'স্টকের বিবরণ',
+    'Gross Wt.',
+    labels.purity,
+    'Pure Wt.',
+    en ? 'Making Rate /g' : 'মেকিং রেট /গ্রাম',
+    en ? `Making Amt. (${chosenCurrency.code})` : `মেকিং চার্জ (${chosenCurrency.code})`,
+    en ? `Total (${chosenCurrency.code})` : `মোট (${chosenCurrency.code})`,
+  ];
+  const itemCountLabel = en
+    ? `Total (${lines.length} ${lines.length === 1 ? 'item' : 'items'})`
+    : `মোট (${lines.length}টি আইটেম)`;
+  const printableTotalLabel = en
+    ? `Total Amount Including VAT (${chosenCurrency.code})`
+    : `ভ্যাটসহ মোট (${chosenCurrency.code})`;
   const invoice = (
     <div ref={printRef} id="printable-gold-invoice" data-testid="gold-printable-invoice" className="gold-print-root mx-auto bg-white text-[#172b49]"
       style={{ width: '210mm', height: '296mm', padding: '24px', boxSizing: 'border-box', overflow: 'hidden', border: '2px solid #c5a059', transform: pdfMode ? 'none' : `scale(${previewScale})`, transformOrigin: 'top left' }}>
@@ -449,12 +465,10 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
             {data.email && <p>Email: {data.email}</p>}
             {data.trn && <p>TRN: {data.trn}</p>}
           </div>
-          <div className="flex items-center justify-center gap-2 pt-2">
-            <div className="flex h-[50px] w-[82px] shrink-0 items-center justify-center border border-[#d3b15c] bg-[#192f50] px-1 text-center text-[9px] font-extrabold leading-tight tracking-[.12em] text-white">{labels.taxInvoice}</div>
-            <div className="flex flex-col items-center">
-              <QRCodeSVG value={data.locationUrl || `${window.location.origin}/dashboard/details`} size={54} level="M" />
-              <span className="mt-0.5 text-[6px] text-slate-500">{en ? 'Scan to find us' : 'আমাদের খুঁজতে স্ক্যান করুন'}</span>
-            </div>
+          <div data-testid="gold-printable-tax-qr" className="flex flex-col items-center gap-1 pt-1">
+            <div className="flex h-[34px] w-[82px] shrink-0 items-center justify-center border border-[#d3b15c] bg-[#192f50] px-1 text-center text-[9px] font-extrabold leading-tight tracking-[.12em] text-white">{labels.taxInvoice}</div>
+            <QRCodeSVG value={data.locationUrl || `${window.location.origin}/dashboard/details`} size={54} level="M" />
+            <span className="text-[6px] text-slate-500">{en ? 'Scan to find us' : 'আমাদের খুঁজতে স্ক্যান করুন'}</span>
           </div>
           <div className="text-right">
             <p className="mb-2 text-[9px] font-extrabold tracking-[.12em] text-[#a27b22]">{labels.partyCopy}</p>
@@ -484,31 +498,31 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
           </div>
         </section>
         <section className="mt-3">
-          <table className="w-full table-fixed border-collapse text-[7px]">
+          <table data-testid="gold-printable-items-table" className="w-full table-fixed border-collapse text-[7px]">
             <colgroup><col style={{ width: '5%' }} /><col style={{ width: '24%' }} /><col style={{ width: '10%' }} /><col style={{ width: '8%' }} /><col style={{ width: '10%' }} /><col style={{ width: '12%' }} /><col style={{ width: '14%' }} /><col style={{ width: '17%' }} /></colgroup>
-            <thead className="bg-[#1b365b] text-white"><tr>{['S.No', labels.desc, 'Gross Wt.', labels.purity, 'Pure Wt.', labels.makingRate, labels.makingAmount, labels.total].map((text, index) => <th key={index} className="border border-[#294568] px-1 py-2 text-left font-bold">{text}</th>)}</tr></thead>
+            <thead className="bg-[#1b365b] text-white"><tr>{printableColumnLabels.map((text, index) => <th key={index} className="border border-[#294568] px-1 py-2 text-left font-bold">{text}</th>)}</tr></thead>
             <tbody>
               {printableRows.map((line, index) => <tr key={line?.id ?? `empty-${index + 1}`} data-testid="gold-printable-item-row" className="h-5 border-b border-[#e7e8eb]">
                 <td className="border-r border-[#edf0f4] px-1 py-1">{index + 1}</td>
                 {line ? <>
                   <td className="truncate border-r border-[#edf0f4] px-1 py-1">{line.description || '—'}</td><td className="border-r border-[#edf0f4] px-1 py-1">{number(line.grossValue, 3)}</td>
                   <td className="border-r border-[#edf0f4] px-1 py-1">{line.purityValue.toFixed(3)}</td><td className="border-r border-[#edf0f4] px-1 py-1">{number(line.pure, 3)}</td>
-                  <td className="truncate border-r border-[#edf0f4] px-1 py-1">{money(line.makingRateValue)}</td><td className="truncate border-r border-[#edf0f4] px-1 py-1">{money(line.makingAmountValue)}</td><td className="truncate px-1 py-1 text-right font-semibold">{money(line.total)}</td>
+                  <td className="truncate border-r border-[#edf0f4] px-1 py-1">{number(line.makingRateValue)}</td><td className="truncate border-r border-[#edf0f4] px-1 py-1">{number(line.makingAmountValue)}</td><td className="truncate px-1 py-1 text-right font-semibold">{number(line.total)}</td>
                 </> : Array.from({ length: 7 }, (_, cellIndex) => <td key={`empty-cell-${cellIndex}`} aria-hidden="true" className={`${cellIndex < 6 ? 'border-r border-[#edf0f4] ' : ''}px-1 py-1`} />)}
               </tr>)}
-              <tr className="border-t border-[#c9b26e] bg-[#fbf8ef] font-bold"><td colSpan={2} className="px-1.5 py-2">{en ? 'Total weight' : 'মোট ওজন'}</td><td className="px-1 py-2">{number(calculations.gross, 3)}</td><td></td><td className="px-1 py-2">{number(calculations.pure, 3)}</td><td></td><td className="px-1 py-2">{money(calculations.making)}</td><td className="px-1 py-2 text-right">{money(calculations.values.reduce((sum, item) => sum + item.total, 0))}</td></tr>
+              <tr data-testid="gold-printable-total-row" className="border-t border-[#c9b26e] bg-[#fbf8ef] font-bold"><td colSpan={2} className="px-1.5 py-2">{itemCountLabel}</td><td className="px-1 py-2">{number(calculations.gross, 3)}</td><td></td><td className="px-1 py-2">{number(calculations.pure, 3)}</td><td></td><td className="px-1 py-2">{number(calculations.making)}</td><td className="px-1 py-2 text-right">{number(calculations.values.reduce((sum, item) => sum + item.total, 0))}</td></tr>
             </tbody>
           </table>
         </section>
         <div className="mt-3 flex justify-end">
           <div className="w-[420px] max-w-full text-[8px]">
-            {[[`${labels.goldValue} (${number(calculations.gross, 2)}g gross × ${number(safeNumber(data.metalRate), 2)}/g)`, money(calculations.gold)], [en ? 'Total Amount (Before VAT)' : 'ভ্যাটের আগের মোট', money(calculations.beforeVat)], [vatSummaryLabel, money(calculations.vat)], [en ? 'Round-off discount' : 'রাউন্ড-অফ ছাড়', `− ${money(calculations.discount)}`]].map(([label, value]) => <div key={label} className="flex justify-between border-b border-[#ece7db] px-2 py-1"><span>{label}</span><span>{value}</span></div>)}
-            <div className="flex justify-between bg-[#1b365b] px-2 py-2 text-[9px] font-extrabold text-white"><span>{labels.incl}</span><span data-testid="text-gold-total">{money(calculations.total)}</span></div>
+            {[[`${en ? 'GOLD VALUE' : 'স্বর্ণের মূল্য'} (${number(calculations.gross, 2)}g × ${number(safeNumber(data.metalRate), 2)}/g)`, money(calculations.gold)], [en ? `Total Amount Before VAT (${chosenCurrency.code})` : `ভ্যাটের আগের মোট (${chosenCurrency.code})`, money(calculations.beforeVat)], [en ? `Total VAT Amount (${data.vatRate.trim() || '0'}%)` : `মোট ভ্যাট (${data.vatRate.trim() || '0'}%)`, money(calculations.vat)], [en ? `Round Off Discount (${chosenCurrency.code})` : `রাউন্ড-অফ ছাড় (${chosenCurrency.code})`, `− ${money(calculations.discount)}`]].map(([label, value]) => <div key={label} className="flex justify-between border-b border-[#ece7db] px-2 py-1"><span>{label}</span><span>{value}</span></div>)}
+            <div className="flex justify-between bg-[#1b365b] px-2 py-2 text-[9px] font-extrabold text-white"><span data-testid="text-gold-printable-total-label">{printableTotalLabel}</span><span data-testid="text-gold-total">{money(calculations.total)}</span></div>
           </div>
         </div>
         <div data-testid="gold-printable-payment-box" className="mt-3 flex min-h-[64px] flex-col justify-center gap-1 border border-[#e6dfce] px-3 py-3 text-[8px] leading-relaxed">
-          <p><span className="font-bold">{labels.words}: </span>{numberToWords(calculations.total, lang)} {chosenCurrency.name}</p>
-          <p><span className="font-bold">{labels.mode}: </span>{data.payment}{data.pending ? ` · ${labels.pendingShort}` : ''}</p>
+          <p><span className="font-bold">{labels.words} ({chosenCurrency.code}): </span>{numberToWords(calculations.total, lang)} {chosenCurrency.name}</p>
+          <p><span className="font-bold">{labels.mode}: </span><span className="uppercase">{data.payment}</span>{data.pending ? ` · ${labels.pendingShort}` : ''}</p>
           {data.notes && <p><span className="font-bold">{labels.notes}: </span>{data.notes}</p>}
         </div>
         <div className="mt-auto grid grid-cols-3 gap-8 px-3 pb-2 pt-10 text-center text-[8px] font-semibold">

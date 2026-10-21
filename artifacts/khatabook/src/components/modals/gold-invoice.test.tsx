@@ -148,8 +148,17 @@ describe('gold invoice', () => {
     render(<GoldInvoice viewOnly />);
 
     const header = screen.getByTestId('gold-printable-header');
-    expect(header.children[1]).toHaveClass('flex', 'items-center', 'justify-center', 'gap-2');
-    expect(header.children[1]).toHaveTextContent('TAX INVOICE');
+    const taxQr = screen.getByTestId('gold-printable-tax-qr');
+    expect(taxQr).toHaveClass('flex', 'flex-col', 'items-center');
+    expect(taxQr).toHaveTextContent('TAX INVOICE');
+    expect(taxQr.querySelector('svg')).toBeInTheDocument();
+    const tableHeaders = [...screen.getByTestId('gold-printable-items-table').querySelectorAll('thead th')].map((cell) => cell.textContent);
+    expect(tableHeaders).toEqual([
+      'S.No', 'Stock Description', 'Gross Wt.', 'Purity', 'Pure Wt.',
+      'Making Rate /g', 'Making Amt. (AED)', 'Total (AED)',
+    ]);
+    expect(screen.getByTestId('gold-printable-total-row')).toHaveTextContent('Total (1 item)');
+    expect(screen.getByTestId('text-gold-printable-total-label')).toHaveTextContent('Total Amount Including VAT (AED)');
     const rows = screen.getAllByTestId('gold-header-meta-row');
     expect(rows).toHaveLength(5);
     for (const row of rows) {
@@ -157,8 +166,9 @@ describe('gold invoice', () => {
       expect(row.children[0]).toHaveClass('min-w-0', 'break-words');
       expect(row.children[1]).toHaveClass('min-w-0', 'break-words', 'text-right');
     }
-    expect(screen.getByText('Total Amount (Before VAT)')).toBeInTheDocument();
-    expect(screen.getAllByText('Round-off discount').length).toBeGreaterThan(1);
+    expect(screen.getByText('Total Amount Before VAT (AED)')).toBeInTheDocument();
+    expect(screen.getByText('Total VAT Amount (5%)')).toBeInTheDocument();
+    expect(screen.getByText('Round Off Discount (AED)')).toBeInTheDocument();
   });
 
   it('downloads a generated PDF from the fixed A4 template', async () => {
