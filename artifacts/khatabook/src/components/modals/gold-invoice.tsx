@@ -440,7 +440,7 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
     <div ref={printRef} id="printable-gold-invoice" data-testid="gold-printable-invoice" className="gold-print-root mx-auto bg-white text-[#172b49]"
       style={{ width: '210mm', height: '296mm', padding: '24px', boxSizing: 'border-box', overflow: 'hidden', border: '2px solid #c5a059', transform: pdfMode ? 'none' : `scale(${previewScale})`, transformOrigin: 'top left' }}>
       <div ref={pdfContentRef} className="flex h-full min-h-[1058px] flex-col border border-[#d7bd79] p-[22px] text-[9px] leading-[1.35]">
-        <div className="grid grid-cols-[1.12fr_.76fr_1fr] gap-3 border-b border-[#e8dfc8] pb-3">
+        <div data-testid="gold-printable-header" className="grid grid-cols-[1.12fr_.76fr_1fr] items-start gap-3 border-b border-[#e8dfc8] pb-3">
           <div className="min-w-0">
             {data.logo && <img src={data.logo} alt="" className="mb-1 h-11 max-w-[145px] object-contain object-left" />}
             <p className="text-[15px] font-extrabold tracking-tight text-[#18345a]">{data.company || (en ? 'Your Shop' : 'আপনার দোকান')}</p>
@@ -449,11 +449,12 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
             {data.email && <p>Email: {data.email}</p>}
             {data.trn && <p>TRN: {data.trn}</p>}
           </div>
-          <div className="flex flex-col items-center text-center">
-            <p className="font-serif text-[17px] text-[#9a741b]" lang="ar" dir="rtl">بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ</p>
-            <div className="my-1 flex h-[54px] w-[74px] items-center justify-center border border-[#d3b15c] bg-[#192f50] text-center text-[9px] font-extrabold leading-tight tracking-[.12em] text-white">{labels.taxInvoice}</div>
-            <QRCodeSVG value={data.locationUrl || `${window.location.origin}/dashboard/details`} size={48} level="M" />
-            <span className="mt-0.5 text-[7px] text-slate-500">{en ? 'Scan to find us' : 'আমাদের খুঁজতে স্ক্যান করুন'}</span>
+          <div className="flex items-center justify-center gap-2 pt-2">
+            <div className="flex h-[50px] w-[82px] shrink-0 items-center justify-center border border-[#d3b15c] bg-[#192f50] px-1 text-center text-[9px] font-extrabold leading-tight tracking-[.12em] text-white">{labels.taxInvoice}</div>
+            <div className="flex flex-col items-center">
+              <QRCodeSVG value={data.locationUrl || `${window.location.origin}/dashboard/details`} size={54} level="M" />
+              <span className="mt-0.5 text-[6px] text-slate-500">{en ? 'Scan to find us' : 'আমাদের খুঁজতে স্ক্যান করুন'}</span>
+            </div>
           </div>
           <div className="text-right">
             <p className="mb-2 text-[9px] font-extrabold tracking-[.12em] text-[#a27b22]">{labels.partyCopy}</p>
@@ -501,7 +502,7 @@ export function GoldInvoice({ historyRecord, autoAction = 'open', viewOnly = fal
         </section>
         <div className="mt-3 flex justify-end">
           <div className="w-[420px] max-w-full text-[8px]">
-            {[[`${labels.goldValue} (${number(calculations.gross, 2)}g gross × ${number(safeNumber(data.metalRate), 2)}/g)`, money(calculations.gold)], [labels.beforeVat, money(calculations.beforeVat)], [vatSummaryLabel, money(calculations.vat)], [labels.discount, `− ${money(calculations.discount)}`]].map(([label, value]) => <div key={label} className="flex justify-between border-b border-[#ece7db] px-2 py-1"><span>{label}</span><span>{value}</span></div>)}
+            {[[`${labels.goldValue} (${number(calculations.gross, 2)}g gross × ${number(safeNumber(data.metalRate), 2)}/g)`, money(calculations.gold)], [en ? 'Total Amount (Before VAT)' : 'ভ্যাটের আগের মোট', money(calculations.beforeVat)], [vatSummaryLabel, money(calculations.vat)], [en ? 'Round-off discount' : 'রাউন্ড-অফ ছাড়', `− ${money(calculations.discount)}`]].map(([label, value]) => <div key={label} className="flex justify-between border-b border-[#ece7db] px-2 py-1"><span>{label}</span><span>{value}</span></div>)}
             <div className="flex justify-between bg-[#1b365b] px-2 py-2 text-[9px] font-extrabold text-white"><span>{labels.incl}</span><span data-testid="text-gold-total">{money(calculations.total)}</span></div>
           </div>
         </div>
