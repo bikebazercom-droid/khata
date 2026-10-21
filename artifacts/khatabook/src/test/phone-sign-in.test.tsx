@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { authMeQueryKey } from '../lib/authQueryKeys';
+import { authMeQueryKey, authRouteMeQueryKey } from '../lib/authQueryKeys';
 
 const phoneAuthMocks = vi.hoisted(() => ({
   sendOtp: vi.fn(),
@@ -27,11 +27,16 @@ const verifiedSession = {
   role: 'owner' as const,
 };
 
-function renderPhoneSignIn() {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
+const expiredPhoneSession = {
+  userId: 'expired-owner',
+  businessId: 'expired-business',
+  authMethod: 'phone' as const,
+  role: 'owner' as const,
+};
 
+function renderPhoneSignIn(queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false } },
+})) {
   render(
     <QueryClientProvider client={queryClient}>
       <PhoneSignIn />
@@ -47,9 +52,35 @@ describe('phone OTP sign-in auth cache', () => {
     phoneAuthMocks.sendOtp.mockResolvedValue(undefined);
   });
 
+  it('keeps the phone form available after a fresh sign-in check rejects a cached phone session', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    queryClient.setQueryData(authMeQueryKey(), expiredPhoneSession);
+
+    await expect(queryClient.fetchQuery({
+      queryKey: authRouteMeQueryKey(null, 41),
+      queryFn: async () => {
+        throw Object.assign(new Error('Session expired'), { status: 401 });
+      },
+      retry: false,
+    })).rejects.toMatchObject({ status: 401 });
+
+    renderPhoneSignIn(queryClient);
+
+    expect(screen.getByTestId('input-phone')).toBeInTheDocument();
+    expect(screen.getByTestId('button-send-otp')).toBeEnabled();
+    expect(queryClient.getQueryData(authMeQueryKey())).toEqual(expiredPhoneSession);
+    expect(queryClient.getQueryData(authRouteMeQueryKey(null, 41))).toBeUndefined();
+  });
+
   it('seeds the active no-Clerk auth query before routing to the ledger', async () => {
     phoneAuthMocks.verifyOtp.mockResolvedValue(verifiedSession);
-    const queryClient = renderPhoneSignIn();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    queryClient.setQueryData(authMeQueryKey(), expiredPhoneSession);
+    renderPhoneSignIn(queryClient);
 
     fireEvent.change(screen.getByTestId('input-phone'), { target: { value: '01712345678' } });
     fireEvent.click(screen.getByTestId('button-send-otp'));
