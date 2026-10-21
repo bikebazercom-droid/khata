@@ -2,8 +2,10 @@ export type AuthMeQueryKey = readonly ['auth-me', string | undefined];
 export type AuthRouteMeQueryKey = readonly ['auth-me', string | undefined, 'route-check', number];
 
 /**
- * Keep every auth-me observer on the same key. A missing Clerk ID is the
+ * Keep normal auth-me observers on the same key. A missing Clerk ID is the
  * normal case for phone-OTP sessions and must still match the OTP cache seed.
+ * Sign-in routes use authRouteMeQueryKey so a prior session cannot redirect
+ * the user away before the server validates the current session.
  */
 export function authMeQueryKey(clerkUserId?: string | null): AuthMeQueryKey {
   return ['auth-me', clerkUserId ?? undefined];
