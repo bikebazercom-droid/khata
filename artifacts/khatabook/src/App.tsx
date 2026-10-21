@@ -12,7 +12,7 @@ import { LandingPage } from '@/pages/landing';
 import { PrivacyPolicyPage } from '@/pages/privacy-policy';
 import { SupportPage } from '@/pages/support';
 import { fetchMe, phoneLogout } from '@/lib/phoneAuth';
-import { authMeQueryKey } from '@/lib/authQueryKeys';
+import { authMeQueryKey, authRouteMeQueryKey } from '@/lib/authQueryKeys';
 import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import { useRetryPendingUploads } from '@/lib/useRetryPendingUploads';
 import { BusinessContextProvider } from '@/lib/businessContext';
@@ -178,6 +178,8 @@ const queryClient = new QueryClient({
   },
 });
 persistCache(queryClient);
+
+let nextAuthRouteRequestId = 0;
 
 // ─── Real-time sync ───────────────────────────────────────────────────────────
 
@@ -504,13 +506,22 @@ function AuthCacheInvalidator() {
  */
 export function useAppAuth(options: { route?: string } = {}) {
   const { isLoaded, isSignedIn: clerkSignedIn, userId: clerkUserId } = useAuth();
+  const authRouteRequestId = useRef<number | null>(null);
+  const isPublicAuthPage = !!options.route && !shouldUseOfflineIdentityFallback(options.route);
+  if (isPublicAuthPage && authRouteRequestId.current === null) {
+    authRouteRequestId.current = ++nextAuthRouteRequestId;
+  }
 
   // Resolve the server-side role even in development; a Clerk session alone
   // does not establish the user's business permissions.
   const devBypass = import.meta.env.DEV && import.meta.env.VITE_DEV_AUTH_BYPASS === 'true';
   const enabled = isLoaded && !devBypass;
   const { data: authData, isLoading: authLoading, isError, error } = useQuery({
-    queryKey: authMeQueryKey(clerkUserId),
+    // A sign-in route gets a fresh /me query on each visit. Reusing the normal
+    // auth-me cache here can briefly redirect a signed-out user back home.
+    queryKey: isPublicAuthPage
+      ? authRouteMeQueryKey(clerkUserId, authRouteRequestId.current!)
+      : authMeQueryKey(clerkUserId),
     queryFn: () => fetchMe(),
     enabled,
     staleTime: 0,
@@ -521,7 +532,7 @@ export function useAppAuth(options: { route?: string } = {}) {
   const authErrorCode = (error as Error & { code?: string } | undefined)?.code;
   // An offline identity keeps ledger routes usable, but must never make the
   // sign-in screen redirect away before the current Clerk/server session settles.
-  const storedIdentity = isLocalLogoutPending() || (options.route && !shouldUseOfflineIdentityFallback(options.route))
+  const storedIdentity = isLocalLogoutPending() || isPublicAuthPage
     ? null
     : readOfflineIdentity();
   const offlineIdentity = storedIdentity &&

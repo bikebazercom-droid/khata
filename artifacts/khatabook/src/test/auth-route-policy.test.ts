@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isPublicAuthRoute, shouldUseOfflineIdentityFallback } from '../lib/auth-route-policy';
+import { authMeQueryKey, authRouteMeQueryKey } from '../lib/authQueryKeys';
 
 describe('public authentication routing', () => {
   it('keeps sign-in and sign-up routes available during connectivity failures', () => {
@@ -19,5 +20,15 @@ describe('public authentication routing', () => {
     expect(shouldUseOfflineIdentityFallback('/sign-in/verify')).toBe(false);
     expect(shouldUseOfflineIdentityFallback('/sign-up')).toBe(false);
     expect(shouldUseOfflineIdentityFallback('/dashboard')).toBe(true);
+  });
+
+  it('isolates each sign-in visit from a cached successful auth-me result', () => {
+    const cachedSessionKey = authMeQueryKey();
+    const firstSignInVisit = authRouteMeQueryKey(null, 1);
+    const secondSignInVisit = authRouteMeQueryKey(null, 2);
+
+    expect(firstSignInVisit).not.toEqual(cachedSessionKey);
+    expect(secondSignInVisit).not.toEqual(firstSignInVisit);
+    expect(firstSignInVisit.slice(0, 2)).toEqual(cachedSessionKey);
   });
 });
