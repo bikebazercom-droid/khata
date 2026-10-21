@@ -340,13 +340,12 @@ router.post(
     }
 
     const [record] = await db
-      .select()
+      .select({ id: otpCodesTable.id })
       .from(otpCodesTable)
       .where(
         and(
           eq(otpCodesTable.phone, normalized),
           eq(otpCodesTable.code, otpDigest(normalized, normalizedCode)),
-          eq(otpCodesTable.verified, false),
           gt(otpCodesTable.expiresAt, new Date()),
         ),
       )
@@ -360,14 +359,12 @@ router.post(
       return;
     }
 
-    // Consume atomically: two requests with the same code cannot each claim
-    // an invitation or create a different account.
+    // Delete atomically so replay is impossible without relying on the
+    // optional `verified` column that may be absent in older production DBs.
     const [consumed] = await db
-      .update(otpCodesTable)
-      .set({ verified: true })
+      .delete(otpCodesTable)
       .where(and(
         eq(otpCodesTable.id, record.id),
-        eq(otpCodesTable.verified, false),
         gt(otpCodesTable.expiresAt, new Date()),
       )).returning({ id: otpCodesTable.id });
     if (!consumed) {

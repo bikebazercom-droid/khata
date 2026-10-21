@@ -22,6 +22,11 @@ description: Architecture and gotchas for the khatabook multi-user cloud account
 - OTP delivery uses the configured sms.net.bd provider; delivery failures return an error and remove the unusable code.
 - `phone_session` JWT is signed with SESSION_SECRET and stored in an httpOnly, lax browser cookie
 
+For OTP verification, select only the stable columns needed from `otp_codes` and atomically delete the matching unexpired code after it is accepted. Do not depend on the optional `verified` column when consuming a code.
+
+**Why:** Existing Supabase/Hostinger schemas may predate the `verified` column; selecting a full Drizzle row or filtering on that column can make SMS delivery succeed while verification fails with a generic client error.
+**How to apply:** Keep the lookup projection to `id` and verify with phone, digest, and expiry; consume with `DELETE ... RETURNING id` so replay protection remains without a schema migration.
+
 ## Phone sessions persist until explicit logout
 
 Phone-session JWT expiry is not the revocation boundary. The server validates the account status and `phoneSessionVersion`; explicit logout increments that version. Continue accepting older signed phone JWTs that still carry an `exp`, and strip their legacy expiry when renewing the browser cookie. Browser cookies use a rolling 400-day lifetime.

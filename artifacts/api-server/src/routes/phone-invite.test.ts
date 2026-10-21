@@ -149,6 +149,7 @@ describe("phone worker invitation and verified first sign-in", () => {
     expect(await db.select().from(userLoginEventsTable).where(eq(userLoginEventsTable.userId, staff!.id))).toHaveLength(1);
     const [recorded] = await db.select().from(userLoginEventsTable).where(eq(userLoginEventsTable.userId, staff!.id));
     expect(recorded?.ip).toBeNull(); // No configured policy; never mistake the proxy socket for a user IP.
+    expect(await db.select().from(otpCodesTable).where(eq(otpCodesTable.phone, normalized))).toHaveLength(0);
     const replay = await request(app).post("/auth/phone/verify-otp").send({ phone, code });
     expect(replay.status).toBe(401);
 
