@@ -666,10 +666,9 @@ function HomeRoute() {
 }
 
 function SignInRoute() {
-  const { isAuthenticated, isLoading } = useAppAuth({ route: '/sign-in' });
+  const { isLoading } = useAppAuth({ route: '/sign-in' });
 
   if (isLoading) return <AppSplash />;
-  if (isAuthenticated) return <Redirect to="/" />;
   return <SignInPage />;
 }
 
