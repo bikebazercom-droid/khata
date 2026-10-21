@@ -4,6 +4,7 @@
 - [Orval codegen recovery](orval-codegen-recovery.md) — codegen cleans generated folders before input validation, so rerun it successfully before any checks that depend on generated imports.
 - [Orval and Zod format compatibility](orval-zod-format-compat.md) — OpenAPI UUID/email formats generate Zod 4 methods in this Zod 3 setup; omit them unless codegen is fixed.
 - [Khatabook auth & multi-tenancy](khatabook-auth-multitenancy.md) — seed-business rules, session revocation, Expo Clerk SSO, and DB setup gotchas.
+- [Fresh auth checks on sign-in routes](stale-auth-route-cache.md) — a cached successful `/api/auth/me` result can redirect a signed-out user away; isolate each public sign-in visit from normal auth cache.
 - [First-book name onboarding](first-book-name-onboarding.md) — an empty business/settings name marks a new owner’s first book as needing a custom name.
 - [Worker invitation identity](worker-invite-identity.md) — one pending invite per verified identity across businesses avoids arbitrary first-sign-in claims.
 - [Android export validation](android-export-validation.md) — verify the actual signed APK; Gradle configuration success alone misses SDK and JVM build failures.
