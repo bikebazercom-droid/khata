@@ -1,4 +1,5 @@
 import { SiteFooter } from "@/components/layout/site-footer";
+import { Link } from "wouter";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -28,13 +29,13 @@ export function LandingPage() {
           গ্রাহক, সরবরাহকারী, বকেয়া এবং লেনদেন — সব এক জায়গায়।
         </p>
 
-        <a
-          href={`${basePath}/sign-in`}
+        <Link
+          href="/sign-in"
           data-testid="link-landing-sign-in"
           className="w-full max-w-sm flex items-center justify-center gap-3 bg-[#0078d4] hover:bg-[#006cbf] border border-[#0078d4]/50 text-white rounded-2xl px-6 py-4 font-bold text-sm shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
         >
           Sign In / সাইন ইন করুন
-        </a>
+        </Link>
 
         <p className="text-white/30 text-xs mt-6">
           বিনামূল্যে · কোনো ক্রেডিট কার্ড লাগবে না
