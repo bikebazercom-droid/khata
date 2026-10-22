@@ -666,9 +666,9 @@ function HomeRoute() {
 }
 
 function SignInRoute() {
-  const { isLoading } = useAppAuth({ route: '/sign-in' });
-
-  if (isLoading) return <AppSplash />;
+  // Keep the public sign-in screen available while Clerk or /api/auth/me is
+  // still initializing. Authentication must not depend on an existing session
+  // check, and phone OTP can still work if Clerk's remote SDK is delayed.
   return <SignInPage />;
 }
 
