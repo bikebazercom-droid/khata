@@ -14,6 +14,7 @@ import { PrivacyPolicyPage } from '@/pages/privacy-policy';
 import { SupportPage } from '@/pages/support';
 import { fetchMe, phoneLogout } from '@/lib/phoneAuth';
 import { authMeQueryKey, authRouteMeQueryKey } from '@/lib/authQueryKeys';
+import { hasVerifiedPhoneSession } from '@/lib/verifiedPhoneSession';
 import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import { useRetryPendingUploads } from '@/lib/useRetryPendingUploads';
 import { BusinessContextProvider } from '@/lib/businessContext';
@@ -519,7 +520,9 @@ export function useAppAuth(options: { route?: string } = {}) {
   // Resolve the server-side role even in development; a Clerk session alone
   // does not establish the user's business permissions.
   const devBypass = import.meta.env.DEV && import.meta.env.VITE_DEV_AUTH_BYPASS === 'true';
-  const enabled = isLoaded && !devBypass;
+  // Phone OTP is verified by the API, not Clerk. It must be able to restore a
+  // valid phone session even if Clerk's remote SDK is slow or unavailable.
+  const enabled = !devBypass;
   const { data: authData, isLoading: authLoading, isError, error } = useQuery({
     // A sign-in route gets a fresh /me query on each visit. Reusing the normal
     // auth-me cache here can briefly redirect a signed-out user back home.
@@ -534,6 +537,7 @@ export function useAppAuth(options: { route?: string } = {}) {
   });
   const status = (error as Error & { status?: number } | undefined)?.status;
   const authErrorCode = (error as Error & { code?: string } | undefined)?.code;
+  const phoneSessionReady = hasVerifiedPhoneSession(authData, status);
   // An offline identity keeps ledger routes usable, but must never make the
   // sign-in screen redirect away before the current Clerk/server session settles.
   const storedIdentity = isLocalLogoutPending() || isPublicAuthPage
@@ -551,10 +555,12 @@ export function useAppAuth(options: { route?: string } = {}) {
   // open immediately while offline or while Clerk's CDN is unreachable. A
   // definitive 401/403 above always overrides it; server APIs remain the
   // authority whenever the device is connected.
-  const authSettled = isLoaded && (!enabled || !authLoading || !!offlineIdentity);
+  const authSettled = phoneSessionReady ||
+    (isLoaded && (!enabled || !authLoading || !!offlineIdentity));
 
   const networkFallback = !!offlineIdentity && status !== 401 && status !== 403;
   const realAuth = enabled && (
+    phoneSessionReady ||
     (!isError && !!authData?.userId) ||
     (networkFallback && !!offlineIdentity.userId)
   );
@@ -679,17 +685,16 @@ function SignInRoute() {
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 function AuthServerReporter({ onNetworkFailure, onSettled }: { onNetworkFailure: () => void; onSettled: () => void }) {
-  const { isLoaded, userId } = useAuth();
+  const { userId } = useAuth();
   const { data, isSuccess, isError, error } = useQuery({
     queryKey: authMeQueryKey(userId),
     queryFn: () => fetchMe(),
-    enabled: isLoaded,
+    enabled: true,
     staleTime: 0,
     refetchOnMount: 'always',
     retry: false,
   });
   useEffect(() => {
-    if (!isLoaded) return;
     if (isSuccess) {
       if (data?.userId && data.businessId && (data.role === 'owner' || data.role === 'staff')) {
         markServerReauthenticated();
@@ -701,7 +706,7 @@ function AuthServerReporter({ onNetworkFailure, onSettled }: { onNetworkFailure:
       if (status === 401 || status === 403) { revokeNetworkWrites(); onSettled(); }
       else onNetworkFailure();
     }
-  }, [isLoaded, data, isSuccess, isError, error, onSettled, onNetworkFailure]);
+  }, [data, isSuccess, isError, error, onSettled, onNetworkFailure]);
   return null;
 }
 
