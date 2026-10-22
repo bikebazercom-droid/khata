@@ -1,6 +1,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { ClerkProvider, useAuth } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
+import { resolveClerkClientEnvironment } from '@/lib/clerkEnvironment';
 import { shadcn } from '@clerk/themes';
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from 'wouter';
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -74,13 +75,16 @@ const NotFound = lazyWithChunkRecovery(() => import('@/pages/not-found'));
 // ─── Clerk setup ──────────────────────────────────────────────────────────────
 
 // REQUIRED — copy verbatim. Resolves the key from window.location.hostname.
+const clerkClientEnvironment = resolveClerkClientEnvironment(
+  import.meta.env as ImportMetaEnv & {
+    readonly NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?: string;
+  },
+);
 const clerkPubKey = publishableKeyFromHost(
   window.location.hostname,
-  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
+  clerkClientEnvironment.publishableKey,
 );
-
-// REQUIRED — copy verbatim. Empty in dev, auto-set in prod.
-const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+const clerkProxyUrl = clerkClientEnvironment.proxyUrl;
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
