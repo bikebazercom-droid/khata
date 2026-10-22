@@ -13,6 +13,7 @@
 - [Offline ledger replay](offline-ledger-replay.md) — project queued transfer pairs and balance deltas while preserving scoped, idempotent server replay.
 - [Shared offline data layer](browser-legacy-outbox.md) — queued entries appear as normal local ledger activity; keep server data authoritative and all replay scoped/idempotent.
 - [Offline shell validation](offline-shell-validation.md) — service-worker checks need compiled assets and a browser-reachable secure origin.
+- [Auth-safe shell updates](auth-safe-shell-updates.md) — do not auto-reload an active session when a new service-worker shell activates.
 - [API integration test concurrency](api-integration-test-concurrency.md) — database-backed suites can fail nondeterministically when Vitest runs test files in parallel.
 - [Readiness probe pool](readiness-probe-pool.md) — keep readiness checks isolated and let the client timeout discard its connection before the server-side fallback.
 - [PostgreSQL pooler compatibility](supabase-postgres-pooler.md) — the event bus needs persistent LISTEN/NOTIFY; Supabase transaction pooling is incompatible.
