@@ -14,6 +14,7 @@ import { PrivacyPolicyPage } from '@/pages/privacy-policy';
 import { SupportPage } from '@/pages/support';
 import { fetchMe, phoneLogout } from '@/lib/phoneAuth';
 import { authMeQueryKey, authRouteMeQueryKey } from '@/lib/authQueryKeys';
+import { authenticatedLandingPath } from '@/lib/auth-route-policy';
 import { hasVerifiedPhoneSession } from '@/lib/verifiedPhoneSession';
 import { useRealtimeSync } from '@/lib/useRealtimeSync';
 import { useRetryPendingUploads } from '@/lib/useRetryPendingUploads';
@@ -676,9 +677,15 @@ function HomeRoute() {
 }
 
 function SignInRoute() {
-  // Keep the public sign-in screen available while Clerk or /api/auth/me is
-  // still initializing. Authentication must not depend on an existing session
-  // check, and phone OTP can still work if Clerk's remote SDK is delayed.
+  // The Expo WebView has no Clerk native token for phone-OTP sessions, so its
+  // startup URL may be /sign-in even when the persistent HttpOnly cookie is
+  // still valid. Check the server session and return active users to the app.
+  const { isAuthenticated, role } = useAppAuth({ route: '/sign-in' });
+  if (isAuthenticated) {
+    return <Redirect to={authenticatedLandingPath(role)} />;
+  }
+
+  // Never block sign-in UI while Clerk or the server check is still loading.
   return <SignInPage />;
 }
 

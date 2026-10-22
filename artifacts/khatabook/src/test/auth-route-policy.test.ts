@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { isPublicAuthRoute, shouldUseOfflineIdentityFallback } from '../lib/auth-route-policy';
+import {
+  authenticatedLandingPath,
+  isPublicAuthRoute,
+  shouldUseOfflineIdentityFallback,
+} from '../lib/auth-route-policy';
 import { authMeQueryKey, authRouteMeQueryKey } from '../lib/authQueryKeys';
 
 describe('public authentication routing', () => {
@@ -30,5 +34,10 @@ describe('public authentication routing', () => {
     expect(firstSignInVisit).not.toEqual(cachedSessionKey);
     expect(secondSignInVisit).not.toEqual(firstSignInVisit);
     expect(firstSignInVisit.slice(0, 2)).toEqual(cachedSessionKey);
+  });
+
+  it('routes an existing server session back to the correct app landing page', () => {
+    expect(authenticatedLandingPath('owner')).toBe('/dashboard');
+    expect(authenticatedLandingPath('staff')).toBe('/');
   });
 });
