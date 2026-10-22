@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authMeQueryKey, authRouteMeQueryKey } from '../lib/authQueryKeys';
+import { applyPendingShellReload, deferShellReloadDuringAuth } from '../lib/serviceWorkerUpdate';
 
 const phoneAuthMocks = vi.hoisted(() => ({
   sendOtp: vi.fn(),
@@ -49,6 +50,7 @@ function renderPhoneSignIn(queryClient = new QueryClient({
 describe('phone OTP sign-in auth cache', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
     phoneAuthMocks.sendOtp.mockResolvedValue(undefined);
   });
 
@@ -91,6 +93,31 @@ describe('phone OTP sign-in auth cache', () => {
       expect(queryClient.getQueryData(authMeQueryKey())).toEqual(verifiedSession);
     });
     expect(phoneAuthMocks.setLocation).toHaveBeenCalledWith('/');
+  });
+
+  it('keeps the OTP form intact during a shell update and applies it after verification', async () => {
+    phoneAuthMocks.verifyOtp.mockResolvedValue(verifiedSession);
+    renderPhoneSignIn();
+
+    fireEvent.change(screen.getByTestId('input-phone'), { target: { value: '01712345678' } });
+    fireEvent.click(screen.getByTestId('button-send-otp'));
+    const codeInput = await screen.findByTestId('input-otp-code');
+    fireEvent.change(codeInput, { target: { value: '123456' } });
+
+    const reload = vi.fn();
+    expect(deferShellReloadDuringAuth('/sign-in', 'shell-v2')).toBe(true);
+    expect(applyPendingShellReload('/sign-in', reload)).toBe(false);
+    expect(reload).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('banglakhata:pending-shell-reload')).toBe('shell-v2');
+    expect(screen.getByTestId('input-otp-code')).toHaveValue('123456');
+    expect(screen.getByTestId('button-verify-otp')).toBeEnabled();
+
+    fireEvent.click(screen.getByTestId('button-verify-otp'));
+    await waitFor(() => expect(phoneAuthMocks.setLocation).toHaveBeenCalledWith('/'));
+
+    expect(applyPendingShellReload('/', reload)).toBe(true);
+    expect(reload).toHaveBeenCalledOnce();
+    expect(sessionStorage.getItem('banglakhata:pending-shell-reload')).toBeNull();
   });
 
   it('converts Bengali OTP digits to ASCII before verification', async () => {

@@ -44,11 +44,10 @@ describe('service worker network exclusion and scope', () => {
     expect(build).toContain("type: 'banglakhata-shell-version'");
     expect(main).toContain("addEventListener('message'");
     expect(main).toContain("message?.type !== 'banglakhata-shell-version'");
-    expect(main).toContain("sessionStorage.setItem('banglakhata:pending-shell-reload'");
+    expect(main).toContain('deferShellReloadDuringAuth');
     expect(main).toContain('window.location.reload()');
     expect(main).toContain('reloadedShellVersion');
-    expect(app).toContain("sessionStorage.getItem('banglakhata:pending-shell-reload')");
-    expect(app).toContain('if (isAuthRoute) return;');
+    expect(app).toContain('applyPendingShellReload');
     expect(main).not.toContain("addEventListener('controllerchange'");
   });
 });

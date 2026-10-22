@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import { AppErrorBoundary } from './components/app-error-boundary';
 import { registerServiceWorker } from './lib/registerServiceWorker';
+import { deferShellReloadDuringAuth } from './lib/serviceWorkerUpdate';
 
 import './index.css';
 
@@ -16,16 +17,8 @@ navigator.serviceWorker?.addEventListener('message', (event: MessageEvent<unknow
     message.version === reloadedShellVersion
   ) return;
   reloadedShellVersion = message.version;
-  if (/^\/(sign-in|sign-up)(?:\/|$)/.test(window.location.pathname)) {
-    // A shell update must not interrupt Clerk's sign-in/OAuth callback flow.
-    try {
-      sessionStorage.setItem('banglakhata:pending-shell-reload', message.version);
-    } catch {
-      // Keeping the active auth flow uninterrupted is more important than
-      // applying the shell update when browser storage is unavailable.
-    }
-    return;
-  }
+  // A shell update must not interrupt Clerk or phone OTP auth flows.
+  if (deferShellReloadDuringAuth(window.location.pathname, message.version)) return;
   window.location.reload();
 });
 
