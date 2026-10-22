@@ -970,6 +970,17 @@ function AppClient() {
     void restorePersistedQueries(queryClient, cachedIdentity.userId, cachedIdentity.businessId).catch(() => {});
   }, [cachedIdentity?.userId, cachedIdentity?.businessId]);
 
+  useEffect(() => {
+    if (isAuthRoute) return;
+    try {
+      if (!sessionStorage.getItem('banglakhata:pending-shell-reload')) return;
+      sessionStorage.removeItem('banglakhata:pending-shell-reload');
+      window.location.reload();
+    } catch {
+      // Ignore unavailable browser storage; auth has already completed.
+    }
+  }, [isAuthRoute]);
+
   // Legal and support pages must remain reachable without an auth session,
   // Clerk configuration, or a successful server connectivity probe.
   if (location === "/privacy-policy") return <PrivacyPolicyPage />;

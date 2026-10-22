@@ -38,13 +38,17 @@ describe('service worker network exclusion and scope', () => {
   it('checks for a fresh worker after registration and reloads only for a new shell version', () => {
     const registration = readFileSync(join(process.cwd(), 'src/lib/registerServiceWorker.ts'), 'utf8');
     const main = readFileSync(join(process.cwd(), 'src/main.tsx'), 'utf8');
+    const app = readFileSync(join(process.cwd(), 'src/App.tsx'), 'utf8');
     const build = readFileSync(join(process.cwd(), 'vite.config.ts'), 'utf8');
     expect(registration).toContain('registration.update()');
     expect(build).toContain("type: 'banglakhata-shell-version'");
     expect(main).toContain("addEventListener('message'");
     expect(main).toContain("message?.type !== 'banglakhata-shell-version'");
+    expect(main).toContain("sessionStorage.setItem('banglakhata:pending-shell-reload'");
     expect(main).toContain('window.location.reload()');
     expect(main).toContain('reloadedShellVersion');
+    expect(app).toContain("sessionStorage.getItem('banglakhata:pending-shell-reload')");
+    expect(app).toContain('if (isAuthRoute) return;');
     expect(main).not.toContain("addEventListener('controllerchange'");
   });
 });
