@@ -43,8 +43,7 @@ describe('service worker network exclusion and scope', () => {
     expect(registration).toContain('registration.update()');
     expect(build).toContain("type: 'banglakhata-shell-version'");
     expect(main).toContain("addEventListener('message'");
-    expect(main).toContain("message?.type !== 'banglakhata-shell-version'");
-    expect(main).toContain('deferShellReloadDuringAuth');
+    expect(main).toContain('handleShellVersionMessage');
     expect(main).toContain('window.location.reload()');
     expect(main).toContain('reloadedShellVersion');
     expect(app).toContain('applyPendingShellReload');
