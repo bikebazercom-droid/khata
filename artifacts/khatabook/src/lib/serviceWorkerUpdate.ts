@@ -16,12 +16,14 @@ export function handleShellVersionMessage(
     update.version === currentVersion
   ) return null;
 
-  if (!deferShellReloadDuringAuth(path, update.version)) reload();
+  if (!deferShellReloadDuringPublicEntry(path, update.version)) reload();
   return update.version;
 }
 
-export function deferShellReloadDuringAuth(path: string, version: string): boolean {
-  if (!isPublicAuthRoute(path)) return false;
+export function deferShellReloadDuringPublicEntry(path: string, version: string): boolean {
+  // Include the landing page: an update arriving on "/" can otherwise reload
+  // the app during the tap that is meant to navigate to "/sign-in".
+  if (path !== '/' && !isPublicAuthRoute(path)) return false;
 
   try {
     window.sessionStorage.setItem(PENDING_SHELL_RELOAD_KEY, version);
@@ -32,7 +34,9 @@ export function deferShellReloadDuringAuth(path: string, version: string): boole
 }
 
 export function applyPendingShellReload(path: string, reload: () => void): boolean {
-  if (isPublicAuthRoute(path)) return false;
+  // A new worker can activate while the user is tapping Sign In from the
+  // landing page. Keep the shell stable through that navigation and sign-in.
+  if (path === '/' || isPublicAuthRoute(path)) return false;
 
   try {
     if (!window.sessionStorage.getItem(PENDING_SHELL_RELOAD_KEY)) return false;

@@ -81,6 +81,7 @@ function ClerkSignIn() {
       routing="path"
       path={`${basePath}/sign-in`}
       signUpUrl={`${basePath}/sign-up`}
+      forceRedirectUrl={`${basePath}/dashboard`}
       appearance={{
         elements: {
           rootBox: 'w-full',
@@ -146,7 +147,7 @@ export function PhoneSignIn() {
       // Seed React Query's auth-me cache with the fresh response so
       // useAppAuth resolves immediately — no hard reload needed.
       qc.setQueryData(authMeQueryKey(), me);
-      setLocation('/');
+      setLocation(me.role === 'owner' ? '/dashboard' : '/');
     } catch (err: any) {
       setError(err.message ?? 'Invalid code');
     } finally {

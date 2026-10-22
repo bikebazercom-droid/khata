@@ -27,4 +27,19 @@ describe('service-worker updates during Clerk sign-in', () => {
       expect(sessionStorage.getItem(PENDING_SHELL_RELOAD_KEY)).toBeNull();
     },
   );
+
+  it('does not reload the landing page before the user can open sign-in', () => {
+    const reload = vi.fn();
+    const message = { type: 'banglakhata-shell-version', version: 'shell-v2' };
+
+    expect(handleShellVersionMessage(message, '/', null, reload)).toBe('shell-v2');
+    expect(reload).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem(PENDING_SHELL_RELOAD_KEY)).toBe('shell-v2');
+    expect(applyPendingShellReload('/', reload)).toBe(false);
+    expect(applyPendingShellReload('/sign-in', reload)).toBe(false);
+
+    expect(applyPendingShellReload('/dashboard', reload)).toBe(true);
+    expect(reload).toHaveBeenCalledOnce();
+    expect(sessionStorage.getItem(PENDING_SHELL_RELOAD_KEY)).toBeNull();
+  });
 });

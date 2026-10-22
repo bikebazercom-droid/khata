@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authMeQueryKey, authRouteMeQueryKey } from '../lib/authQueryKeys';
-import { applyPendingShellReload, deferShellReloadDuringAuth } from '../lib/serviceWorkerUpdate';
+import { applyPendingShellReload, deferShellReloadDuringPublicEntry } from '../lib/serviceWorkerUpdate';
 
 const phoneAuthMocks = vi.hoisted(() => ({
   sendOtp: vi.fn(),
@@ -92,7 +92,7 @@ describe('phone OTP sign-in auth cache', () => {
     await waitFor(() => {
       expect(queryClient.getQueryData(authMeQueryKey())).toEqual(verifiedSession);
     });
-    expect(phoneAuthMocks.setLocation).toHaveBeenCalledWith('/');
+    expect(phoneAuthMocks.setLocation).toHaveBeenCalledWith('/dashboard');
   });
 
   it('keeps the OTP form intact during a shell update and applies it after verification', async () => {
@@ -105,7 +105,7 @@ describe('phone OTP sign-in auth cache', () => {
     fireEvent.change(codeInput, { target: { value: '123456' } });
 
     const reload = vi.fn();
-    expect(deferShellReloadDuringAuth('/sign-in', 'shell-v2')).toBe(true);
+    expect(deferShellReloadDuringPublicEntry('/sign-in', 'shell-v2')).toBe(true);
     expect(applyPendingShellReload('/sign-in', reload)).toBe(false);
     expect(reload).not.toHaveBeenCalled();
     expect(sessionStorage.getItem('banglakhata:pending-shell-reload')).toBe('shell-v2');
@@ -113,9 +113,9 @@ describe('phone OTP sign-in auth cache', () => {
     expect(screen.getByTestId('button-verify-otp')).toBeEnabled();
 
     fireEvent.click(screen.getByTestId('button-verify-otp'));
-    await waitFor(() => expect(phoneAuthMocks.setLocation).toHaveBeenCalledWith('/'));
+    await waitFor(() => expect(phoneAuthMocks.setLocation).toHaveBeenCalledWith('/dashboard'));
 
-    expect(applyPendingShellReload('/', reload)).toBe(true);
+    expect(applyPendingShellReload('/dashboard', reload)).toBe(true);
     expect(reload).toHaveBeenCalledOnce();
     expect(sessionStorage.getItem('banglakhata:pending-shell-reload')).toBeNull();
   });
