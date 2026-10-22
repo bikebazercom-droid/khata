@@ -35,18 +35,16 @@ describe('service worker network exclusion and scope', () => {
     expect(build).not.toContain('caches.delete("banglakhata-entry-outbox")');
   });
 
-  it('checks for a fresh worker after registration and reloads only for a new shell version', () => {
+  it('checks for a fresh worker without reloading the active app shell', () => {
     const registration = readFileSync(join(process.cwd(), 'src/lib/registerServiceWorker.ts'), 'utf8');
     const main = readFileSync(join(process.cwd(), 'src/main.tsx'), 'utf8');
     const app = readFileSync(join(process.cwd(), 'src/App.tsx'), 'utf8');
     const build = readFileSync(join(process.cwd(), 'vite.config.ts'), 'utf8');
     expect(registration).toContain('registration.update()');
-    expect(build).toContain("type: 'banglakhata-shell-version'");
-    expect(main).toContain("addEventListener('message'");
-    expect(main).toContain('handleShellVersionMessage');
-    expect(main).toContain('window.location.reload()');
-    expect(main).toContain('reloadedShellVersion');
-    expect(app).toContain('applyPendingShellReload');
+    expect(build).not.toContain("type: 'banglakhata-shell-version'");
+    expect(main).not.toContain("addEventListener('message'");
+    expect(main).not.toContain('window.location.reload()');
+    expect(app).not.toContain('applyPendingShellReload');
     expect(main).not.toContain("addEventListener('controllerchange'");
   });
 });

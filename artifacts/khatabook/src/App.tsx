@@ -34,7 +34,6 @@ import { useBusinessContext } from '@/lib/businessContext';
 import { isNetworkWriteAuthorized, isOfflineMode, markServerReauthenticated, revokeNetworkWrites, useAuthConnectivity } from '@/lib/useAuthConnectivity';
 import { isPublicAuthRoute, shouldUseOfflineIdentityFallback } from '@/lib/auth-route-policy';
 import { AuthConnectivityGate } from '@/components/auth-connectivity-gate';
-import { applyPendingShellReload } from '@/lib/serviceWorkerUpdate';
 import { clearLocalLogoutPending, clearOfflineIdentity, isLocalLogoutPending, readOfflineIdentity, saveOfflineIdentity } from '@/lib/offlineSession';
 import { clearPersistedPartyQueries, clearPersistedQueries, persistCache, restorePersistedQueries, setQueryPersistenceScope } from '@/lib/queryPersister';
 import { EntrySavedFeedbackHost } from '@/components/ui/entry-saved-feedback';
@@ -974,10 +973,6 @@ function AppClient() {
     setQueryPersistenceScope(cachedIdentity.userId, cachedIdentity.businessId);
     void restorePersistedQueries(queryClient, cachedIdentity.userId, cachedIdentity.businessId).catch(() => {});
   }, [cachedIdentity?.userId, cachedIdentity?.businessId]);
-
-  useEffect(() => {
-    applyPendingShellReload(location, () => window.location.reload());
-  }, [location]);
 
   // Legal and support pages must remain reachable without an auth session,
   // Clerk configuration, or a successful server connectivity probe.

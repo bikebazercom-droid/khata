@@ -3,20 +3,8 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import { AppErrorBoundary } from './components/app-error-boundary';
 import { registerServiceWorker } from './lib/registerServiceWorker';
-import { handleShellVersionMessage } from './lib/serviceWorkerUpdate';
 
 import './index.css';
-
-let reloadedShellVersion: string | null = null;
-navigator.serviceWorker?.addEventListener('message', (event: MessageEvent<unknown>) => {
-  const version = handleShellVersionMessage(
-    event.data,
-    window.location.pathname,
-    reloadedShellVersion,
-    () => window.location.reload(),
-  );
-  if (version) reloadedShellVersion = version;
-});
 
 createRoot(document.getElementById('root')!).render(
   <AppErrorBoundary>

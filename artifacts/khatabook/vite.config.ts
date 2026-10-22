@@ -89,9 +89,6 @@ self.addEventListener('activate', event => {
       if (name.startsWith(CACHE_PREFIX) && name !== CACHE) await caches.delete(name);
     }
     await self.clients.claim();
-    for (const client of await self.clients.matchAll({ type: 'window', includeUncontrolled: true })) {
-      client.postMessage({ type: 'banglakhata-shell-version', version: VERSION });
-    }
   })());
 });
 self.addEventListener('fetch', event => {
