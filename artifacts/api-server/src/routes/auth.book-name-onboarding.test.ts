@@ -63,7 +63,7 @@ describe("first-book name onboarding", () => {
       .limit(1);
     if (!seedOwner) {
       const [reserved] = await db.insert(appUsersTable).values({
-        clerkUserId: reservedSeedClerkId,
+        firebaseUid: reservedSeedClerkId,
         businessId: SEED_BUSINESS_ID,
         role: "owner",
       }).returning({ id: appUsersTable.id });
@@ -81,7 +81,7 @@ describe("first-book name onboarding", () => {
     await db.delete(otpCodesTable).where(eq(otpCodesTable.phone, normalizedOwnerPhone));
 
     const [emailUser] = await db.select().from(appUsersTable)
-      .where(eq(appUsersTable.clerkUserId, clerkUserId)).limit(1);
+      .where(eq(appUsersTable.firebaseUid, clerkUserId)).limit(1);
     const [phoneUser] = await db.select().from(appUsersTable)
       .where(eq(appUsersTable.phone, normalizedOwnerPhone)).limit(1);
     for (const user of [emailUser, phoneUser].filter((item) => item !== undefined)) {
@@ -126,7 +126,7 @@ describe("first-book name onboarding", () => {
       });
 
       const [user] = await db.select().from(appUsersTable)
-        .where(eq(appUsersTable.clerkUserId, clerkUserId)).limit(1);
+        .where(eq(appUsersTable.firebaseUid, clerkUserId)).limit(1);
       expect(user?.role).toBe("owner");
       expect(user?.businessId).not.toBe(SEED_BUSINESS_ID);
       const [primaryBook] = await db.select().from(businessesTable)

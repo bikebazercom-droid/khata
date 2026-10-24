@@ -16,7 +16,7 @@ function isOfflineIdentity(value: unknown): value is OfflineIdentity {
     (identity.authMethod === 'firebase' || identity.authMethod === 'phone');
 }
 
-/** Identity metadata only; session credentials remain with Clerk or the httpOnly cookie. */
+/** Identity metadata only; session credentials remain with Firebase or the httpOnly cookie. */
 export function readOfflineIdentity(): OfflineIdentity | null {
   try {
     const raw = localStorage.getItem(OFFLINE_IDENTITY_KEY);

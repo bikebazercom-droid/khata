@@ -58,7 +58,7 @@ export function PrivacyPolicyPage() {
               We do not sell customer or ledger records. We share information with service providers only as needed to operate features, and with people whom the business owner authorizes in that business.
             </p>
             <ul className="list-disc space-y-2 pl-5">
-              <li><strong>Clerk:</strong> provides account authentication and receives the identity information required for the sign-in method you choose.</li>
+              <li><strong>Firebase Authentication:</strong> provides Google account authentication and receives the identity information required for sign-in.</li>
               <li><strong>sms.net.bd:</strong> receives a phone number and verification or invitation message when BanglaKhata requests delivery of an SMS code.</li>
               <li><strong>Expo push service:</strong> when mobile notifications are enabled, Expo receives the device push token and notification text or record identifiers needed to deliver ledger activity alerts.</li>
               <li><strong>Hosting, database, and object-storage providers:</strong> operate the app, store its PostgreSQL records, and store uploaded bill images. Providers can vary with the deployment configuration.</li>

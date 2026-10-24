@@ -12,7 +12,6 @@ import { ensureSmsReady } from "../services/sms";
 import adminRouter from "./admin";
 import authRouter from "./auth";
 
-vi.mock("@clerk/express", () => ({ getAuth: () => ({ userId: null }) }));
 vi.mock("../services/sms", () => ({
   sendOtpSms: vi.fn(),
   ensureSmsReady: vi.fn(),

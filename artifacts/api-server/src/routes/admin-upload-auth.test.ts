@@ -4,13 +4,11 @@ import { describe, expect, it, vi } from "vitest";
 import { signAdminToken } from "../middlewares/requireAdmin";
 import { createApiRouter } from "./index";
 
-vi.mock("@clerk/express", () => ({ getAuth: () => ({ userId: null }) }));
-
 describe("admin installer status route", () => {
   const app = express();
   app.use("/api", createApiRouter());
 
-  it("accepts an admin JWT before Clerk user-session middleware", async () => {
+  it("accepts an admin JWT before user-session middleware", async () => {
     const response = await request(app)
       .get("/api/admin/binary-info")
       .set("Authorization", `Bearer ${signAdminToken()}`)

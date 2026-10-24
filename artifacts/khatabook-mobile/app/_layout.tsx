@@ -4,8 +4,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ClerkProvider } from '@clerk/expo';
-import { tokenCache } from '@clerk/expo/token-cache';
 import { setBaseUrl, setExtraHeaders } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -18,9 +16,8 @@ import { StatusBar } from 'expo-status-bar';
 
 SplashScreen.preventAutoHideAsync();
 
-const { apiBaseUrl, clerkPublishableKey } = resolveMobileStartupConfig({
+const { apiBaseUrl } = resolveMobileStartupConfig({
   apiDomain: process.env.EXPO_PUBLIC_DOMAIN,
-  clerkPublishableKey: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY,
 });
 setBaseUrl(apiBaseUrl);
 setExtraHeaders({ 'x-client-platform': Platform.OS === 'web' ? 'web' : 'mobile' });
@@ -75,21 +72,15 @@ export default function RootLayout() {
     void SplashScreen.hideAsync();
   }, []);
 
-  const nativeRuntimeReady = Boolean(apiBaseUrl && clerkPublishableKey);
-  const app = nativeRuntimeReady && clerkPublishableKey ? (
-    <ClerkProvider
-      publishableKey={clerkPublishableKey}
-      tokenCache={tokenCache}
-      proxyUrl={process.env.EXPO_PUBLIC_CLERK_PROXY_URL}
-    >
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <BusinessScopeProvider>
-            <RootLayoutNav nativeRuntimeReady />
-          </BusinessScopeProvider>
-        </AuthProvider>
-      </QueryClientProvider>
-    </ClerkProvider>
+  const nativeRuntimeReady = Boolean(apiBaseUrl);
+  const app = nativeRuntimeReady ? (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <BusinessScopeProvider>
+          <RootLayoutNav nativeRuntimeReady />
+        </BusinessScopeProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   ) : (
     <RootLayoutNav nativeRuntimeReady={false} />
   );

@@ -126,11 +126,11 @@ export function SettingsDrawer({
       }
 
       // Start identity-provider sign-out immediately after deletion. Clearing
-      // the query cache while Clerk is still signed in can trigger /auth/me,
+      // the query cache while Firebase is still signed in can trigger /auth/me,
       // which would otherwise provision a replacement account.
       postNativeAuthMessage(NATIVE_AUTH_LOGOUT_MESSAGE);
-      const clerkSignOut = isSignedIn ? signOut().catch(() => {}) : Promise.resolve();
-      await clerkSignOut;
+      const firebaseSignOut = isSignedIn ? signOut().catch(() => {}) : Promise.resolve();
+      await firebaseSignOut;
       queryClient.clear();
       revokeNetworkWrites();
       clearAllPendingUploads();

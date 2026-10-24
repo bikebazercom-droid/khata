@@ -16,7 +16,7 @@ describe('verified phone session', () => {
   });
 
   it('does not treat Clerk identities or incomplete responses as phone sessions', () => {
-    expect(hasVerifiedPhoneSession({ authMethod: 'clerk', userId: 'user-1' })).toBe(false);
+    expect(hasVerifiedPhoneSession({ authMethod: 'firebase', userId: 'user-1' })).toBe(false);
     expect(hasVerifiedPhoneSession({ authMethod: 'phone' })).toBe(false);
     expect(hasVerifiedPhoneSession(undefined)).toBe(false);
   });

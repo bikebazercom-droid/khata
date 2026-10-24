@@ -8,10 +8,6 @@ import {
 } from "@workspace/db";
 import { requireAuth, type AuthenticatedRequest } from "./requireAuth";
 
-vi.mock("@clerk/express", () => ({
-  getAuth: () => ({ userId: null }),
-}));
-
 describe("phone-session business selection", () => {
   let defaultBusinessId: string;
   let selectedBusinessId: string;

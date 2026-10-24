@@ -40,13 +40,13 @@ export function createApiRouter(
   // the GCS presigned PUT. Mount before session auth so clients need no header.
   router.use(localUploadRouter);
 
-  // Admin routes — use their own JWT auth (adminBearer), not Clerk.
+  // Admin routes — use their own JWT auth (adminBearer), not user sessions.
   router.use(adminRouter);
   // Desktop installer status/upload routes also use admin JWTs. Mount them
-  // before user-session auth so admin tokens are not rejected as Clerk sessions.
+  // before user-session auth so admin tokens are not rejected as user sessions.
   router.use(uploadsRouter);
 
-  // All routes below require a valid session (Clerk or phone OTP).
+  // All routes below require a valid Firebase or phone OTP session.
   router.use(requireAuth as any);
   router.use(enforceRoleAccess);
 

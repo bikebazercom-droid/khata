@@ -192,7 +192,7 @@ paths:
     post:
       operationId: reportAuthLogoutEvent
       tags: [auth]
-      summary: Revoke the current Clerk session after explicit user sign-out
+      summary: Revoke the current Firebase or phone session after explicit user sign-out
       responses:
         "204":
           description: Session revoked

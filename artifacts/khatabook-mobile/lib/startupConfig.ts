@@ -1,6 +1,5 @@
 type MobileStartupEnvironment = {
   apiDomain?: string | null;
-  clerkPublishableKey?: string | null;
 };
 
 function resolveApiBaseUrl(apiDomain?: string | null): string | null {
@@ -23,12 +22,7 @@ function resolveApiBaseUrl(apiDomain?: string | null): string | null {
 }
 
 export function resolveMobileStartupConfig(environment: MobileStartupEnvironment) {
-  const clerkKey = environment.clerkPublishableKey?.trim();
-  const clerkPublishableKey =
-    clerkKey && /^pk_(?:test|live)_/.test(clerkKey) ? clerkKey : null;
-
   return {
     apiBaseUrl: resolveApiBaseUrl(environment.apiDomain),
-    clerkPublishableKey,
   };
 }

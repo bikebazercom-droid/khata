@@ -4,7 +4,7 @@ import { clearLocalLogoutPending, isLocalLogoutPending } from './offlineSession'
 
 export type AuthConnectivity = 'probing' | 'online' | 'offline';
 export const AUTH_PROBE_TIMEOUT_MS = 6000;
-const CLERK_BOOT_TIMEOUT_MS = 8000;
+const AUTH_SETTLE_TIMEOUT_MS = 8000;
 let networkWritesAuthorized = false;
 let offlineMode = false;
 export function isNetworkWriteAuthorized() { return networkWritesAuthorized; }
@@ -13,7 +13,7 @@ export function markServerReauthenticated() { networkWritesAuthorized = true; of
 export function revokeNetworkWrites() { networkWritesAuthorized = false; }
 
 /**
- * Probe the API process before mounting Clerk or any mutating application UI.
+ * Probe the API process before mounting authenticated or mutating UI.
  * Keep server reachability separate from session authentication: an expired or
  * misconfigured auth session must not be reported as a network outage.
  */
@@ -118,7 +118,7 @@ export function useAuthConnectivity(clearQueries: () => void) {
     if (phase !== 'online' || settled.current) return;
     const timer = setTimeout(() => {
       if (!settled.current) goOffline(); // SDK/CDN or /me may be stalled
-    }, CLERK_BOOT_TIMEOUT_MS);
+    }, AUTH_SETTLE_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [phase, goOffline]);
 

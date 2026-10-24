@@ -35,10 +35,10 @@ describe("existing staff sessions after owner revocation", () => {
     foreignPartyId = parties[1]!.id;
 
     const users = await db.insert(appUsersTable).values([
-      { businessId, role: "owner", clerkUserId: `revocation-owner-${crypto.randomUUID()}` },
+      { businessId, role: "owner", firebaseUid: `revocation-owner-${crypto.randomUUID()}` },
       {
         businessId, role: "staff", status: "active",
-        clerkUserId: `revocation-staff-${crypto.randomUUID()}`,
+        firebaseUid: `revocation-staff-${crypto.randomUUID()}`,
         verifiedEmail: `revocation-${crypto.randomUUID()}@example.test`,
       },
     ]).returning();
@@ -80,7 +80,7 @@ describe("existing staff sessions after owner revocation", () => {
     auth.businessId = user.businessId;
     auth.role = user.role;
     auth.status = user.status;
-    auth.authMethod = "clerk";
+    auth.authMethod = "firebase";
     next();
   });
   app.use(enforceRoleAccess);

@@ -38,7 +38,6 @@ minimumReleaseAgeExclude:
 
 onlyBuiltDependencies:
   - '@swc/core'
-  - '@clerk/shared'
   - browser-tabs-lock
   - core-js
   - esbuild
@@ -46,7 +45,6 @@ onlyBuiltDependencies:
   - unrs-resolver
 
 allowBuilds:
-  '@clerk/shared': true
   '@firebase/util': false
   '@swc/core': true
   browser-tabs-lock: true

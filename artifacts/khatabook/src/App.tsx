@@ -423,11 +423,11 @@ function AuthCacheInvalidator() {
   return null;
 }
 
-// ─── Auth state (unified Clerk + phone) ───────────────────────────────────────
+// ─── Auth state (Firebase Google + phone) ─────────────────────────────────────
 
 /**
- * Returns the combined auth state across Clerk (email/Google) and the custom
- * phone-OTP path. Phone auth is confirmed by a successful /api/auth/me fetch
+ * Returns the combined auth state across Firebase Google and the custom
+ * phone-OTP path. Authentication is confirmed by a successful /api/auth/me fetch
  * (the server reads the httpOnly `phone_session` cookie).
  *
  * Online authentication and business permissions come from /api/auth/me.
@@ -462,7 +462,7 @@ export function useAppAuth(options: { route?: string } = {}) {
   const authErrorCode = (error as Error & { code?: string } | undefined)?.code;
   const phoneSessionReady = hasVerifiedPhoneSession(authData, status);
   // An offline identity keeps ledger routes usable, but must never make the
-  // sign-in screen redirect away before the current Clerk/server session settles.
+  // sign-in screen redirect away before the current server session settles.
   const storedIdentity = isLocalLogoutPending() || isPublicAuthPage
     ? null
     : readOfflineIdentity();
@@ -475,7 +475,7 @@ export function useAppAuth(options: { route?: string } = {}) {
   const resolvedAuthData = authData ?? offlineIdentity ?? undefined;
 
   // A previously authenticated local identity lets the already-cached app
-  // open immediately while offline or while Clerk's CDN is unreachable. A
+  // open immediately while offline or while the auth provider is unreachable. A
   // definitive 401/403 above always overrides it; server APIs remain the
   // authority whenever the device is connected.
   const authSettled = phoneSessionReady || (!enabled || !authLoading || !!offlineIdentity);
@@ -519,7 +519,7 @@ export function useAppAuth(options: { route?: string } = {}) {
 // ─── Branded splash (first-visit only) ───────────────────────────────────────
 
 /**
- * Shown only on the very first visit (no cached auth) while Clerk loads.
+ * Shown only on the very first visit (no cached auth) while server auth loads.
  * Matches the landing-page hero so the transition feels like a natural
  * continuation rather than a loading artifact.
  */
@@ -598,7 +598,7 @@ function HomeRoute() {
 }
 
 function SignInRoute() {
-  // The Expo WebView has no Clerk native token for phone-OTP sessions, so its
+  // The Expo WebView uses the same server-backed phone-OTP session, so its
   // startup URL may be /sign-in even when the persistent HttpOnly cookie is
   // still valid. Check the server session and return active users to the app.
   const { isAuthenticated, role } = useAppAuth({ route: '/sign-in' });
@@ -606,7 +606,7 @@ function SignInRoute() {
     return <Redirect to={authenticatedLandingPath(role)} />;
   }
 
-  // Never block sign-in UI while Clerk or the server check is still loading.
+  // Never block sign-in UI while the server check is still loading.
   return <SignInPage />;
 }
 
@@ -906,7 +906,7 @@ function AppClient() {
   }, [cachedIdentity?.userId, cachedIdentity?.businessId]);
 
   // Legal and support pages must remain reachable without an auth session,
-  // Clerk configuration, or a successful server connectivity probe.
+  // Firebase configuration, or a successful server connectivity probe.
   if (location === "/privacy-policy") return <PrivacyPolicyPage />;
   if (location === "/support") return <SupportPage />;
 

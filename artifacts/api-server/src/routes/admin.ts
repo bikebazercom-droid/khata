@@ -28,7 +28,7 @@ router.post("/admin/auth/login", loginLimiter, (req, res) => {
 router.use("/admin", requireAdmin as any);
 
 const fiveMinutesAgo = () => new Date(Date.now() - 5 * 60_000);
-const registered = () => or(isNotNull(appUsersTable.clerkUserId), isNotNull(appUsersTable.phone));
+const registered = () => or(isNotNull(appUsersTable.firebaseUid), isNotNull(appUsersTable.phone));
 const active = () => sql<boolean>`EXISTS (
   SELECT 1 FROM user_presence p WHERE p.user_id = ${appUsersTable.id}
   AND p.last_seen_at >= ${fiveMinutesAgo()} AND ${appUsersTable.status} = 'active'
@@ -72,7 +72,7 @@ function serializeUser(user: typeof appUsersTable.$inferSelect) {
   return {
     id: user.id, name: user.displayName ?? "—", email: user.verifiedEmail,
     phone: user.phone,
-    authProvider: user.clerkUserId ? "clerk" : "phone_otp",
+    authProvider: user.firebaseUid ? "firebase" : "phone_otp",
     status: user.status,
     createdAt: user.createdAt.toISOString(), lastLogin: user.lastLogin?.toISOString() ?? null,
   };

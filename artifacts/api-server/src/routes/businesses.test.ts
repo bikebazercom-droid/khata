@@ -40,7 +40,7 @@ describe("business creation", () => {
     ownerBusinessId = ownerBusiness!.id;
     const [owner] = await db.insert(appUsersTable).values({
       businessId: ownerBusiness!.id,
-      clerkUserId: `business-create-${crypto.randomUUID()}`,
+      firebaseUid: `business-create-${crypto.randomUUID()}`,
       role: "owner",
     }).returning();
     userId = owner!.id;

@@ -7,7 +7,7 @@
  * user_businesses → businesses. A keyed identity tombstone remains to reject
  * stale credentials and permit a verified, empty re-registration.
  *
- * After this call succeeds the user can sign back in via Clerk / phone OTP
+ * After this call succeeds the user can sign back in via Firebase / phone OTP
  * and receive a freshly-provisioned empty account.
  */
 import { Router, type IRouter } from "express";
@@ -116,7 +116,7 @@ router.delete(
         .select({
           verifiedEmail: appUsersTable.verifiedEmail,
           phone: appUsersTable.phone,
-          clerkUserId: appUsersTable.clerkUserId,
+          firebaseUid: appUsersTable.firebaseUid,
           businessId: appUsersTable.businessId,
         })
         .from(appUsersTable)
@@ -142,43 +142,9 @@ router.delete(
       const deletedPhone = account.phone
         ? hashDeletedAccountIdentity("phone", account.phone)
         : null;
-      const deletedClerkUserId = account.clerkUserId
-        ? hashDeletedAccountIdentity("clerk", account.clerkUserId)
+      const deletedFirebaseUid = account.firebaseUid
+        ? hashDeletedAccountIdentity("firebase", account.firebaseUid)
         : null;
-
-      // Remove the Clerk identity before erasing app data so a provider failure
-      // leaves the account and its records intact for a safe retry.
-      if (account.clerkUserId) {
-        const clerkSecret = process.env.CLERK_SECRET_KEY;
-        if (!clerkSecret) {
-          res.status(503).json({ error: "Account deletion is temporarily unavailable." });
-          return;
-        }
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5_000);
-        let clerkResponse: Response;
-        try {
-          clerkResponse = await fetch(
-            `https://api.clerk.com/v1/users/${encodeURIComponent(account.clerkUserId)}`,
-            {
-              method: "DELETE",
-              headers: { Authorization: `Bearer ${clerkSecret}` },
-              signal: controller.signal,
-            },
-          );
-        } catch (error) {
-          console.error("[account-delete] Clerk identity deletion failed:", error);
-          res.status(502).json({ error: "Could not delete the sign-in account. Please try again." });
-          return;
-        } finally {
-          clearTimeout(timeout);
-        }
-        if (!clerkResponse.ok && clerkResponse.status !== 404) {
-          console.error(`[account-delete] Clerk identity deletion returned ${clerkResponse.status}.`);
-          res.status(502).json({ error: "Could not delete the sign-in account. Please try again." });
-          return;
-        }
-      }
 
       await db.transaction(async (tx) => {
         // 1. Collect all business IDs owned by this user.
@@ -264,7 +230,7 @@ router.delete(
           await tx.update(appUsersTable).set({
             businessId: SEED_BUSINESS_ID,
             phone: deletedPhone,
-            clerkUserId: deletedClerkUserId,
+            firebaseUid: deletedFirebaseUid,
             verifiedEmail: deletedEmail,
             displayName: null,
             language: null,

@@ -7,7 +7,7 @@ import {
   businessSettingsTable, userBusinessesTable,
 } from "@workspace/db";
 import {
-  getOrCreateClerkUser, getOrCreatePhoneUser, SEED_BUSINESS_ID, type AuthenticatedRequest,
+  getOrCreateFirebaseUser, getOrCreatePhoneUser, SEED_BUSINESS_ID, type AuthenticatedRequest,
 } from "../middlewares/requireAuth";
 import userRouter from "./user";
 
@@ -16,7 +16,7 @@ describe("account deletion and client sign-out", () => {
     const [business] = await db.insert(businessesTable).values({ name: "Language preference regression" }).returning();
     const [user] = await db.insert(appUsersTable).values({
       businessId: business!.id,
-      clerkUserId: `language-preference-${crypto.randomUUID()}`,
+      firebaseUid: `language-preference-${crypto.randomUUID()}`,
       role: "owner",
     }).returning();
 
@@ -145,51 +145,13 @@ describe("account deletion and client sign-out", () => {
     }
   });
 
-  it("keeps account records intact when Clerk cannot delete the sign-in identity", async () => {
-    const [business] = await db.insert(businessesTable).values({ name: "Clerk delete failure regression" }).returning();
-    const clerkUserId = `delete-clerk-${crypto.randomUUID()}`;
-    const [user] = await db.insert(appUsersTable).values({
-      businessId: business!.id,
-      clerkUserId,
-      verifiedEmail: "delete-owner@example.test",
-      role: "owner",
-    }).returning();
-
-    const app = express();
-    app.use(express.json());
-    app.use((req: Request, _res: Response, next: NextFunction) => {
-      (req as AuthenticatedRequest).userId = user!.id;
-      next();
-    });
-    app.use(userRouter);
-
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 503 }));
-    vi.stubEnv("CLERK_SECRET_KEY", "test-secret");
-    vi.stubGlobal("fetch", fetchMock);
-    try {
-      const response = await request(app).delete("/user/account").send({ confirmation: "DELETE" });
-      expect(response.status).toBe(502);
-      expect(fetchMock).toHaveBeenCalledWith(
-        `https://api.clerk.com/v1/users/${encodeURIComponent(clerkUserId)}`,
-        expect.objectContaining({ method: "DELETE" }),
-      );
-      expect(await db.select().from(appUsersTable).where(eq(appUsersTable.id, user!.id))).toHaveLength(1);
-      expect(await db.select().from(businessesTable).where(eq(businessesTable.id, business!.id))).toHaveLength(1);
-    } finally {
-      vi.unstubAllGlobals();
-      vi.unstubAllEnvs();
-      await db.delete(appUsersTable).where(eq(appUsersTable.id, user!.id));
-      await db.delete(businessesTable).where(eq(businessesTable.id, business!.id));
-    }
-  });
-
-  it("deletes the Clerk identity and app data after a valid confirmation", async () => {
-    const [business] = await db.insert(businessesTable).values({ name: "Clerk account deletion regression" }).returning();
-    const clerkUserId = `delete-clerk-success-${crypto.randomUUID()}`;
+  it("tombstones the Firebase identity and app data after a valid confirmation", async () => {
+    const [business] = await db.insert(businessesTable).values({ name: "Firebase account deletion regression" }).returning();
+    const firebaseUid = `delete-firebase-${crypto.randomUUID()}`;
     const email = `delete-success-${crypto.randomUUID()}@example.test`;
     const [user] = await db.insert(appUsersTable).values({
       businessId: business!.id,
-      clerkUserId,
+      firebaseUid,
       verifiedEmail: email,
       role: "owner",
     }).returning();
@@ -206,43 +168,17 @@ describe("account deletion and client sign-out", () => {
     });
     app.use(userRouter);
 
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
-    vi.stubEnv("CLERK_SECRET_KEY", "test-secret");
-    vi.stubGlobal("fetch", fetchMock);
-    let recreatedUserId: string | undefined;
-    let recreatedBusinessId: string | undefined;
     try {
       const response = await request(app).delete("/user/account").send({ confirmation: email });
       expect(response.status).toBe(200);
-      expect(fetchMock).toHaveBeenCalledWith(
-        `https://api.clerk.com/v1/users/${encodeURIComponent(clerkUserId)}`,
-        expect.objectContaining({ method: "DELETE" }),
-      );
       const [tombstone] = await db.select().from(appUsersTable).where(eq(appUsersTable.id, user!.id));
       expect(tombstone?.workerAccessDeletedAt).toBeTruthy();
+      expect(tombstone?.firebaseUid).not.toBe(firebaseUid);
       expect(await db.select().from(businessesTable).where(eq(businessesTable.id, business!.id))).toEqual([]);
-      const oldProviderIdentity = await getOrCreateClerkUser(clerkUserId, email);
-      expect(oldProviderIdentity.id).toBe(user!.id);
-      expect(oldProviderIdentity.workerAccessDeletedAt).toBeTruthy();
-      const recreated = await getOrCreateClerkUser(
-        `new-provider-${crypto.randomUUID()}`,
-        email,
-      );
-      recreatedUserId = recreated.id;
-      recreatedBusinessId = recreated.businessId;
-      expect(recreated.clerkUserId).toMatch(/^new-provider-/);
-      expect(recreated.verifiedEmail).toBe(email);
+      await expect(getOrCreateFirebaseUser(firebaseUid, email)).rejects.toThrow(/deleted/i);
+      await expect(getOrCreateFirebaseUser(`new-provider-${crypto.randomUUID()}`, email))
+        .rejects.toThrow(/deleted/i);
     } finally {
-      vi.unstubAllGlobals();
-      vi.unstubAllEnvs();
-      if (recreatedUserId) {
-        await db.delete(userBusinessesTable).where(eq(userBusinessesTable.userId, recreatedUserId));
-        await db.delete(appUsersTable).where(eq(appUsersTable.id, recreatedUserId));
-      }
-      if (recreatedBusinessId && recreatedBusinessId !== SEED_BUSINESS_ID) {
-        await db.delete(businessSettingsTable).where(eq(businessSettingsTable.businessId, recreatedBusinessId));
-        await db.delete(businessesTable).where(eq(businessesTable.id, recreatedBusinessId));
-      }
       await db.delete(userBusinessesTable).where(eq(userBusinessesTable.userId, user!.id));
       await db.delete(appUsersTable).where(eq(appUsersTable.id, user!.id));
       await db.delete(businessesTable).where(eq(businessesTable.id, business!.id));
@@ -253,7 +189,7 @@ describe("account deletion and client sign-out", () => {
     const [business] = await db.insert(businessesTable).values({ name: "Staff delete guard regression" }).returning();
     const [user] = await db.insert(appUsersTable).values({
       businessId: business!.id,
-      clerkUserId: `staff-delete-regression-${crypto.randomUUID()}`,
+      firebaseUid: `staff-delete-regression-${crypto.randomUUID()}`,
       role: "staff",
     }).returning();
     await db.insert(userBusinessesTable).values({

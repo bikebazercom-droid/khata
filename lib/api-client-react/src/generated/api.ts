@@ -635,7 +635,7 @@ export const getReportAuthLogoutEventUrl = () => {
 }
 
 /**
- * @summary Revoke the current Clerk session after explicit user sign-out
+ * @summary Revoke the current Firebase or phone session after explicit user sign-out
  */
 export const reportAuthLogoutEvent = async ( options?: RequestInit): Promise<void> => {
 
@@ -684,7 +684,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type ReportAuthLogoutEventMutationError = ErrorType<ErrorEnvelope>
 
     /**
- * @summary Revoke the current Clerk session after explicit user sign-out
+ * @summary Revoke the current Firebase or phone session after explicit user sign-out
  */
 export const useReportAuthLogoutEvent = <TError = ErrorType<ErrorEnvelope>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportAuthLogoutEvent>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}

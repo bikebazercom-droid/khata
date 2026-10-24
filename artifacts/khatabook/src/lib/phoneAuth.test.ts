@@ -13,7 +13,7 @@ describe('native WebView auth bootstrap', () => {
     const identity = {
       userId: 'owner-1',
       businessId: 'business-1',
-      authMethod: 'clerk' as const,
+      authMethod: 'firebase' as const,
       role: 'owner' as const,
     };
     const postMessage = vi.fn();

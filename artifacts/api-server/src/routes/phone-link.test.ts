@@ -21,7 +21,7 @@ vi.mock("../middlewares/requireAuth", async (importOriginal) => {
       req.businessId = "phone-link-test-business";
       req.role = authState.role;
       req.status = "active";
-      req.authMethod = "clerk";
+      req.authMethod = "firebase";
       next();
     },
   };
@@ -62,7 +62,7 @@ describe("authenticated owner phone linking", () => {
       businessId,
       phone: currentPhone,
       role: "owner",
-      clerkUserId: `phone-link-${Date.now()}`,
+      firebaseUid: `phone-link-${Date.now()}`,
     }).returning();
     ownerId = owner!.id;
     authState.userId = ownerId;
@@ -70,7 +70,7 @@ describe("authenticated owner phone linking", () => {
       businessId,
       phone: alreadyUsedPhone,
       role: "owner",
-      clerkUserId: `phone-link-other-${Date.now()}`,
+      firebaseUid: `phone-link-other-${Date.now()}`,
     }).returning();
     expect(otherOwner).toBeTruthy();
   });

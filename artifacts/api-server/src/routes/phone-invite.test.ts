@@ -22,7 +22,6 @@ import { PostgresRateLimitStore } from "../lib/postgresRateLimitStore";
 import authRouter from "./auth";
 import ownerRouter from "./owner";
 
-vi.mock("@clerk/express", () => ({ getAuth: () => ({ userId: null }) }));
 vi.mock("../services/sms", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../services/sms")>();
   return {

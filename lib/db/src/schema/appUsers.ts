@@ -7,13 +7,13 @@ export const userStatusEnum = pgEnum("user_status", ["active", "suspended"]);
 
 export const appUsersTable = pgTable("app_users", {
   id: uuid("id").primaryKey().defaultRandom(),
-  /** Set when signed in via Clerk (email / Google). Null for phone-only users. */
-  clerkUserId: text("clerk_user_id").unique(),
+  /** Historical imported identity ID; retained in the existing column, never used for authentication. */
+  legacyIdentityId: text("clerk_user_id").unique(),
   /** Firebase Auth UID linked after a verified Google sign-in. */
   firebaseUid: text("firebase_uid").unique(),
-  /** Set when signed in via custom phone OTP. Null for Clerk-only users. */
+  /** Set when signed in via custom phone OTP. Null for Google-only users. */
   phone: text("phone").unique(),
-  /** Set only from a verified Clerk email address returned by Clerk's API. */
+  /** Set only from the verified email claim returned by the active identity provider. */
   verifiedEmail: text("verified_email"),
   /** Per-user interface language; null until the user explicitly chooses one. */
   language: text("language"),
@@ -40,11 +40,11 @@ export const appUsersTable = pgTable("app_users", {
   adjustmentPartyIds: jsonb("adjustment_party_ids").$type<string[]>().notNull().default([]),
 });
 
-/** Records the Clerk sessions already counted as successful logins. */
+/** Records identity-provider sessions already counted as successful logins. */
 export const appUserLoginSessionsTable = pgTable("app_user_login_sessions", {
   userId: uuid("user_id").notNull().references(() => appUsersTable.id, { onDelete: "cascade" }),
   sessionId: text("session_id").notNull(),
-  /** Reject even unexpired Clerk JWTs after an explicit sign-out. */
+  /** Reject unexpired identity-provider sessions after an explicit sign-out. */
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
 }, (table) => [primaryKey({ columns: [table.userId, table.sessionId] })]);
 

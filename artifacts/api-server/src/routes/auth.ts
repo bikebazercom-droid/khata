@@ -520,7 +520,7 @@ router.post(
 );
 
 // ─── Authenticated owner phone linking ────────────────────────────────────────
-// A Clerk/Google owner can add a verified phone to the existing BanglaKhata
+// A Firebase Google account owner can add a verified phone to the existing BanglaKhata
 // account without creating a second owner or moving any ledger data.
 
 router.post(

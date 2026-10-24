@@ -8,7 +8,7 @@ import {
   notificationsTable, ownerPushTokensTable, partiesTable, userBusinessesTable,
   workerInvitesTable, workerPartyAssignmentsTable,
 } from "@workspace/db";
-import { getOrCreateClerkUser, getOrCreatePhoneUser, requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
+import { getOrCreateFirebaseUser, getOrCreatePhoneUser, requireAuth, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import { enforceRoleAccess } from "../middlewares/roleAccess";
 import ownerRouter from "./owner";
 import authRouter from "./auth";
@@ -549,16 +549,16 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
     expect(again.status).toBe(201);
     // Claim first, then stale pending-invite ID delete: it must remove claimed staff too.
     clerk.id = `worker-adjust-${crypto.randomUUID()}`;
-    const claimed = await getOrCreateClerkUser(clerk.id, email);
+    const claimed = await getOrCreateFirebaseUser(clerk.id, email);
     expect(claimed.adjustmentPartyIds).toEqual([a, b]);
     expect((await request(app).delete(`/owner/workers/${again.body.id}`).set("Authorization", "Bearer owner")).status).toBe(204);
     const [deleted] = await db.select().from(appUsersTable).where(eq(appUsersTable.id, claimed.id));
     expect(deleted?.workerAccessDeletedAt).not.toBeNull();
-    expect((await getOrCreateClerkUser(clerk.id, email)).id).toBe(claimed.id);
+    expect((await getOrCreateFirebaseUser(clerk.id, email)).id).toBe(claimed.id);
   });
 
   it("does not let a revoked Clerk session consume a re-invitation or regain access", async () => {
-    const [staff] = await db.select().from(appUsersTable).where(eq(appUsersTable.clerkUserId, clerk.id));
+    const [staff] = await db.select().from(appUsersTable).where(eq(appUsersTable.firebaseUid, clerk.id));
     await db.insert(appUserLoginSessionsTable).values({ userId: staff!.id, sessionId: "old-worker-session", revokedAt: new Date() });
     vi.stubEnv("CLERK_SECRET_KEY", "sk_test_local_fixture");
     vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => new Response(JSON.stringify(String(url).includes("/sessions/") ? {
@@ -711,7 +711,7 @@ describe("staff deletion, explicit re-invitation and scoped adjustments", () => 
       const created = await request(app).post("/owner/workers").set("Authorization", "Bearer owner")
         .send({ email: fixtureEmail, partyIds: [a, b], adjustmentPartyIds: [a, b] });
       expect(created.status).toBe(201);
-      const worker = await getOrCreateClerkUser(identity, fixtureEmail);
+      const worker = await getOrCreateFirebaseUser(identity, fixtureEmail);
       userId = worker.id;
       await db.insert(appUserLoginSessionsTable).values({ userId, sessionId: known });
       expect((await request(app).delete(`/owner/workers/${userId}`).set("Authorization", "Bearer owner")).status).toBe(204);

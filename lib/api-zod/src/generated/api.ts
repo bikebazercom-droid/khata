@@ -124,7 +124,7 @@ export const GetAuthMeResponse = zod.object({
 
 
 /**
- * @summary Revoke the current Clerk session after explicit user sign-out
+ * @summary Revoke the current Firebase or phone session after explicit user sign-out
  */
 export const ReportAuthLogoutEventResponse = zod.void()
 

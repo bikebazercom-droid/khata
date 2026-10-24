@@ -2,22 +2,12 @@ import path from 'path';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
-import { loadEnv } from 'vite';
 import { createHash } from 'node:crypto';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
 
 const isBuild = process.argv.includes('build');
-const clerkPublishableKeyFromEnv =
-  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ??
-  loadEnv(
-    isBuild ? 'production' : 'development',
-    path.resolve(import.meta.dirname),
-    '',
-  ).NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ??
-  '';
-
 const rawPort = process.env.PORT;
 if (!rawPort && !isBuild) {
   throw new Error('PORT environment variable is required but was not provided.');
@@ -112,11 +102,6 @@ self.addEventListener('fetch', event => {
 
 export default defineConfig({
   base: basePath,
-  // This app is Vite, but some Hostinger Clerk instructions use Next.js's
-  // NEXT_PUBLIC_ prefix. Expose only this explicitly public Clerk key.
-  define: {
-    'import.meta.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY': JSON.stringify(clerkPublishableKeyFromEnv),
-  },
   plugins: [
     react(),
     offlineShell(),

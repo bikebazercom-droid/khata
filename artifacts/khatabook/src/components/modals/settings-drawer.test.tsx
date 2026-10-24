@@ -5,13 +5,15 @@ import { SettingsDrawer } from './settings-drawer';
 const mocks = vi.hoisted(() => ({
   setLang: vi.fn(),
   lang: 'bn' as 'bn' | 'en',
-  clerkUser: null as null | { primaryEmailAddress?: { emailAddress: string } },
+  firebaseEmail: null as string | null,
 }));
 
-vi.mock('@clerk/react', () => ({
-  useClerk: () => ({ signOut: vi.fn() }),
-  useAuth: () => ({ isSignedIn: true }),
-  useUser: () => ({ user: mocks.clerkUser }),
+vi.mock('@/lib/firebaseClient', () => ({
+  signOutFirebase: vi.fn(),
+  subscribeFirebaseEmail: (onEmail: (email: string | null) => void) => {
+    onEmail(mocks.firebaseEmail);
+    return () => {};
+  },
 }));
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ clear: vi.fn() }),
@@ -57,7 +59,7 @@ describe('settings drawer language selection', () => {
     cleanup();
     mocks.setLang.mockClear();
     mocks.lang = 'bn';
-    mocks.clerkUser = null;
+    mocks.firebaseEmail = null;
   });
 
   it('translates the settings return button to Back in English', () => {
@@ -166,7 +168,7 @@ describe('settings drawer language selection', () => {
 
   it('requires the current sign-in identity or DELETE before enabling account deletion', () => {
     mocks.lang = 'en';
-    mocks.clerkUser = { primaryEmailAddress: { emailAddress: 'owner@example.com' } };
+    mocks.firebaseEmail = 'owner@example.com';
     render(<SettingsDrawer open onOpenChange={vi.fn()} />);
 
     fireEvent.pointerDown(screen.getByRole('button', { name: 'More options' }), {

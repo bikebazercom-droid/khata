@@ -16,7 +16,6 @@ type PendingRead = {
 const flow = vi.hoisted(() => ({
   secureToken: null as string | null,
   platform: 'ios',
-  clerkSignedIn: false,
   pendingRead: null as PendingRead | null,
   events: [] as string[],
   requestTokens: [] as Array<string | null>,
@@ -24,8 +23,6 @@ const flow = vi.hoisted(() => ({
   identityError: null as unknown,
   logout: vi.fn(),
   logoutEvent: vi.fn(),
-  clerkGetToken: vi.fn(),
-  clerkSignOut: vi.fn(),
   identity: {
     role: 'owner' as const,
     businessId: 'test-business',
@@ -46,15 +43,6 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
     removeItem: vi.fn(async () => undefined),
     setItem: vi.fn(async () => undefined),
   },
-}));
-
-vi.mock('@clerk/expo', () => ({
-  useAuth: () => ({
-    isLoaded: true,
-    isSignedIn: flow.clerkSignedIn,
-    getToken: flow.clerkGetToken,
-    signOut: flow.clerkSignOut,
-  }),
 }));
 
 vi.mock('expo-secure-store', () => ({
@@ -159,7 +147,6 @@ function renderWithAuth(children: ReactNode, queryClient = createQueryClient()) 
 describe('mobile phone-session restoration', () => {
   beforeEach(() => {
     flow.platform = 'ios';
-    flow.clerkSignedIn = false;
     flow.secureToken = null;
     flow.pendingRead = null;
     flow.events.length = 0;
@@ -168,10 +155,6 @@ describe('mobile phone-session restoration', () => {
     flow.identityError = null;
     flow.logout.mockReset().mockResolvedValue(undefined);
     flow.logoutEvent.mockReset().mockResolvedValue(undefined);
-    flow.clerkGetToken.mockReset().mockResolvedValue(null);
-    flow.clerkSignOut.mockReset().mockImplementation(async () => {
-      flow.clerkSignedIn = false;
-    });
   });
 
   afterEach(() => {
@@ -291,34 +274,6 @@ describe('mobile phone-session restoration', () => {
     view.queryClient.clear();
   });
 
-  it('revokes simultaneous Clerk and phone sessions with their own bearer tokens', async () => {
-    flow.secureToken = 'phone-session-token';
-    flow.clerkSignedIn = true;
-    flow.clerkGetToken.mockResolvedValue('clerk-session-token');
-
-    let currentState: AuthState | undefined;
-    const view = renderWithAuth(<AuthProbe capture={(state) => { currentState = state; }} />);
-    await waitFor(() => expect(currentState?.token).toBe('phone-session-token'));
-
-    let signOutError: unknown;
-    await act(async () => {
-      signOutError = await currentState?.signOut();
-    });
-
-    expect(signOutError).toBeNull();
-    expect(flow.logoutEvent).toHaveBeenCalledWith({
-      headers: { Authorization: 'Bearer clerk-session-token' },
-    });
-    expect(flow.logout).toHaveBeenCalledWith({
-      headers: { Authorization: 'Bearer phone-session-token' },
-    });
-    expect(flow.clerkSignOut).toHaveBeenCalledOnce();
-    expect(flow.secureToken).toBeNull();
-
-    view.unmount();
-    view.queryClient.clear();
-  });
-
   it('keeps the saved phone credential when server revocation fails', async () => {
     flow.secureToken = 'phone-session-token';
     flow.logout.mockRejectedValueOnce(new Error('revocation failed'));
@@ -335,7 +290,6 @@ describe('mobile phone-session restoration', () => {
     expect(signOutError).toBeInstanceOf(Error);
     expect(flow.secureToken).toBe('phone-session-token');
     expect(flow.events).not.toContain('secure-delete');
-    expect(flow.clerkSignOut).not.toHaveBeenCalled();
 
     view.unmount();
     view.queryClient.clear();

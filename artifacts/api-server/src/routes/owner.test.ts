@@ -10,7 +10,7 @@ import {
   userBusinessesTable, workerInvitesTable, workerPartyAssignmentsTable,
 } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
-import { getOrCreateClerkUser, type AuthenticatedRequest } from "../middlewares/requireAuth";
+import { getOrCreateFirebaseUser, type AuthenticatedRequest } from "../middlewares/requireAuth";
 import ownerRouter from "./owner";
 
 const makeApp = (businessId: string, role: "owner" | "staff" = "owner") => {
@@ -51,7 +51,7 @@ describe("owner worker invitation authorization", () => {
     partyId = party!.id;
     otherPartyId = otherParty!.id;
     const [staff] = await db.insert(appUsersTable).values({
-      clerkUserId: `owner-activity-staff-${Date.now()}`,
+      firebaseUid: `owner-activity-staff-${Date.now()}`,
       verifiedEmail: `activity-staff-${Date.now()}@example.test`,
       businessId,
       role: "staff",
@@ -78,7 +78,7 @@ describe("owner worker invitation authorization", () => {
       email: `pending-elsewhere-${Date.now()}@example.test`,
     });
     await db.insert(appUsersTable).values({
-      clerkUserId: `owner-invite-test-${Date.now()}`,
+      firebaseUid: `owner-invite-test-${Date.now()}`,
       verifiedEmail: linkedEmail,
       businessId: otherBusinessId,
       role: "owner",
@@ -212,7 +212,7 @@ describe("owner worker invitation authorization", () => {
     }).returning();
     const clerkUserId = `claim-race-${Date.now()}`;
     const [claimResult, revokeResponse] = await Promise.all([
-      getOrCreateClerkUser(clerkUserId, email),
+      getOrCreateFirebaseUser(clerkUserId, email),
       request(makeApp(businessId)).patch(`/owner/workers/${invite!.id}`).send({ status: "suspended" }),
     ]);
     const [finalInvite] = await db.select().from(workerInvitesTable).where(eq(workerInvitesTable.id, invite!.id));

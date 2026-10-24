@@ -5,27 +5,13 @@ import jwt from "jsonwebtoken";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import {
-  appUserLoginSessionsTable, appUsersTable, businessesTable, db, userBusinessesTable,
+  appUsersTable, businessesTable, db, userBusinessesTable,
 } from "@workspace/db";
 import {
-  CLERK_WEBVIEW_SESSION_COOKIE_MAX_AGE_MS,
+  FIREBASE_SESSION_COOKIE_MAX_AGE_MS,
   PHONE_SESSION_COOKIE_MAX_AGE_MS,
 } from "../middlewares/requireAuth";
 import authRouter from "./auth";
-
-const clerkSession = vi.hoisted(() => ({ userId: "", oldSessionId: "", newSessionId: "" }));
-vi.mock("@clerk/express", () => ({
-  getAuth: (req: { headers: { authorization?: string } }) => {
-    const token = req.headers.authorization;
-    if (token === "Bearer clerk-old") {
-      return { userId: clerkSession.userId, sessionId: clerkSession.oldSessionId };
-    }
-    if (token === "Bearer clerk-new") {
-      return { userId: clerkSession.userId, sessionId: clerkSession.newSessionId };
-    }
-    return { userId: null };
-  },
-}));
 
 describe("phone session logout", () => {
   let businessId: string;
@@ -165,59 +151,4 @@ describe("phone session logout", () => {
     expect(replay.status).toBe(401);
   });
 
-  it("rejects the old Clerk bearer session after explicit sign-out but allows a different session", async () => {
-    clerkSession.userId = `logout-clerk-${crypto.randomUUID()}`;
-    clerkSession.oldSessionId = `old-${crypto.randomUUID()}`;
-    clerkSession.newSessionId = `new-${crypto.randomUUID()}`;
-    const [user] = await db.insert(appUsersTable).values({
-      businessId, clerkUserId: clerkSession.userId, role: "owner",
-    }).returning();
-    await db.insert(userBusinessesTable).values({ userId: user!.id, businessId });
-    const lookup = vi.spyOn(globalThis, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        primary_email_address_id: "verified",
-        email_addresses: [{ id: "verified", email_address: "clerk-logout@example.test", verification: { status: "verified" } }],
-      }),
-    } as Response);
-    try {
-      const before = await request(app).get("/auth/me")
-        .set("Authorization", "Bearer clerk-old")
-        .set("x-banglakhata-native-session", "1");
-      expect(before.status, before.text).toBe(200);
-      const rawCookies = before.headers["set-cookie"];
-      const cookies = Array.isArray(rawCookies) ? rawCookies : rawCookies ? [rawCookies] : [];
-      const webViewCookie = cookies.find((value) => value.startsWith("clerk_webview_session="));
-      expect(webViewCookie).toContain(`Max-Age=${CLERK_WEBVIEW_SESSION_COOKIE_MAX_AGE_MS / 1000}`);
-      expect(webViewCookie).toContain("HttpOnly");
-
-      const reopened = await request(app).get("/auth/me")
-        .set("Cookie", webViewCookie!.split(";")[0]!);
-      expect(reopened.status, reopened.text).toBe(200);
-      expect(reopened.body.authMethod).toBe("clerk");
-
-      const logout = await request(app).post("/auth/logout-event")
-        .set("Cookie", webViewCookie!.split(";")[0]!);
-      expect(logout.status, logout.text).toBe(204);
-      const clearedCookies = logout.headers["set-cookie"];
-      const cleared = Array.isArray(clearedCookies) ? clearedCookies : clearedCookies ? [clearedCookies] : [];
-      expect(cleared.find((value) => value.startsWith("clerk_webview_session="))).toContain("Expires=");
-
-      const copiedWebViewCookie = await request(app).get("/auth/me")
-        .set("Cookie", webViewCookie!.split(";")[0]!);
-      expect(copiedWebViewCookie.status).toBe(401);
-      const copiedOldToken = await request(app).get("/auth/me").set("Authorization", "Bearer clerk-old");
-      expect(copiedOldToken.status).toBe(401);
-
-      const [oldSession] = await db.select().from(appUserLoginSessionsTable)
-        .where(eq(appUserLoginSessionsTable.sessionId, clerkSession.oldSessionId));
-      expect(oldSession?.revokedAt).toBeInstanceOf(Date);
-      const newSession = await request(app).get("/auth/me").set("Authorization", "Bearer clerk-new");
-      expect(newSession.status, newSession.text).toBe(200);
-    } finally {
-      lookup.mockRestore();
-      await db.delete(userBusinessesTable).where(eq(userBusinessesTable.userId, user!.id));
-      await db.delete(appUsersTable).where(eq(appUsersTable.id, user!.id));
-    }
-  });
 });
