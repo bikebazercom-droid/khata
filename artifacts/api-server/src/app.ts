@@ -9,7 +9,7 @@ import { logger } from "./lib/logger";
 import { ensureDefaultBusiness } from "./middlewares/requireAuth";
 import { migrateBillImages } from "./lib/migrateBillImages";
 import { mountFrontendHosting, shouldServeFrontends } from "./lib/frontend-hosting";
-import { trustedProxyCidrs } from "./middlewares/ipBlock";
+import { trustedProxySetting } from "./middlewares/ipBlock";
 import { isDatabaseNumericOverflow } from "./lib/apiValidation";
 
 const app: Express = express();
@@ -25,10 +25,9 @@ if (
   throw new Error('CORS_ALLOWED_ORIGINS is required for production local-storage deployments');
 }
 
-// Only accept forwarding headers from explicitly configured proxy CIDRs.
-// Without configuration, req.ip is the socket peer (not the spoofable XFF).
-const trustedProxies = trustedProxyCidrs();
-app.set("trust proxy", trustedProxies.length ? trustedProxies : false);
+// Trust explicit ingress CIDRs/hops, or the single ingress hop used by the
+// combined production app. Never trust an arbitrary X-Forwarded-For chain.
+app.set("trust proxy", trustedProxySetting());
 
 app.use(
   pinoHttp({

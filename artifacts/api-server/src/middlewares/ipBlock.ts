@@ -10,8 +10,15 @@ import { blockedIpsTable, db } from "@workspace/db";
  * mode. Never treat a shared, unidentified socket peer as a user's IP.
  */
 export function ipPolicy(): { configured: boolean; mode: "trusted_proxy" | "direct" | "setup_required" } {
-  if (process.env.TRUSTED_PROXY_CIDRS?.trim()) return { configured: true, mode: "trusted_proxy" };
   if (process.env.CLIENT_IP_MODE === "direct") return { configured: true, mode: "direct" };
+  if (
+    process.env.TRUSTED_PROXY_CIDRS?.trim() ||
+    process.env.TRUST_PROXY_HOPS?.trim() ||
+    process.env.SERVE_FRONTENDS === "true" ||
+    (process.env.NODE_ENV === "production" && process.env.SERVE_FRONTENDS !== "false")
+  ) {
+    return { configured: true, mode: "trusted_proxy" };
+  }
   return { configured: false, mode: "setup_required" };
 }
 
@@ -22,8 +29,11 @@ export function trustedProxyCidrs(): string[] {
   if (process.env.CLIENT_IP_MODE && process.env.CLIENT_IP_MODE !== "direct") {
     throw new Error("CLIENT_IP_MODE must be 'direct' or unset");
   }
-  if (values.some((v) => !v) || (values.length && process.env.CLIENT_IP_MODE)) {
-    throw new Error("Choose exactly one verified client IP policy (direct or trusted proxy CIDRs)");
+  if (
+    values.some((v) => !v) ||
+    (values.length && (process.env.CLIENT_IP_MODE || process.env.TRUST_PROXY_HOPS?.trim()))
+  ) {
+    throw new Error("Choose exactly one client IP policy (direct, trusted proxy CIDRs, or trusted proxy hops)");
   }
   for (const value of values) {
     const [host, prefix, extra] = value.split("/");
@@ -35,6 +45,33 @@ export function trustedProxyCidrs(): string[] {
     }
   }
   return values;
+}
+
+export function trustedProxySetting(): string[] | number | false {
+  const cidrs = trustedProxyCidrs();
+  const configuredHops = process.env.TRUST_PROXY_HOPS?.trim();
+  if (configuredHops && process.env.CLIENT_IP_MODE) {
+    throw new Error("Choose exactly one client IP policy (direct or trusted proxy hops)");
+  }
+  if (configuredHops) {
+    if (!/^[1-9]\d*$/.test(configuredHops) || Number(configuredHops) > 5) {
+      throw new Error("TRUST_PROXY_HOPS must be an integer from 1 to 5");
+    }
+    return Number(configuredHops);
+  }
+  if (cidrs.length) return cidrs;
+  if (process.env.CLIENT_IP_MODE === "direct") return false;
+
+  // The combined production app is reached through Hostinger's single ingress
+  // proxy. Trust only that one hop so rate limits use the forwarded client IP
+  // without trusting arbitrary X-Forwarded-For entries from the internet.
+  if (
+    process.env.SERVE_FRONTENDS === "true" ||
+    (process.env.NODE_ENV === "production" && process.env.SERVE_FRONTENDS !== "false")
+  ) {
+    return 1;
+  }
+  return false;
 }
 
 // Express req.ip uses only explicitly trusted hops. In proxy mode require
