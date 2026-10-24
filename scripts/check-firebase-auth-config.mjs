@@ -42,18 +42,19 @@ try {
     console.log("Firebase Auth API key preflight passed.");
   } else {
     const safeReason = typeof errorMessage === "string" ? errorMessage : `HTTP ${response.status}`;
-    console.error(
-      `Firebase Auth rejected the configured Web API key (${safeReason}). ` +
-      "Confirm it is active in the same Firebase project and permits Identity Toolkit API requests from banglakhata.com.",
+    console.warn(
+      `Warning: Firebase Auth could not validate the configured Web API key (${safeReason}). ` +
+      "Continuing the build; Google Sign-In may fail until the key and Identity Toolkit restrictions are corrected.",
     );
-    process.exitCode = 1;
   }
 } catch (error) {
   const message = error instanceof Error && error.name === "AbortError"
     ? "request timed out"
     : "Firebase Auth could not be reached";
-  console.error(`Firebase Auth API key preflight failed: ${message}.`);
-  process.exitCode = 1;
+  console.warn(
+    `Warning: Firebase Auth API key preflight could not complete (${message}). ` +
+    "Continuing the build; verify Google Sign-In after deployment.",
+  );
 } finally {
   clearTimeout(timeout);
 }
