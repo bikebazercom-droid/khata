@@ -1,4 +1,4 @@
-import { getApp, getApps, initializeApp } from 'firebase/app';
+import { getApps, initializeApp, type FirebaseOptions } from 'firebase/app';
 import {
   browserLocalPersistence,
   getAuth,
@@ -13,19 +13,33 @@ import {
 } from 'firebase/auth';
 
 function getFirebaseAuth(): Auth {
-  const config = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  const config: FirebaseOptions = {
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY?.trim(),
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN?.trim(),
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID?.trim(),
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET?.trim(),
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID?.trim(),
+    appId: import.meta.env.VITE_FIREBASE_APP_ID?.trim(),
   };
   const missing = Object.entries(config).filter(([, value]) => !value).map(([key]) => key);
   if (missing.length) {
     throw new Error(`Firebase is not configured. Missing: ${missing.join(', ')}`);
   }
-  const app = getApps().length ? getApp() : initializeApp(config);
+
+  const existingDefaultApp = getApps().find((app) => app.name === '[DEFAULT]');
+  if (existingDefaultApp) {
+    const configMatches = Object.entries(config).every(
+      ([key, value]) => existingDefaultApp.options[key as keyof FirebaseOptions] === value,
+    );
+    if (!configMatches) {
+      throw new Error(
+        'Firebase was already initialized with a different configuration. Reload the latest app build.',
+      );
+    }
+    return getAuth(existingDefaultApp);
+  }
+
+  const app = initializeApp(config);
   return getAuth(app);
 }
 
