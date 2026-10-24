@@ -8,7 +8,7 @@
   "license": "MIT",
   "scripts": {
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
-    "build:hostinger": "node -e 'const keys=[\"VITE_FIREBASE_API_KEY\",\"VITE_FIREBASE_AUTH_DOMAIN\",\"VITE_FIREBASE_PROJECT_ID\",\"VITE_FIREBASE_STORAGE_BUCKET\",\"VITE_FIREBASE_MESSAGING_SENDER_ID\",\"VITE_FIREBASE_APP_ID\"];const missing=keys.filter(k=>!process.env[k]);if(missing.length){console.error(\"Missing Firebase environment variables: \"+missing.join(\", \"));process.exit(1)}' && pnpm --filter @workspace/api-server run build && NODE_ENV=production BASE_PATH=/ pnpm --filter @workspace/khatabook run build && NODE_ENV=production BASE_PATH=/admin/ pnpm --filter @workspace/banglakhata-admin run build",
+    "build:hostinger": "node ./scripts/check-firebase-auth-config.mjs && pnpm --filter @workspace/api-server run build && NODE_ENV=production BASE_PATH=/ pnpm --filter @workspace/khatabook run build && NODE_ENV=production BASE_PATH=/admin/ pnpm --filter @workspace/banglakhata-admin run build",
     "db:migrate:hostinger-supabase": "pnpm --filter @workspace/db run migrate:hostinger-supabase",
     "start": "NODE_ENV=production SERVE_FRONTENDS=true node --enable-source-maps artifacts/api-server/dist/index.mjs",
     "typecheck:libs": "tsc --build",
