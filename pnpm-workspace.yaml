@@ -47,11 +47,13 @@ onlyBuiltDependencies:
 
 allowBuilds:
   '@clerk/shared': true
+  '@firebase/util': false
   '@swc/core': true
   browser-tabs-lock: true
   core-js: true
   esbuild: true
   msw: true
+  protobufjs: false
   unrs-resolver: true
 
 overrides:

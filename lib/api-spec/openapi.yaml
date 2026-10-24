@@ -1360,7 +1360,7 @@ components:
           type: string
         authMethod:
           type: string
-          enum: [phone, clerk]
+          enum: [phone, firebase]
         adjustmentPartyIds:
           type: array
           items:
@@ -1913,7 +1913,7 @@ components:
 
     AuthProvider:
       type: string
-      enum: [phone_otp, clerk]
+      enum: [phone_otp, firebase]
 
     AdminLoginInput:
       type: object

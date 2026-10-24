@@ -1,11 +1,15 @@
-import { useState } from 'react';
-import { SignIn } from '@clerk/react';
-import { sendOtp, verifyOtp } from '@/lib/phoneAuth';
+import { useEffect, useState } from 'react';
+import { sendOtp, verifyOtp, fetchMe } from '@/lib/phoneAuth';
 import { authMeQueryKey } from '@/lib/authQueryKeys';
 import { useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageMeta } from '@/components/layout/page-meta';
 import { SiteFooter } from '@/components/layout/site-footer';
+import {
+  beginGoogleSignIn,
+  exchangeFirebaseSession,
+  finishGoogleRedirect,
+} from '@/lib/firebaseClient';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -38,21 +42,21 @@ export function SignInPage() {
 }
 
 function SignInTabs() {
-  const [tab, setTab] = useState<'clerk' | 'phone'>('clerk');
+  const [tab, setTab] = useState<'google' | 'phone'>('google');
 
   return (
     <div>
       {/* Tab bar */}
       <div className="sign-in-tab-bar flex rounded-xl bg-white/20 p-1 mb-6">
         <button
-          onClick={() => setTab('clerk')}
+          onClick={() => setTab('google')}
           className={`flex-1 text-sm font-medium py-2 rounded-lg transition-colors ${
-            tab === 'clerk'
+            tab === 'google'
               ? 'bg-white text-[#1B3A6B] shadow-sm font-bold'
               : 'text-white/80 hover:text-white'
           }`}
         >
-          Email / Google
+          Google
         </button>
         <button
           onClick={() => setTab('phone')}
@@ -66,8 +70,8 @@ function SignInTabs() {
         </button>
       </div>
 
-      {tab === 'clerk' ? (
-        <ClerkSignIn />
+      {tab === 'google' ? (
+        <GoogleSignIn />
       ) : (
         <PhoneSignIn />
       )}
@@ -75,43 +79,63 @@ function SignInTabs() {
   );
 }
 
-function ClerkSignIn() {
+function GoogleSignIn() {
+  const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function completeSignIn(credential: Awaited<ReturnType<typeof finishGoogleRedirect>>) {
+    if (!credential) return;
+    await exchangeFirebaseSession(credential);
+    const me = await fetchMe();
+    queryClient.setQueryData(authMeQueryKey(), me);
+    setLocation(me.role === 'owner' ? '/dashboard' : '/');
+  }
+
+  useEffect(() => {
+    let active = true;
+    finishGoogleRedirect()
+      .then(async (credential) => {
+        if (!credential || !active) return;
+        setLoading(true);
+        await completeSignIn(credential);
+      })
+      .catch((err: unknown) => {
+        if (active) setError(err instanceof Error ? err.message : 'Google sign-in failed.');
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  async function handleGoogleSignIn() {
+    setError('');
+    setLoading(true);
+    try {
+      const credential = await beginGoogleSignIn();
+      if (credential) await completeSignIn(credential);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Google sign-in failed.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <SignIn
-      routing="path"
-      path={`${basePath}/sign-in`}
-      signUpUrl={`${basePath}/sign-up`}
-      forceRedirectUrl={`${basePath}/dashboard`}
-      appearance={{
-        elements: {
-          rootBox: 'w-full',
-          cardBox: 'w-full rounded-2xl shadow-lg overflow-hidden border border-slate-200',
-          card: '!shadow-none !border-0 !rounded-none bg-white',
-          footer: '!shadow-none !border-0 !rounded-none bg-white',
-          headerTitle: 'text-slate-900',
-          headerSubtitle: 'text-slate-500',
-          socialButtonsBlockButtonText: 'text-slate-700',
-          formFieldLabel: 'text-slate-700',
-          footerActionLink: 'text-sky-600',
-          footerActionText: 'text-slate-500',
-          dividerText: 'text-slate-400',
-          formButtonPrimary: 'bg-[#1B3A6B] hover:bg-[#24488A]',
-          formFieldInput: 'border-slate-200 focus:border-[#1B3A6B]',
-        },
-        variables: {
-          colorPrimary: '#1B3A6B',
-          colorForeground: '#1B3A6B',
-          colorMutedForeground: '#64748b',
-          colorDanger: '#ef4444',
-          colorBackground: '#ffffff',
-          colorInput: '#f1f5f9',
-          colorInputForeground: '#0f172a',
-          colorNeutral: '#e2e8f0',
-          fontFamily: 'Inter, sans-serif',
-          borderRadius: '0.5rem',
-        },
-      }}
-    />
+    <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-lg">
+      <h2 className="text-center text-xl font-semibold text-slate-900">Welcome back</h2>
+      <p className="mb-6 mt-1 text-center text-sm text-slate-500">Sign in to your ledger account</p>
+      {error && <p role="alert" className="mb-4 text-sm text-red-600">{error}</p>}
+      <button
+        type="button"
+        onClick={() => void handleGoogleSignIn()}
+        disabled={loading}
+        className="flex w-full items-center justify-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60"
+      >
+        <span aria-hidden="true" className="text-base font-bold text-[#4285f4]">G</span>
+        {loading ? 'Signing in…' : 'Continue with Google'}
+      </button>
+    </div>
   );
 }
 

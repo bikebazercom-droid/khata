@@ -9,6 +9,8 @@ export const appUsersTable = pgTable("app_users", {
   id: uuid("id").primaryKey().defaultRandom(),
   /** Set when signed in via Clerk (email / Google). Null for phone-only users. */
   clerkUserId: text("clerk_user_id").unique(),
+  /** Firebase Auth UID linked after a verified Google sign-in. */
+  firebaseUid: text("firebase_uid").unique(),
   /** Set when signed in via custom phone OTP. Null for Clerk-only users. */
   phone: text("phone").unique(),
   /** Set only from a verified Clerk email address returned by Clerk's API. */

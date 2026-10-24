@@ -1,55 +1,30 @@
-import { SignUp } from '@clerk/react';
+import { Link } from 'wouter';
 import { PageMeta } from '@/components/layout/page-meta';
 import { SiteFooter } from '@/components/layout/site-footer';
-
-const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 export function SignUpPage() {
   return (
     <>
       <PageMeta
-        title="Create an Account | BanglaKhata - Business Ledger"
-        description="Create a BanglaKhata account to manage customer and supplier records, business transactions, and outstanding balances."
+        title="Create an Account | BanglaKhata"
+        description="Start using BanglaKhata with your approved Google account."
       />
-      <div className="min-h-[100dvh] bg-[#f8fafc] flex flex-col items-center justify-center px-4 py-12">
-        <div className="w-full max-w-[440px]">
-          <SignUp
-            routing="path"
-            path={`${basePath}/sign-up`}
-            signInUrl={`${basePath}/sign-in`}
-            appearance={{
-            elements: {
-              rootBox: 'w-full',
-              cardBox: 'w-full rounded-2xl shadow-lg overflow-hidden border border-slate-200',
-              card: '!shadow-none !border-0 !rounded-none bg-white',
-              footer: '!shadow-none !border-0 !rounded-none bg-white',
-              headerTitle: 'text-slate-900',
-              headerSubtitle: 'text-slate-500',
-              socialButtonsBlockButtonText: 'text-slate-700',
-              formFieldLabel: 'text-slate-700',
-              footerActionLink: 'text-sky-600',
-              footerActionText: 'text-slate-500',
-              dividerText: 'text-slate-400',
-              formButtonPrimary: 'bg-slate-900 hover:bg-slate-800',
-              formFieldInput: 'border-slate-200 focus:border-sky-500',
-            },
-            variables: {
-              colorPrimary: '#0f172a',
-              colorForeground: '#0f172a',
-              colorMutedForeground: '#64748b',
-              colorDanger: '#ef4444',
-              colorBackground: '#ffffff',
-              colorInput: '#f1f5f9',
-              colorInputForeground: '#0f172a',
-              colorNeutral: '#e2e8f0',
-              fontFamily: 'Inter, sans-serif',
-              borderRadius: '0.5rem',
-            },
-            }}
-          />
-        </div>
+      <main className="flex min-h-[100dvh] flex-col items-center justify-center bg-[#f8fafc] px-4 py-12">
+        <section className="w-full max-w-[440px] rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-lg">
+          <h1 className="text-xl font-semibold text-slate-900">Create your BanglaKhata account</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            Sign in with Google using an email approved for your business. Your existing ledger
+            access will be linked to the same verified email.
+          </p>
+          <Link
+            href="/sign-in"
+            className="mt-6 inline-flex w-full items-center justify-center rounded-lg bg-[#1B3A6B] px-4 py-3 text-sm font-semibold text-white hover:bg-[#24488A]"
+          >
+            Continue to sign in
+          </Link>
+        </section>
         <SiteFooter />
-      </div>
+      </main>
     </>
   );
 }

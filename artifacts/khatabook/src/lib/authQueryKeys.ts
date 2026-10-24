@@ -7,8 +7,8 @@ export type AuthRouteMeQueryKey = readonly ['auth-me', string | undefined, 'rout
  * Sign-in routes use authRouteMeQueryKey so a prior session cannot redirect
  * the user away before the server validates the current session.
  */
-export function authMeQueryKey(clerkUserId?: string | null): AuthMeQueryKey {
-  return ['auth-me', clerkUserId ?? undefined];
+export function authMeQueryKey(identityId?: string | null): AuthMeQueryKey {
+  return ['auth-me', identityId ?? undefined];
 }
 
 /**
@@ -16,8 +16,8 @@ export function authMeQueryKey(clerkUserId?: string | null): AuthMeQueryKey {
  * inheriting a successful /me result cached by the previous app session.
  */
 export function authRouteMeQueryKey(
-  clerkUserId: string | null | undefined,
+  identityId: string | null | undefined,
   requestId: number,
 ): AuthRouteMeQueryKey {
-  return ['auth-me', clerkUserId ?? undefined, 'route-check', requestId];
+  return ['auth-me', identityId ?? undefined, 'route-check', requestId];
 }

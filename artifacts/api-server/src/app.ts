@@ -4,13 +4,6 @@ import cookieParser from "cookie-parser";
 import path from "path";
 import { fileURLToPath } from "url";
 import pinoHttp from "pino-http";
-import { clerkMiddleware } from "@clerk/express";
-import { publishableKeyFromHost } from "@clerk/shared/keys";
-import {
-  CLERK_PROXY_PATH,
-  clerkProxyMiddleware,
-  getClerkProxyHost,
-} from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { ensureDefaultBusiness } from "./middlewares/requireAuth";
@@ -57,9 +50,6 @@ app.use(
   }),
 );
 
-// Clerk proxy must come before body parsers — it streams raw bytes.
-app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
-
 app.use(cors({
   credentials: true,
   origin: corsAllowedOrigins.length
@@ -74,18 +64,6 @@ app.use(cookieParser());
 // base64 data URL) can be submitted with a ledger entry.
 app.use(express.json({ limit: "8mb" }));
 app.use(express.urlencoded({ extended: true }));
-
-// Resolve the publishable key from the incoming request host so the same
-// server can serve multiple Clerk custom domains.
-app.use(
-  clerkMiddleware((req) => ({
-    publishableKey: publishableKeyFromHost(
-      getClerkProxyHost(req) ?? "",
-      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ??
-        process.env.CLERK_PUBLISHABLE_KEY,
-    ),
-  })),
-);
 
 const __dirname_app   = path.dirname(fileURLToPath(import.meta.url));
 
@@ -106,7 +84,6 @@ if (shouldServeFrontends(process.env.NODE_ENV, process.env.SERVE_FRONTENDS)) {
   mountFrontendHosting(app, {
     websiteDir: path.resolve(__dirname_app, "../../khatabook/dist/public"),
     adminDir: path.resolve(__dirname_app, "../../banglakhata-admin/dist/public"),
-    reservedPrefixes: [CLERK_PROXY_PATH],
   });
 }
 

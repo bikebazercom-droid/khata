@@ -18,7 +18,7 @@ export interface MeResponse {
   businessName?: string;
   needsBookName?: boolean;
   phone?: string;
-  authMethod: "clerk" | "phone";
+  authMethod: "firebase" | "phone";
   role?: "owner" | "staff";
 }
 

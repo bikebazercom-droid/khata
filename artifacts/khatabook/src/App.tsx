@@ -1,8 +1,5 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { ClerkProvider, useAuth } from '@clerk/react';
-import { publishableKeyFromHost } from '@clerk/react/internal';
-import { resolveClerkClientEnvironment } from '@/lib/clerkEnvironment';
-import { shadcn } from '@clerk/themes';
+import { signOutFirebase } from '@/lib/firebaseClient';
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from 'wouter';
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
@@ -73,78 +70,7 @@ const SignInPage = lazyWithChunkRecovery(() => import('@/pages/sign-in').then((m
 const SignUpPage = lazyWithChunkRecovery(() => import('@/pages/sign-up').then((module) => ({ default: module.SignUpPage })));
 const NotFound = lazyWithChunkRecovery(() => import('@/pages/not-found'));
 
-// ─── Clerk setup ──────────────────────────────────────────────────────────────
-
-// REQUIRED — copy verbatim. Resolves the key from window.location.hostname.
-const clerkClientEnvironment = resolveClerkClientEnvironment(
-  import.meta.env as ImportMetaEnv & {
-    readonly NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?: string;
-  },
-);
-const clerkPubKey = publishableKeyFromHost(
-  window.location.hostname,
-  clerkClientEnvironment.publishableKey,
-);
-const clerkProxyUrl = clerkClientEnvironment.proxyUrl;
-
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
-
-// Strip the basePath prefix Clerk appends (Clerk gives full paths, wouter
-// setLocation prepends the base — avoid doubling).
-function stripBase(path: string): string {
-  return basePath && path.startsWith(basePath)
-    ? path.slice(basePath.length) || '/'
-    : path;
-}
-
-const clerkAppearance = {
-  theme: shadcn,
-  cssLayerName: 'clerk',
-  options: {
-    logoPlacement: 'inside' as const,
-    logoLinkUrl: basePath || '/',
-    logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
-  },
-  variables: {
-    colorPrimary: '#0f172a',
-    colorForeground: '#0f172a',
-    colorMutedForeground: '#64748b',
-    colorDanger: '#ef4444',
-    colorBackground: '#ffffff',
-    colorInput: '#f1f5f9',
-    colorInputForeground: '#0f172a',
-    colorNeutral: '#e2e8f0',
-    fontFamily: 'Inter, sans-serif',
-    borderRadius: '0.5rem',
-  },
-  elements: {
-    rootBox: 'w-full flex justify-center',
-    cardBox: 'bg-white rounded-2xl w-[440px] max-w-full overflow-hidden shadow-lg border border-slate-200',
-    card: '!shadow-none !border-0 !bg-transparent !rounded-none',
-    footer: '!shadow-none !border-0 !bg-transparent !rounded-none',
-    headerTitle: 'text-slate-900',
-    headerSubtitle: 'text-slate-500',
-    socialButtonsBlockButtonText: 'text-slate-700',
-    formFieldLabel: 'text-slate-700',
-    footerActionLink: 'text-sky-600',
-    footerActionText: 'text-slate-500',
-    dividerText: 'text-slate-400',
-    identityPreviewEditButton: 'text-sky-600',
-    formFieldSuccessText: 'text-green-600',
-    alertText: 'text-red-600',
-    logoBox: 'py-2',
-    logoImage: 'w-12 h-12',
-    socialButtonsBlockButton: 'border border-slate-200',
-    formButtonPrimary: 'bg-slate-900 hover:bg-slate-800',
-    formFieldInput: 'border-slate-200',
-    footerAction: 'bg-transparent',
-    dividerLine: 'bg-slate-200',
-    alert: 'bg-red-50',
-    otpCodeFieldInput: 'border-slate-200',
-    formFieldRow: '',
-    main: '',
-  },
-};
 
 // ─── Query client ─────────────────────────────────────────────────────────────
 
@@ -192,7 +118,7 @@ let nextAuthRouteRequestId = 0;
 /**
  * Mounts the SSE subscription only when the user is authenticated so we don't
  * attempt an un-authed connection on the landing page.
- * Must be rendered inside both ClerkProvider and QueryClientProvider.
+ * Must be rendered inside QueryClientProvider.
  */
 function RealtimeSyncManager() {
   const { isAuthenticated, userId, role, businessId } = useAppAuth();
@@ -419,16 +345,15 @@ function NativePushRegistrationManager() {
 function AuthCacheInvalidator() {
   const qc = useQueryClient();
   const { selectedBusinessId, setSelectedBusiness, setBusinesses } = useBusinessContext();
-  const { isLoaded, userId: clerkUserId } = useAuth();
   const previousAuthorization = useRef<{
     userId: string;
     role: string | undefined;
     adjustmentPartyIds: string[];
   } | null>(null);
   const { data: me, isError, error } = useQuery({
-    queryKey: authMeQueryKey(clerkUserId),
+    queryKey: authMeQueryKey(),
     queryFn: () => fetchMe(),
-    enabled: isLoaded,
+    enabled: true,
     retry: false,
     staleTime: 0,
     refetchOnMount: 'always',
@@ -441,7 +366,7 @@ function AuthCacheInvalidator() {
       qc.removeQueries({
         predicate: (query) =>
           query.queryKey[0] !== 'auth-me' ||
-          query.queryKey[1] !== (clerkUserId ?? undefined),
+          query.queryKey[1] !== undefined,
       });
       const cachedIdentity = readOfflineIdentity();
       clearOfflineIdentity();
@@ -511,25 +436,22 @@ function AuthCacheInvalidator() {
  * always disables that fallback.
  */
 export function useAppAuth(options: { route?: string } = {}) {
-  const { isLoaded, isSignedIn: clerkSignedIn, userId: clerkUserId } = useAuth();
   const authRouteRequestId = useRef<number | null>(null);
   const isPublicAuthPage = !!options.route && !shouldUseOfflineIdentityFallback(options.route);
   if (isPublicAuthPage && authRouteRequestId.current === null) {
     authRouteRequestId.current = ++nextAuthRouteRequestId;
   }
 
-  // Resolve the server-side role even in development; a Clerk session alone
+  // Resolve the server-side role even in development; a client identity alone
   // does not establish the user's business permissions.
   const devBypass = import.meta.env.DEV && import.meta.env.VITE_DEV_AUTH_BYPASS === 'true';
-  // Phone OTP is verified by the API, not Clerk. It must be able to restore a
-  // valid phone session even if Clerk's remote SDK is slow or unavailable.
   const enabled = !devBypass;
   const { data: authData, isLoading: authLoading, isError, error } = useQuery({
     // A sign-in route gets a fresh /me query on each visit. Reusing the normal
     // auth-me cache here can briefly redirect a signed-out user back home.
     queryKey: isPublicAuthPage
-      ? authRouteMeQueryKey(clerkUserId, authRouteRequestId.current!)
-      : authMeQueryKey(clerkUserId),
+      ? authRouteMeQueryKey(undefined, authRouteRequestId.current!)
+      : authMeQueryKey(),
     queryFn: () => fetchMe(),
     enabled,
     staleTime: 0,
@@ -556,8 +478,7 @@ export function useAppAuth(options: { route?: string } = {}) {
   // open immediately while offline or while Clerk's CDN is unreachable. A
   // definitive 401/403 above always overrides it; server APIs remain the
   // authority whenever the device is connected.
-  const authSettled = phoneSessionReady ||
-    (isLoaded && (!enabled || !authLoading || !!offlineIdentity));
+  const authSettled = phoneSessionReady || (!enabled || !authLoading || !!offlineIdentity);
 
   const networkFallback = !!offlineIdentity && status !== 401 && status !== 403;
   const realAuth = enabled && (
@@ -583,7 +504,7 @@ export function useAppAuth(options: { route?: string } = {}) {
   return {
     isAuthenticated,
     isLoading,
-    authMethod: resolvedAuthData?.authMethod ?? (clerkSignedIn ? 'clerk' : null),
+    authMethod: resolvedAuthData?.authMethod ?? null,
     role,
     userId: resolvedAuthData?.userId,
     businessId: resolvedAuthData?.businessId ?? null,
@@ -692,9 +613,8 @@ function SignInRoute() {
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 function AuthServerReporter({ onNetworkFailure, onSettled }: { onNetworkFailure: () => void; onSettled: () => void }) {
-  const { userId } = useAuth();
   const { data, isSuccess, isError, error } = useQuery({
-    queryKey: authMeQueryKey(userId),
+    queryKey: authMeQueryKey(),
     queryFn: () => fetchMe(),
     enabled: true,
     staleTime: 0,
@@ -926,7 +846,6 @@ function AppRouter({ onNetworkFailure, onSettled }: { onNetworkFailure: () => vo
 }
 
 function StaffAccessRemovedScreen() {
-  const { signOut } = useAuth();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const [signingOut, setSigningOut] = useState(false);
@@ -936,7 +855,7 @@ function StaffAccessRemovedScreen() {
     setSigningOut(true);
     await Promise.all([
       phoneLogout().catch(() => {}),
-      signOut().catch(() => {}),
+      signOutFirebase().catch(() => {}),
     ]);
     clearOfflineIdentity();
     clearAllPendingUploads();
@@ -996,18 +915,7 @@ function AppClient() {
   // offline error; protected routes remain gated below.
   if (showPublicLandingWhileChecking) return <LandingPage />;
 
-  if (!clerkPubKey) {
-    return (
-      <main className="min-h-[100dvh] bg-slate-50 px-6 flex items-center justify-center">
-        <section role="alert" className="w-full max-w-sm rounded-2xl bg-white p-7 text-center shadow-sm border border-slate-100">
-          <h1 className="text-xl font-bold text-slate-900">অ্যাপটি এখন খোলা যাচ্ছে না</h1>
-          <p className="mt-3 text-sm leading-6 text-slate-600">সাইন-ইন কনফিগারেশন পাওয়া যায়নি। পরে আবার চেষ্টা করুন।</p>
-        </section>
-      </main>
-    );
-  }
-
-  // Boot Clerk alongside the reachability probe, but keep authenticated routes,
+  // Keep authenticated routes, realtime listeners, and mutation-capable providers
   // realtime listeners, and mutation-capable providers behind the online gate.
   return (
     <AuthConnectivityGate
@@ -1016,29 +924,11 @@ function AppClient() {
       hasOfflineIdentity={!!cachedIdentity}
       onRetry={() => { void retry(); }}
     >
-      <ClerkProvider
-        publishableKey={clerkPubKey}
-        proxyUrl={clerkProxyUrl}
-        appearance={clerkAppearance}
-        signInUrl={`${basePath}/sign-in`}
-        signUpUrl={`${basePath}/sign-up`}
-        localization={{
-          signIn: {
-            start: { title: 'Welcome back', subtitle: 'Sign in to your ledger account' },
-          },
-          signUp: {
-            start: { title: 'Create your account', subtitle: 'Start managing your business ledger' },
-          },
-        }}
-        routerPush={(to) => setLocation(stripBase(to))}
-        routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
-      >
-        <QueryClientProvider client={queryClient}>
-          {phase === 'probing' && !cachedIdentity && !isAuthRoute
-            ? <AppSplash />
-            : <AppRouter onNetworkFailure={goOffline} onSettled={serverAuthSettled} />}
-        </QueryClientProvider>
-      </ClerkProvider>
+      <QueryClientProvider client={queryClient}>
+        {phase === 'probing' && !cachedIdentity && !isAuthRoute
+          ? <AppSplash />
+          : <AppRouter onNetworkFailure={goOffline} onSettled={serverAuthSettled} />}
+      </QueryClientProvider>
     </AuthConnectivityGate>
   );
 }

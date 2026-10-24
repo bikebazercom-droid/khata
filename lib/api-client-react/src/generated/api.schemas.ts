@@ -113,7 +113,7 @@ export type AuthMeAuthMethod = typeof AuthMeAuthMethod[keyof typeof AuthMeAuthMe
 
 export const AuthMeAuthMethod = {
   phone: 'phone',
-  clerk: 'clerk',
+  firebase: 'firebase',
 } as const;
 
 export interface AuthMe {
@@ -529,7 +529,7 @@ export type AuthProvider = typeof AuthProvider[keyof typeof AuthProvider];
 
 export const AuthProvider = {
   phone_otp: 'phone_otp',
-  clerk: 'clerk',
+  firebase: 'firebase',
 } as const;
 
 export interface AdminLoginInput {

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { getAuth } from "@clerk/express";
-import { eq, isNull, isNotNull, and, inArray, lt } from "drizzle-orm";
+import { eq, isNull, isNotNull, and, inArray, lt, sql } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 import {
   db,
@@ -45,7 +45,7 @@ export interface AuthenticatedRequest extends Request {
   businessId: string;
   role: "owner" | "staff";
   status: "active" | "suspended";
-  authMethod: "clerk" | "phone" | "dev";
+  authMethod: "clerk" | "firebase" | "phone" | "dev";
   clerkSessionId?: string;
   verifiedEmail?: string;
   phone?: string;
@@ -285,6 +285,56 @@ export async function getOrCreateClerkUser(
   return user!;
 }
 
+export async function getOrCreateFirebaseUser(
+  firebaseUid: string,
+  verifiedEmail: string,
+  displayName?: string,
+): Promise<AppUser> {
+  const email = verifiedEmail.trim().toLowerCase();
+  const [byUid] = await db.select().from(appUsersTable)
+    .where(eq(appUsersTable.firebaseUid, firebaseUid)).limit(1);
+  if (byUid) return byUid;
+
+  const emailMatches = await db.select().from(appUsersTable)
+    .where(sql`lower(${appUsersTable.verifiedEmail}) = ${email}`).limit(2);
+  if (emailMatches.length > 1) {
+    throw new Error("Verified email matches multiple accounts; administrator review is required");
+  }
+  const existing = emailMatches[0];
+  if (existing) {
+    if (existing.workerAccessDeletedAt || existing.status !== "active") return existing;
+    if (existing.firebaseUid && existing.firebaseUid !== firebaseUid) {
+      throw new Error("This account is already linked to another Google identity");
+    }
+    const [linked] = await db.update(appUsersTable)
+      .set({ firebaseUid })
+      .where(eq(appUsersTable.id, existing.id))
+      .returning();
+    await linkUserBusiness(existing.id, existing.businessId);
+    return linked!;
+  }
+
+  if (!await isPreapproved("email", email)) {
+    throw new PreapprovalRequiredError("email", email);
+  }
+  const [seedOwner] = await db.select().from(appUsersTable).where(and(
+    eq(appUsersTable.businessId, SEED_BUSINESS_ID),
+    eq(appUsersTable.role, "owner"),
+    isNull(appUsersTable.workerAccessDeletedAt),
+  )).limit(1);
+  const businessId = seedOwner ? await createBusinessForNameSetup() : SEED_BUSINESS_ID;
+  if (!seedOwner) await requireSeedBusinessNameSetup();
+  const [user] = await db.insert(appUsersTable).values({
+    firebaseUid,
+    verifiedEmail: email,
+    displayName: displayName?.trim() || null,
+    businessId,
+    role: "owner",
+  }).returning();
+  await linkUserBusiness(user!.id, businessId);
+  return user!;
+}
+
 export async function getOrCreatePhoneUser(
   phone: string,
 ): Promise<AppUser> {
@@ -431,9 +481,11 @@ export async function verifyClerkSessionCreationTime(
 
 const SESSION_SECRET = process.env.SESSION_SECRET!;
 const COOKIE_NAME = "phone_session";
+const FIREBASE_COOKIE_NAME = "firebase_session";
 // Browsers cap persistent cookies at roughly 400 days. Renew the cookie on
 // authenticated requests so active phone sessions remain signed in until logout.
 export const PHONE_SESSION_COOKIE_MAX_AGE_MS = 400 * 24 * 60 * 60 * 1000;
+export const FIREBASE_SESSION_COOKIE_MAX_AGE_MS = PHONE_SESSION_COOKIE_MAX_AGE_MS;
 export const CLERK_WEBVIEW_SESSION_COOKIE_MAX_AGE_MS = PHONE_SESSION_COOKIE_MAX_AGE_MS;
 const CLERK_WEBVIEW_SESSION_COOKIE_NAME = "clerk_webview_session";
 export const NATIVE_WEBVIEW_SESSION_HEADER = "x-banglakhata-native-session";
@@ -442,6 +494,13 @@ interface PhoneSessionPayload {
   userId: string;
   businessId?: string;
   phone: string;
+  sessionVersion: number;
+}
+
+interface FirebaseSessionPayload {
+  userId: string;
+  businessId: string;
+  firebaseUid: string;
   sessionVersion: number;
 }
 
@@ -513,6 +572,36 @@ export function issuePhoneSession(
 
 export function clearPhoneSession(res: Response): void {
   res.clearCookie(COOKIE_NAME, { path: "/" });
+}
+
+export function issueFirebaseSession(res: Response, payload: FirebaseSessionPayload): void {
+  const token = jwt.sign(payload, SESSION_SECRET);
+  res.cookie(FIREBASE_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: FIREBASE_SESSION_COOKIE_MAX_AGE_MS,
+    path: "/",
+  });
+}
+
+export function clearFirebaseSession(res: Response): void {
+  res.clearCookie(FIREBASE_COOKIE_NAME, { path: "/" });
+}
+
+function verifyFirebaseSession(token: string): FirebaseSessionPayload | null {
+  try {
+    const value = jwt.verify(token, SESSION_SECRET) as Partial<FirebaseSessionPayload>;
+    if (
+      typeof value.userId !== "string"
+      || typeof value.businessId !== "string"
+      || typeof value.firebaseUid !== "string"
+      || !Number.isInteger(value.sessionVersion)
+    ) return null;
+    return value as FirebaseSessionPayload;
+  } catch {
+    return null;
+  }
 }
 
 function verifyPhoneSession(token: string): PhoneSessionPayload | null {
@@ -757,7 +846,43 @@ export async function requireAuth(
     }
   }
 
-  // ── 2. Try phone session cookie ──
+  // ── 2. Try persistent Firebase-backed browser session ──
+  const firebaseCookie = (req as any).cookies?.[FIREBASE_COOKIE_NAME];
+  if (firebaseCookie) {
+    const payload = verifyFirebaseSession(firebaseCookie);
+    if (payload) {
+      const [user] = await db.select().from(appUsersTable)
+        .where(eq(appUsersTable.id, payload.userId)).limit(1);
+      if (
+        !user
+        || user.status !== "active"
+        || user.workerAccessDeletedAt
+        || user.firebaseUid !== payload.firebaseUid
+        || user.phoneSessionVersion !== payload.sessionVersion
+      ) {
+        clearFirebaseSession(res);
+        res.status(401).json({ error: "Invalid or revoked session" });
+        return;
+      }
+      const businessId = await resolveBusinessId(user, req);
+      if (!businessId) {
+        res.status(403).json({ error: "Business access denied" });
+        return;
+      }
+      issueFirebaseSession(res, { ...payload, businessId });
+      const authReq = req as AuthenticatedRequest;
+      authReq.userId = user.id;
+      authReq.businessId = businessId;
+      authReq.role = user.role;
+      authReq.status = user.status;
+      authReq.authMethod = "firebase";
+      authReq.verifiedEmail = user.verifiedEmail ?? undefined;
+      return next();
+    }
+    clearFirebaseSession(res);
+  }
+
+  // ── 3. Try phone session cookie ──
   const cookieToken = (req as any).cookies?.[COOKIE_NAME];
   const bearerHeader = req.headers.authorization;
   const bearerToken = bearerHeader?.startsWith("Bearer ") ? bearerHeader.slice(7) : undefined;

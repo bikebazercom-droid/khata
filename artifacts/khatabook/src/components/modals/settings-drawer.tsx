@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
-import { useClerk, useAuth, useUser } from '@clerk/react';
+import { signOutFirebase, subscribeFirebaseEmail } from '@/lib/firebaseClient';
 import { useRemoveOwnerPushToken } from '@workspace/api-client-react';
 import { AlertTriangle, ArrowLeft, Building2, ChevronDown, EllipsisVertical, FileText, Gem, Globe2, List, LogIn, LogOut, Mail, Menu, Phone, Trash2, X } from 'lucide-react';
 import {
@@ -74,10 +74,11 @@ export function SettingsDrawer({
 }) {
   const { t, lang, setLang } = useLanguage();
   const queryClient = useQueryClient();
-  const { signOut } = useClerk();
-  const { isSignedIn } = useAuth();
   const { isAuthenticated, role, phone, authMethod, userId } = useAppAuth();
-  const { user: clerkUser } = useUser();
+  const [firebaseEmail, setFirebaseEmail] = useState<string | null>(null);
+  useEffect(() => subscribeFirebaseEmail(setFirebaseEmail), []);
+  const isSignedIn = authMethod === 'firebase';
+  const signOut = signOutFirebase;
   const removeOwnerPushToken = useRemoveOwnerPushToken();
   const [, navigate] = useLocation();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -106,10 +107,7 @@ export function SettingsDrawer({
 
   const loginIdentity = authMethod === 'phone'
     ? phone || readOfflineIdentity()?.phone
-    : clerkUser?.primaryEmailAddress?.emailAddress ||
-      clerkUser?.primaryPhoneNumber?.phoneNumber ||
-      clerkUser?.emailAddresses[0]?.emailAddress ||
-      clerkUser?.phoneNumbers[0]?.phoneNumber;
+    : firebaseEmail;
 
   const handleConfirmDelete = useCallback(async () => {
     if (isDeleting) return;

@@ -15,7 +15,6 @@ import {
   db,
   otpCodesTable,
   appUsersTable,
-  appUserLoginSessionsTable,
   userLoginEventsTable,
   userPresenceTable,
   adminOtpConfigTable,
@@ -24,12 +23,14 @@ import {
   partiesTable,
 } from "@workspace/db";
 import {
+  PreapprovalRequiredError,
+  clearFirebaseSession,
   getOrCreatePhoneUser,
+  getOrCreateFirebaseUser,
   issuePhoneSession,
+  issueFirebaseSession,
   clearPhoneSession,
-  clearClerkWebViewSession,
   isNativeWebViewSessionExchange,
-  issueClerkWebViewSession,
   requireAuth,
   type AuthenticatedRequest,
 } from "../middlewares/requireAuth";
@@ -38,6 +39,7 @@ import { clientIp } from "../middlewares/ipBlock";
 import { deviceDescription, recordFailedLoginAttempt } from "../lib/authTelemetry";
 import { normalizeBdPhone } from "../lib/bdPhone";
 import { normalizeOtpCode, OTP_VALIDITY_MS } from "../lib/otp";
+import { verifyFirebaseIdToken } from "../lib/firebaseAuth";
 import { PostgresRateLimitStore } from "../lib/postgresRateLimitStore";
 import {
   getNormalizedOtpPhoneRateLimitKey,
@@ -46,6 +48,70 @@ import {
 } from "../lib/otpRateLimitKeys";
 
 const router: IRouter = Router();
+
+router.post("/auth/firebase/session", rateLimit({
+  windowMs: 15 * 60_000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+}), async (req: Request, res: Response): Promise<void> => {
+  const idToken = typeof req.body?.idToken === "string" ? req.body.idToken : "";
+  if (!idToken || idToken.length > 10_000) {
+    res.status(400).json({ error: "A valid Firebase ID token is required" });
+    return;
+  }
+
+  let identity;
+  try {
+    identity = await verifyFirebaseIdToken(idToken);
+  } catch (error) {
+    req.log?.error({ err: error }, "Firebase token verification unavailable");
+    res.status(503).json({ error: "Google sign-in verification is temporarily unavailable" });
+    return;
+  }
+  if (!identity) {
+    res.status(401).json({ error: "Firebase identity is invalid or its email is not verified" });
+    return;
+  }
+
+  try {
+    const user = await getOrCreateFirebaseUser(identity.uid, identity.email, identity.displayName);
+    if (user.workerAccessDeletedAt || user.status !== "active") {
+      res.status(403).json({ error: "Account suspended or access removed" });
+      return;
+    }
+
+    await db.transaction(async (tx) => {
+      await tx.update(appUsersTable).set({ lastLogin: new Date() })
+        .where(eq(appUsersTable.id, user.id));
+      await tx.insert(userLoginEventsTable).values({
+        userId: user.id,
+        ip: clientIp(req),
+        device: deviceDescription(req),
+        authMethod: "firebase",
+        source: req.get("x-client-platform") === "mobile" ? "mobile" : "web",
+      });
+    });
+    issueFirebaseSession(res, {
+      userId: user.id,
+      businessId: user.businessId,
+      firebaseUid: identity.uid,
+      sessionVersion: user.phoneSessionVersion,
+    });
+    res.json({ success: true });
+  } catch (error) {
+    if (error instanceof PreapprovalRequiredError) {
+      res.status(403).json({ error: "This email is not approved for BanglaKhata access" });
+      return;
+    }
+    const message = error instanceof Error ? error.message : "";
+    if (message.includes("matches multiple accounts") || message.includes("already linked")) {
+      res.status(409).json({ error: message });
+      return;
+    }
+    throw error;
+  }
+});
 
 // ─── Rate limiters ────────────────────────────────────────────────────────────
 
@@ -641,23 +707,23 @@ router.post("/auth/phone/logout", async (req: Request, res: Response): Promise<v
 router.post("/auth/logout-event", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const auth = req as AuthenticatedRequest;
   await db.transaction(async (tx) => {
-    if (auth.authMethod === "clerk") {
-      if (!auth.clerkSessionId) throw new Error("Missing Clerk session to revoke");
-      await tx.update(appUserLoginSessionsTable).set({ revokedAt: new Date() }).where(and(
-        eq(appUserLoginSessionsTable.userId, auth.userId),
-        eq(appUserLoginSessionsTable.sessionId, auth.clerkSessionId),
-      ));
+    await tx.delete(userPresenceTable).where(eq(userPresenceTable.userId, auth.userId));
+    if (auth.authMethod === "firebase") {
+      const [current] = await tx.select({ phoneSessionVersion: appUsersTable.phoneSessionVersion })
+        .from(appUsersTable).where(eq(appUsersTable.id, auth.userId)).limit(1);
+      if (current) {
+        await tx.update(appUsersTable).set({
+          phoneSessionVersion: current.phoneSessionVersion + 1,
+        }).where(eq(appUsersTable.id, auth.userId));
+      }
     }
-    await tx.delete(userPresenceTable).where(auth.authMethod === "clerk"
-      ? and(eq(userPresenceTable.userId, auth.userId),
-        eq(userPresenceTable.sessionId, `clerk:${auth.clerkSessionId}`))
-      : eq(userPresenceTable.userId, auth.userId));
     await tx.update(appUsersTable).set({ lastLogout: new Date() }).where(and(
       eq(appUsersTable.id, auth.userId),
       eq(appUsersTable.businessId, auth.businessId),
     ));
   });
-  if (auth.authMethod === "clerk") clearClerkWebViewSession(res);
+  if (auth.authMethod === "firebase") clearFirebaseSession(res);
+  if (auth.authMethod === "phone") clearPhoneSession(res);
   res.status(204).end();
 });
 
@@ -666,8 +732,9 @@ router.post("/auth/logout-event", requireAuth, async (req: Request, res: Respons
 router.post("/auth/presence", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const auth = req as AuthenticatedRequest;
   if (auth.authMethod === "dev") { res.status(204).end(); return; }
-  const sessionId = auth.authMethod === "clerk"
-    ? `clerk:${auth.clerkSessionId}`
+  const sessionId = auth.authMethod === "firebase"
+    ? `firebase:${(await db.select({ uid: appUsersTable.firebaseUid })
+      .from(appUsersTable).where(eq(appUsersTable.id, auth.userId)).limit(1))[0]?.uid}`
     : `phone:${(await db.select({ version: appUsersTable.phoneSessionVersion })
       .from(appUsersTable).where(eq(appUsersTable.id, auth.userId)).limit(1))[0]?.version}`;
   await db.insert(userPresenceTable).values({
@@ -699,25 +766,16 @@ router.get(
       .where(eq(businessesTable.id, auth.businessId)).limit(1);
     const [user] = await db.select({
       ids: appUsersTable.adjustmentPartyIds,
-      clerkUserId: appUsersTable.clerkUserId,
       phone: appUsersTable.phone,
       phoneSessionVersion: appUsersTable.phoneSessionVersion,
     }).from(appUsersTable)
       .where(eq(appUsersTable.id, auth.userId)).limit(1);
     if (isNativeWebViewSessionExchange(req)) {
-      if (auth.authMethod === "clerk" && auth.clerkSessionId && user?.clerkUserId) {
-        clearPhoneSession(res);
-        issueClerkWebViewSession(res, {
-          userId: auth.userId,
-          clerkUserId: user.clerkUserId,
-          sessionId: auth.clerkSessionId,
-        });
-      } else if (
+      if (
         auth.authMethod === "phone"
         && user?.phone
         && Number.isInteger(user.phoneSessionVersion)
       ) {
-        clearClerkWebViewSession(res);
         issuePhoneSession(res, {
           userId: auth.userId,
           businessId: auth.businessId,
