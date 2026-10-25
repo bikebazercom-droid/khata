@@ -5,7 +5,7 @@
 - [Orval and Zod format compatibility](orval-zod-format-compat.md) — OpenAPI UUID/email formats generate Zod 4 methods in this Zod 3 setup; omit them unless codegen is fixed.
 - [Khatabook auth & multi-tenancy](khatabook-auth-multitenancy.md) — seed-business rules, session revocation, Expo Clerk SSO, and DB setup gotchas.
 - [Hostinger proxy trust](hostinger-proxy-trust.md) — trust only the ingress hop(s) needed for correct client IP and rate limiting; never enable unrestricted proxy trust.
-- [Firebase authentication migration](firebase-auth-migration.md) — web uses Firebase Google; mobile keeps phone OTP, and imported users link by unique verified email while legacy IDs remain preserved.
+- [Firebase authentication migration](firebase-auth-migration.md) — web uses Firebase Google; Android app uses native Google OAuth plus phone OTP, with imported users linked by verified email.
 - [Fresh auth checks on sign-in routes](stale-auth-route-cache.md) — a cached successful `/api/auth/me` result can redirect a signed-out user away; isolate each public sign-in visit from normal auth cache.
 - [First-book name onboarding](first-book-name-onboarding.md) — an empty business/settings name marks a new owner’s first book as needing a custom name.
 - [Worker invitation identity](worker-invite-identity.md) — one pending invite per verified identity across businesses avoids arbitrary first-sign-in claims.

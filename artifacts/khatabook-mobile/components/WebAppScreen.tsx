@@ -35,6 +35,7 @@ import {
   parseStaffLedgerNotificationResponse,
 } from '@/lib/notificationBridge';
 import { useOptionalAuth } from '@/contexts/AuthContext';
+import { NativeGoogleAuthBridge } from '@/components/NativeGoogleAuthBridge';
 import {
   NATIVE_FILE_EXPORT_RESULT_EVENT,
   parseNativeFileExportRequest,
@@ -46,6 +47,9 @@ import {
 const NATIVE_AUTH_READY_MESSAGE = 'banglakhata-native-auth-ready';
 const NATIVE_AUTH_REJECTED_MESSAGE = 'banglakhata-native-auth-rejected';
 const NATIVE_AUTH_LOGOUT_MESSAGE = 'banglakhata-native-auth-logout';
+const NATIVE_GOOGLE_SIGN_IN_REQUEST_MESSAGE = 'banglakhata-native-google-sign-in';
+const NATIVE_GOOGLE_ID_TOKEN_EVENT = 'banglakhata-native-google-id-token';
+const NATIVE_GOOGLE_AUTH_ERROR_EVENT = 'banglakhata-native-google-auth-error';
 
 function createNativeAuthBootstrapScript(token: string): string {
   return `(() => {
@@ -104,6 +108,7 @@ export function WebAppScreen() {
   const [nativeAuthToken, setNativeAuthToken] = useState<string | null>(null);
   const [nativeSessionAtStart, setNativeSessionAtStart] = useState(false);
   const [nativeAuthError, setNativeAuthError] = useState(false);
+  const [googleAuthAttempt, setGoogleAuthAttempt] = useState(0);
   const webViewRef = useRef<WebView>(null);
   const pendingPushNavigation = useRef(createPendingNotificationNavigationQueue());
   const webPageReady = useRef(false);
@@ -481,6 +486,12 @@ export function WebAppScreen() {
       }
       return;
     }
+    if (pushMessage?.type === NATIVE_GOOGLE_SIGN_IN_REQUEST_MESSAGE) {
+      const sourceUrl = event.nativeEvent.url;
+      if (Platform.OS === 'web' || !webAppUrl || !sourceUrl || !hasSameOrigin(sourceUrl, webAppUrl)) return;
+      setGoogleAuthAttempt((attempt) => attempt + 1);
+      return;
+    }
     if (pushMessage?.type === 'banglakhata-web-ready' || pushMessage?.type === 'banglakhata-enable-push') {
       const sourceUrl = event.nativeEvent.url;
       if (!webAppUrl || (sourceUrl && !hasSameOrigin(sourceUrl, webAppUrl))) return;
@@ -504,6 +515,16 @@ export function WebAppScreen() {
     sendPendingPushNavigation,
     webAppUrl,
   ]);
+
+  const sendNativeGoogleToken = useCallback((idToken: string) => {
+    const script = `window.dispatchEvent(new CustomEvent(${JSON.stringify(NATIVE_GOOGLE_ID_TOKEN_EVENT)}, { detail: { idToken: ${JSON.stringify(idToken)} } })); true;`;
+    webViewRef.current?.injectJavaScript(script);
+  }, []);
+
+  const sendNativeGoogleError = useCallback((message: string) => {
+    const script = `window.dispatchEvent(new CustomEvent(${JSON.stringify(NATIVE_GOOGLE_AUTH_ERROR_EVENT)}, { detail: { message: ${JSON.stringify(message)} } })); true;`;
+    webViewRef.current?.injectJavaScript(script);
+  }, []);
 
   const initialUrl = resolveWebAppStartUrl(nativeSessionAtStart);
 
@@ -597,6 +618,13 @@ export function WebAppScreen() {
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       {websiteView}
+      {Platform.OS !== 'web' ? (
+        <NativeGoogleAuthBridge
+          attempt={googleAuthAttempt}
+          onToken={sendNativeGoogleToken}
+          onError={sendNativeGoogleError}
+        />
+      ) : null}
 
       {loading && !loadFailed && (
         <View

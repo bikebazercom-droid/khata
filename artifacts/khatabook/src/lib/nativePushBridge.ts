@@ -6,6 +6,9 @@ export const STORED_OWNER_PUSH_TOKEN_KEY = 'banglakhata_owner_push_token';
 export const NATIVE_AUTH_READY_MESSAGE = 'banglakhata-native-auth-ready';
 export const NATIVE_AUTH_REJECTED_MESSAGE = 'banglakhata-native-auth-rejected';
 export const NATIVE_AUTH_LOGOUT_MESSAGE = 'banglakhata-native-auth-logout';
+export const NATIVE_GOOGLE_SIGN_IN_REQUEST_MESSAGE = 'banglakhata-native-google-sign-in';
+export const NATIVE_GOOGLE_ID_TOKEN_EVENT = 'banglakhata-native-google-id-token';
+export const NATIVE_GOOGLE_AUTH_ERROR_EVENT = 'banglakhata-native-google-auth-error';
 
 type NativeWebViewBridge = {
   postMessage: (message: string) => void;
@@ -38,6 +41,17 @@ export function postNativeAuthMessage(
   if (!bridge) return false;
   try {
     bridge.postMessage(JSON.stringify({ type }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function postNativeGoogleSignInRequest(): boolean {
+  const bridge = getBridge();
+  if (!bridge) return false;
+  try {
+    bridge.postMessage(JSON.stringify({ type: NATIVE_GOOGLE_SIGN_IN_REQUEST_MESSAGE }));
     return true;
   } catch {
     return false;

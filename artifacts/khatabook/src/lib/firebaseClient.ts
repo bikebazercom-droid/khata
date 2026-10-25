@@ -72,8 +72,33 @@ export async function finishGoogleRedirect(): Promise<UserCredential | null> {
   return getRedirectResult(auth);
 }
 
-export async function exchangeFirebaseSession(credential: UserCredential): Promise<void> {
-  const idToken = await credential.user.getIdToken();
+export async function exchangeGoogleIdTokenForFirebaseIdToken(googleIdToken: string): Promise<string> {
+  const apiKey = import.meta.env.VITE_FIREBASE_API_KEY?.trim();
+  if (!apiKey) throw new Error('Firebase Google sign-in is not configured.');
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        postBody: `id_token=${encodeURIComponent(googleIdToken)}&providerId=google.com`,
+        requestUri: window.location.origin,
+        returnIdpCredential: true,
+        returnSecureToken: true,
+      }),
+    },
+  );
+  const body = await response.json().catch(() => ({})) as {
+    idToken?: string;
+    error?: { message?: string };
+  };
+  if (!response.ok || !body.idToken) {
+    throw new Error(body.error?.message || 'Google sign-in could not be verified by Firebase.');
+  }
+  return body.idToken;
+}
+
+export async function exchangeFirebaseIdToken(idToken: string): Promise<void> {
   const response = await fetch('/api/auth/firebase/session', {
     method: 'POST',
     credentials: 'include',
@@ -84,6 +109,10 @@ export async function exchangeFirebaseSession(credential: UserCredential): Promi
     const body = await response.json().catch(() => ({})) as { error?: string };
     throw new Error(body.error || 'Google sign-in could not be completed.');
   }
+}
+
+export async function exchangeFirebaseSession(credential: UserCredential): Promise<void> {
+  await exchangeFirebaseIdToken(await credential.user.getIdToken());
 }
 
 export async function signOutFirebase(): Promise<void> {

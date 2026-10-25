@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { sendOtp, verifyOtp, fetchMe } from '@/lib/phoneAuth';
 import { authMeQueryKey } from '@/lib/authQueryKeys';
 import { useLocation } from 'wouter';
@@ -7,9 +7,17 @@ import { PageMeta } from '@/components/layout/page-meta';
 import { SiteFooter } from '@/components/layout/site-footer';
 import {
   beginGoogleSignIn,
+  exchangeFirebaseIdToken,
+  exchangeGoogleIdTokenForFirebaseIdToken,
   exchangeFirebaseSession,
   finishGoogleRedirect,
 } from '@/lib/firebaseClient';
+import {
+  NATIVE_GOOGLE_AUTH_ERROR_EVENT,
+  NATIVE_GOOGLE_ID_TOKEN_EVENT,
+  isInsideNativeWebView,
+  postNativeGoogleSignInRequest,
+} from '@/lib/nativePushBridge';
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -85,13 +93,19 @@ function GoogleSignIn() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  async function completeSignIn(credential: Awaited<ReturnType<typeof finishGoogleRedirect>>) {
-    if (!credential) return;
-    await exchangeFirebaseSession(credential);
+  const completeFirebaseSignIn = useCallback(async (firebaseIdToken: string) => {
+    await exchangeFirebaseIdToken(firebaseIdToken);
     const me = await fetchMe();
     queryClient.setQueryData(authMeQueryKey(), me);
     setLocation(me.role === 'owner' ? '/dashboard' : '/');
-  }
+  }, [queryClient, setLocation]);
+
+  const completeSignIn = useCallback(async (
+    credential: Awaited<ReturnType<typeof finishGoogleRedirect>>,
+  ) => {
+    if (!credential) return;
+    await completeFirebaseSignIn(await credential.user.getIdToken());
+  }, [completeFirebaseSignIn]);
 
   useEffect(() => {
     let active = true;
@@ -106,10 +120,48 @@ function GoogleSignIn() {
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, []);
+  }, [completeSignIn]);
+
+  useEffect(() => {
+    let active = true;
+    const handleNativeGoogleToken = (event: Event) => {
+      const idToken = (event as CustomEvent<{ idToken?: unknown }>).detail?.idToken;
+      if (typeof idToken !== 'string' || !idToken) return;
+      setError('');
+      setLoading(true);
+      void exchangeGoogleIdTokenForFirebaseIdToken(idToken)
+        .then((firebaseIdToken) => completeFirebaseSignIn(firebaseIdToken))
+        .catch((err: unknown) => {
+          if (active) setError(err instanceof Error ? err.message : 'Google sign-in failed.');
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    };
+    const handleNativeGoogleError = (event: Event) => {
+      const message = (event as CustomEvent<{ message?: unknown }>).detail?.message;
+      if (typeof message === 'string' && message) setError(message);
+      setLoading(false);
+    };
+    window.addEventListener(NATIVE_GOOGLE_ID_TOKEN_EVENT, handleNativeGoogleToken);
+    window.addEventListener(NATIVE_GOOGLE_AUTH_ERROR_EVENT, handleNativeGoogleError);
+    return () => {
+      active = false;
+      window.removeEventListener(NATIVE_GOOGLE_ID_TOKEN_EVENT, handleNativeGoogleToken);
+      window.removeEventListener(NATIVE_GOOGLE_AUTH_ERROR_EVENT, handleNativeGoogleError);
+    };
+  }, [completeFirebaseSignIn]);
 
   async function handleGoogleSignIn() {
     setError('');
+    if (isInsideNativeWebView()) {
+      setLoading(true);
+      if (!postNativeGoogleSignInRequest()) {
+        setLoading(false);
+        setError('এই অ্যাপে Google sign-in চালু করা যায়নি।');
+      }
+      return;
+    }
     setLoading(true);
     try {
       const credential = await beginGoogleSignIn();
