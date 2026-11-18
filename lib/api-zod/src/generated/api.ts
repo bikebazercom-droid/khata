@@ -61,10 +61,30 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary Exchange a verified Supabase Google token for an app session
+ */
+export const exchangeSupabaseSessionBodyAccessTokenMin = 20;
+export const exchangeSupabaseSessionBodyAccessTokenMax = 10000;
+
+
+
+export const ExchangeSupabaseSessionBody = zod.object({
+  "accessToken": zod.string().min(exchangeSupabaseSessionBodyAccessTokenMin).max(exchangeSupabaseSessionBodyAccessTokenMax)
+})
+
+export const ExchangeSupabaseSessionResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
  * @summary Send a phone sign-in code
  */
+export const sendPhoneOtpBodyDeliveryMethodDefault = `sms`;
+
 export const SendPhoneOtpBody = zod.object({
-  "phone": zod.string().describe('Bangladeshi phone number in 01XXXXXXXXX format.')
+  "phone": zod.string().describe('Bangladeshi phone number in 01XXXXXXXXX format.'),
+  "deliveryMethod": zod.enum(['sms', 'whatsapp']).default(sendPhoneOtpBodyDeliveryMethodDefault)
 })
 
 export const SendPhoneOtpResponse = zod.object({
@@ -117,7 +137,7 @@ export const GetAuthMeResponse = zod.object({
   "businessId": zod.string(),
   "userId": zod.string(),
   "businessName": zod.string(),
-  "authMethod": zod.enum(['phone', 'firebase']),
+  "authMethod": zod.enum(['phone', 'firebase', 'supabase']),
   "adjustmentPartyIds": zod.array(zod.string()),
   "phone": zod.string().optional()
 })

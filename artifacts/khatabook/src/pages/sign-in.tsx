@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
-import { sendOtp, verifyOtp, fetchMe } from '@/lib/phoneAuth';
+import { sendOtp, verifyOtp, fetchMe, type OtpDeliveryMethod } from '@/lib/phoneAuth';
 import { authMeQueryKey } from '@/lib/authQueryKeys';
 import { useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageMeta } from '@/components/layout/page-meta';
 import { SiteFooter } from '@/components/layout/site-footer';
 import {
-  beginGoogleSignIn,
   exchangeFirebaseIdToken,
   exchangeGoogleIdTokenForFirebaseIdToken,
-  exchangeFirebaseSession,
-  finishGoogleRedirect,
 } from '@/lib/firebaseClient';
+import {
+  beginSupabaseGoogleSignIn,
+  ensureSupabaseAppSession,
+} from '@/lib/supabaseAuth';
 import {
   NATIVE_GOOGLE_AUTH_ERROR_EVENT,
   NATIVE_GOOGLE_ID_TOKEN_EVENT,
@@ -100,27 +101,26 @@ function GoogleSignIn() {
     setLocation(me.role === 'owner' ? '/dashboard' : '/');
   }, [queryClient, setLocation]);
 
-  const completeSignIn = useCallback(async (
-    credential: Awaited<ReturnType<typeof finishGoogleRedirect>>,
-  ) => {
-    if (!credential) return;
-    await completeFirebaseSignIn(await credential.user.getIdToken());
-  }, [completeFirebaseSignIn]);
-
   useEffect(() => {
+    if (isInsideNativeWebView()) return;
     let active = true;
-    finishGoogleRedirect()
-      .then(async (credential) => {
-        if (!credential || !active) return;
+    void ensureSupabaseAppSession()
+      .then(async (hasSession) => {
+        if (!hasSession) return;
+        if (!active) return;
         setLoading(true);
-        await completeSignIn(credential);
+        const me = await fetchMe();
+        queryClient.setQueryData(authMeQueryKey(), me);
+        setLocation(me.role === 'owner' ? '/dashboard' : '/');
       })
       .catch((err: unknown) => {
-        if (active) setError(err instanceof Error ? err.message : 'Google sign-in failed.');
+        if (active && err instanceof Error && err.message !== 'Supabase Google sign-in is not configured.') {
+          setError(err.message);
+        }
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [completeSignIn]);
+  }, [queryClient, setLocation]);
 
   useEffect(() => {
     let active = true;
@@ -164,8 +164,7 @@ function GoogleSignIn() {
     }
     setLoading(true);
     try {
-      const credential = await beginGoogleSignIn();
-      if (credential) await completeSignIn(credential);
+      await beginSupabaseGoogleSignIn();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Google sign-in failed.');
     } finally {
@@ -185,7 +184,7 @@ function GoogleSignIn() {
         className="flex w-full items-center justify-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60"
       >
         <span aria-hidden="true" className="text-base font-bold text-[#4285f4]">G</span>
-        {loading ? 'Signing in…' : 'Continue with Google'}
+        {loading ? 'Signing in…' : 'Sign in with Google'}
       </button>
     </div>
   );
@@ -196,22 +195,28 @@ export function PhoneSignIn() {
   const qc = useQueryClient();
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
+  const [deliveryMethod, setDeliveryMethod] = useState<OtpDeliveryMethod>('sms');
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  async function handleSendOtp(e: React.FormEvent) {
-    e.preventDefault();
+  async function requestOtp(method: OtpDeliveryMethod) {
     setError('');
     setLoading(true);
     try {
-      await sendOtp(phone);
+      await sendOtp(phone, method);
+      setDeliveryMethod(method);
       setStep('otp');
     } catch (err: any) {
       setError(err.message ?? 'Failed to send OTP');
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleSendOtp(e: React.FormEvent) {
+    e.preventDefault();
+    await requestOtp('sms');
   }
 
   async function handleVerifyOtp(e: React.FormEvent) {
@@ -272,6 +277,15 @@ export function PhoneSignIn() {
             >
               {loading ? 'Sending…' : 'Send code'}
             </button>
+            <button
+              type="button"
+              data-testid="button-send-otp-whatsapp"
+              onClick={() => void requestOtp('whatsapp')}
+              disabled={loading}
+              className="w-full rounded-lg border border-green-600 bg-white py-2.5 text-sm font-medium text-green-700 hover:bg-green-50 disabled:cursor-wait disabled:opacity-50 transition-colors"
+            >
+              {loading ? 'Sending…' : 'Send OTP via WhatsApp'}
+            </button>
           </form>
         </>
       ) : (
@@ -280,7 +294,7 @@ export function PhoneSignIn() {
             Enter the code
           </h2>
           <p className="text-sm text-slate-500 text-center mb-6">
-            Sent to {phone}. The code is valid for 15 minutes.
+            Sent to {phone} via {deliveryMethod === 'whatsapp' ? 'WhatsApp' : 'SMS'}. The code is valid for 15 minutes.
           </p>
           <form onSubmit={handleVerifyOtp} className="space-y-4">
             <div>

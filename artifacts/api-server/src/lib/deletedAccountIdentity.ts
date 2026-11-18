@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 
 export function hashDeletedAccountIdentity(
-  kind: "email" | "phone" | "firebase",
+  kind: "email" | "phone" | "firebase" | "supabase",
   identifier: string,
 ): string {
   const secret = process.env.SESSION_SECRET;

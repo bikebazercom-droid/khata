@@ -5,17 +5,28 @@ const requiredVariables = [
   "VITE_FIREBASE_STORAGE_BUCKET",
   "VITE_FIREBASE_MESSAGING_SENDER_ID",
   "VITE_FIREBASE_APP_ID",
+  "VITE_SUPABASE_URL",
+  "VITE_SUPABASE_ANON_KEY",
 ];
 
 const missingVariables = requiredVariables.filter((name) => !process.env[name]?.trim());
 if (missingVariables.length > 0) {
-  console.error(`Missing Firebase environment variables: ${missingVariables.join(", ")}`);
+  console.error(`Missing authentication environment variables: ${missingVariables.join(", ")}`);
   process.exit(1);
 }
 
 const apiKey = process.env.VITE_FIREBASE_API_KEY.trim();
 if (!/^AIza[0-9A-Za-z_-]{20,}$/.test(apiKey)) {
   console.error("VITE_FIREBASE_API_KEY does not look like a Firebase Web API key.");
+  process.exit(1);
+}
+
+try {
+  if (new URL(process.env.VITE_SUPABASE_URL.trim()).protocol !== "https:") {
+    throw new Error();
+  }
+} catch {
+  console.error("VITE_SUPABASE_URL must be a valid HTTPS URL.");
   process.exit(1);
 }
 

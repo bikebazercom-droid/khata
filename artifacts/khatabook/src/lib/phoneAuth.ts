@@ -18,7 +18,7 @@ export interface MeResponse {
   businessName?: string;
   needsBookName?: boolean;
   phone?: string;
-  authMethod: "firebase" | "phone";
+  authMethod: "firebase" | "supabase" | "phone";
   role?: "owner" | "staff";
 }
 
@@ -88,12 +88,14 @@ export async function fetchMe(signal?: AbortSignal): Promise<MeResponse> {
   return res.json() as Promise<MeResponse>;
 }
 
-export async function sendOtp(phone: string): Promise<void> {
+export type OtpDeliveryMethod = 'sms' | 'whatsapp';
+
+export async function sendOtp(phone: string, deliveryMethod: OtpDeliveryMethod = 'sms'): Promise<void> {
   const res = await fetch(`/api/auth/phone/send-otp`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ phone }),
+    body: JSON.stringify({ phone, deliveryMethod }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({})) as any;

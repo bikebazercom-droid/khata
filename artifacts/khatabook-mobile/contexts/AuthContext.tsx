@@ -14,7 +14,7 @@ import { clearSavedAuthToken, getSavedAuthToken, saveAuthToken } from '@/lib/aut
 import { isUnauthorized } from '@/lib/domain';
 
 type PhoneSession = { token: string };
-type AuthMethod = 'firebase' | 'phone';
+type AuthMethod = 'firebase' | 'supabase' | 'phone';
 
 const DELETED_ACCOUNT_MARKER = 'banglakhata.deleted-account-lockout';
 

@@ -5,8 +5,10 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { PhoneOtpSendInputDeliveryMethod } from './phoneOtpSendInputDeliveryMethod';
 
 export interface PhoneOtpSendInput {
   /** Bangladeshi phone number in 01XXXXXXXXX format. */
   phone: string;
+  deliveryMethod?: PhoneOtpSendInputDeliveryMethod;
 }

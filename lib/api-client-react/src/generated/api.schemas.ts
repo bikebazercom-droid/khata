@@ -65,9 +65,30 @@ export interface HealthStatus {
   status: string;
 }
 
+export type PhoneOtpSendInputDeliveryMethod = typeof PhoneOtpSendInputDeliveryMethod[keyof typeof PhoneOtpSendInputDeliveryMethod];
+
+
+export const PhoneOtpSendInputDeliveryMethod = {
+  sms: 'sms',
+  whatsapp: 'whatsapp',
+} as const;
+
 export interface PhoneOtpSendInput {
   /** Bangladeshi phone number in 01XXXXXXXXX format. */
   phone: string;
+  deliveryMethod?: PhoneOtpSendInputDeliveryMethod;
+}
+
+export interface SupabaseSessionInput {
+  /**
+     * @minLength 20
+     * @maxLength 10000
+     */
+  accessToken: string;
+}
+
+export interface SupabaseSessionResult {
+  success: boolean;
 }
 
 export interface PhoneOtpSendResult {
@@ -114,6 +135,7 @@ export type AuthMeAuthMethod = typeof AuthMeAuthMethod[keyof typeof AuthMeAuthMe
 export const AuthMeAuthMethod = {
   phone: 'phone',
   firebase: 'firebase',
+  supabase: 'supabase',
 } as const;
 
 export interface AuthMe {

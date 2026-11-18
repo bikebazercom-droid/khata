@@ -80,6 +80,48 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /auth/supabase/session:
+    post:
+      operationId: exchangeSupabaseSession
+      tags: [auth]
+      summary: Exchange a verified Supabase Google token for an app session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SupabaseSessionInput"
+      responses:
+        "200":
+          description: App session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupabaseSessionResult"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          description: Supabase identity is invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "403":
+          description: Account is not approved or is disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: Supabase verification is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /auth/phone/send-otp:
     post:
       operationId: sendPhoneOtp
@@ -1298,10 +1340,30 @@ components:
     PhoneOtpSendInput:
       type: object
       required: [phone]
+      additionalProperties: false
       properties:
         phone:
           type: string
           description: Bangladeshi phone number in 01XXXXXXXXX format.
+        deliveryMethod:
+          type: string
+          enum: [sms, whatsapp]
+          default: sms
+    SupabaseSessionInput:
+      type: object
+      required: [accessToken]
+      additionalProperties: false
+      properties:
+        accessToken:
+          type: string
+          minLength: 20
+          maxLength: 10000
+    SupabaseSessionResult:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
     PhoneOtpSendResult:
       type: object
       required: [success]
@@ -1360,7 +1422,7 @@ components:
           type: string
         authMethod:
           type: string
-          enum: [phone, firebase]
+          enum: [phone, firebase, supabase]
         adjustmentPartyIds:
           type: array
           items:

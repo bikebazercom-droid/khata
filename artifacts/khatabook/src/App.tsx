@@ -1,5 +1,6 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { signOutFirebase } from '@/lib/firebaseClient';
+import { ensureSupabaseAppSession, signOutSupabase } from '@/lib/supabaseAuth';
 import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from 'wouter';
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
@@ -352,7 +353,10 @@ function AuthCacheInvalidator() {
   } | null>(null);
   const { data: me, isError, error } = useQuery({
     queryKey: authMeQueryKey(),
-    queryFn: () => fetchMe(),
+    queryFn: async () => {
+      await ensureSupabaseAppSession();
+      return fetchMe();
+    },
     enabled: true,
     retry: false,
     staleTime: 0,
@@ -856,6 +860,7 @@ function StaffAccessRemovedScreen() {
     await Promise.all([
       phoneLogout().catch(() => {}),
       signOutFirebase().catch(() => {}),
+      signOutSupabase().catch(() => {}),
     ]);
     clearOfflineIdentity();
     clearAllPendingUploads();

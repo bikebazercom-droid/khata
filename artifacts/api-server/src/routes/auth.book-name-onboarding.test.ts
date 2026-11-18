@@ -234,4 +234,5 @@ describe("first-book name onboarding", () => {
     expect(updatedBook?.name).toBe("Dhaka General Store");
     expect(updatedSettings?.storeName).toBe("Dhaka General Store");
   });
+
 });

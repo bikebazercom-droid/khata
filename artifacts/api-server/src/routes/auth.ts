@@ -4,7 +4,7 @@
  * These are intentionally public (no requireAuth middleware). They either
  * issue a session or verify identity.
  *
- * OTPs are only usable after the SMS provider accepts delivery.
+ * OTPs are only usable after the selected delivery provider accepts delivery.
  */
 import { Router, type IRouter, type Request, type Response } from "express";
 import { eq, and, gt, inArray, lt } from "drizzle-orm";
@@ -22,19 +22,24 @@ import {
   workerPartyAssignmentsTable,
   partiesTable,
 } from "@workspace/db";
+import { ExchangeSupabaseSessionBody, SendPhoneOtpBody } from "@workspace/api-zod";
 import {
   PreapprovalRequiredError,
   clearFirebaseSession,
+  clearSupabaseSession,
   getOrCreatePhoneUser,
   getOrCreateFirebaseUser,
+  getOrCreateSupabaseUser,
   issuePhoneSession,
   issueFirebaseSession,
+  issueSupabaseSession,
   clearPhoneSession,
   isNativeWebViewSessionExchange,
   requireAuth,
   type AuthenticatedRequest,
 } from "../middlewares/requireAuth";
 import { ensureSmsReady, sendOtpSms, SmsGatewayError } from "../services/sms";
+import { ensureWhatsAppReady, sendOtpWhatsApp, WhatsAppGatewayError } from "../services/whatsapp";
 import { clientIp } from "../middlewares/ipBlock";
 import { deviceDescription, recordFailedLoginAttempt } from "../lib/authTelemetry";
 import { normalizeBdPhone } from "../lib/bdPhone";
@@ -113,6 +118,102 @@ router.post("/auth/firebase/session", rateLimit({
   }
 });
 
+router.post("/auth/supabase/session", rateLimit({
+  windowMs: 15 * 60_000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+}), async (req: Request, res: Response): Promise<void> => {
+  const parsed = ExchangeSupabaseSessionBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "A valid Supabase access token is required" });
+    return;
+  }
+  const supabaseUrl = process.env.VITE_SUPABASE_URL?.trim();
+  const anonKey = process.env.VITE_SUPABASE_ANON_KEY?.trim();
+  if (!supabaseUrl || !anonKey) {
+    res.status(503).json({ error: "Supabase sign-in is not configured" });
+    return;
+  }
+
+  let providerResponse: globalThis.Response;
+  try {
+    providerResponse = await fetch(`${supabaseUrl.replace(/\/+$/, "")}/auth/v1/user`, {
+      headers: {
+        apikey: anonKey,
+        authorization: `Bearer ${parsed.data.accessToken}`,
+      },
+      signal: AbortSignal.timeout(8_000),
+    });
+  } catch (error) {
+    req.log?.error({ err: error }, "Supabase identity verification unavailable");
+    res.status(503).json({ error: "Supabase sign-in verification is temporarily unavailable" });
+    return;
+  }
+  if (!providerResponse.ok) {
+    res.status(401).json({ error: "Supabase identity is invalid" });
+    return;
+  }
+
+  const identity = await providerResponse.json() as {
+    id?: string;
+    email?: string;
+    email_confirmed_at?: string | null;
+    identities?: Array<{
+      provider?: string;
+      identity_data?: { email?: string; email_verified?: boolean };
+    }>;
+    user_metadata?: { full_name?: string; name?: string };
+  };
+  const email = identity.email?.trim().toLowerCase();
+  const isGoogleIdentity = identity.identities?.some((item) =>
+    item.provider === "google"
+    && item.identity_data?.email_verified === true
+    && item.identity_data.email?.trim().toLowerCase() === email
+  );
+  if (!identity.id || !email || !identity.email_confirmed_at || !isGoogleIdentity) {
+    res.status(401).json({ error: "A verified Google identity is required" });
+    return;
+  }
+
+  try {
+    const user = await getOrCreateSupabaseUser(
+      identity.id,
+      email,
+      identity.user_metadata?.full_name || identity.user_metadata?.name,
+    );
+    if (user.workerAccessDeletedAt || user.status !== "active") {
+      res.status(403).json({ error: "Account suspended or access removed" });
+      return;
+    }
+    await db.transaction(async (tx) => {
+      await tx.update(appUsersTable).set({ lastLogin: new Date() })
+        .where(eq(appUsersTable.id, user.id));
+      await tx.insert(userLoginEventsTable).values({
+        userId: user.id,
+        ip: clientIp(req),
+        device: deviceDescription(req),
+        authMethod: "supabase",
+        source: req.get("x-client-platform") === "mobile" ? "mobile" : "web",
+      });
+    });
+    issueSupabaseSession(res, {
+      userId: user.id,
+      businessId: user.businessId,
+      supabaseUid: identity.id,
+      sessionVersion: user.phoneSessionVersion,
+    });
+    res.json({ success: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message.includes("matches multiple accounts") || message.includes("already linked")) {
+      res.status(409).json({ error: message });
+      return;
+    }
+    throw error;
+  }
+});
+
 // ─── Rate limiters ────────────────────────────────────────────────────────────
 
 const SEND_OTP_IP_WINDOW_MS = 15 * 60_000;
@@ -171,6 +272,7 @@ function otpDigest(phone: string, code: string): string {
 
 function safeFailureCode(error: unknown): string {
   if (error instanceof SmsGatewayError) return error.code;
+  if (error instanceof WhatsAppGatewayError) return error.code;
   if (typeof error === "object" && error !== null && "code" in error) {
     const code = (error as { code?: unknown }).code;
     if (typeof code === "string" && /^[A-Za-z0-9_-]{1,40}$/.test(code)) return code;
@@ -188,6 +290,17 @@ function smsFailureLogFields(error: unknown) {
     ...(error.providerErrorCode !== undefined
       ? { providerErrorCode: error.providerErrorCode }
       : {}),
+  };
+}
+
+function whatsappFailureLogFields(error: unknown) {
+  if (!(error instanceof WhatsAppGatewayError)) {
+    return { errorCode: safeFailureCode(error) };
+  }
+  return {
+    errorCode: error.code,
+    ...(error.httpStatus !== undefined ? { httpStatus: error.httpStatus } : {}),
+    ...(error.providerErrorCode !== undefined ? { providerErrorCode: error.providerErrorCode } : {}),
   };
 }
 
@@ -255,7 +368,18 @@ router.post(
       res.status(503).json({ error: "Phone OTP is temporarily disabled" });
       return;
     }
-    const { phone } = req.body ?? {};
+    const parsedBody = SendPhoneOtpBody.safeParse(req.body);
+    if (!parsedBody.success) {
+      await recordFailedLoginAttempt(req, {
+        identifier: typeof req.body?.phone === "string"
+          ? normalizeBdPhone(req.body.phone) ?? "invalid_phone"
+          : "unknown",
+        authMethod: "phone", stage: "send_otp", errorCode: "invalid_send_otp_body",
+      });
+      res.status(400).json({ error: "phone and a supported delivery method are required" });
+      return;
+    }
+    const { phone, deliveryMethod } = parsedBody.data;
     if (typeof phone !== "string" || !phone.trim()) {
       await recordFailedLoginAttempt(req, {
         identifier: "unknown", authMethod: "phone", stage: "send_otp", errorCode: "missing_phone",
@@ -276,12 +400,14 @@ router.post(
     }
 
     try {
-      await ensureSmsReady();
+      if (deliveryMethod === "whatsapp") ensureWhatsAppReady();
+      else await ensureSmsReady();
     } catch (error) {
+      const isWhatsApp = deliveryMethod === "whatsapp";
       req.log.error({
-        stage: "sms_configuration",
-        ...smsFailureLogFields(error),
-      }, "Phone OTP request cannot proceed because SMS delivery is not configured");
+        stage: isWhatsApp ? "whatsapp_configuration" : "sms_configuration",
+        ...(isWhatsApp ? whatsappFailureLogFields(error) : smsFailureLogFields(error)),
+      }, `Phone OTP request cannot proceed because ${isWhatsApp ? "WhatsApp" : "SMS"} delivery is not configured`);
       await recordFailedLoginAttempt(req, {
         identifier: normalized, authMethod: "phone", stage: "send_otp", errorCode: safeFailureCode(error),
       });
@@ -329,19 +455,28 @@ router.post(
     }
 
     try {
-      const receipt = await sendOtpSms(normalized, code);
-      req.log.info({
-        stage: "sms_delivery",
-        providerStatus: "accepted",
-        ...(receipt?.providerRequestId !== undefined
-          ? { providerRequestId: receipt.providerRequestId }
-          : {}),
-      }, "Phone OTP SMS accepted by provider");
+      if (deliveryMethod === "whatsapp") {
+        const receipt = await sendOtpWhatsApp(normalized, code);
+        req.log.info({
+          stage: "whatsapp_delivery",
+          providerStatus: "accepted",
+          ...(receipt?.providerMessageId ? { providerMessageId: receipt.providerMessageId } : {}),
+        }, "Phone OTP WhatsApp template accepted by provider");
+      } else {
+        const receipt = await sendOtpSms(normalized, code);
+        req.log.info({
+          stage: "sms_delivery",
+          providerStatus: "accepted",
+          ...(receipt?.providerRequestId !== undefined
+            ? { providerRequestId: receipt.providerRequestId }
+            : {}),
+        }, "Phone OTP SMS accepted by provider");
+      }
     } catch (error) {
       req.log.error({
-        stage: "sms_delivery",
-        ...smsFailureLogFields(error),
-      }, "Phone OTP SMS delivery failed");
+        stage: deliveryMethod === "whatsapp" ? "whatsapp_delivery" : "sms_delivery",
+        ...(deliveryMethod === "whatsapp" ? whatsappFailureLogFields(error) : smsFailureLogFields(error)),
+      }, `Phone OTP ${deliveryMethod === "whatsapp" ? "WhatsApp" : "SMS"} delivery failed`);
       await recordFailedLoginAttempt(req, {
         identifier: normalized, authMethod: "phone", stage: "send_otp", errorCode: safeFailureCode(error),
       });
@@ -353,7 +488,9 @@ router.post(
           errorCode: safeFailureCode(cleanupError),
         }, "Undelivered phone OTP record could not be removed");
       }
-      res.status(503).json({ error: "Could not send the SMS code. Please try again later." });
+      res.status(503).json({
+        error: `Could not send the ${deliveryMethod === "whatsapp" ? "WhatsApp" : "SMS"} code. Please try again later.`,
+      });
       return;
     }
     res.json({ success: true });
@@ -401,7 +538,7 @@ router.post(
       await recordFailedLoginAttempt(req, {
         identifier: normalized, authMethod: "phone", stage: "verify_otp", errorCode: "invalid_code_format",
       });
-      res.status(400).json({ error: "Enter the 6-digit code from the SMS" });
+      res.status(400).json({ error: "Enter the 6-digit code you received" });
       return;
     }
 
@@ -708,7 +845,7 @@ router.post("/auth/logout-event", requireAuth, async (req: Request, res: Respons
   const auth = req as AuthenticatedRequest;
   await db.transaction(async (tx) => {
     await tx.delete(userPresenceTable).where(eq(userPresenceTable.userId, auth.userId));
-    if (auth.authMethod === "firebase") {
+    if (auth.authMethod === "firebase" || auth.authMethod === "supabase") {
       const [current] = await tx.select({ phoneSessionVersion: appUsersTable.phoneSessionVersion })
         .from(appUsersTable).where(eq(appUsersTable.id, auth.userId)).limit(1);
       if (current) {
@@ -723,6 +860,7 @@ router.post("/auth/logout-event", requireAuth, async (req: Request, res: Respons
     ));
   });
   if (auth.authMethod === "firebase") clearFirebaseSession(res);
+  if (auth.authMethod === "supabase") clearSupabaseSession(res);
   if (auth.authMethod === "phone") clearPhoneSession(res);
   res.status(204).end();
 });
@@ -735,6 +873,9 @@ router.post("/auth/presence", requireAuth, async (req: Request, res: Response): 
   const sessionId = auth.authMethod === "firebase"
     ? `firebase:${(await db.select({ uid: appUsersTable.firebaseUid })
       .from(appUsersTable).where(eq(appUsersTable.id, auth.userId)).limit(1))[0]?.uid}`
+    : auth.authMethod === "supabase"
+      ? `supabase:${(await db.select({ uid: appUsersTable.supabaseUid })
+        .from(appUsersTable).where(eq(appUsersTable.id, auth.userId)).limit(1))[0]?.uid}`
     : `phone:${(await db.select({ version: appUsersTable.phoneSessionVersion })
       .from(appUsersTable).where(eq(appUsersTable.id, auth.userId)).limit(1))[0]?.version}`;
   await db.insert(userPresenceTable).values({

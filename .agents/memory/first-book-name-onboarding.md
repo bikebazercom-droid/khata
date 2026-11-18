@@ -8,3 +8,7 @@ New owner onboarding uses an empty name on the owner’s existing or first busin
 **Why:** This preserves the existing primary/seed-business identity and avoids a schema migration; a visible default name cannot distinguish a new account from an existing owner.
 
 **How to apply:** When changing signup or book creation, preserve the empty-name marker until the owner submits a nonblank name. Do not create a second business just for setup.
+
+Public web Google signup is the exception: seed the new, isolated book and its settings with the same default name so it opens straight to the dashboard. The owner can rename it later.
+
+**Why:** The user explicitly asked for new web Google users to start working immediately without a blocking naming step. Phone and native Android onboarding must not change.

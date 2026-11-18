@@ -13,7 +13,7 @@ function isOfflineIdentity(value: unknown): value is OfflineIdentity {
   return typeof identity.userId === 'string' &&
     typeof identity.businessId === 'string' &&
     (identity.role === 'owner' || identity.role === 'staff') &&
-    (identity.authMethod === 'firebase' || identity.authMethod === 'phone');
+    (identity.authMethod === 'firebase' || identity.authMethod === 'supabase' || identity.authMethod === 'phone');
 }
 
 /** Identity metadata only; session credentials remain with Firebase or the httpOnly cookie. */

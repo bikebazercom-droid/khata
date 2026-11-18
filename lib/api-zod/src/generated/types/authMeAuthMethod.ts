@@ -12,4 +12,5 @@ export type AuthMeAuthMethod = typeof AuthMeAuthMethod[keyof typeof AuthMeAuthMe
 export const AuthMeAuthMethod = {
   phone: 'phone',
   firebase: 'firebase',
+  supabase: 'supabase',
 } as const;

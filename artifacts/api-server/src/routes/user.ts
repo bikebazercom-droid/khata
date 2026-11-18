@@ -117,6 +117,7 @@ router.delete(
           verifiedEmail: appUsersTable.verifiedEmail,
           phone: appUsersTable.phone,
           firebaseUid: appUsersTable.firebaseUid,
+          supabaseUid: appUsersTable.supabaseUid,
           businessId: appUsersTable.businessId,
         })
         .from(appUsersTable)
@@ -144,6 +145,9 @@ router.delete(
         : null;
       const deletedFirebaseUid = account.firebaseUid
         ? hashDeletedAccountIdentity("firebase", account.firebaseUid)
+        : null;
+      const deletedSupabaseUid = account.supabaseUid
+        ? hashDeletedAccountIdentity("supabase", account.supabaseUid)
         : null;
 
       await db.transaction(async (tx) => {
@@ -231,6 +235,7 @@ router.delete(
             businessId: SEED_BUSINESS_ID,
             phone: deletedPhone,
             firebaseUid: deletedFirebaseUid,
+            supabaseUid: deletedSupabaseUid,
             verifiedEmail: deletedEmail,
             displayName: null,
             language: null,

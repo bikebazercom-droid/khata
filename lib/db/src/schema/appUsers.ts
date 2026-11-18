@@ -11,6 +11,8 @@ export const appUsersTable = pgTable("app_users", {
   legacyIdentityId: text("clerk_user_id").unique(),
   /** Firebase Auth UID linked after a verified Google sign-in. */
   firebaseUid: text("firebase_uid").unique(),
+  /** Supabase Auth UID linked after a verified Google sign-in. */
+  supabaseUid: text("supabase_uid").unique(),
   /** Set when signed in via custom phone OTP. Null for Google-only users. */
   phone: text("phone").unique(),
   /** Set only from the verified email claim returned by the active identity provider. */

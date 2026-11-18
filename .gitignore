@@ -18,6 +18,30 @@ node_modules/
 !.env.sample
 !.env.template
 .envrc
+*.env
+.env.local*
+.npmrc.local
+.netrc
+.pgpass
+.service-account/
+credentials.json
+service-account*.json
+*serviceAccountKey*.json
+client_secret*.json
+secrets.json
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+*.mobileprovision
+*.provisionprofile
+key.properties
+keystore.properties
+local.properties
+id_rsa
+id_ed25519
 
 # IDEs and editors
 /.idea

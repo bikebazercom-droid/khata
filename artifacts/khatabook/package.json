@@ -84,6 +84,7 @@
     "zod": "catalog:"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.119.0",
     "firebase": "^13.1.0",
     "html2canvas": "^1.4.1",
     "html2pdf.js": "^0.14.0",

@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { signOutFirebase, subscribeFirebaseEmail } from '@/lib/firebaseClient';
+import { signOutSupabase, subscribeSupabaseEmail } from '@/lib/supabaseAuth';
 import { useRemoveOwnerPushToken } from '@workspace/api-client-react';
 import { AlertTriangle, ArrowLeft, Building2, ChevronDown, EllipsisVertical, FileText, Gem, Globe2, List, LogIn, LogOut, Mail, Menu, Phone, Trash2, X } from 'lucide-react';
 import {
@@ -76,9 +77,11 @@ export function SettingsDrawer({
   const queryClient = useQueryClient();
   const { isAuthenticated, role, phone, authMethod, userId } = useAppAuth();
   const [firebaseEmail, setFirebaseEmail] = useState<string | null>(null);
+  const [supabaseEmail, setSupabaseEmail] = useState<string | null>(null);
   useEffect(() => subscribeFirebaseEmail(setFirebaseEmail), []);
-  const isSignedIn = authMethod === 'firebase';
-  const signOut = signOutFirebase;
+  useEffect(() => authMethod === 'supabase' ? subscribeSupabaseEmail(setSupabaseEmail) : undefined, [authMethod]);
+  const isSignedIn = authMethod === 'firebase' || authMethod === 'supabase';
+  const signOut = authMethod === 'supabase' ? signOutSupabase : signOutFirebase;
   const removeOwnerPushToken = useRemoveOwnerPushToken();
   const [, navigate] = useLocation();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -107,7 +110,7 @@ export function SettingsDrawer({
 
   const loginIdentity = authMethod === 'phone'
     ? phone || readOfflineIdentity()?.phone
-    : firebaseEmail;
+    : authMethod === 'supabase' ? supabaseEmail : firebaseEmail;
 
   const handleConfirmDelete = useCallback(async () => {
     if (isDeleting) return;

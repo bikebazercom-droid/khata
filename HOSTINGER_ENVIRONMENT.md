@@ -19,6 +19,10 @@ in Replit does not mean the same variable exists on Hostinger.
 - Runtime start command, if Hostinger asks for one:
   `node --enable-source-maps artifacts/api-server/dist/index.mjs`
 - Do not set the Entry File to `pnpm start`.
+- Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` for both the build and
+  the Node runtime. Use the full project HTTPS URL and the public anon or
+  publishable key, not the service-role key. Enable Google in that Supabase
+  project and allow `https://banglakhata.com` as a redirect URL.
 
 ## Health checks
 

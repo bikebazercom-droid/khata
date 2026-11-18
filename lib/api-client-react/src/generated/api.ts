@@ -80,6 +80,8 @@ import type {
   PushTokenInput,
   ReminderMessage,
   ReportBrandingInput,
+  SupabaseSessionInput,
+  SupabaseSessionResult,
   UploadUrlRequest,
   UploadUrlResponse
 } from './api.schemas';
@@ -332,6 +334,77 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
 
 
+
+export const getExchangeSupabaseSessionUrl = () => {
+
+
+
+
+  return `/api/auth/supabase/session`
+}
+
+/**
+ * @summary Exchange a verified Supabase Google token for an app session
+ */
+export const exchangeSupabaseSession = async (supabaseSessionInput: SupabaseSessionInput, options?: RequestInit): Promise<SupabaseSessionResult> => {
+
+  return customFetch<SupabaseSessionResult>(getExchangeSupabaseSessionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(supabaseSessionInput)
+  }
+);}
+
+
+
+
+
+export const getExchangeSupabaseSessionMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof exchangeSupabaseSession>>, TError,{data: BodyType<SupabaseSessionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof exchangeSupabaseSession>>, TError,{data: BodyType<SupabaseSessionInput>}, TContext> => {
+
+const mutationKey = ['exchangeSupabaseSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof exchangeSupabaseSession>>, {data: BodyType<SupabaseSessionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  exchangeSupabaseSession(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ExchangeSupabaseSessionMutationResult = NonNullable<Awaited<ReturnType<typeof exchangeSupabaseSession>>>
+    export type ExchangeSupabaseSessionMutationBody = BodyType<SupabaseSessionInput>
+    export type ExchangeSupabaseSessionMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Exchange a verified Supabase Google token for an app session
+ */
+export const useExchangeSupabaseSession = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof exchangeSupabaseSession>>, TError,{data: BodyType<SupabaseSessionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof exchangeSupabaseSession>>,
+        TError,
+        {data: BodyType<SupabaseSessionInput>},
+        TContext
+      > => {
+      return useMutation(getExchangeSupabaseSessionMutationOptions(options));
+    }
 
 export const getSendPhoneOtpUrl = () => {
 

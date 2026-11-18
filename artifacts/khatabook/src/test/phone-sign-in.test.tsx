@@ -108,6 +108,24 @@ describe('phone OTP sign-in auth cache', () => {
     });
   });
 
+  it('requests WhatsApp delivery and verifies the same OTP without a channel field', async () => {
+    phoneAuthMocks.verifyOtp.mockResolvedValue(verifiedSession);
+    renderPhoneSignIn();
+
+    fireEvent.change(screen.getByTestId('input-phone'), { target: { value: '01712345678' } });
+    fireEvent.click(screen.getByTestId('button-send-otp-whatsapp'));
+    await waitFor(() => {
+      expect(phoneAuthMocks.sendOtp).toHaveBeenCalledWith('01712345678', 'whatsapp');
+    });
+    expect(await screen.findByText(/via WhatsApp/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId('input-otp-code'), { target: { value: '123456' } });
+    fireEvent.click(screen.getByTestId('button-verify-otp'));
+    await waitFor(() => {
+      expect(phoneAuthMocks.verifyOtp).toHaveBeenCalledWith('01712345678', '123456');
+    });
+  });
+
   it('does not set an authenticated query or navigate when OTP verification fails', async () => {
     phoneAuthMocks.verifyOtp.mockRejectedValue(new Error('Invalid code'));
     const queryClient = renderPhoneSignIn();

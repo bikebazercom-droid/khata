@@ -43,7 +43,7 @@ export interface AuthenticatedRequest extends Request {
   businessId: string;
   role: "owner" | "staff";
   status: "active" | "suspended";
-  authMethod: "firebase" | "phone" | "dev";
+  authMethod: "firebase" | "supabase" | "phone" | "dev";
   verifiedEmail?: string;
   phone?: string;
 }
@@ -140,7 +140,10 @@ async function requireSeedBusinessNameSetup(): Promise<void> {
     });
 }
 
-async function claimWorkerInvite(identity: { email?: string; phone?: string; firebaseUid?: string }, existing?: AppUser) {
+async function claimWorkerInvite(
+  identity: { email?: string; phone?: string; firebaseUid?: string; supabaseUid?: string },
+  existing?: AppUser,
+) {
   return db.transaction(async (tx) => {
     const identityCondition = identity.email
       ? eq(workerInvitesTable.email, identity.email)
@@ -159,10 +162,12 @@ async function claimWorkerInvite(identity: { email?: string; phone?: string; fir
     const [staff] = existing ? await tx.update(appUsersTable).set({
       workerAccessDeletedAt: null, status: "active", adjustmentPartyIds: [],
       ...(identity.firebaseUid ? { firebaseUid: identity.firebaseUid } : {}),
+      ...(identity.supabaseUid ? { supabaseUid: identity.supabaseUid } : {}),
     }).where(and(eq(appUsersTable.id, existing.id), eq(appUsersTable.status, "suspended"),
       isNotNull(appUsersTable.workerAccessDeletedAt)))
       .returning() : await tx.insert(appUsersTable).values({
       firebaseUid: identity.firebaseUid,
+      supabaseUid: identity.supabaseUid,
       verifiedEmail: identity.email,
       phone: identity.phone,
       businessId: invite.businessId,
@@ -275,6 +280,84 @@ export async function getOrCreateFirebaseUser(
   return user!;
 }
 
+export async function getOrCreateSupabaseUser(
+  supabaseUid: string,
+  verifiedEmail: string,
+  displayName?: string,
+): Promise<AppUser> {
+  const email = verifiedEmail.trim().toLowerCase();
+  const [byUid] = await db.select().from(appUsersTable)
+    .where(eq(appUsersTable.supabaseUid, supabaseUid)).limit(1);
+  if (byUid) return byUid;
+
+  const deletedUid = hashDeletedAccountIdentity("supabase", supabaseUid);
+  const [deletedAccount] = await db.select({ id: appUsersTable.id }).from(appUsersTable)
+    .where(and(
+      eq(appUsersTable.supabaseUid, deletedUid),
+      isNotNull(appUsersTable.workerAccessDeletedAt),
+    )).limit(1);
+  if (deletedAccount) throw new Error("This account was deleted and cannot be restored by sign-in.");
+
+  const deletedEmail = hashDeletedAccountIdentity("email", email);
+  const [deletedEmailAccount] = await db.select({ id: appUsersTable.id }).from(appUsersTable)
+    .where(and(
+      eq(appUsersTable.verifiedEmail, deletedEmail),
+      eq(appUsersTable.role, "owner"),
+      isNotNull(appUsersTable.workerAccessDeletedAt),
+    )).limit(1);
+  if (deletedEmailAccount) throw new Error("This account was deleted and cannot be restored by sign-in.");
+
+  const emailMatches = await db.select().from(appUsersTable)
+    .where(sql`lower(${appUsersTable.verifiedEmail}) = ${email}`).limit(2);
+  if (emailMatches.length > 1) {
+    throw new Error("Verified email matches multiple accounts; administrator review is required");
+  }
+  const existing = emailMatches[0];
+  if (existing) {
+    if (existing.workerAccessDeletedAt) {
+      return (await claimWorkerInvite({ email, supabaseUid }, existing)) ?? existing;
+    }
+    if (existing.status !== "active") return existing;
+    if (existing.supabaseUid && existing.supabaseUid !== supabaseUid) {
+      throw new Error("This account is already linked to another Supabase identity");
+    }
+    const [linked] = await db.update(appUsersTable)
+      .set({ supabaseUid })
+      .where(eq(appUsersTable.id, existing.id))
+      .returning();
+    await linkUserBusiness(existing.id, existing.businessId);
+    return linked!;
+  }
+
+  const invitedStaff = await claimWorkerInvite({ email, supabaseUid });
+  if (invitedStaff) return invitedStaff;
+  // Public Google sign-ups always start with an empty book, never the
+  // reserved business that may still contain data from before sign-in.
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`supabase-signup:${supabaseUid}`}, 0))`);
+    const [concurrentUser] = await tx.select().from(appUsersTable)
+      .where(eq(appUsersTable.supabaseUid, supabaseUid)).limit(1);
+    if (concurrentUser) return concurrentUser;
+
+    // Use a default name so web Google users can enter the dashboard without
+    // the blocking first-book naming step. They can rename it at any time.
+    const bookName = "আমার খাতা";
+    const [business] = await tx.insert(businessesTable).values({ name: bookName })
+      .returning({ id: businessesTable.id });
+    const businessId = business!.id;
+    await tx.insert(businessSettingsTable).values({ businessId, storeName: bookName });
+    const [user] = await tx.insert(appUsersTable).values({
+      supabaseUid,
+      verifiedEmail: email,
+      displayName: displayName?.trim() || null,
+      businessId,
+      role: "owner",
+    }).returning();
+    await tx.insert(userBusinessesTable).values({ userId: user!.id, businessId });
+    return user!;
+  });
+}
+
 export async function getOrCreatePhoneUser(
   phone: string,
 ): Promise<AppUser> {
@@ -369,6 +452,7 @@ async function resolveBusinessId(
 const SESSION_SECRET = process.env.SESSION_SECRET!;
 const COOKIE_NAME = "phone_session";
 const FIREBASE_COOKIE_NAME = "firebase_session";
+const SUPABASE_COOKIE_NAME = "supabase_session";
 // Browsers cap persistent cookies at roughly 400 days. Renew the cookie on
 // authenticated requests so active phone sessions remain signed in until logout.
 export const PHONE_SESSION_COOKIE_MAX_AGE_MS = 400 * 24 * 60 * 60 * 1000;
@@ -386,6 +470,13 @@ interface FirebaseSessionPayload {
   userId: string;
   businessId: string;
   firebaseUid: string;
+  sessionVersion: number;
+}
+
+interface SupabaseSessionPayload {
+  userId: string;
+  businessId: string;
+  supabaseUid: string;
   sessionVersion: number;
 }
 
@@ -434,6 +525,21 @@ export function clearFirebaseSession(res: Response): void {
   res.clearCookie(FIREBASE_COOKIE_NAME, { path: "/" });
 }
 
+export function issueSupabaseSession(res: Response, payload: SupabaseSessionPayload): void {
+  const token = jwt.sign(payload, SESSION_SECRET);
+  res.cookie(SUPABASE_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: FIREBASE_SESSION_COOKIE_MAX_AGE_MS,
+    path: "/",
+  });
+}
+
+export function clearSupabaseSession(res: Response): void {
+  res.clearCookie(SUPABASE_COOKIE_NAME, { path: "/" });
+}
+
 function verifyFirebaseSession(token: string): FirebaseSessionPayload | null {
   try {
     const value = jwt.verify(token, SESSION_SECRET) as Partial<FirebaseSessionPayload>;
@@ -444,6 +550,21 @@ function verifyFirebaseSession(token: string): FirebaseSessionPayload | null {
       || !Number.isInteger(value.sessionVersion)
     ) return null;
     return value as FirebaseSessionPayload;
+  } catch {
+    return null;
+  }
+}
+
+function verifySupabaseSession(token: string): SupabaseSessionPayload | null {
+  try {
+    const value = jwt.verify(token, SESSION_SECRET) as Partial<SupabaseSessionPayload>;
+    if (
+      typeof value.userId !== "string"
+      || typeof value.businessId !== "string"
+      || typeof value.supabaseUid !== "string"
+      || !Number.isInteger(value.sessionVersion)
+    ) return null;
+    return value as SupabaseSessionPayload;
   } catch {
     return null;
   }
@@ -472,6 +593,7 @@ export async function requireAuth(
   const isNativeSessionExchange = isNativeWebViewSessionExchange(req);
   const hasWebViewSessionCookie = Boolean(
     (req as any).cookies?.[FIREBASE_COOKIE_NAME]
+    || (req as any).cookies?.[SUPABASE_COOKIE_NAME]
     || (req as any).cookies?.[COOKIE_NAME],
   );
 
@@ -549,6 +671,42 @@ export async function requireAuth(
       return next();
     }
     clearFirebaseSession(res);
+  }
+
+  // ── Try persistent Supabase-backed browser session ──
+  const supabaseCookie = (req as any).cookies?.[SUPABASE_COOKIE_NAME];
+  if (supabaseCookie) {
+    const payload = verifySupabaseSession(supabaseCookie);
+    if (payload) {
+      const [user] = await db.select().from(appUsersTable)
+        .where(eq(appUsersTable.id, payload.userId)).limit(1);
+      if (
+        !user
+        || user.status !== "active"
+        || user.workerAccessDeletedAt
+        || user.supabaseUid !== payload.supabaseUid
+        || user.phoneSessionVersion !== payload.sessionVersion
+      ) {
+        clearSupabaseSession(res);
+        res.status(401).json({ error: "Invalid or revoked session" });
+        return;
+      }
+      const businessId = await resolveBusinessId(user, req);
+      if (!businessId) {
+        res.status(403).json({ error: "Business access denied" });
+        return;
+      }
+      issueSupabaseSession(res, { ...payload, businessId });
+      const authReq = req as AuthenticatedRequest;
+      authReq.userId = user.id;
+      authReq.businessId = businessId;
+      authReq.role = user.role;
+      authReq.status = user.status;
+      authReq.authMethod = "supabase";
+      authReq.verifiedEmail = user.verifiedEmail ?? undefined;
+      return next();
+    }
+    clearSupabaseSession(res);
   }
 
   // ── 3. Try phone session cookie ──
