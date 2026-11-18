@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createClient } from '@supabase/supabase-js';
+import { supabaseProjectUrl } from '../../../../config/public-auth.json';
 
 const mockAuth = vi.hoisted(() => ({
   signInWithOAuth: vi.fn(),
@@ -44,6 +46,14 @@ describe('Supabase Google sign-in bridge', () => {
       provider: 'google',
       options: { redirectTo: 'https://banglakhata.com' },
     });
+  });
+
+  it('uses the public project URL when no override is configured', async () => {
+    vi.stubEnv('VITE_SUPABASE_URL', undefined);
+    vi.resetModules();
+    const { beginSupabaseGoogleSignIn: beginWithFreshConfig } = await import('./supabaseAuth');
+    await beginWithFreshConfig();
+    expect(createClient).toHaveBeenCalledWith(supabaseProjectUrl, 'test-public-anon-key', expect.any(Object));
   });
 
   it('exchanges a callback session with the server before app requests', async () => {

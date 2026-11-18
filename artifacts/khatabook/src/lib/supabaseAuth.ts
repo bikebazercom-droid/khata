@@ -1,4 +1,5 @@
 import { createClient, type Session } from '@supabase/supabase-js';
+import { supabaseProjectUrl } from '../../../../config/public-auth.json';
 
 let client: ReturnType<typeof createClient> | undefined;
 let exchangedAccessToken = '';
@@ -6,7 +7,7 @@ let pendingExchange: { accessToken: string; promise: Promise<void> } | undefined
 
 export function getSupabaseAuthClient() {
   if (client) return client;
-  const url = import.meta.env.VITE_SUPABASE_URL?.trim();
+  const url = import.meta.env.VITE_SUPABASE_URL?.trim() || supabaseProjectUrl;
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
   if (!url || !anonKey) {
     throw new Error('Supabase Google sign-in is not configured.');
@@ -62,7 +63,7 @@ async function exchangeAccessToken(session: Session): Promise<void> {
 }
 
 export async function ensureSupabaseAppSession(): Promise<boolean> {
-  if (!import.meta.env.VITE_SUPABASE_URL?.trim() || !import.meta.env.VITE_SUPABASE_ANON_KEY?.trim()) return false;
+  if (!import.meta.env.VITE_SUPABASE_ANON_KEY?.trim()) return false;
   const { data, error } = await getSupabaseAuthClient().auth.getSession();
   if (error) throw error;
   if (!data.session) return false;

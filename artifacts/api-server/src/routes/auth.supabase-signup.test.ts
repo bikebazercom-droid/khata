@@ -13,6 +13,7 @@ import {
   userLoginEventsTable,
 } from "@workspace/db";
 import { SEED_BUSINESS_ID } from "../middlewares/requireAuth";
+import { supabaseProjectUrl } from "../../../../config/public-auth.json";
 import authRouter from "./auth";
 
 const app = express();
@@ -61,7 +62,9 @@ describe("public web Google sign-in", () => {
 
   it("opens one isolated book without preapproval and issues a usable session", async () => {
     mockGoogleIdentity(email);
+    vi.stubEnv("VITE_SUPABASE_URL", undefined);
     const responses = await Promise.all([signIn(), signIn()]);
+    expect(fetch).toHaveBeenCalledWith(`${supabaseProjectUrl}/auth/v1/user`, expect.any(Object));
     const [first, second] = responses;
     expect(first!.status, first!.text).toBe(200);
     expect(second!.status, second!.text).toBe(200);

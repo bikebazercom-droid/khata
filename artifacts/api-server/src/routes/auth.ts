@@ -11,6 +11,7 @@ import { eq, and, gt, inArray, lt } from "drizzle-orm";
 import { createHmac, randomInt } from "node:crypto";
 import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
+import { supabaseProjectUrl } from "../../../../config/public-auth.json";
 import {
   db,
   otpCodesTable,
@@ -129,7 +130,7 @@ router.post("/auth/supabase/session", rateLimit({
     res.status(400).json({ error: "A valid Supabase access token is required" });
     return;
   }
-  const supabaseUrl = process.env.VITE_SUPABASE_URL?.trim();
+  const supabaseUrl = process.env.VITE_SUPABASE_URL?.trim() || supabaseProjectUrl;
   const anonKey = process.env.VITE_SUPABASE_ANON_KEY?.trim();
   if (!supabaseUrl || !anonKey) {
     res.status(503).json({ error: "Supabase sign-in is not configured" });

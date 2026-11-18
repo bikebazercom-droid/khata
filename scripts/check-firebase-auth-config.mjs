@@ -1,3 +1,9 @@
+import { readFileSync } from "node:fs";
+
+const { supabaseProjectUrl } = JSON.parse(
+  readFileSync(new URL("../config/public-auth.json", import.meta.url), "utf8"),
+);
+
 const requiredVariables = [
   "VITE_FIREBASE_API_KEY",
   "VITE_FIREBASE_AUTH_DOMAIN",
@@ -5,7 +11,6 @@ const requiredVariables = [
   "VITE_FIREBASE_STORAGE_BUCKET",
   "VITE_FIREBASE_MESSAGING_SENDER_ID",
   "VITE_FIREBASE_APP_ID",
-  "VITE_SUPABASE_URL",
   "VITE_SUPABASE_ANON_KEY",
 ];
 
@@ -22,7 +27,7 @@ if (!/^AIza[0-9A-Za-z_-]{20,}$/.test(apiKey)) {
 }
 
 try {
-  if (new URL(process.env.VITE_SUPABASE_URL.trim()).protocol !== "https:") {
+  if (new URL(process.env.VITE_SUPABASE_URL?.trim() || supabaseProjectUrl).protocol !== "https:") {
     throw new Error();
   }
 } catch {
