@@ -10,6 +10,7 @@ import {
 import {
   FIREBASE_SESSION_COOKIE_MAX_AGE_MS,
   PHONE_SESSION_COOKIE_MAX_AGE_MS,
+  requireAuth,
 } from "../middlewares/requireAuth";
 import authRouter from "./auth";
 
@@ -23,6 +24,9 @@ describe("phone session logout", () => {
   app.use(express.json());
   app.use(cookieParser());
   app.use(authRouter);
+  app.post("/test-entry", requireAuth, (_req, res) => {
+    res.status(201).json({ saved: true });
+  });
 
   beforeAll(async () => {
     phone = `+88017${Math.floor(Math.random() * 100_000_000).toString().padStart(8, "0")}`;
@@ -81,12 +85,35 @@ describe("phone session logout", () => {
     expect(webViewSession.body.authMethod).toBe("phone");
   });
 
+  it("accepts native entry requests without cookies and with stale cookies after app resume", async () => {
+    const staleToken = jwt.sign({
+      userId, businessId, phone, sessionVersion: -1,
+    }, process.env.SESSION_SECRET!);
+    for (const cookie of ["", `phone_session=${staleToken}`,
+      `firebase_session=${staleToken}; supabase_session=${staleToken}`]) {
+      const req = request(app).post("/test-entry")
+        .set("Authorization", `Bearer ${token}`)
+        .set("x-banglakhata-native-session", "1");
+      if (cookie) req.set("Cookie", cookie);
+      const response = await req.send({ amount: 100 });
+      expect(response.status, response.text).toBe(201);
+    }
+    const forged = await request(app).post("/test-entry")
+      .set("Authorization", "Bearer forged-token")
+      .set("x-banglakhata-native-session", "1")
+      .set("Cookie", `phone_session=${token}`);
+    expect(forged.status).toBe(401);
+  });
+
   it("revokes a copied mobile bearer token and records the explicit logout", async () => {
     const before = await request(app).get("/auth/me").set("Authorization", `Bearer ${token}`);
     expect(before.status, before.text).toBe(200);
     expect(before.headers["cache-control"]).toContain("no-store");
 
-    const logout = await request(app).post("/auth/phone/logout").set("Authorization", `Bearer ${token}`);
+    const logout = await request(app).post("/auth/phone/logout")
+      .set("Authorization", `Bearer ${token}`)
+      .set("x-banglakhata-native-session", "1")
+      .set("Cookie", "phone_session=stale-webview-cookie");
     expect(logout.status).toBe(200);
     const [user] = await db.select().from(appUsersTable).where(eq(appUsersTable.id, userId));
     expect(user?.phoneSessionVersion).toBe(1);

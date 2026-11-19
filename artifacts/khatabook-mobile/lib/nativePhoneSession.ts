@@ -7,6 +7,7 @@ export async function saveWebViewPhoneSession(
   sourceUrl: string,
   webAppUrl: string,
   acceptSession: (session: { token: string }) => Promise<void>,
+  onStored?: (token: string) => void,
 ): Promise<{ requestId: string; ok: boolean } | null> {
   let message: { type?: unknown; requestId?: unknown; token?: unknown };
   try {
@@ -22,6 +23,7 @@ export async function saveWebViewPhoneSession(
   ) return null;
   try {
     await acceptSession({ token: message.token });
+    onStored?.(message.token);
     return { requestId: message.requestId, ok: true };
   } catch {
     return { requestId: message.requestId, ok: false };

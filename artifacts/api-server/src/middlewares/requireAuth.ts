@@ -638,7 +638,9 @@ export async function requireAuth(
   }
 
   // ── Try persistent Firebase-backed browser session ──
-  const firebaseCookie = (req as any).cookies?.[FIREBASE_COOKIE_NAME];
+  // A native phone request explicitly supplies its securely stored credential.
+  // Do not let an old WebView cookie shadow that valid bearer after app resume.
+  const firebaseCookie = isNativeSessionExchange ? undefined : (req as any).cookies?.[FIREBASE_COOKIE_NAME];
   if (firebaseCookie) {
     const payload = verifyFirebaseSession(firebaseCookie);
     if (payload) {
@@ -674,7 +676,7 @@ export async function requireAuth(
   }
 
   // ── Try persistent Supabase-backed browser session ──
-  const supabaseCookie = (req as any).cookies?.[SUPABASE_COOKIE_NAME];
+  const supabaseCookie = isNativeSessionExchange ? undefined : (req as any).cookies?.[SUPABASE_COOKIE_NAME];
   if (supabaseCookie) {
     const payload = verifySupabaseSession(supabaseCookie);
     if (payload) {
@@ -710,7 +712,7 @@ export async function requireAuth(
   }
 
   // ── 3. Try phone session cookie ──
-  const cookieToken = (req as any).cookies?.[COOKIE_NAME];
+  const cookieToken = isNativeSessionExchange ? undefined : (req as any).cookies?.[COOKIE_NAME];
   const bearerHeader = req.headers.authorization;
   const bearerToken = bearerHeader?.startsWith("Bearer ") ? bearerHeader.slice(7) : undefined;
   if (cookieToken || bearerToken) {

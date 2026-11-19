@@ -812,8 +812,11 @@ router.post(
 // ─── POST /api/auth/phone/logout ──────────────────────────────────────────────
 
 router.post("/auth/phone/logout", async (req: Request, res: Response): Promise<void> => {
-  const token = (req as any).cookies?.phone_session ??
-    (req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.slice(7) : undefined);
+  const bearerToken = req.headers.authorization?.startsWith("Bearer ")
+    ? req.headers.authorization.slice(7) : undefined;
+  const token = isNativeWebViewSessionExchange(req)
+    ? bearerToken
+    : (req as any).cookies?.phone_session ?? bearerToken;
   if (token) {
     let payload: { userId?: string; phone?: string; sessionVersion?: number } | null = null;
     try {

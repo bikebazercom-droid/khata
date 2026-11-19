@@ -36,6 +36,7 @@ import {
 } from '@/lib/notificationBridge';
 import { useOptionalAuth } from '@/contexts/AuthContext';
 import { NativeGoogleAuthBridge } from '@/components/NativeGoogleAuthBridge';
+import { createNativePhoneFetchScript } from '@/lib/nativePhoneFetch';
 import {
   NATIVE_PHONE_SESSION_SAVED_EVENT,
   NATIVE_SESSION_STORAGE_SCRIPT,
@@ -57,7 +58,7 @@ const NATIVE_GOOGLE_ID_TOKEN_EVENT = 'banglakhata-native-google-id-token';
 const NATIVE_GOOGLE_AUTH_ERROR_EVENT = 'banglakhata-native-google-auth-error';
 
 function createNativeAuthBootstrapScript(token: string): string {
-  return `(() => {
+  return createNativePhoneFetchScript(token) + `(() => {
     const nativeToken = ${JSON.stringify(token)};
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
@@ -485,6 +486,10 @@ export function WebAppScreen() {
         event.nativeEvent.url ?? '',
         webAppUrl,
         nativeAuth.acceptSession,
+        (token) => {
+          setNativeAuthToken(token);
+          webViewRef.current?.injectJavaScript(createNativePhoneFetchScript(token));
+        },
       ).then((result) => {
         if (result) webViewRef.current?.injectJavaScript(
           createWebEventScript(NATIVE_PHONE_SESSION_SAVED_EVENT, result),
@@ -499,8 +504,9 @@ export function WebAppScreen() {
     ) {
       const sourceUrl = event.nativeEvent.url;
       if (!webAppUrl || !sourceUrl || !hasSameOrigin(sourceUrl, webAppUrl)) return;
-      setNativeAuthToken(null);
       if (pushMessage.type !== NATIVE_AUTH_READY_MESSAGE) {
+        setNativeAuthToken(null);
+        webViewRef.current?.injectJavaScript(createNativePhoneFetchScript(null));
         void nativeAuth?.clearNativeSession().catch(() => {});
       }
       return;
@@ -615,6 +621,11 @@ export function WebAppScreen() {
         thirdPartyCookiesEnabled
         injectedJavaScriptBeforeContentLoaded={NATIVE_SESSION_STORAGE_SCRIPT + (nativeAuthToken
           ? createNativeAuthBootstrapScript(nativeAuthToken)
+          : '')}
+        // Android's before-content injection is best-effort. Also install at
+        // document-ready so subsequent entry requests never rely on cookies alone.
+        injectedJavaScript={NATIVE_SESSION_STORAGE_SCRIPT + (nativeAuthToken
+          ? createNativePhoneFetchScript(nativeAuthToken)
           : '')}
         setSupportMultipleWindows={false}
         mediaPlaybackRequiresUserAction={false}

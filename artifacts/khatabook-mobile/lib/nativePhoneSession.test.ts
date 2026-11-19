@@ -10,14 +10,17 @@ describe('WebView phone session secure storage', () => {
   it('acknowledges only after secure storage finishes', async () => {
     let finish!: () => void;
     const accept = vi.fn(() => new Promise<void>((resolve) => { finish = resolve; }));
+    const onStored = vi.fn();
     let settled = false;
-    const result = saveWebViewPhoneSession(raw, `${site}/sign-in`, site, accept);
+    const result = saveWebViewPhoneSession(raw, `${site}/sign-in`, site, accept, onStored);
     void result.then(() => { settled = true; });
     await Promise.resolve();
     expect(settled).toBe(false);
+    expect(onStored).not.toHaveBeenCalled();
     expect(accept).toHaveBeenCalledWith({ token: 'test-token' });
     finish();
     await expect(result).resolves.toEqual({ requestId: 'request-1', ok: true });
+    expect(onStored).toHaveBeenCalledWith('test-token');
   });
 
   it('rejects untrusted origins and malformed messages without touching storage', async () => {
