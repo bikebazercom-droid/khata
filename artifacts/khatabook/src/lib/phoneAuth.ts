@@ -11,6 +11,7 @@ import {
   NATIVE_AUTH_REJECTED_MESSAGE,
   postNativeAuthMessage,
 } from './nativePushBridge';
+import { persistNativePhoneSession } from './nativePhoneSession';
 
 export interface MeResponse {
   userId: string;
@@ -118,7 +119,11 @@ export async function verifyOtp(phone: string, code: string): Promise<MeResponse
     if (res.status === 401) throw new Error('Invalid or expired code');
     throw new Error(`Sign-in service error (HTTP ${res.status}). Use Google/email or try again later.`);
   }
-  return res.json() as Promise<MeResponse>;
+  const result = await res.json() as MeResponse & { token?: string };
+  await persistNativePhoneSession(result.token);
+  // The bearer token is for the native secure store, not React Query or offline caches.
+  const { token: _token, ...identity } = result;
+  return identity;
 }
 
 export async function sendPhoneLinkOtp(phone: string): Promise<void> {

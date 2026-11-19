@@ -37,6 +37,11 @@ import {
 import { useOptionalAuth } from '@/contexts/AuthContext';
 import { NativeGoogleAuthBridge } from '@/components/NativeGoogleAuthBridge';
 import {
+  NATIVE_PHONE_SESSION_SAVED_EVENT,
+  NATIVE_SESSION_STORAGE_SCRIPT,
+  saveWebViewPhoneSession,
+} from '@/lib/nativePhoneSession';
+import {
   NATIVE_FILE_EXPORT_RESULT_EVENT,
   parseNativeFileExportRequest,
   saveNativeWebViewFile,
@@ -473,6 +478,20 @@ export function WebAppScreen() {
     } catch {
       // Existing sound messages are plain strings rather than JSON.
     }
+    if (pushMessage?.type === 'banglakhata-native-phone-session') {
+      if (!nativeAuth || !webAppUrl) return;
+      void saveWebViewPhoneSession(
+        event.nativeEvent.data,
+        event.nativeEvent.url ?? '',
+        webAppUrl,
+        nativeAuth.acceptSession,
+      ).then((result) => {
+        if (result) webViewRef.current?.injectJavaScript(
+          createWebEventScript(NATIVE_PHONE_SESSION_SAVED_EVENT, result),
+        );
+      });
+      return;
+    }
     if (
       pushMessage?.type === NATIVE_AUTH_READY_MESSAGE
       || pushMessage?.type === NATIVE_AUTH_REJECTED_MESSAGE
@@ -509,6 +528,7 @@ export function WebAppScreen() {
       playSuccessSound();
     }
   }, [
+    nativeAuth?.acceptSession,
     nativeAuth?.clearNativeSession,
     playSuccessSound,
     requestOwnerPushToken,
@@ -593,9 +613,9 @@ export function WebAppScreen() {
         cacheEnabled
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
-        injectedJavaScriptBeforeContentLoaded={nativeAuthToken
+        injectedJavaScriptBeforeContentLoaded={NATIVE_SESSION_STORAGE_SCRIPT + (nativeAuthToken
           ? createNativeAuthBootstrapScript(nativeAuthToken)
-          : undefined}
+          : '')}
         setSupportMultipleWindows={false}
         mediaPlaybackRequiresUserAction={false}
         allowsInlineMediaPlayback
