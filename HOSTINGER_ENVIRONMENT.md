@@ -81,6 +81,37 @@ reports an error if an applied file's checksum has changed.
 HOSTINGER_DATABASE_MIGRATION_CONFIRM=apply pnpm run db:migrate:hostinger-supabase
 ```
 
+### OTP verification returns HTTP 500 after a Google-auth update
+
+Phone OTP verification reads the shared `app_users` row. Even phone-only
+accounts therefore require the `supabase_uid` column introduced in
+`supabase/migrations/20261118_000001_add_supabase_uid.sql`. SMS delivery can
+succeed while verification fails if this migration is missing.
+
+Check the **actual database used by Hostinger's runtime `DATABASE_URL`**,
+not just the development database or another Supabase project:
+
+```sql
+SELECT data_type, is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'app_users'
+  AND column_name = 'supabase_uid';
+
+SELECT indexname
+FROM pg_indexes
+WHERE schemaname = 'public'
+  AND tablename = 'app_users'
+  AND indexname = 'app_users_supabase_uid_unique_idx';
+```
+
+If either query returns no rows, review and apply the existing additive
+migration to that database with authorization. Do not edit the migration,
+rerun a full bootstrap, remove authentication checks, or put database
+credentials in the repository. A GitHub push/rebuild alone does not apply it.
+After the repair, request a **new OTP**: the failed verification may already
+have consumed the previous code.
+
 The migration tests include a PostgreSQL integration test. Run it only against
 a disposable local PostgreSQL instance using
 `MIGRATION_TEST_DATABASE_URL`; the test rejects non-local database hosts and
