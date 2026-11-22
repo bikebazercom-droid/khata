@@ -223,8 +223,8 @@ describe('mobile phone-session restoration', () => {
     secondView.queryClient.clear();
   });
 
-  it('clears an unauthorized saved session without depending on a native route redirect', async () => {
-    flow.secureToken = 'revoked-phone-session';
+  it('keeps the durable credential after a failed background identity check and can recover', async () => {
+    flow.secureToken = 'saved-phone-session';
     flow.identityError = { status: 401 };
 
     let currentState: AuthState | undefined;
@@ -232,10 +232,17 @@ describe('mobile phone-session restoration', () => {
       <AuthProbe capture={(state) => { currentState = state; }} />,
     );
 
-    await waitFor(() => expect(flow.requestTokens).toEqual(['revoked-phone-session']));
-    await waitFor(() => expect(currentState?.token).toBeNull());
-    await waitFor(() => expect(currentState?.hasSession).toBe(false));
+    await waitFor(() => expect(currentState?.identityError).toMatchObject({ status: 401 }));
+    expect(currentState?.token).toBe('saved-phone-session');
+    expect(flow.secureToken).toBe('saved-phone-session');
+    expect(flow.events).not.toContain('secure-delete');
 
+    flow.identityError = null;
+    await act(async () => { await currentState?.refreshIdentity(); });
+    await waitFor(() => expect(currentState?.identity?.userId).toBe('test-owner'));
+    // Explicit, authenticated rejection still has a dedicated clearing path.
+    await act(async () => { await currentState?.clearNativeSession(); });
+    expect(currentState?.token).toBeNull();
     expect(flow.secureToken).toBeNull();
     expect(flow.events).toContain('secure-delete');
 

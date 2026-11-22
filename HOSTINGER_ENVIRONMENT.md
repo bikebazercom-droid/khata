@@ -25,6 +25,25 @@ in Replit does not mean the same variable exists on Hostinger.
   `VITE_SUPABASE_URL` in both environments only when overriding that endpoint.
   Enable Google in that project and allow `https://banglakhata.com` as a redirect URL.
 
+## Public phone sign-in and persistent Android sessions
+
+- No admin pre-approval is required. A verified Bangladesh mobile number
+  creates a private, empty owner ledger unless it belongs to an existing
+  account or a pending staff invitation.
+- Keep `SESSION_SECRET` unchanged across restarts, redeployments, and every
+  running API instance. Changing it invalidates saved login credentials and
+  outstanding OTPs. Rotate it only intentionally for security.
+- OTPs remain single-use and valid for 15 minutes. If an older server already
+  consumed a code before account creation failed, request one fresh code after
+  deploying the fix; old consumed codes cannot be recovered.
+- Deploying the website/API from GitHub does not replace an installed Android
+  APK. The current mobile source saves phone credentials in SecureStore and
+  authenticates WebView API requests independently of cookie loss. Install an
+  updated Android build for these native changes, then complete OTP login once.
+- Switching apps, backgrounding, or a failed background identity request must
+  not erase the saved phone credential. Manual logout, account deletion, and
+  server-enforced security revocation still apply.
+
 ## Health checks
 
 - `GET /api/healthz` confirms the API process is responding; it does not query PostgreSQL.

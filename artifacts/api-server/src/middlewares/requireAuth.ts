@@ -11,7 +11,6 @@ import {
   userBusinessesTable,
   workerInvitesTable,
   workerPartyAssignmentsTable,
-  preapprovedLoginsTable,
   type AppUser,
 } from "@workspace/db";
 import { clientIp } from "./ipBlock";
@@ -20,21 +19,6 @@ import { hashDeletedAccountIdentity } from "../lib/deletedAccountIdentity";
 
 // Fixed UUID for the seed business that owns all pre-auth legacy data.
 export const SEED_BUSINESS_ID = "00000000-0000-0000-0000-000000000001";
-
-export class PreapprovalRequiredError extends Error {
-  constructor(public readonly kind: "phone" | "email", public readonly identifier: string) {
-    super("Identity is not on the pre-approved login list");
-    this.name = "PreapprovalRequiredError";
-  }
-}
-
-async function isPreapproved(kind: "phone" | "email", identifier: string): Promise<boolean> {
-  const [entry] = await db.select({ id: preapprovedLoginsTable.id })
-    .from(preapprovedLoginsTable)
-    .where(and(eq(preapprovedLoginsTable.kind, kind), eq(preapprovedLoginsTable.identifier, identifier)))
-    .limit(1);
-  return !!entry;
-}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -115,29 +99,6 @@ async function linkUserBusiness(userId: string, businessId: string) {
     .insert(userBusinessesTable)
     .values({ userId, businessId })
     .onConflictDoNothing();
-}
-
-async function createBusinessForNameSetup(): Promise<string> {
-  const [business] = await db
-    .insert(businessesTable)
-    .values({ name: "" })
-    .returning({ id: businessesTable.id });
-  await db.insert(businessSettingsTable)
-    .values({ businessId: business!.id, storeName: "" })
-    .onConflictDoNothing();
-  return business!.id;
-}
-
-async function requireSeedBusinessNameSetup(): Promise<void> {
-  await db.update(businessesTable)
-    .set({ name: "" })
-    .where(eq(businessesTable.id, SEED_BUSINESS_ID));
-  await db.insert(businessSettingsTable)
-    .values({ businessId: SEED_BUSINESS_ID, storeName: "" })
-    .onConflictDoUpdate({
-      target: businessSettingsTable.businessId,
-      set: { storeName: "" },
-    });
 }
 
 async function claimWorkerInvite(
@@ -259,25 +220,23 @@ export async function getOrCreateFirebaseUser(
 
   const invitedStaff = await claimWorkerInvite({ email, firebaseUid });
   if (invitedStaff) return invitedStaff;
-  if (!await isPreapproved("email", email)) {
-    throw new PreapprovalRequiredError("email", email);
-  }
-  const [seedOwner] = await db.select().from(appUsersTable).where(and(
-    eq(appUsersTable.businessId, SEED_BUSINESS_ID),
-    eq(appUsersTable.role, "owner"),
-    isNull(appUsersTable.workerAccessDeletedAt),
-  )).limit(1);
-  const businessId = seedOwner ? await createBusinessForNameSetup() : SEED_BUSINESS_ID;
-  if (!seedOwner) await requireSeedBusinessNameSetup();
-  const [user] = await db.insert(appUsersTable).values({
-    firebaseUid,
-    verifiedEmail: email,
-    displayName: displayName?.trim() || null,
-    businessId,
-    role: "owner",
-  }).returning();
-  await linkUserBusiness(user!.id, businessId);
-  return user!;
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`firebase:${firebaseUid}`}))`);
+    const [concurrentUser] = await tx.select().from(appUsersTable)
+      .where(eq(appUsersTable.firebaseUid, firebaseUid)).limit(1);
+    if (concurrentUser) return concurrentUser;
+    // Public registrations must never inherit the reserved legacy ledger.
+    const name = "আমার খাতা";
+    const [business] = await tx.insert(businessesTable).values({ name }).returning();
+    const businessId = business!.id;
+    await tx.insert(businessSettingsTable).values({ businessId, storeName: name });
+    const [user] = await tx.insert(appUsersTable).values({
+      firebaseUid, verifiedEmail: email, displayName: displayName?.trim() || null,
+      businessId, role: "owner",
+    }).returning();
+    await tx.insert(userBusinessesTable).values({ userId: user!.id, businessId });
+    return user!;
+  });
 }
 
 export async function getOrCreateSupabaseUser(
@@ -373,43 +332,24 @@ export async function getOrCreatePhoneUser(
     return existing;
   }
 
-  const [deletedAccount] = await db.select({ id: appUsersTable.id }).from(appUsersTable)
-    .where(and(
-      eq(appUsersTable.phone, hashDeletedAccountIdentity("phone", phone)),
-      eq(appUsersTable.role, "owner"),
-      isNotNull(appUsersTable.workerAccessDeletedAt),
-    )).limit(1);
-
   const staff = await claimWorkerInvite({ phone });
   if (staff) return staff;
-  if (!deletedAccount && !await isPreapproved("phone", phone)) {
-    throw new PreapprovalRequiredError("phone", phone);
-  }
-
-  const [seedOwner] = await db
-    .select()
-    .from(appUsersTable)
-    .where(and(
-      eq(appUsersTable.businessId, SEED_BUSINESS_ID),
-      eq(appUsersTable.role, "owner"),
-      isNull(appUsersTable.workerAccessDeletedAt),
-    ))
-    .limit(1);
-
-  let businessId: string;
-  if (!seedOwner) {
-    businessId = SEED_BUSINESS_ID;
-    await requireSeedBusinessNameSetup();
-  } else {
-    businessId = await createBusinessForNameSetup();
-  }
-
-  const [user] = await db
-    .insert(appUsersTable)
-    .values({ phone, businessId, role: "owner" })
-    .returning();
-  await linkUserBusiness(user!.id, businessId);
-  return user!;
+  return db.transaction(async (tx) => {
+    // Serialize first sign-ins for the same verified number. A retry must not
+    // leave an orphan business or fail a unique-phone constraint.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`phone:${phone}`}))`);
+    const [concurrentUser] = await tx.select().from(appUsersTable)
+      .where(eq(appUsersTable.phone, phone)).limit(1);
+    if (concurrentUser) return concurrentUser;
+    const name = "আমার খাতা";
+    const [business] = await tx.insert(businessesTable).values({ name }).returning();
+    const businessId = business!.id;
+    await tx.insert(businessSettingsTable).values({ businessId, storeName: name });
+    const [user] = await tx.insert(appUsersTable)
+      .values({ phone, businessId, role: "owner" }).returning();
+    await tx.insert(userBusinessesTable).values({ userId: user!.id, businessId });
+    return user!;
+  });
 }
 
 // ─── Business-id resolution ───────────────────────────────────────────────────

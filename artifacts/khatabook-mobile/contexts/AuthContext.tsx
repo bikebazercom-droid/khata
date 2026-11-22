@@ -11,7 +11,6 @@ import {
   type AuthMe,
 } from '@workspace/api-client-react';
 import { clearSavedAuthToken, getSavedAuthToken, saveAuthToken } from '@/lib/authStorage';
-import { isUnauthorized } from '@/lib/domain';
 
 type PhoneSession = { token: string };
 type AuthMethod = 'firebase' | 'supabase' | 'phone';
@@ -103,16 +102,10 @@ export function AuthProvider({ children }: React.PropsWithChildren) {
     return () => setAuthTokenGetter(getSavedAuthToken);
   }, [getApiToken]);
 
-  useEffect(() => {
-    if (!identityQuery.error || !isUnauthorized(identityQuery.error) || accountDeleted) return;
-    if (authMethod !== 'phone' || Platform.OS === 'web') return;
-    clearSavedAuthToken()
-      .catch(() => undefined)
-      .finally(() => {
-        setToken(null);
-        setPreferredMethod(null);
-      });
-  }, [accountDeleted, authMethod, identityQuery.error]);
+  // Do not destroy the durable credential from a background query error.
+  // A previous request can finish after acceptSession with a stale 401.
+  // The WebView's authenticated bootstrap handles authoritative rejection;
+  // explicit logout/account deletion also clear SecureStore below.
 
   const acceptSession = useCallback(async (session: PhoneSession) => {
     if (Platform.OS !== 'web') {

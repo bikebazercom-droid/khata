@@ -25,7 +25,6 @@ import {
 } from "@workspace/db";
 import { ExchangeSupabaseSessionBody, SendPhoneOtpBody } from "@workspace/api-zod";
 import {
-  PreapprovalRequiredError,
   clearFirebaseSession,
   clearSupabaseSession,
   getOrCreatePhoneUser,
@@ -106,10 +105,6 @@ router.post("/auth/firebase/session", rateLimit({
     });
     res.json({ success: true });
   } catch (error) {
-    if (error instanceof PreapprovalRequiredError) {
-      res.status(403).json({ error: "This email is not approved for BanglaKhata access" });
-      return;
-    }
     const message = error instanceof Error ? error.message : "";
     if (message.includes("matches multiple accounts") || message.includes("already linked")) {
       res.status(409).json({ error: message });
@@ -563,36 +558,9 @@ router.post(
       return;
     }
 
-    // Delete atomically so replay is impossible without relying on the
-    // optional `verified` column that may be absent in older production DBs.
-    const [consumed] = await db
-      .delete(otpCodesTable)
-      .where(and(
-        eq(otpCodesTable.id, record.id),
-        gt(otpCodesTable.expiresAt, new Date()),
-      )).returning({ id: otpCodesTable.id });
-    if (!consumed) {
-      await recordFailedLoginAttempt(req, {
-        identifier: normalized, authMethod: "phone", stage: "verify_otp", errorCode: "invalid_or_expired_code",
-      });
-      res.status(401).json({ error: "Invalid or expired code" });
-      return;
-    }
-
-    // JIT provision the user + business.
-    let user;
-    try {
-      user = await getOrCreatePhoneUser(normalized);
-    } catch (error) {
-      if (error instanceof Error && error.name === "PreapprovalRequiredError") {
-        await recordFailedLoginAttempt(req, {
-          identifier: normalized, authMethod: "phone", stage: "account_creation", errorCode: "not_preapproved",
-        });
-        res.status(403).json({ error: "Account creation is currently limited to pre-approved phone numbers" });
-        return;
-      }
-      throw error;
-    }
+    // Provision idempotently before consuming the code. A database/setup error
+    // must not turn a still-valid OTP into an "expired" code on the next try.
+    const user = await getOrCreatePhoneUser(normalized);
     if (user.workerAccessDeletedAt) {
       await recordFailedLoginAttempt(req, {
         identifier: normalized, authMethod: "phone", stage: "account_status",
@@ -613,7 +581,14 @@ router.post(
       res.status(403).json({ error: "Account suspended", code: "ACCOUNT_SUSPENDED" });
       return;
     }
-    await db.transaction(async (tx) => {
+    const completed = await db.transaction(async (tx) => {
+      // Consumption and session bookkeeping commit together; rollback leaves
+      // the OTP usable. Concurrent verification still permits only one winner.
+      const [consumed] = await tx.delete(otpCodesTable).where(and(
+        eq(otpCodesTable.id, record.id),
+        gt(otpCodesTable.expiresAt, new Date()),
+      )).returning({ id: otpCodesTable.id });
+      if (!consumed) return false;
       await tx.update(appUsersTable).set({ lastLogin: new Date() })
         .where(eq(appUsersTable.id, user.id));
       await tx.insert(userLoginEventsTable).values({
@@ -622,7 +597,15 @@ router.post(
       });
       await tx.delete(userLoginEventsTable).where(lt(userLoginEventsTable.occurredAt,
         new Date(Date.now() - 90 * 24 * 60 * 60_000)));
+      return true;
     });
+    if (!completed) {
+      await recordFailedLoginAttempt(req, {
+        identifier: normalized, authMethod: "phone", stage: "verify_otp", errorCode: "invalid_or_expired_code",
+      });
+      res.status(401).json({ error: "Invalid or expired code" });
+      return;
+    }
 
     const sessionPayload = {
       userId: user.id,
