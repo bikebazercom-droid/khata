@@ -37,13 +37,14 @@
  *      it becomes visible again, regardless of SSE state.
  *
  * SELF-HEALING SSE
- *   Native EventSource reconnects automatically with browser-managed
- *   exponential back-off. The server also sends a `retry: 3000` directive
- *   so the first reconnect attempt happens within 3 seconds.
+ *   Authenticated fetch streaming reconnects after the server's retry interval.
+ *   Normal API polling provides a fallback when a proxy interrupts streaming.
  */
 
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { createFetchEventStream } from './fetchEventStream';
+import { authMeQueryKey } from './authQueryKeys';
 import {
   getGetDashboardSummaryQueryKey,
   getListPartiesQueryKey,
@@ -80,6 +81,8 @@ export function useRealtimeSync(
   enabled: boolean,
   onConnectionChange?: (isOnline: boolean) => void,
   beforeOnlineRefresh?: () => Promise<void>,
+  businessId: string | null = null,
+  userId?: string,
 ) {
   const qc = useQueryClient();
   // Stable ref so visibilitychange listener doesn't re-close over stale `qc`.
@@ -90,7 +93,10 @@ export function useRealtimeSync(
     if (!enabled) return;
 
     // ── Open SSE connection ───────────────────────────────────────────────
-    const es = new EventSource(`${BASE}/api/events`, { withCredentials: true });
+    const es = createFetchEventStream(`${BASE}/api/events`, businessId);
+    let connected = false;
+    let disposed = false;
+    let fallbackRunning = false;
 
     // ── Offline grace timer ───────────────────────────────────────────────
     let offlineTimer: ReturnType<typeof setTimeout> | null = null;
@@ -107,7 +113,7 @@ export function useRealtimeSync(
       if (offlineTimer !== null) return; // timer already ticking
       offlineTimer = setTimeout(() => {
         offlineTimer = null;
-        onConnectionChange?.(false);
+        void fallbackRefresh();
       }, OFFLINE_GRACE_MS);
     }
 
@@ -122,6 +128,12 @@ export function useRealtimeSync(
       lastForegroundRefreshAt = now;
       void qcRef.current.invalidateQueries({ queryKey: getListPartiesQueryKey() });
       void qcRef.current.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+      // Include the open ledger, not only the home list, after app switching.
+      void qcRef.current.invalidateQueries({ queryKey: getListGlobalLedgerEntriesQueryKey() });
+      void qcRef.current.invalidateQueries({
+        predicate: (query) => typeof query.queryKey[0] === 'string' &&
+          /^\/api\/parties\/[^/]+(?:\/ledger-entries)?$/.test(query.queryKey[0]),
+      });
     }
 
     async function refreshAfterNetworkRestore() {
@@ -132,6 +144,33 @@ export function useRealtimeSync(
       }
       await qcRef.current.invalidateQueries();
     }
+
+    // Some hosting proxies interrupt streaming even when normal API requests
+    // work. Do not confuse that with no internet or stop queued entry uploads.
+    async function fallbackRefresh() {
+      if (disposed || fallbackRunning || document.visibilityState === 'hidden') return;
+      fallbackRunning = true;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
+      try {
+        const response = await fetch(`${BASE}/api/healthz`, {
+          cache: 'no-store', signal: controller.signal,
+        });
+        if (!response.ok || (await response.json()).status !== 'ok') throw new Error('API unavailable');
+        if (disposed) return;
+        markOnline();
+        window.dispatchEvent(new Event('banglakhata-connection-restored'));
+        void qcRef.current.invalidateQueries();
+      } catch {
+        if (!disposed) onConnectionChange?.(false);
+      } finally {
+        clearTimeout(timeout);
+        fallbackRunning = false;
+      }
+    }
+    const fallbackTimer = window.setInterval(() => {
+      if (!connected) void fallbackRefresh();
+    }, 5000);
 
     function handleVisibilityChange() {
       if (document.visibilityState === 'hidden') {
@@ -170,15 +209,20 @@ export function useRealtimeSync(
 
     // (Re)connect: sweep all caches to catch up on missed events.
     es.addEventListener('connected', () => {
+      connected = true;
       markOnline();
       // Let the offline mutation queue resume immediately; cache cleanup and
       // fresh query reads happen alongside that independent replay.
       window.dispatchEvent(new Event('banglakhata-connection-restored'));
       void refreshAfterNetworkRestore();
     });
+    es.addEventListener('sync.required', () => {
+      void refreshAfterNetworkRestore();
+    });
 
     // SSE error (dropped connection / brief blip): start grace timer.
     es.addEventListener('error', () => {
+      connected = false;
       scheduleOffline();
     });
 
@@ -273,16 +317,19 @@ export function useRealtimeSync(
     // ─── settings.updated ─────────────────────────────────────────────────
     es.addEventListener('settings.updated', () => {
       void qc.invalidateQueries({ queryKey: getGetBusinessSettingsQueryKey() });
+      void qc.invalidateQueries({ queryKey: authMeQueryKey() });
     });
 
     // ── Cleanup ───────────────────────────────────────────────────────────
     return () => {
+      disposed = true;
       es.close();
+      window.clearInterval(fallbackTimer);
       if (offlineTimer !== null) clearTimeout(offlineTimer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', refreshForegroundPartyData);
       window.removeEventListener('pageshow', refreshForegroundPartyData);
       window.removeEventListener('online', handleBrowserOnline);
     };
-  }, [enabled, onConnectionChange, beforeOnlineRefresh, qc]);
+  }, [enabled, onConnectionChange, beforeOnlineRefresh, qc, businessId, userId]);
 }

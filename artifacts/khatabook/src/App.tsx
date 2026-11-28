@@ -135,7 +135,7 @@ function RealtimeSyncManager() {
     if (!userId || !activeBusinessId) return;
     await clearPersistedPartyQueries(userId, activeBusinessId);
   }, [userId, activeBusinessId]);
-  useRealtimeSync(isAuthenticated, setIsOnline, clearOnlinePartySnapshot);
+  useRealtimeSync(isAuthenticated, setIsOnline, clearOnlinePartySnapshot, activeBusinessId, userId);
   activeScope.current = scope;
   useEffect(() => {
     if (!scope || !userId) return;
@@ -406,6 +406,13 @@ function AuthCacheInvalidator() {
 
   useEffect(() => {
     if (!me?.userId || isError) return;
+    if (me.role === 'staff') {
+      // Staff cannot call the owner-only /businesses route. Their verified
+      // identity already supplies the assigned book's id and display name.
+      setBusinesses([{ id: me.businessId, name: me.businessName ?? '', partyCount: 0 }]);
+      if (selectedBusinessId !== me.businessId) setSelectedBusiness(me.businessId);
+      return;
+    }
     let active = true;
     void fetch('/api/businesses', { credentials: 'include', cache: 'no-store' }).then(async (response) => {
       if (!response.ok) return;
@@ -502,7 +509,7 @@ export function useAppAuth(options: { route?: string } = {}) {
 
   // ── Development bypass — returned AFTER all hooks so hook order is stable ──
   if (devBypass) {
-    return { isAuthenticated: true, isLoading: false, authMethod: 'dev' as const, role: 'owner' as const, userId: 'dev-user', businessId: null, phone: undefined, needsBookName: false, adjustmentPartyIds: [] as string[] };
+    return { isAuthenticated: true, isLoading: false, authMethod: 'dev' as const, role: 'owner' as const, userId: 'dev-user', businessId: null, businessName: undefined, phone: undefined, needsBookName: false, adjustmentPartyIds: [] as string[] };
   }
 
   return {
@@ -512,6 +519,7 @@ export function useAppAuth(options: { route?: string } = {}) {
     role,
     userId: resolvedAuthData?.userId,
     businessId: resolvedAuthData?.businessId ?? null,
+    businessName: resolvedAuthData?.businessName,
     phone: (resolvedAuthData as (typeof resolvedAuthData & { phone?: string }) | undefined)?.phone,
     needsBookName: resolvedAuthData?.needsBookName ?? false,
     adjustmentPartyIds: (resolvedAuthData as (typeof resolvedAuthData & { adjustmentPartyIds?: string[] }) | undefined)?.adjustmentPartyIds ?? [],

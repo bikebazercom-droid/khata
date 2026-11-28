@@ -16,6 +16,7 @@ import { pool } from "@workspace/db";
 import { logger } from "./logger";
 
 export type EventType =
+  | "sync.required"
   | "party.created"
   | "party.updated"
   | "party.deleted"
@@ -63,6 +64,7 @@ const registry = new Map<string, Set<Handler>>();
 // A single persistent client handles all channels for this process.
 
 let listenClient: pg.Client | null = null;
+let connectingClient: Promise<pg.Client> | null = null;
 
 /** Channels this process is currently LISTENing on. */
 const listeningChannels = new Set<string>();
@@ -106,10 +108,12 @@ async function createListenClient(): Promise<pg.Client> {
 }
 
 async function getListenClient(): Promise<pg.Client> {
-  if (!listenClient) {
-    listenClient = await createListenClient();
-  }
-  return listenClient;
+  if (listenClient) return listenClient;
+  connectingClient ??= createListenClient().then((client) => {
+    listenClient = client;
+    return client;
+  }).finally(() => { connectingClient = null; });
+  return connectingClient;
 }
 
 /** After a reconnect, re-LISTEN on every channel we previously had. */
@@ -122,6 +126,12 @@ async function reconnectAndRelisten(): Promise<void> {
       const channel = channelFor(businessId);
       await client.query(`LISTEN ${channel}`);
       listeningChannels.add(channel);
+      // A live HTTP stream can survive a dropped database listener. Tell its
+      // clients to fetch changes that happened while LISTEN was reconnecting.
+      registry.get(businessId)?.forEach((handler) => {
+        try { handler({ type: "sync.required", payload: {} }); }
+        catch (err) { logger.error({ err }, "eventBus: resync handler failed"); }
+      });
     }
     logger.info({ count: businessIds.length }, "eventBus: reconnected and re-listening");
   } catch (err) {
@@ -149,15 +159,24 @@ async function ensureListening(businessId: string): Promise<void> {
  * Register an SSE handler for a business. Returns an unsubscribe function
  * the caller must invoke when the connection closes.
  */
-export function subscribe(businessId: string, handler: Handler): () => void {
+export function subscribe(
+  businessId: string,
+  handler: Handler,
+  readiness?: { ready: () => void; failed: () => void },
+): () => void {
   if (!registry.has(businessId)) registry.set(businessId, new Set());
   registry.get(businessId)!.add(handler);
 
-  ensureListening(businessId).catch((err) => {
+  let active = true;
+  ensureListening(businessId).then(() => {
+    if (active) readiness?.ready();
+  }).catch((err) => {
     logger.error({ err, businessId }, "eventBus: failed to LISTEN on channel");
+    if (active) readiness?.failed();
   });
 
   return () => {
+    active = false;
     const handlers = registry.get(businessId);
     if (!handlers) return;
     handlers.delete(handler);

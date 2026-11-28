@@ -670,6 +670,10 @@ router.post(
       // return rows without .returning(), so we patch them manually here).
       const primaryEntryFinal = { ...primaryEntry!, linkedEntryId: counterEntry!.id };
 
+      // The ledger is already committed. Notify live readers immediately;
+      // secondary owner-alert persistence must not delay balance refreshes.
+      broadcast(businessId, { type: "ledger.created", payload: { partyId: party.id, entryId: primaryEntry!.id } });
+      broadcast(businessId, { type: "ledger.created", payload: { partyId: transferPartyId, entryId: counterEntry!.id } });
       const notifications = role === "staff"
         ? await createOwnerEntryNotificationsBestEffort({
           businessId,
@@ -678,8 +682,6 @@ router.post(
         })
         : [];
       publishOwnerEntryNotifications(notifications);
-      broadcast(businessId, { type: "ledger.created", payload: { partyId: party.id, entryId: primaryEntry!.id } });
-      broadcast(businessId, { type: "ledger.created", payload: { partyId: transferPartyId, entryId: counterEntry!.id } });
 
       res.status(201).json(
         CreateLedgerEntryResponse.parse({
@@ -749,6 +751,7 @@ router.post(
     }
     const entry = result.entry;
 
+    broadcast(businessId, { type: 'ledger.created', payload: { partyId: party.id, entryId: entry!.id } });
     const notifications = role === "staff"
       ? await createOwnerEntryNotificationsBestEffort({
         businessId,
@@ -757,7 +760,6 @@ router.post(
       })
       : [];
     publishOwnerEntryNotifications(notifications);
-    broadcast(businessId, { type: 'ledger.created', payload: { partyId: party.id, entryId: entry!.id } });
 
     res.status(201).json(
       CreateLedgerEntryResponse.parse({

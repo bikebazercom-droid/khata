@@ -63,7 +63,7 @@ function partyBalanceFontSize(value: string): string {
 
 export function HomeView() {
   const { openSwitcher, businesses, selectedBusinessId, setSelectedBusiness } = useBusinessContext();
-  const { isAuthenticated, role: userRole, userId, businessId, needsBookName } = useAppAuth();
+  const { isAuthenticated, role: userRole, userId, businessId, businessName, needsBookName } = useAppAuth();
   const queryClient = useQueryClient();
   const activeBusinessId = selectedBusinessId ?? businessId;
   const activeBusiness = businesses.find((b) => b.id === activeBusinessId);
@@ -136,7 +136,10 @@ export function HomeView() {
       refetchOnMount: 'always',
     },
   });
-  const activeBookName = resolveLedgerBookName(activeBusiness?.name, settings?.storeName);
+  const activeBookName = resolveLedgerBookName(
+    activeBusiness?.name, settings?.storeName,
+    activeBusinessId === businessId ? businessName : undefined,
+  );
   const summaryParams = { role };
   // Party-list freshness is handled by React Query/offline persistence, not
   // the WebView HTTP cache; always let invalidation reach the API.
