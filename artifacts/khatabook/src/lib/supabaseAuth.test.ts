@@ -17,6 +17,7 @@ import {
   beginSupabaseGoogleSignIn,
   ensureSupabaseAppSession,
   signOutSupabase,
+  subscribeSupabaseEmail,
 } from './supabaseAuth';
 
 describe('Supabase Google sign-in bridge', () => {
@@ -46,6 +47,15 @@ describe('Supabase Google sign-in bridge', () => {
       provider: 'google',
       options: { redirectTo: 'https://banglakhata.com' },
     });
+  });
+
+  it('keeps existing ledger settings usable when Google browser configuration is absent', () => {
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', '');
+    const onEmail = vi.fn();
+    const unsubscribe = subscribeSupabaseEmail(onEmail);
+    expect(onEmail).toHaveBeenCalledWith(null);
+    expect(mockAuth.onAuthStateChange).not.toHaveBeenCalled();
+    expect(() => unsubscribe()).not.toThrow();
   });
 
   it('uses the public project URL when no override is configured', async () => {

@@ -86,6 +86,12 @@ export async function signOutSupabase(): Promise<void> {
 }
 
 export function subscribeSupabaseEmail(onEmail: (email: string | null) => void): () => void {
+  // Existing app cookies may remain valid even when web Google is temporarily
+  // unconfigured. An optional settings email label must not crash that ledger.
+  if (!import.meta.env.VITE_SUPABASE_ANON_KEY?.trim()) {
+    onEmail(null);
+    return () => {};
+  }
   const { data } = getSupabaseAuthClient().auth.onAuthStateChange((_event, session) => {
     onEmail(session?.user.email ?? null);
   });
