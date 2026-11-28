@@ -93,6 +93,8 @@ function GoogleSignIn() {
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const webGoogleUnavailable = !isInsideNativeWebView() &&
+    import.meta.env.VITE_SUPABASE_GOOGLE_CONFIG_ERROR === 'invalid-public-key';
 
   const completeFirebaseSignIn = useCallback(async (firebaseIdToken: string) => {
     await exchangeFirebaseIdToken(firebaseIdToken);
@@ -176,11 +178,16 @@ function GoogleSignIn() {
     <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-lg">
       <h2 className="text-center text-xl font-semibold text-slate-900">Welcome back</h2>
       <p className="mb-6 mt-1 text-center text-sm text-slate-500">Sign in to your ledger account</p>
+      {webGoogleUnavailable && (
+        <p role="status" className="mb-4 text-center text-sm text-amber-800">
+          Google sign-in সাময়িকভাবে চালু নেই। Phone Number দিয়ে লগইন করুন।
+        </p>
+      )}
       {error && <p role="alert" className="mb-4 text-sm text-red-600">{error}</p>}
       <button
         type="button"
         onClick={() => void handleGoogleSignIn()}
-        disabled={loading}
+        disabled={loading || webGoogleUnavailable}
         className="flex w-full items-center justify-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60"
       >
         <span aria-hidden="true" className="text-base font-bold text-[#4285f4]">G</span>

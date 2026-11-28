@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
+import { publicSupabaseKeyOnly } from './vite-public-supabase';
 
 const isBuild = process.argv.includes('build');
 const rawPort = process.env.PORT;
@@ -103,25 +104,7 @@ self.addEventListener('fetch', event => {
 export default defineConfig({
   base: basePath,
   plugins: [
-    {
-      name: 'public-supabase-key-only',
-      configResolved(config) {
-        const key = config.env.VITE_SUPABASE_ANON_KEY?.trim();
-        if (!key || /^sb_publishable_[A-Za-z0-9_-]+$/.test(key)) return;
-        let role: unknown;
-        try {
-          const parts = key.split('.');
-          if (parts.length === 3) {
-            role = JSON.parse(Buffer.from(parts[1]!, 'base64url').toString('utf8')).role;
-          }
-        } catch {
-          // Invalid tokens and private keys are rejected below.
-        }
-        if (role !== 'anon') {
-          throw new Error('VITE_SUPABASE_ANON_KEY must be a public Supabase publishable key or legacy anon key.');
-        }
-      },
-    },
+    publicSupabaseKeyOnly(),
     react(),
     offlineShell(),
     tailwindcss({ optimize: false }),
@@ -171,6 +154,10 @@ export default defineConfig({
     allowedHosts: true,
     fs: {
       strict: true,
+      deny: [
+        '**/.env', '**/.env.*', '**/.replit', '**/.git/**',
+        '**/*.{crt,pem,key,p12,pfx,jks,keystore}',
+      ],
     },
   },
   preview: {
