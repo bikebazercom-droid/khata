@@ -1,6 +1,7 @@
 {
   "name": "workspace",
   "version": "0.0.0",
+  "packageManager": "pnpm@10.26.1",
   "engines": {
     "node": ">=22",
     "pnpm": ">=10.26 <12"

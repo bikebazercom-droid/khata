@@ -79,3 +79,6 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Generated build and verification output; never ship or checkpoint.
+/generated-artifacts/

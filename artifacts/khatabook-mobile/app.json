@@ -17,8 +17,8 @@
       "versionCode": 4,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#F7F9FC"
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#194D8F"
       },
       "permissions": [
         "android.permission.INTERNET",

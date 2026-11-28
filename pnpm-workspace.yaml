@@ -6,6 +6,14 @@ packages:
 
 autoInstallPeers: false
 
+# Worklets' Babel plugin imports these packages without declaring them.
+# Explicit edges keep both Metro and clean pnpm installs reproducible.
+packageExtensions:
+  'react-native-worklets@0.10.1':
+    dependencies:
+      '@babel/generator': ^7.29.7
+      '@babel/traverse': ^7.29.7
+
 catalog:
   '@replit/vite-plugin-cartographer': ^0.5.21
   '@replit/vite-plugin-dev-banner': ^0.1.1
